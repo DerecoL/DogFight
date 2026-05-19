@@ -260,6 +260,34 @@ describe('battle simulation', () => {
     })
   })
 
+  it('makes ruthless sacrifice replace small item effects with large item triggers', () => {
+    const player: FighterSnapshot = {
+      name: 'P',
+      dogType: 'BULLY',
+      wins: 0,
+      losses: 0,
+      round: 0,
+      items: [
+        { id: 'small-copy', defId: 'small-bite', quality: 'BRONZE', area: 'EQUIPMENT', x: 0, y: 0 },
+        { id: 'large-copy', defId: 'giant-bone', quality: 'BRONZE', area: 'EQUIPMENT', x: 1, y: 0 },
+        { id: 'sacrifice', defId: 'bully-sacrifice', quality: 'DIAMOND', area: 'EQUIPMENT', x: 5, y: 0 },
+      ],
+    }
+    const opponent: FighterSnapshot = { name: 'O', dogType: 'SHIBA', wins: 0, losses: 0, round: 0, items: [] }
+    const result = simulateBattle(player, opponent, 'structured-item-event')
+    const firstPlayerRoll = result.events.find((event) => event.kind === 'ROLL' && event.actor === 'player')
+    const firstRollItemEvents = result.events.filter(
+      (event) => event.kind === 'ITEM' && event.actor === 'player' && event.time === firstPlayerRoll?.time,
+    )
+    const largeEvent = firstRollItemEvents.find((event) => event.itemId === 'large-copy')
+
+    expect(firstPlayerRoll?.roll).toBe(2)
+    expect(firstRollItemEvents.some((event) => event.itemId === 'small-copy')).toBe(false)
+    expect(largeEvent).toMatchObject({ defId: 'giant-bone', effectType: 'DAMAGE' })
+    expect(largeEvent?.amount).toBeGreaterThanOrEqual(16)
+    expect(largeEvent?.targetHpDelta).toBe(-(largeEvent?.amount ?? 0))
+  })
+
   it('lets dog emperor double triggered item effects when the lucky number procs', () => {
     const player: FighterSnapshot = {
       name: 'P',
