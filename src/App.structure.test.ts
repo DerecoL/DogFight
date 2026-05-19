@@ -7,7 +7,7 @@ const css = readFileSync(new URL('./App.css', import.meta.url), 'utf8')
 describe('selection screen structure', () => {
   it('renders a mode lobby and opens the peak arena screen from the peak card', () => {
     expect(app).toContain("type GameMode = 'CASUAL' | 'LADDER' | 'DOGFIGHT' | 'PEAK'")
-    expect(app).toContain("type AppScreen = 'LOBBY' | 'CASUAL' | 'PEAK'")
+    expect(app).toContain("type AppScreen = 'LOBBY' | 'CASUAL' | 'DOGFIGHT' | 'PEAK'")
     expect(app).toContain("const [appScreen, setAppScreen] = useState<AppScreen>('LOBBY')")
     expect(app).toContain('function ModeLobby')
     expect(app).toContain('休闲模式')
@@ -17,6 +17,29 @@ describe('selection screen structure', () => {
     expect(app).toContain('战斗结束后的狗进入巅峰竞技场')
     expect(app).toContain('onEnterPeak={() => setAppScreen(\'PEAK\')}')
     expect(app).toContain('进入巅峰模式')
+  })
+
+  it('wires dogfight mode to room APIs and shows room actions plus spectator entry points', () => {
+    expect(app).toContain('function DogfightLobby')
+    expect(app).toContain('function DogfightRoomView')
+    expect(app).toContain("api<DogfightRoomsResponse>('/dogfight/rooms')")
+    expect(app).toContain("api<DogfightRoomResponse>('/dogfight/rooms'")
+    expect(app).toContain("api<DogfightRoomResponse>('/dogfight/match'")
+    expect(app).toContain("api<DogfightRoomResponse>(`/dogfight/rooms/${roomId}/join`")
+    expect(app).toContain("api<DogfightRoomResponse>(`/dogfight/rooms/${room.id}/ready`")
+    expect(app).toContain("api<DogfightBattleResponse>(`/dogfight/battles/${battleId}`")
+    expect(app).toContain("onEnterDogfight={() => setAppScreen('DOGFIGHT')}")
+    expect(app).toContain('创建房间')
+    expect(app).toContain('加入房间')
+    expect(app).toContain('随机匹配')
+    expect(app).toContain('房间列表')
+    expect(app).toContain("room.status === 'WAITING' ? '加入房间' : '观战'")
+    expect(app).toContain('失败容错')
+    expect(app).toContain('${5 - room.currentRun.losses}')
+    expect(app).not.toContain('斗狗胜场上限')
+    expect(css).toContain('.dogfight-screen')
+    expect(css).toContain('.dogfight-layout')
+    expect(css).toContain('.dogfight-room-list')
   })
 
   it('wires peak arena to apex APIs and keeps the lobby button in the top banner', () => {
@@ -127,6 +150,15 @@ describe('selection screen structure', () => {
     expect(app).toContain('playerMaxHp')
     expect(app).toContain('opponentMaxHp')
     expect(app).toContain('const hpPercent = maxHp > 0 ? (hp / maxHp) * 100 : 0')
+  })
+
+  it('renders battle shield bars from playback event shield values', () => {
+    expect(app).toContain('playerShield')
+    expect(app).toContain('opponentShield')
+    expect(app).toContain('shield={opponentShield}')
+    expect(app).toContain('shield={playerShield}')
+    expect(app).toContain('className="shield-bar"')
+    expect(css).toContain('.shield-bar')
   })
 
   it('shows item effects directly on equipment cards', () => {

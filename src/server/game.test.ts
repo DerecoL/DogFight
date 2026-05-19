@@ -450,6 +450,35 @@ describe('battle simulation', () => {
     expect(absorbedDamage).toMatchObject({ playerHp: 100, targetHpDelta: 0 })
   })
 
+  it('records current shield values on each battle event', () => {
+    const player: FighterSnapshot = {
+      name: 'P',
+      dogType: 'SHIBA',
+      wins: 0,
+      losses: 0,
+      round: 0,
+      items: [
+        { id: 'shield', defId: 'v3-golden-kennel', quality: 'DIAMOND', area: 'EQUIPMENT', x: 0, y: 0 },
+      ],
+    }
+    const opponent: FighterSnapshot = {
+      name: 'O',
+      dogType: 'SHIBA',
+      wins: 0,
+      losses: 0,
+      round: 0,
+      items: [
+        { id: 'bite', defId: 'starter-1', quality: 'BRONZE', area: 'EQUIPMENT', x: 0, y: 0 },
+      ],
+    }
+
+    const result = simulateBattle(player, opponent, 'shield-ui-events')
+    const shieldEvent = result.events.find((event) => event.itemId === 'shield')
+
+    expect(shieldEvent?.playerShield).toBeGreaterThan(0)
+    expect(result.events.every((event) => typeof event.playerShield === 'number' && typeof event.opponentShield === 'number')).toBe(true)
+  })
+
   it('makes poison bypass shield and end battle when health reaches zero', () => {
     const player: FighterSnapshot = {
       name: 'P',

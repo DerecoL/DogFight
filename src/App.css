@@ -2123,6 +2123,137 @@ input {
 @keyframes winnerHop {
   to { transform: translateY(-8px); }
 }
+
+.dogfight-screen,
+.dogfight-room-view {
+  display: grid;
+  gap: 18px;
+}
+
+.dogfight-layout {
+  display: grid;
+  grid-template-columns: 360px minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.dogfight-actions,
+.dogfight-room-list,
+.dogfight-member-list,
+.dogfight-battle-list,
+.dogfight-room-status {
+  background: rgba(255, 250, 241, .94);
+  border: 3px solid var(--ink);
+  border-radius: 10px;
+  box-shadow: 6px 7px 0 rgba(61, 45, 37, .18);
+}
+
+.dogfight-actions,
+.dogfight-room-list,
+.dogfight-member-list,
+.dogfight-battle-list {
+  padding: 14px;
+  display: grid;
+  gap: 12px;
+}
+
+.dogfight-picker {
+  display: grid;
+  gap: 10px;
+  padding-top: 10px;
+  border-top: 2px dashed var(--line);
+}
+
+.dogfight-picker .dog-select-screen { padding: 0; }
+.dogfight-picker .dog-select-layout { grid-template-columns: 1fr; }
+.dogfight-picker .screen-heading { display: none; }
+
+.dogfight-room-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 12px;
+  background: #fff;
+  border: 2px solid var(--line);
+  border-radius: 8px;
+}
+
+.dogfight-room-card.selected {
+  border-color: var(--blue);
+  background: #eef4ff;
+}
+
+.dogfight-room-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.dogfight-room-status {
+  padding: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.dogfight-room-status h2,
+.dogfight-room-status p {
+  margin: 0;
+}
+
+.dogfight-room-columns {
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.dogfight-member-list article {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  background: #fff;
+  border: 2px solid var(--line);
+  border-radius: 8px;
+}
+
+.dogfight-member-list article.eliminated {
+  opacity: .58;
+  filter: grayscale(.35);
+}
+
+.dogfight-member-list p {
+  margin: 2px 0 0;
+  color: var(--muted);
+  font-weight: 800;
+  font-size: 13px;
+}
+
+.dogfight-play-area {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+
+.dogfight-workbench {
+  align-items: start;
+}
+
+.dogfight-battle-row {
+  min-height: 42px;
+  padding: 9px 12px;
+  text-align: left;
+  background: #fff;
+  border: 2px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  font-weight: 900;
+}
 @keyframes dicePop {
   50% { transform: translateY(-8px) scale(1.16) rotate(8deg); }
 }

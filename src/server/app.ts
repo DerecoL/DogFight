@@ -7,6 +7,7 @@ import { Prisma, type ApexEntry } from '@prisma/client'
 import { z } from 'zod'
 import { cookieOptionsForEnv, resolveServerConfig } from './config'
 import { prisma } from './db'
+import { registerDogfightRoutes } from './dogfight'
 import { publicErrorMessage } from './errors'
 import { buildApexSeedEntries, resolveApexChallenge, type ApexOpponent } from './game/apex'
 import { itemDef, relicDef } from './game/data'
@@ -114,6 +115,8 @@ export function buildApp() {
     await ensureApexSeeds()
     return prisma.apexEntry.findMany({ orderBy: { rank: 'asc' } })
   }
+
+  registerDogfightRoutes(app, requireUser)
 
   app.get('/api/health', async () => ({ ok: true }))
 
