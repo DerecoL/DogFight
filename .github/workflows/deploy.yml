@@ -31,7 +31,12 @@ jobs:
 
             mkdir -p "$DEPLOY_PATH"
             if [ ! -d "$DEPLOY_PATH/.git" ]; then
-              git clone "$REPO_URL" "$DEPLOY_PATH"
+              TEMP_DEPLOY_PATH="${DEPLOY_PATH}.repo-tmp"
+              rm -rf "$TEMP_DEPLOY_PATH"
+              git clone "$REPO_URL" "$TEMP_DEPLOY_PATH"
+              find "$DEPLOY_PATH" -mindepth 1 -maxdepth 1 ! -name backups ! -name .env.production -exec rm -rf {} +
+              cp -a "$TEMP_DEPLOY_PATH"/. "$DEPLOY_PATH"/
+              rm -rf "$TEMP_DEPLOY_PATH"
             fi
 
             cd "$DEPLOY_PATH"
