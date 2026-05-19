@@ -107,6 +107,21 @@ describe('battle simulation', () => {
     expect(resolveWinnerByHealthPercent({ hp: 0, maxHp: 100 }, { hp: 0, maxHp: 100 })).toBe('player')
   })
 
+  it('starts fighters with round-scaled max health and records it for playback', () => {
+    const player: FighterSnapshot = { name: 'P', dogType: 'SHIBA', wins: 0, losses: 0, round: 6, items: [] }
+    const opponent: FighterSnapshot = { name: 'O', dogType: 'SHIBA', wins: 0, losses: 0, round: 7, items: [] }
+    const result = simulateBattle(player, opponent, 'round-health-growth')
+
+    expect(result.playerMaxHp).toBe(220)
+    expect(result.opponentMaxHp).toBe(270)
+    expect(result.events[0]).toMatchObject({
+      playerHp: 220,
+      playerMaxHp: 220,
+      opponentHp: 270,
+      opponentMaxHp: 270,
+    })
+  })
+
   it('records the exact item instance and effect payload for item triggers', () => {
     const player: FighterSnapshot = {
       name: 'P',

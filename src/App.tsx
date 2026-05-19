@@ -65,6 +65,8 @@ type BattleEvent = {
   text: string
   playerHp: number
   opponentHp: number
+  playerMaxHp: number
+  opponentMaxHp: number
   roll?: number
   itemId?: string
   defId?: string
@@ -79,6 +81,8 @@ type Battle = {
   duration: number
   playerHp: number
   opponentHp: number
+  playerMaxHp: number
+  opponentMaxHp: number
   events: BattleEvent[]
   playerSnapshot?: BattleSnapshot
   opponentSnapshot?: BattleSnapshot
@@ -160,6 +164,10 @@ const qualityLabel: Record<ItemQuality, string> = {
 }
 const DOG_SELECTION_SLOT_COUNT = 8
 const SHOP_CHOICE_SLOT_COUNT = 7
+const BASE_MAX_HP = 100
+const EARLY_ROUND_HP_GROWTH = 20
+const LATE_ROUND_HP_GROWTH = 50
+const EARLY_HP_GROWTH_ROUNDS = 6
 const dogOptions: DogType[] = ['SHIBA', 'SAMOYED', 'MUTT', 'BULLY', 'EMPEROR']
 const shopChoiceOrder: ShopType[] = ['GENERAL', 'LARGE', 'MEDIUM', 'SMALL', 'SMALL_DICE', 'BIG_DICE', 'RELIC']
 const dogStrategies: Record<DogType, string> = {
@@ -235,6 +243,13 @@ function qualityAmount(amount: number, quality?: string) {
 function effectText(def: ItemDef, quality: ItemQuality = 'BRONZE') {
   const amount = qualityAmount(def.effect.amount, quality)
   return `${def.effect.type === 'HEAL' ? '回复' : '造成'} ${amount} ${def.effect.type === 'HEAL' ? '生命' : '伤害'}`
+}
+
+function maxHealthForRound(round: number) {
+  const completedRounds = Math.max(0, Math.floor(round))
+  const earlyRounds = Math.min(completedRounds, EARLY_HP_GROWTH_ROUNDS)
+  const lateRounds = Math.max(0, completedRounds - EARLY_HP_GROWTH_ROUNDS)
+  return BASE_MAX_HP + earlyRounds * EARLY_ROUND_HP_GROWTH + lateRounds * LATE_ROUND_HP_GROWTH
 }
 
 function diceToneText(def: ItemDef) {
@@ -1352,8 +1367,10 @@ function BattleEquipmentRow({ owner, snapshot, activeEvent, onInspect }: { owner
 }
 
 function BattleStage({ player, opponent, event, lastRoll, speed, finished, winner }: { player: BattleSnapshot; opponent: BattleSnapshot; event?: BattleEvent; lastRoll?: BattleEvent; speed: number; finished: boolean; winner?: string }) {
-  const playerHp = event?.playerHp ?? 100
-  const opponentHp = event?.opponentHp ?? 100
+  const playerMaxHp = event?.playerMaxHp ?? maxHealthForRound(player.round)
+  const opponentMaxHp = event?.opponentMaxHp ?? maxHealthForRound(opponent.round)
+  const playerHp = event?.playerHp ?? playerMaxHp
+  const opponentHp = event?.opponentHp ?? opponentMaxHp
   return (
     <div className="battle-stage">
       <BattleFxCanvas event={event} speed={speed} />
@@ -1361,6 +1378,7 @@ function BattleStage({ player, opponent, event, lastRoll, speed, finished, winne
         side="opponent"
         snapshot={opponent}
         hp={opponentHp}
+        maxHp={opponentMaxHp}
         event={event}
         finished={finished}
         winner={winner}
@@ -1370,6 +1388,7 @@ function BattleStage({ player, opponent, event, lastRoll, speed, finished, winne
         side="player"
         snapshot={player}
         hp={playerHp}
+        maxHp={playerMaxHp}
         event={event}
         finished={finished}
         winner={winner}
@@ -1378,18 +1397,19 @@ function BattleStage({ player, opponent, event, lastRoll, speed, finished, winne
   )
 }
 
-function BattleDog({ side, snapshot, hp, event, finished, winner }: { side: 'player' | 'opponent'; snapshot: BattleSnapshot; hp: number; event?: BattleEvent; finished: boolean; winner?: string }) {
+function BattleDog({ side, snapshot, hp, maxHp, event, finished, winner }: { side: 'player' | 'opponent'; snapshot: BattleSnapshot; hp: number; maxHp: number; event?: BattleEvent; finished: boolean; winner?: string }) {
   const isActor = event?.actor === side
   const isTarget = event?.target === side || event?.target === 'both'
   const healing = isActor && event?.effectType === 'HEAL'
   const lost = finished && winner && winner !== side
   const won = finished && winner === side
+  const hpPercent = maxHp > 0 ? (hp / maxHp) * 100 : 0
   return (
     <div className={`battle-dog ${side} ${isActor ? 'attacking' : ''} ${isTarget && event?.effectType !== 'HEAL' ? 'hit' : ''} ${healing ? 'healing' : ''} ${won ? 'winner' : ''} ${lost ? 'loser' : ''}`}>
       <div className="hp">
         <span><HeartPulse size={16} /> {snapshot.name}</span>
-        <div><i style={{ width: `${Math.max(0, Math.min(100, hp))}%` }} /></div>
-        <b>{Math.max(0, Math.round(hp))}</b>
+        <div><i style={{ width: `${Math.max(0, Math.min(100, hpPercent))}%` }} /></div>
+        <b>{Math.max(0, Math.round(hp))}/{maxHp}</b>
       </div>
       <img className="battle-dog-img" src={dogAssets[snapshot.dogType]} alt="" />
       <strong>{dogNames[snapshot.dogType]}</strong>

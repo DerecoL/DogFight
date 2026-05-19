@@ -17,6 +17,10 @@ type Side = 'player' | 'opponent'
 const BULLY_LARGE_EFFECT_CHANCE = 0.4
 const EMPEROR_LUCKY_EFFECT_CHANCE = 0.5
 const TRIGGER_QUEUE_CAP = 40
+const BASE_MAX_HP = 100
+const EARLY_ROUND_HP_GROWTH = 20
+const LATE_ROUND_HP_GROWTH = 50
+const EARLY_HP_GROWTH_ROUNDS = 6
 
 type HealthForDecision = {
   hp: number
@@ -52,13 +56,20 @@ type BattleSideState = {
   disabledLarge: number
 }
 
-function createSideState(): BattleSideState {
+function maxHealthForRound(round: number) {
+  const completedRounds = Math.max(0, Math.floor(round))
+  const earlyRounds = Math.min(completedRounds, EARLY_HP_GROWTH_ROUNDS)
+  const lateRounds = Math.max(0, completedRounds - EARLY_HP_GROWTH_ROUNDS)
+  return BASE_MAX_HP + earlyRounds * EARLY_ROUND_HP_GROWTH + lateRounds * LATE_ROUND_HP_GROWTH
+}
+
+function createSideState(maxHp: number): BattleSideState {
   return {
     shield: 0,
     thorns: 0,
     weak: 0,
     poison: 0,
-    maxHp: 100,
+    maxHp,
     rollCount: 0,
     missedLucky: 0,
     avalanche: 0,
@@ -148,15 +159,23 @@ function roundScaled(amount: number, scale: number) {
 
 export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapshot, seed: string): BattleResult {
   const rng = createRng(seed)
-  const state: Record<Side, BattleSideState> = { player: createSideState(), opponent: createSideState() }
-  let playerHp = 100
-  let opponentHp = 100
+  const playerMaxHp = maxHealthForRound(player.round)
+  const opponentMaxHp = maxHealthForRound(opponent.round)
+  const state: Record<Side, BattleSideState> = { player: createSideState(playerMaxHp), opponent: createSideState(opponentMaxHp) }
+  let playerHp = playerMaxHp
+  let opponentHp = opponentMaxHp
   const events: BattleEvent[] = []
   const playerSnapshot = toBattleSnapshot(player)
   const opponentSnapshot = toBattleSnapshot(opponent)
 
-  const push = (event: Omit<BattleEvent, 'playerHp' | 'opponentHp'>) => {
-    events.push({ ...event, playerHp: Math.max(0, playerHp), opponentHp: Math.max(0, opponentHp) })
+  const push = (event: Omit<BattleEvent, 'playerHp' | 'opponentHp' | 'playerMaxHp' | 'opponentMaxHp'>) => {
+    events.push({
+      ...event,
+      playerHp: Math.max(0, playerHp),
+      opponentHp: Math.max(0, opponentHp),
+      playerMaxHp: state.player.maxHp,
+      opponentMaxHp: state.opponent.maxHp,
+    })
   }
 
   const getHp = (side: Side) => side === 'player' ? playerHp : opponentHp
@@ -236,7 +255,7 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
       if (actorState.weak > 0) actorState.weak -= 1
       if (weakScale < 1 && result.delta < 0) {
         const refunded = Math.round(Math.abs(result.delta) * 0.5)
-        setHp(targetSide, Math.min(100, getHp(targetSide) + refunded))
+        setHp(targetSide, Math.min(targetState.maxHp, getHp(targetSide) + refunded))
       }
       const after = getHp(targetSide)
       triggers.push({
@@ -457,6 +476,8 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
       duration: time,
       playerHp: Math.max(0, playerHp),
       opponentHp: Math.max(0, opponentHp),
+      playerMaxHp: state.player.maxHp,
+      opponentMaxHp: state.opponent.maxHp,
       events,
       playerSnapshot,
       opponentSnapshot,

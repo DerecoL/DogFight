@@ -120,6 +120,8 @@ export type BattleEvent = {
   text: string
   playerHp: number
   opponentHp: number
+  playerMaxHp: number
+  opponentMaxHp: number
   roll?: number
   itemId?: string
   defId?: string
@@ -136,6 +138,8 @@ export type BattleResult = {
   duration: number
   playerHp: number
   opponentHp: number
+  playerMaxHp: number
+  opponentMaxHp: number
   events: BattleEvent[]
   playerSnapshot: BattleFighterSnapshot
   opponentSnapshot: BattleFighterSnapshot

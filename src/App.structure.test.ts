@@ -78,6 +78,12 @@ describe('selection screen structure', () => {
     expect(css).toContain('.battle-continue-row')
   })
 
+  it('renders battle health bars as a percentage of max health', () => {
+    expect(app).toContain('playerMaxHp')
+    expect(app).toContain('opponentMaxHp')
+    expect(app).toContain('const hpPercent = maxHp > 0 ? (hp / maxHp) * 100 : 0')
+  })
+
   it('shows item effects directly on equipment cards', () => {
     expect(app).toContain('className="item-effect"')
     expect(app).toContain('effectText(item.def, normalizeQuality(item.quality))')
