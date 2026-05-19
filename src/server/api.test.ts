@@ -9,6 +9,7 @@ const describeWithDatabase = databaseUrl.startsWith('postgresql://') || database
 const app = buildApp()
 
 beforeEach(async () => {
+  await prisma.apexEntry.deleteMany()
   await prisma.battleLog.deleteMany()
   await prisma.ghostSnapshot.deleteMany()
   await prisma.itemInstance.deleteMany()
@@ -312,5 +313,34 @@ describeWithDatabase('run API', () => {
     await prisma.run.update({ where: { id: runId }, data: { phase: 'RELIC_CHOICE', relicChoices: JSON.stringify([firstRelic]) } })
     const upgraded = await agent.post(`/api/runs/${runId}/relic/select`).send({ relicId: firstRelic }).expect(200)
     expect(upgraded.body.run.relics).toContainEqual(expect.objectContaining({ relicId: firstRelic, quality: nextQuality(firstRelicChoice.quality) }))
+  })
+
+  it('lists apex seeds and submits a completed twelve-win run once', async () => {
+    const agent = request.agent(app.server)
+    await app.ready()
+
+    await agent.post('/api/auth/register').send({ email: `apex${Date.now()}@dog.test`, password: 'dogdice' }).expect(200)
+    await agent.post('/api/profile/nickname').send({ nickname: 'Apex Player' }).expect(200)
+    const created = await agent.post('/api/runs').send({ dogType: 'SHIBA' }).expect(200)
+    const runId = created.body.run.id
+
+    await prisma.run.update({
+      where: { id: runId },
+      data: { wins: 12, losses: 0, round: 12, phase: 'COMPLETE', status: 'COMPLETE' },
+    })
+
+    const overview = await agent.get('/api/apex').expect(200)
+    expect(overview.body.leaderboard).toHaveLength(50)
+    expect(overview.body.leaderboard[0]).toMatchObject({ rank: 1, isSeed: true })
+    expect(overview.body.candidates.map((run: { id: string }) => run.id)).toContain(runId)
+
+    const submitted = await agent.post('/api/apex/submit').send({ runId }).expect(200)
+    expect(submitted.body.entry).toMatchObject({ sourceRunId: runId, isSeed: false, name: expect.stringContaining('Apex Player') })
+    expect(submitted.body.report.battles.length).toBeGreaterThan(0)
+    expect(submitted.body.leaderboard).toHaveLength(51)
+
+    const afterSubmit = await agent.get('/api/apex').expect(200)
+    expect(afterSubmit.body.candidates.map((run: { id: string }) => run.id)).not.toContain(runId)
+    await agent.post('/api/apex/submit').send({ runId }).expect(409)
   })
 })

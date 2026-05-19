@@ -79,6 +79,27 @@ model GhostSnapshot {
   @@index([round, wins, losses])
 }
 
+model ApexEntry {
+  id            String   @id @default(cuid())
+  userId        String?
+  sourceRunId   String?  @unique
+  name          String
+  dogType       String
+  luckyNumber   Int?
+  round         Int
+  wins          Int
+  losses        Int
+  items         String
+  relics        String   @default("[]")
+  rank          Int      @unique
+  challengeWins Int      @default(0)
+  isSeed        Boolean  @default(false)
+  createdAt     DateTime @default(now())
+
+  @@index([userId])
+  @@index([rank])
+}
+
 model BattleLog {
   id        String   @id @default(cuid())
   runId     String
