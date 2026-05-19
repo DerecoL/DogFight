@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import {
   DndContext,
   DragOverlay,
@@ -329,6 +329,7 @@ export default function App() {
   const [battle, setBattle] = useState<Battle | null>(null)
   const [eventIndex, setEventIndex] = useState(0)
   const [speed, setSpeed] = useState(1)
+  const [ceremonyDismissedRounds, setCeremonyDismissedRounds] = useState(() => new Set<string>())
   const [musicEnabled, setMusicEnabled] = useState(() => localStorage.getItem(musicPreferenceKey) !== 'off')
   const [musicBlocked, setMusicBlocked] = useState(false)
   const [appHasAudioFocus, setAppHasAudioFocus] = useState(() => !document.hidden && document.hasFocus())
@@ -399,6 +400,8 @@ export default function App() {
   const draggingItem = run?.items.find((item) => item.id === draggingItemId) || null
   const currentEvent = battle?.events[eventIndex]
   const score = run ? run.wins * 100 + Math.max(0, 12 - run.losses * 2) * 5 : 0
+  const classRewardCeremonyKey = run?.phase === 'CLASS_REWARD' ? `${run.id}:${run.round}` : ''
+  const showClassRewardCeremony = Boolean(run?.phase === 'CLASS_REWARD' && classRewardCeremonyKey && !ceremonyDismissedRounds.has(classRewardCeremonyKey))
 
   const action = async (fn: () => Promise<{ run: Run; battle?: Battle } | { user: AuthUser | null; activeRun?: Run | null; needsNickname?: boolean }>) => {
     setError('')
@@ -451,6 +454,11 @@ export default function App() {
     setSelectedItemId(null)
     setSelectedOfferId(null)
     setTipAnchor(null)
+  }
+
+  const dismissClassRewardCeremony = (key: string) => {
+    if (!key) return
+    setCeremonyDismissedRounds((current) => new Set(current).add(key))
   }
 
   const toggleMusic = () => {
@@ -534,7 +542,15 @@ export default function App() {
         <ShopChoiceSelect choices={run.choices} onPick={(shopType) => action(() => api(`/runs/${run.id}/choice/select`, { method: 'POST', body: JSON.stringify({ shopType }) }))} />
       )}
 
-      {!battle && run.phase === 'CLASS_REWARD' && (
+      {!battle && run.phase === 'CLASS_REWARD' && showClassRewardCeremony && (
+        <ClassRewardCeremony
+          run={run}
+          choices={run.classRewardChoices}
+          onDismiss={() => dismissClassRewardCeremony(classRewardCeremonyKey)}
+        />
+      )}
+
+      {!battle && run.phase === 'CLASS_REWARD' && !showClassRewardCeremony && (
         <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd}>
           <section className="reward-workbench">
             <ClassRewardSelect
@@ -835,6 +851,56 @@ function shopChoiceIcon(shopType: ShopType) {
   return <Swords size={36} />
 }
 
+function handleChoiceCardKeyDown(event: KeyboardEvent<HTMLElement>, onChoose: () => void) {
+  if (event.key === 'Enter' || event.key === ' ') {
+    event.preventDefault()
+    onChoose()
+  }
+}
+
+function ClassRewardCeremony({ run, choices, onDismiss }: { run: Run; choices: ClassRewardChoice[]; onDismiss: () => void }) {
+  const finalAwakening = run.round >= 6
+  const title = finalAwakening ? '终阶觉醒' : '职业觉醒'
+  const subtitle = finalAwakening ? '终阶职业装备已经解锁，构筑的核心能力将在这一回合定型。' : '职业路线开始成型，选择一件专属装备改变接下来的战斗节奏。'
+
+  function handleCeremonyKeyDown(event: KeyboardEvent<HTMLElement>) {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault()
+      onDismiss()
+    }
+  }
+
+  return (
+    <section
+      className="class-reward-ceremony"
+      role="button"
+      tabIndex={0}
+      onClick={onDismiss}
+      onKeyDown={handleCeremonyKeyDown}
+      aria-label={`${dogNames[run.dogType]}${title}`}
+    >
+      <div className="ceremony-stage">
+        <div className="ceremony-round-badge">第 {run.round} 回合</div>
+        <img className="ceremony-dog-avatar" src={dogAssets[run.dogType]} alt="" />
+        <div className="ceremony-copy">
+          <span>{dogNames[run.dogType]} 专属装备授予</span>
+          <h2>{title}</h2>
+          <p>{subtitle}</p>
+        </div>
+        <div className="ceremony-reward-preview" aria-label="本次可选职业装备">
+          {choices.map((choice) => (
+            <span key={choice.defId} className={`ceremony-reward-chip ${qualityClass(choice.quality)}`}>
+              <strong>{choice.def.name}</strong>
+              <small>{choice.def.size}格 · {choice.def.dice.join('/')}</small>
+            </span>
+          ))}
+        </div>
+        <span className="ceremony-skip-hint">点击任意处继续</span>
+      </div>
+    </section>
+  )
+}
+
 function ClassRewardSelect({ choices, onPick }: { choices: ClassRewardChoice[]; onPick: (defId: string) => void }) {
   const [selected, setSelected] = useState(choices[0]?.defId ?? '')
   return (
@@ -845,12 +911,12 @@ function ClassRewardSelect({ choices, onPick }: { choices: ClassRewardChoice[]; 
       </div>
       <div className="reward-choice-grid">
         {choices.map((choice) => (
-          <button key={choice.defId} className={`choice reward-choice ${selected === choice.defId ? 'selected' : ''}`} onClick={() => setSelected(choice.defId)}>
+          <div key={choice.defId} role="button" tabIndex={0} className={`choice reward-choice ${selected === choice.defId ? 'selected' : ''}`} onClick={() => setSelected(choice.defId)} onKeyDown={(event) => handleChoiceCardKeyDown(event, () => setSelected(choice.defId))}>
             <strong>{choice.def.name}</strong>
             <span className={`tip-tag ${qualityClass(choice.quality)}`}>{qualityLabel[choice.quality]}</span>
             <span>{choice.def.size}格 · {choice.def.dice.join('/')}</span>
             <span><RuleText text={choice.def.description ?? effectText(choice.def, choice.quality)} /></span>
-          </button>
+          </div>
         ))}
       </div>
       <button className="primary action-button choice-submit" disabled={!selected} onClick={() => selected && onPick(selected)}>领取职业装备</button>
@@ -868,12 +934,12 @@ function RelicChoiceSelect({ choices, onPick }: { choices: RelicChoice[]; onPick
       </div>
       <div className="choice-grid relic-choice-grid">
         {choices.map((choice) => (
-          <button key={choice.relicId} className={`choice relic-choice ${selected === choice.relicId ? 'selected' : ''}`} onClick={() => setSelected(choice.relicId)}>
+          <div key={choice.relicId} role="button" tabIndex={0} className={`choice relic-choice ${selected === choice.relicId ? 'selected' : ''}`} onClick={() => setSelected(choice.relicId)} onKeyDown={(event) => handleChoiceCardKeyDown(event, () => setSelected(choice.relicId))}>
             <Trophy size={36} />
             <strong>{choice.def.name}</strong>
             <span className={`tip-tag ${qualityClass(choice.quality)}`}>{qualityLabel[choice.quality]}</span>
             <span><RuleText text={choice.def.description} /></span>
-          </button>
+          </div>
         ))}
       </div>
       <button className="primary action-button choice-submit" disabled={!selected} onClick={() => selected && onPick(selected)}>获得遗物</button>
@@ -951,8 +1017,8 @@ function InventoryBoard({ run, selectedItemId, draggingItemId, onSelectItem, onS
     <section className="inventory-board expanded">
       <GridPanel title="装备栏" subtitle="12 格单行，从左向右触发" icon={<Grid3X3 size={18} />} area="EQUIPMENT" w={12} h={1} items={run.items} selectedItemId={selectedItemId} draggingItemId={draggingItemId} onSelectItem={onSelectItem} onSlotClick={onSlotClick} />
       <div className="bag-relic-row">
-        <GridPanel title="背包" subtitle="12 格单行，战斗中默认不生效" icon={<Backpack size={18} />} area="BAG" w={12} h={1} items={run.items} selectedItemId={selectedItemId} draggingItemId={draggingItemId} onSelectItem={onSelectItem} onSlotClick={onSlotClick} />
         <RelicRail relics={run.relics ?? []} />
+        <GridPanel title="背包" subtitle="12 格单行，战斗中默认不生效" icon={<Backpack size={18} />} area="BAG" w={12} h={1} items={run.items} selectedItemId={selectedItemId} draggingItemId={draggingItemId} onSelectItem={onSelectItem} onSlotClick={onSlotClick} />
       </div>
     </section>
   )
@@ -1281,7 +1347,7 @@ function BattleDog({ side, snapshot, hp, event, finished, winner }: { side: 'pla
   const isActor = event?.actor === side
   const isTarget = event?.target === side || event?.target === 'both'
   const healing = isActor && event?.effectType === 'HEAL'
-  const lost = finished && winner && winner !== 'draw' && winner !== side
+  const lost = finished && winner && winner !== side
   const won = finished && winner === side
   return (
     <div className={`battle-dog ${side} ${isActor ? 'attacking' : ''} ${isTarget && event?.effectType !== 'HEAL' ? 'hit' : ''} ${healing ? 'healing' : ''} ${won ? 'winner' : ''} ${lost ? 'loser' : ''}`}>

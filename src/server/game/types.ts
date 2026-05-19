@@ -132,7 +132,7 @@ export type BattleEvent = {
 }
 
 export type BattleResult = {
-  winner: 'player' | 'opponent' | 'draw'
+  winner: 'player' | 'opponent'
   duration: number
   playerHp: number
   opponentHp: number

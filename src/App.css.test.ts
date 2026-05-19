@@ -46,6 +46,10 @@ describe('equipment layout scale', () => {
     expect(cssRule('.inventory-board.expanded .grid-panel:last-child')).toContain('align-content: end')
   })
 
+  it('keeps the left relic rail narrow and the right bag grid wide', () => {
+    expect(cssRule('.bag-relic-row')).toContain('grid-template-columns: 220px minmax(0, 1fr)')
+  })
+
   it('uses the provided hand-drawn cream UI structure', () => {
     expect(css).toContain('--page: #fff4e4')
     expect(css).toContain('--ink: #3d2d25')
@@ -62,5 +66,21 @@ describe('equipment layout scale', () => {
       expect(rule).toContain('gap: 6px')
     }
     expect(cssRule('.battle-toolbar p')).not.toContain('margin-top')
+  })
+
+  it('keeps game headings and hints readable when the system prefers dark mode', () => {
+    expect(cssRule(':root')).toContain('color-scheme: light')
+    expect(cssRule('h1, h2, h3')).toContain('color: var(--ink)')
+    expect(cssRule('p, small')).toContain('color: var(--muted)')
+    expect(cssRule('.screen-heading p')).toContain('color: var(--muted)')
+    expect(cssRule('.battle-toolbar p')).toContain('color: var(--muted)')
+  })
+
+  it('styles the class reward awakening ceremony as a distinct special round surface', () => {
+    expect(cssRule('.class-reward-ceremony')).toContain('min-height')
+    expect(cssRule('.ceremony-stage')).toContain('animation')
+    expect(cssRule('.ceremony-dog-avatar')).toContain('width')
+    expect(cssRule('.ceremony-reward-preview')).toContain('grid-template-columns')
+    expect(cssRule('.ceremony-skip-hint')).toContain('letter-spacing: 0')
   })
 })

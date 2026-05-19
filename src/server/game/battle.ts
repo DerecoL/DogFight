@@ -18,6 +18,11 @@ const BULLY_LARGE_EFFECT_CHANCE = 0.4
 const EMPEROR_LUCKY_EFFECT_CHANCE = 0.5
 const TRIGGER_QUEUE_CAP = 40
 
+type HealthForDecision = {
+  hp: number
+  maxHp: number
+}
+
 type ItemTrigger = {
   itemId: string
   defId: string
@@ -74,6 +79,14 @@ function opponentOf(actor: Side): Side {
   return actor === 'player' ? 'opponent' : 'player'
 }
 
+export function resolveWinnerByHealthPercent(player: HealthForDecision, opponent: HealthForDecision): Side {
+  const playerPercent = player.maxHp > 0 ? player.hp / player.maxHp : 0
+  const opponentPercent = opponent.maxHp > 0 ? opponent.hp / opponent.maxHp : 0
+  if (playerPercent !== opponentPercent) return playerPercent > opponentPercent ? 'player' : 'opponent'
+  if (player.hp !== opponent.hp) return player.hp > opponent.hp ? 'player' : 'opponent'
+  return 'player'
+}
+
 function relicsOf(fighter: FighterSnapshot) {
   return fighter.relics ?? []
 }
@@ -105,7 +118,7 @@ function matchingContext(actor: FighterSnapshot, def: ItemDef, roll: number) {
     return { matches: true, scale: 0.5, note: '（点金手·右映射）' }
   }
   if (triggerOrder(actor.items).some((item) => itemDef(item.defId).advancedEffect === 'TRIGGER_BY_SIZE') && def.size === roll) {
-    return { matches: true, scale: 1, note: '（忍法·破容量触发）' }
+    return { matches: true, scale: 1, note: '（按容量触发）' }
   }
   return { matches: false, scale: 1, note: '' }
 }
@@ -429,14 +442,15 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
     }
   }
 
+  const currentWinner = () => resolveWinnerByHealthPercent(
+    { hp: playerHp, maxHp: state.player.maxHp },
+    { hp: opponentHp, maxHp: state.opponent.maxHp },
+  )
+
+  const currentLeadText = () => currentWinner() === 'player' ? '玩家胜利' : '对手胜利'
+
   const finish = (time: number, text: string): BattleResult => {
-    const winner = playerHp <= 0 && opponentHp <= 0
-      ? 'draw'
-      : playerHp === opponentHp
-        ? 'draw'
-        : playerHp > opponentHp
-          ? 'player'
-          : 'opponent'
+    const winner = currentWinner()
     push({ time, actor: 'system', kind: 'END', target: 'none', text })
     return {
       winner,
@@ -456,8 +470,7 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
       if (fighter.dogType === 'MUTT' && rng() < 0.2) resolveActor(time, actor, true)
 
       if (playerHp <= 0 || opponentHp <= 0) {
-        const lead = playerHp > opponentHp ? '玩家胜利' : opponentHp > playerHp ? '对手胜利' : '平局'
-        return finish(time, `战斗结束：${lead}`)
+        return finish(time, `战斗结束：${currentLeadText()}`)
       }
     }
 
@@ -498,12 +511,10 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
         text: `毒伤加深，双方受到 ${poison} 点伤害`,
       })
       if (playerHp <= 0 || opponentHp <= 0) {
-        const lead = playerHp > opponentHp ? '玩家胜利' : opponentHp > playerHp ? '对手胜利' : '平局'
-        return finish(time, `毒伤结算：${lead}`)
+        return finish(time, `毒伤结算：${currentLeadText()}`)
       }
     }
   }
 
-  const lead = playerHp > opponentHp ? '玩家胜利' : opponentHp > playerHp ? '对手胜利' : '平局'
-  return finish(120, `120 秒判定：${lead}`)
+  return finish(120, `120 秒判定：${currentLeadText()}`)
 }

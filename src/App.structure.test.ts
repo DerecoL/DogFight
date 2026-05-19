@@ -85,12 +85,49 @@ describe('selection screen structure', () => {
   })
 
   it('renders class reward, relic slots, and rule term tooltip surfaces', () => {
+    expect(app).toContain('ClassRewardCeremony')
     expect(app).toContain('ClassRewardSelect')
     expect(app).toContain('RelicChoiceSelect')
     expect(app).toContain('RelicRail')
     expect(app).toContain('RuleText')
     expect(app).toContain('rule-term')
     expect(app).toContain('rule-tip')
+  })
+
+  it('places the relic rail to the left of the bag grid', () => {
+    const rowStart = app.indexOf('className="bag-relic-row"')
+    const rowEnd = app.indexOf('</div>', rowStart)
+    const rowMarkup = app.slice(rowStart, rowEnd)
+
+    expect(rowMarkup.indexOf('<RelicRail')).toBeGreaterThan(-1)
+    expect(rowMarkup.indexOf('area="BAG"')).toBeGreaterThan(-1)
+    expect(rowMarkup.indexOf('<RelicRail')).toBeLessThan(rowMarkup.indexOf('area="BAG"'))
+  })
+
+  it('gates class reward selection behind a dismissible awakening ceremony', () => {
+    expect(app).toContain('classRewardCeremonyKey')
+    expect(app).toContain('ceremonyDismissedRounds')
+    expect(app).toContain('!ceremonyDismissedRounds.has(classRewardCeremonyKey)')
+    expect(app).toContain('onDismiss={() => dismissClassRewardCeremony(classRewardCeremonyKey)}')
+    expect(app).toContain('run.phase === \'CLASS_REWARD\' && showClassRewardCeremony')
+    expect(app).toContain('run.phase === \'CLASS_REWARD\' && !showClassRewardCeremony')
+  })
+
+  it('lets players skip the class reward ceremony with click, Enter, or Space', () => {
+    expect(app).toContain('function handleCeremonyKeyDown')
+    expect(app).toContain("event.key === 'Enter' || event.key === ' '")
+    expect(app).toContain('onClick={onDismiss}')
+    expect(app).toContain('onKeyDown={handleCeremonyKeyDown}')
+    expect(app).toContain('role="button"')
+    expect(app).toContain('tabIndex={0}')
+  })
+
+  it('keeps rule tooltip buttons out of nested choice buttons', () => {
+    expect(app).toContain('function handleChoiceCardKeyDown')
+    expect(app).toContain('<div key={choice.defId} role="button"')
+    expect(app).toContain('<div key={choice.relicId} role="button"')
+    expect(app).not.toContain('<button key={choice.defId} className={`choice reward-choice')
+    expect(app).not.toContain('<button key={choice.relicId} className={`choice relic-choice')
   })
 
   it('anchors dog card tags at the bottom for a consistent gallery rhythm', () => {

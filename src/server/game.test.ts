@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { simulateBattle } from './game/battle'
+import { resolveWinnerByHealthPercent, simulateBattle } from './game/battle'
 import { CLASS_REWARD_DEFS, DOGS, RELIC_DEFS, itemDef, shopPool } from './game/data'
 import { canPlace, findSlot, triggerOrder } from './game/grid'
 import { createRng } from './game/rng'
@@ -86,10 +86,25 @@ describe('battle simulation', () => {
     const player: FighterSnapshot = { name: 'P', dogType: 'MUTT', wins: 0, losses: 0, round: 0, items: baseItems() }
     const opponent: FighterSnapshot = { name: 'O', dogType: 'SHIBA', wins: 0, losses: 0, round: 0, items: baseItems() }
     const result = simulateBattle(player, opponent, 'battle-seed')
-    expect(['player', 'opponent', 'draw']).toContain(result.winner)
+    expect(['player', 'opponent']).toContain(result.winner)
     expect(result.duration).toBeGreaterThan(0)
     expect(result.events.some((event) => event.kind === 'ROLL')).toBe(true)
     expect(result.events.at(-1)?.kind).toBe('END')
+  })
+
+  it('applies escalating sudden-death poison after one minute without producing a draw', () => {
+    const player: FighterSnapshot = { name: 'P', dogType: 'SHIBA', wins: 0, losses: 0, round: 0, items: [] }
+    const opponent: FighterSnapshot = { name: 'O', dogType: 'SHIBA', wins: 0, losses: 0, round: 0, items: [] }
+    const result = simulateBattle(player, opponent, 'sudden-death-no-draw')
+    const suddenDeathTicks = result.events.filter((event) => event.kind === 'POISON' && event.target === 'both')
+
+    expect(suddenDeathTicks.slice(0, 4).map((event) => event.amount)).toEqual([1, 2, 3, 4])
+    expect(result.winner).toBe('player')
+  })
+
+  it('settles the two-minute cap by current health percentage instead of absolute health', () => {
+    expect(resolveWinnerByHealthPercent({ hp: 60, maxHp: 200 }, { hp: 50, maxHp: 100 })).toBe('opponent')
+    expect(resolveWinnerByHealthPercent({ hp: 0, maxHp: 100 }, { hp: 0, maxHp: 100 })).toBe('player')
   })
 
   it('records the exact item instance and effect payload for item triggers', () => {

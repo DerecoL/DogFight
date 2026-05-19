@@ -353,7 +353,7 @@ export function buildApp() {
     const opponent = parseJson<(FighterSnapshot & { ghostId?: string | null }) | null>(run.matchedGhost || '', null)
     if (!opponent) return reply.code(400).send({ error: '没有匹配对手' })
     const result = simulateBattle(snapshotFromRun(run, playerName), opponent, `${run.id}-${Date.now()}`)
-    const playerWon = result.winner === 'player' || result.winner === 'draw'
+    const playerWon = result.winner === 'player'
     const wins = run.wins + (playerWon ? 1 : 0)
     const losses = run.losses + (playerWon ? 0 : 1)
     const status = wins >= 12 || losses >= 3 ? 'COMPLETE' : 'ACTIVE'
