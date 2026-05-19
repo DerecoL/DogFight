@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" role="img" aria-label="柴犬头像">
+  <rect width="160" height="160" rx="36" fill="#FFE7A8"/>
+  <circle cx="80" cy="84" r="48" fill="#E8913A"/>
+  <path d="M44 58 30 23l39 22Z" fill="#C9712D"/>
+  <path d="M116 58 130 23 91 45Z" fill="#C9712D"/>
+  <path d="M56 93c8 23 40 23 48 0 0-15-10-25-24-25S56 78 56 93Z" fill="#FFF4D8"/>
+  <circle cx="63" cy="76" r="6" fill="#2A1A12"/>
+  <circle cx="97" cy="76" r="6" fill="#2A1A12"/>
+  <path d="M74 91c3-5 9-5 12 0-2 5-10 5-12 0Z" fill="#2A1A12"/>
+  <path d="M80 96v8m0 0c-8 8-17 1-17 1m17-1c8 8 17 1 17 1" stroke="#2A1A12" stroke-width="5" stroke-linecap="round" fill="none"/>
+</svg>

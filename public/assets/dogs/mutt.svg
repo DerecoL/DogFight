@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" role="img" aria-label="土狗头像">
+  <rect width="160" height="160" rx="36" fill="#D9F99D"/>
+  <circle cx="80" cy="84" r="48" fill="#B7793F"/>
+  <path d="M47 58 30 31l38 17Z" fill="#8A562C"/>
+  <path d="M112 60 132 36l-35 12Z" fill="#8A562C"/>
+  <path d="M57 94c8 22 38 22 46 0 0-14-9-23-23-23S57 80 57 94Z" fill="#E7C49A"/>
+  <circle cx="63" cy="76" r="6" fill="#21160F"/>
+  <circle cx="97" cy="76" r="6" fill="#21160F"/>
+  <path d="M75 91c3-5 8-5 11 0-2 5-9 5-11 0Z" fill="#21160F"/>
+  <path d="M80 96v8m0 0c-7 7-15 2-15 2m15-2c7 7 15 2 15 2" stroke="#21160F" stroke-width="5" stroke-linecap="round" fill="none"/>
+  <circle cx="103" cy="57" r="8" fill="#6B3F21"/>
+</svg>

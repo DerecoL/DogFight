@@ -1,0 +1,86 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  nickname     String?
+  createdAt    DateTime @default(now())
+  runs         Run[]
+}
+
+model Run {
+  id          String   @id @default(cuid())
+  userId      String
+  dogType     String
+  wins        Int      @default(0)
+  losses      Int      @default(0)
+  round       Int      @default(0)
+  luckyNumber Int?
+  gold        Int      @default(5)
+  phase       String   @default("SHOP")
+  status      String   @default("ACTIVE")
+  shopType    String   @default("GENERAL")
+  shopItems   String   @default("[]")
+  choices     String   @default("[]")
+  refreshCost Int      @default(1)
+  matchedGhost String?
+  lastBattle  String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  user        User     @relation(fields: [userId], references: [id])
+  items       ItemInstance[]
+  battles     BattleLog[]
+}
+
+model ItemInstance {
+  id        String   @id @default(cuid())
+  runId     String
+  defId     String
+  quality   String   @default("BRONZE")
+  area      String
+  x         Int
+  y         Int
+  createdAt DateTime @default(now())
+  run       Run      @relation(fields: [runId], references: [id], onDelete: Cascade)
+}
+
+model GhostSnapshot {
+  id        String   @id @default(cuid())
+  runId     String?
+  userId    String?
+  name      String
+  dogType   String
+  luckyNumber Int?
+  round     Int
+  wins      Int
+  losses    Int
+  gold      Int
+  items     String
+  seed      String
+  createdAt DateTime @default(now())
+
+  @@index([round, wins, losses])
+}
+
+model BattleLog {
+  id        String   @id @default(cuid())
+  runId     String
+  ghostId   String?
+  result    String
+  log       String
+  createdAt DateTime @default(now())
+  run       Run      @relation(fields: [runId], references: [id], onDelete: Cascade)
+}
