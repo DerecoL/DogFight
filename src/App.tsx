@@ -779,7 +779,7 @@ const modeCards: Array<{
   {
     id: 'PEAK',
     title: '巅峰模式',
-    description: '12胜狗进入巅峰竞技场，自动挑战榜单冲击排名',
+    description: '战斗结束后的狗进入巅峰竞技场，自动挑战榜单冲击排名',
     icon: <Crown size={38} />,
     locked: false,
   },
@@ -791,7 +791,7 @@ function ModeLobby({ run, onEnterCasual, onEnterPeak }: { run: Run | null; onEnt
     <section className="mode-lobby-screen">
       <div className="screen-heading centered">
         <h2>模式大厅</h2>
-        <p>选择本次要进入的竞技方式。休闲模式产出的12胜狗可以送入巅峰竞技场。</p>
+        <p>选择本次要进入的竞技方式。休闲模式结束后的狗可以送入巅峰竞技场。</p>
       </div>
       <div className="mode-grid">
         {modeCards.map((mode) => (
@@ -883,7 +883,7 @@ function ApexArena() {
     <section className="apex-screen">
       <div className="screen-heading centered">
         <h2>巅峰竞技场</h2>
-        <p>保存12胜狗的死数据，自动从榜尾向上挑战，失败后固定在当前名次。</p>
+        <p>保存战斗结束后的死数据，自动从榜尾向上挑战，失败后固定在当前名次。</p>
       </div>
       <div className="apex-toolbar">
         <button className="secondary action-button" onClick={() => void loadApex()} disabled={loading}>
@@ -903,14 +903,14 @@ function ApexArena() {
       <div className="apex-layout">
         <section className="apex-candidates">
           <div className="panel-heading">
-            <h3>可投入的12胜狗</h3>
-            <p>{candidates.length > 0 ? '选择一只狗进入巅峰竞技场。每只完成局只能提交一次。' : '暂无可提交的12胜完成局。'}</p>
+            <h3>可投入的完成狗</h3>
+            <p>{candidates.length > 0 ? '选择一只狗进入巅峰竞技场。每只完成局只能提交一次。' : '暂无可提交的完成局。'}</p>
           </div>
           <div className="apex-candidate-list">
             {loading ? (
               <p className="apex-empty">正在读取巅峰数据...</p>
             ) : candidates.length === 0 ? (
-              <p className="apex-empty">先在休闲模式打出12胜，再回来冲榜。</p>
+              <p className="apex-empty">先在休闲模式完成一局，再回来冲榜。</p>
             ) : candidates.map((candidate) => (
               <article className="apex-candidate-card" key={candidate.id}>
                 <img className="dog-avatar small" src={dogAssets[candidate.dogType]} alt="" />

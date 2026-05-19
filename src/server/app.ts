@@ -206,7 +206,6 @@ export function buildApp() {
       where: {
         userId,
         status: 'COMPLETE',
-        wins: { gte: 12 },
         id: { notIn: submittedRunIds },
       },
       orderBy: { updatedAt: 'desc' },
@@ -225,7 +224,7 @@ export function buildApp() {
     const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } })
     const run = await prisma.run.findFirst({ where: { id: runId, userId }, include: { items: true } })
     if (!run) return reply.code(404).send({ error: 'Run not found' })
-    if (run.status !== 'COMPLETE' || run.wins < 12) return reply.code(400).send({ error: 'Only completed 12-win dogs can enter apex arena' })
+    if (run.status !== 'COMPLETE') return reply.code(400).send({ error: 'Only completed dogs can enter apex arena' })
 
     const existing = await prisma.apexEntry.findUnique({ where: { sourceRunId: run.id } })
     if (existing) return reply.code(409).send({ error: 'This dog has already entered apex arena' })

@@ -315,7 +315,7 @@ describeWithDatabase('run API', () => {
     expect(upgraded.body.run.relics).toContainEqual(expect.objectContaining({ relicId: firstRelic, quality: nextQuality(firstRelicChoice.quality) }))
   })
 
-  it('lists apex seeds and submits a completed twelve-win run once', async () => {
+  it('lists apex seeds and submits any completed run once', async () => {
     const agent = request.agent(app.server)
     await app.ready()
 
@@ -326,7 +326,7 @@ describeWithDatabase('run API', () => {
 
     await prisma.run.update({
       where: { id: runId },
-      data: { wins: 12, losses: 0, round: 12, phase: 'COMPLETE', status: 'COMPLETE' },
+      data: { wins: 4, losses: 3, round: 7, phase: 'COMPLETE', status: 'COMPLETE' },
     })
 
     const overview = await agent.get('/api/apex').expect(200)
