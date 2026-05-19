@@ -31,6 +31,8 @@ const BULLY_LARGE_EFFECT_CHANCE = 0.4
 const EMPEROR_LUCKY_EFFECT_CHANCE = 0.5
 const TRIGGER_QUEUE_CAP = 40
 const EXTRA_ROLL_CHAIN_CAP = 12
+const MAX_BATTLE_TIME = 120
+const TIME_EPSILON = 0.000001
 const BASE_MAX_HP = 100
 const EARLY_ROUND_HP_GROWTH = 20
 const LATE_ROUND_HP_GROWTH = 50
@@ -78,7 +80,6 @@ type BattleSideState = {
   adjacentDamageBonus: Record<string, number>
   forcedItemDice: Record<string, number>
   shibaSpeedStacks: number
-  shibaSpeedMeter: number
 }
 
 function maxHealthForRound(round: number) {
@@ -106,8 +107,11 @@ function createSideState(maxHp: number): BattleSideState {
     adjacentDamageBonus: {},
     forcedItemDice: {},
     shibaSpeedStacks: 0,
-    shibaSpeedMeter: 0,
   }
+}
+
+function roundBattleTime(time: number) {
+  return Number(time.toFixed(3))
 }
 
 function rollDog(dogType: DogType, rng: () => number) {
@@ -753,15 +757,13 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
     }
   }
 
-  const resolveSpeedRolls = (time: number, actorSide: Side) => {
+  const rollInterval = (time: number, actorSide: Side) => {
+    const fighter = actorSide === 'player' ? player : opponent
     const fighterState = state[actorSide]
-    if (fighterState.shibaSpeedStacks <= 0) return
-    const interval = Math.max(0.5, 1 - fighterState.shibaSpeedStacks * 0.1)
-    fighterState.shibaSpeedMeter += (1 / interval) - 1
-    while (fighterState.shibaSpeedMeter >= 1) {
-      fighterState.shibaSpeedMeter -= 1
-      resolveActorChain(time, actorSide, true)
-    }
+    let interval = hasRelic(fighter, 'HUSKY_ENGINE') ? 0.85 : 1
+    if (time < 10 && hasEquippedEffect(fighter, 'DOUBLE_RATE_FIRST_TEN')) interval = Math.min(interval, 0.5)
+    if (fighterState.shibaSpeedStacks > 0) interval = Math.max(0.5, interval - fighterState.shibaSpeedStacks * 0.1)
+    return interval
   }
 
   const currentWinner = () => resolveWinnerByHealthPercent(
@@ -787,19 +789,7 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
     }
   }
 
-  for (let time = 1; time <= 120; time += 1) {
-    for (const actor of ['player', 'opponent'] as const) {
-      resolveActorChain(time, actor, false, true)
-      const fighter = actor === 'player' ? player : opponent
-      if (time <= 10 && hasEquippedEffect(fighter, 'DOUBLE_RATE_FIRST_TEN')) resolveActorChain(time, actor, true)
-      resolveSpeedRolls(time, actor)
-      if (hasRelic(fighter, 'HUSKY_ENGINE') && time % 6 === 0) resolveActorChain(time, actor, true)
-
-      if (playerHp <= 0 || opponentHp <= 0) {
-        return finish(time, `战斗结束：${currentLeadText()}`)
-      }
-    }
-
+  const resolveSystemTick = (time: number): BattleResult | null => {
     for (const side of ['player', 'opponent'] as const) {
       if (state[side].poison > 0) {
         const before = getHp(side)
@@ -816,12 +806,12 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
           target: side,
           sourceHpDelta: side === 'player' ? result.delta : 0,
           targetHpDelta: side === 'opponent' ? result.delta : 0,
-          text: `【中毒】结算，${side === 'player' ? '玩家' : '对手'}受到 ${before - result.after} 点伤害`,
+          text: `\u3010\u4e2d\u6bd2\u3011\u7ed3\u7b97\uff0c${side === 'player' ? '\u73a9\u5bb6' : '\u5bf9\u624b'}\u53d7\u5230 ${before - result.after} \u70b9\u4f24\u5bb3`,
         })
       }
     }
     if (playerHp <= 0 || opponentHp <= 0) {
-      return finish(time, `中毒结算：${currentLeadText()}`)
+      return finish(time, `\u4e2d\u6bd2\u7ed3\u7b97\uff0c${currentLeadText()}`)
     }
 
     if (time > 60) {
@@ -839,13 +829,41 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
         target: 'both',
         sourceHpDelta: playerHp - playerBefore,
         targetHpDelta: opponentHp - opponentBefore,
-        text: `毒伤加深，双方受到 ${poison} 点伤害`,
+        text: `\u6bd2\u4f24\u52a0\u6df1\uff0c\u53cc\u65b9\u53d7\u5230 ${poison} \u70b9\u4f24\u5bb3`,
       })
       if (playerHp <= 0 || opponentHp <= 0) {
-        return finish(time, `毒伤结算：${currentLeadText()}`)
+        return finish(time, `\u6bd2\u4f24\u7ed3\u7b97\uff0c${currentLeadText()}`)
       }
     }
+    return null
   }
 
-  return finish(120, `120 秒判定：${currentLeadText()}`)
+  const nextRollAt: Record<Side, number> = { player: 1, opponent: 1 }
+  let nextSystemTickAt = 1
+
+  while (true) {
+    const nextRollTime = Math.min(nextRollAt.player, nextRollAt.opponent)
+    const nextTime = Math.min(nextRollTime, nextSystemTickAt)
+    if (nextTime > MAX_BATTLE_TIME + TIME_EPSILON) break
+
+    const time = roundBattleTime(nextTime)
+    if (nextRollTime <= nextSystemTickAt + TIME_EPSILON) {
+      for (const actor of ['player', 'opponent'] as const) {
+        if (Math.abs(nextRollAt[actor] - time) > TIME_EPSILON) continue
+        resolveActorChain(time, actor, false, true)
+        nextRollAt[actor] = roundBattleTime(time + rollInterval(time, actor))
+        if (playerHp <= 0 || opponentHp <= 0) {
+          return finish(time, `\u6218\u6597\u7ed3\u675f\uff0c${currentLeadText()}`)
+        }
+      }
+      continue
+    }
+
+    const finished = resolveSystemTick(time)
+    if (finished) return finished
+    nextSystemTickAt = roundBattleTime(time + 1)
+  }
+
+  return finish(MAX_BATTLE_TIME, `120 \u79d2\u5224\u5b9a\uff1a${currentLeadText()}`)
+
 }

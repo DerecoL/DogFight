@@ -1027,7 +1027,6 @@ async function currentMockApiScript(buildId) {
     };
     const events = [];
     let time = 0;
-    const push = (event) => events.push({ ...event, time: Number(time.toFixed(1)), playerHp: Math.max(0, playerHp), opponentHp: Math.max(0, opponentHp) });
     const hpOf = (side) => side === 'player' ? playerHp : opponentHp;
     const setHp = (side, hp) => {
       if (side === 'player') playerHp = hp;
@@ -1039,6 +1038,31 @@ async function currentMockApiScript(buildId) {
     const relicWithEffect = (fighter, effect) => normalizeRelics(fighter.relics || []).find((relic) => relicDefsById[relic.relicId]?.effect === effect) || null;
     const hasRelicEffect = (fighter, effect) => Boolean(relicWithEffect(fighter, effect));
     const hasShieldImmunity = (side) => state[side].shield > 0 && equippedOf(fighterOf(side)).some((item) => defs[item.defId]?.advancedEffect === 'SHIELD_IMMUNITY');
+    const poisonTickDamage = (side) => {
+      if (state[side].poison <= 0) return 0;
+      const source = side === 'player' ? opponent : run;
+      const poisonBonusRelic = relicWithEffect(source, 'POISON_TICK_BONUS');
+      return state[side].poison + (poisonBonusRelic ? relicPoisonTickBonus(poisonBonusRelic.relicId, poisonBonusRelic.quality) : 0);
+    };
+    const statusRows = (side) => ({
+      positive: [
+        ...(state[side].shield > 0 ? [{ type: 'shield', label: '护盾', tone: 'positive', amount: Math.round(state[side].shield) }] : []),
+        ...(state[side].thorns > 0 ? [{ type: 'thorns', label: '荆棘', tone: 'positive', stacks: state[side].thorns }] : []),
+      ],
+      negative: [
+        ...(state[side].poison > 0 ? [{ type: 'poison', label: '中毒', tone: 'negative', stacks: state[side].poison, nextTickIn: 1, tickDamage: poisonTickDamage(side) }] : []),
+        ...(state[side].weak > 0 ? [{ type: 'weak', label: '虚弱', tone: 'negative', stacks: state[side].weak }] : []),
+        ...(state[side].disabledItemIds.length > 0 ? [{ type: 'disabled', label: '失效', tone: 'negative', amount: state[side].disabledItemIds.length }] : []),
+      ],
+    });
+    const push = (event) => events.push({
+      ...event,
+      time: Number(time.toFixed(1)),
+      playerHp: Math.max(0, playerHp),
+      opponentHp: Math.max(0, opponentHp),
+      playerStatuses: statusRows('player'),
+      opponentStatuses: statusRows('opponent'),
+    });
     const applyDamage = (side, amount, shieldDamage = amount) => {
       const before = hpOf(side);
       const shieldBefore = state[side].shield;

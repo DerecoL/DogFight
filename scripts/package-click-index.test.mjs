@@ -266,7 +266,9 @@ describe('buildStandaloneIndex', () => {
       const poisonTick = battled.battle.events.find((event) => event.kind === 'POISON' && event.target === 'opponent')
 
       expect(poisonApply).toMatchObject({ amount: 10, target: 'opponent' })
+      expect(poisonApply.opponentStatuses.negative).toContainEqual(expect.objectContaining({ type: 'poison', stacks: 10, tickDamage: 10 }))
       expect(poisonTick).toMatchObject({ amount: 10, target: 'opponent' })
+      expect(poisonTick.opponentStatuses.negative).toContainEqual(expect.objectContaining({ type: 'poison', stacks: 10, tickDamage: 10 }))
     } finally {
       await rm(root, { recursive: true, force: true })
     }

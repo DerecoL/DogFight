@@ -21,6 +21,29 @@ describe('missing equipment effect regressions', () => {
     expect(openingRolls.length).toBeGreaterThan(10)
   })
 
+  it('reschedules shiba speed rolls onto the real battle timeline', () => {
+    const player: FighterSnapshot = {
+      name: 'P',
+      dogType: 'SHIBA',
+      wins: 0,
+      losses: 0,
+      round: 8,
+      relics: [{ id: 'small-only', relicId: 'half-die-right', quality: 'SILVER', slot: 0 }],
+      items: [
+        { id: 'speed', defId: 'shiba-speed-katana', quality: 'GOLD', area: 'EQUIPMENT', x: 0, y: 0 },
+      ],
+    }
+    const opponent: FighterSnapshot = { name: 'O', dogType: 'SHIBA', wins: 0, losses: 0, round: 8, items: [] }
+    const result = simulateBattle(player, opponent, 'shiba-speed-real-timeline')
+    const playerRolls = result.events.filter((event) => event.kind === 'ROLL' && event.actor === 'player')
+    const opponentRolls = result.events.filter((event) => event.kind === 'ROLL' && event.actor === 'opponent')
+
+    expect(playerRolls[0].time).toBe(1)
+    expect(opponentRolls[0].time).toBe(1)
+    expect(playerRolls[1].time).toBeCloseTo(1.9)
+    expect(playerRolls[1].time).toBeLessThan(opponentRolls[1].time)
+  })
+
   it('makes mutt eat air double early rolls while blocking early recovery', () => {
     const player: FighterSnapshot = {
       name: 'P',

@@ -2411,7 +2411,7 @@ function BattleFxCanvas({ event, speed }: { event?: BattleEvent; speed: number }
         context.globalAlpha = Math.max(0, 1 - t)
         context.font = '900 28px Inter, Microsoft YaHei, sans-serif'
         context.textAlign = 'center'
-        context.fillStyle = event.effectType === 'HEAL' ? '#16a34a' : event.effectType === 'POISON' ? '#7c3aed' : '#ef4444'
+        context.fillStyle = event.effectType === 'HEAL' ? '#16a34a' : event.effectType === 'POISON' ? '#22c55e' : '#ef4444'
         const prefix = event.effectType === 'HEAL' ? '+' : '-'
         context.fillText(`${prefix}${event.amount}`, targetX, centerY - 46 - t * 34)
       }
@@ -2460,7 +2460,7 @@ function CollapsedBattleLog({ events, eventIndex, open, onToggle }: { events: Ba
       <button className="log-toggle" onClick={onToggle}>{open ? '收起日志' : '展开日志'}</button>
       <div className="battle-log">
         {visible.map((event, index) => (
-          <p key={`${event.time}-${index}-${event.text}`} className={event.actor}>{event.time}s · {event.text}</p>
+          <p key={`${event.time}-${index}-${event.text}`} className={`${event.actor} ${event.effectType === 'POISON' ? 'poison' : ''}`}>{event.time}s · {event.text}</p>
         ))}
       </div>
     </div>

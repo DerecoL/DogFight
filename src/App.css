@@ -1010,6 +1010,10 @@ input {
 .battle-log .player { color: #a7c4ff; }
 .battle-log .opponent { color: #ffb4c6; }
 .battle-log .system { color: #fde68a; }
+.battle-log p.poison {
+  color: #22c55e;
+  font-weight: 900;
+}
 .speed-row { padding: 5px; border-radius: 999px; background: #fff; border: 1px solid var(--line); }
 .speed-row button { min-height: 32px; padding: 6px 10px; border-radius: 999px; background: transparent; color: #475467; font-weight: 900; }
 .speed-row .active { background: var(--blue); color: #fff; }
@@ -1134,6 +1138,9 @@ input {
   height: clamp(92px, 11vw, 132px);
   border-radius: 18px;
   filter: drop-shadow(0 18px 24px rgba(112, 72, 30, .20));
+}
+.battle-dog.poisoned .battle-dog-img {
+  filter: drop-shadow(0 18px 24px rgba(112, 72, 30, .20)) drop-shadow(0 0 14px rgba(34, 197, 94, .45));
 }
 .battle-dog strong { font-size: 16px; }
 .battle-dog.player.attacking { animation: playerLunge .36s ease; }
