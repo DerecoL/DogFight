@@ -217,13 +217,15 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
   const playerSnapshot = toBattleSnapshot(player)
   const opponentSnapshot = toBattleSnapshot(opponent)
 
-  const push = (event: Omit<BattleEvent, 'playerHp' | 'opponentHp' | 'playerMaxHp' | 'opponentMaxHp'>) => {
+  const push = (event: Omit<BattleEvent, 'playerHp' | 'opponentHp' | 'playerMaxHp' | 'opponentMaxHp' | 'playerShield' | 'opponentShield'>) => {
     events.push({
       ...event,
       playerHp: Math.max(0, playerHp),
       opponentHp: Math.max(0, opponentHp),
       playerMaxHp: state.player.maxHp,
       opponentMaxHp: state.opponent.maxHp,
+      playerShield: Math.max(0, state.player.shield),
+      opponentShield: Math.max(0, state.opponent.shield),
     })
   }
 

@@ -488,6 +488,8 @@ function battleForParticipant(result: BattleResult, side: 'A' | 'B') {
       opponentHp: event.playerHp,
       playerMaxHp: event.opponentMaxHp,
       opponentMaxHp: event.playerMaxHp,
+      playerShield: event.opponentShield,
+      opponentShield: event.playerShield,
     })),
   } satisfies BattleResult
 }

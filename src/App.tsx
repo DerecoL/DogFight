@@ -75,6 +75,8 @@ type BattleEvent = {
   opponentHp: number
   playerMaxHp: number
   opponentMaxHp: number
+  playerShield?: number
+  opponentShield?: number
   roll?: number
   itemId?: string
   defId?: string
@@ -2104,6 +2106,8 @@ function BattleStage({ player, opponent, event, lastRoll, speed, finished, winne
   const opponentMaxHp = event?.opponentMaxHp ?? maxHealthForRound(opponent.round)
   const playerHp = event?.playerHp ?? playerMaxHp
   const opponentHp = event?.opponentHp ?? opponentMaxHp
+  const playerShield = event?.playerShield ?? 0
+  const opponentShield = event?.opponentShield ?? 0
   return (
     <div className="battle-stage">
       <BattleFxCanvas event={event} speed={speed} />
@@ -2112,6 +2116,7 @@ function BattleStage({ player, opponent, event, lastRoll, speed, finished, winne
         snapshot={opponent}
         hp={opponentHp}
         maxHp={opponentMaxHp}
+        shield={opponentShield}
         event={event}
         finished={finished}
         winner={winner}
@@ -2122,6 +2127,7 @@ function BattleStage({ player, opponent, event, lastRoll, speed, finished, winne
         snapshot={player}
         hp={playerHp}
         maxHp={playerMaxHp}
+        shield={playerShield}
         event={event}
         finished={finished}
         winner={winner}
@@ -2130,19 +2136,27 @@ function BattleStage({ player, opponent, event, lastRoll, speed, finished, winne
   )
 }
 
-function BattleDog({ side, snapshot, hp, maxHp, event, finished, winner }: { side: 'player' | 'opponent'; snapshot: BattleSnapshot; hp: number; maxHp: number; event?: BattleEvent; finished: boolean; winner?: string }) {
+function BattleDog({ side, snapshot, hp, maxHp, shield, event, finished, winner }: { side: 'player' | 'opponent'; snapshot: BattleSnapshot; hp: number; maxHp: number; shield: number; event?: BattleEvent; finished: boolean; winner?: string }) {
   const isActor = event?.actor === side
   const isTarget = event?.target === side || event?.target === 'both'
   const healing = isActor && event?.effectType === 'HEAL'
   const lost = finished && winner && winner !== side
   const won = finished && winner === side
   const hpPercent = maxHp > 0 ? (hp / maxHp) * 100 : 0
+  const shieldValue = Math.max(0, Math.round(shield))
+  const shieldPercent = maxHp > 0 ? (shieldValue / maxHp) * 100 : 0
   return (
     <div className={`battle-dog ${side} ${isActor ? 'attacking' : ''} ${isTarget && event?.effectType !== 'HEAL' ? 'hit' : ''} ${healing ? 'healing' : ''} ${won ? 'winner' : ''} ${lost ? 'loser' : ''}`}>
       <div className="hp">
         <span><HeartPulse size={16} /> {snapshot.name}</span>
         <div><i style={{ width: `${Math.max(0, Math.min(100, hpPercent))}%` }} /></div>
         <b>{Math.max(0, Math.round(hp))}/{maxHp}</b>
+        {shieldValue > 0 && (
+          <div className="shield-bar" aria-label={`护盾 ${shieldValue}`}>
+            <i style={{ width: `${Math.max(6, Math.min(100, shieldPercent))}%` }} />
+            <span><Shield size={13} /> 护盾 {shieldValue}</span>
+          </div>
+        )}
       </div>
       <img className="battle-dog-img" src={dogAssets[snapshot.dogType]} alt="" />
       <strong>{dogNames[snapshot.dogType]}</strong>

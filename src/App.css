@@ -890,6 +890,25 @@ input {
 .hp span { display: inline-flex; align-items: center; gap: 6px; font-weight: 850; }
 .hp div { height: 16px; overflow: hidden; background: #f2d7d7; border-radius: 999px; }
 .hp i { display: block; height: 100%; background: linear-gradient(90deg, #31b981, #8be05a); transition: width .2s ease; }
+.shield-bar {
+  position: relative;
+  height: 18px;
+  border: 1px solid rgba(37, 99, 235, .22);
+  background: #dbeafe;
+}
+.shield-bar i {
+  min-width: 14px;
+  background: linear-gradient(90deg, #38bdf8, #2563eb);
+}
+.shield-bar span {
+  position: absolute;
+  inset: 0;
+  justify-content: center;
+  color: #143a72;
+  font-size: 11px;
+  line-height: 1;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, .55);
+}
 .battle-log {
   width: min(860px, 100%);
   height: 330px;
