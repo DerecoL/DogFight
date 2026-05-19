@@ -217,13 +217,15 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
   const playerSnapshot = toBattleSnapshot(player)
   const opponentSnapshot = toBattleSnapshot(opponent)
 
-  const push = (event: Omit<BattleEvent, 'playerHp' | 'opponentHp' | 'playerMaxHp' | 'opponentMaxHp'>) => {
+  const push = (event: Omit<BattleEvent, 'playerHp' | 'opponentHp' | 'playerMaxHp' | 'opponentMaxHp' | 'playerShield' | 'opponentShield'>) => {
     events.push({
       ...event,
       playerHp: Math.max(0, playerHp),
       opponentHp: Math.max(0, opponentHp),
       playerMaxHp: state.player.maxHp,
       opponentMaxHp: state.opponent.maxHp,
+      playerShield: Math.max(0, state.player.shield),
+      opponentShield: Math.max(0, state.opponent.shield),
     })
   }
 
@@ -299,6 +301,8 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
     const actorState = state[actorSide]
     const targetState = state[targetSide]
     const advanced = def.advancedEffect ?? 'NONE'
+    const sacrificeReplacesSmallEffect = def.size === 1
+      && triggerOrder(actor.items).some((entry) => itemDef(entry.defId).advancedEffect === 'SMALL_TRIGGERS_LARGE')
 
     if (targetState.disabledItemIds.includes(item.id)) {
       targetState.disabledItemIds = targetState.disabledItemIds.filter((id) => id !== item.id)
@@ -353,7 +357,7 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
       delete actorState.adjacentDamageBonus[item.id]
     }
 
-    if (def.effect.type === 'DAMAGE' || def.effect.type === 'DAMAGE_SELF_SHIELD') {
+    if (!sacrificeReplacesSmallEffect && (def.effect.type === 'DAMAGE' || def.effect.type === 'DAMAGE_SELF_SHIELD')) {
       const before = getHp(targetSide)
       const result = applyDamage(targetSide, amount, advanced === 'DOUBLE_SHIELD_DAMAGE' ? amount * 2 : amount)
       const weakScale = actorState.weak > 0 ? 0.5 : 1
@@ -425,7 +429,7 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
       }
     }
 
-    if (def.effect.type === 'HEAL') {
+    if (!sacrificeReplacesSmallEffect && def.effect.type === 'HEAL') {
       const wasFull = getHp(actorSide) >= actorState.maxHp
       const result = applyHeal(actorSide, amount)
       triggers.push({
@@ -455,17 +459,17 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
       }
     }
 
-    if (advanced === 'POISON_ON_ROLL') {
+    if (!sacrificeReplacesSmallEffect && advanced === 'POISON_ON_ROLL') {
       if (addPoison(targetSide, targetFighter, qualityAmount(3, quality))) {
         triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'POISON', amount: targetState.poison, target: targetSide, sourceHp: getHp(actorSide), targetHp: getHp(targetSide), sourceHpDelta: 0, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 叠加 ${qualityAmount(3, quality)} 层【中毒】` })
       }
     }
-    if (advanced === 'APPLY_POISON') {
+    if (!sacrificeReplacesSmallEffect && advanced === 'APPLY_POISON') {
       if (addPoison(targetSide, targetFighter, amount)) {
         triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'POISON', amount: targetState.poison, target: targetSide, sourceHp: getHp(actorSide), targetHp: getHp(targetSide), sourceHpDelta: 0, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 叠加 ${amount} 层【中毒】` })
       }
     }
-    if (advanced === 'POISON_AND_DISABLE_RIGHTMOST') {
+    if (!sacrificeReplacesSmallEffect && advanced === 'POISON_AND_DISABLE_RIGHTMOST') {
       if (addPoison(targetSide, targetFighter, amount)) {
         triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'POISON', amount: targetState.poison, target: targetSide, sourceHp: getHp(actorSide), targetHp: getHp(targetSide), sourceHpDelta: 0, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 叠加 ${amount} 层【中毒】` })
       }
@@ -475,16 +479,16 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
         triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'UTILITY', amount: 1, target: targetSide, sourceHp: getHp(actorSide), targetHp: getHp(targetSide), sourceHpDelta: 0, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 使敌方最右侧装备【失效】一次` })
       }
     }
-    if (advanced === 'GAIN_THORNS' && rng() < 0.5) {
+    if (!sacrificeReplacesSmallEffect && advanced === 'GAIN_THORNS' && rng() < 0.5) {
       actorState.thorns += qualityAmount(1, quality)
       triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'UTILITY', amount: actorState.thorns, target: actorSide, sourceHp: getHp(actorSide), targetHp: getHp(targetSide), sourceHpDelta: 0, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 获得 ${qualityAmount(1, quality)} 层【荆棘】` })
     }
-    if (advanced === 'APPLY_WEAK' && rng() < 0.5) {
+    if (!sacrificeReplacesSmallEffect && advanced === 'APPLY_WEAK' && rng() < 0.5) {
       if (addWeak(targetSide, targetFighter, qualityAmount(1, quality))) {
         triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'UTILITY', amount: targetState.weak, target: targetSide, sourceHp: getHp(actorSide), targetHp: getHp(targetSide), sourceHpDelta: 0, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 施加 ${qualityAmount(1, quality)} 层【虚弱】` })
       }
     }
-    if (advanced === 'AVALANCHE' && roll <= 3) {
+    if (!sacrificeReplacesSmallEffect && advanced === 'AVALANCHE' && roll <= 3) {
       actorState.avalanche += 1
       if (actorState.avalanche >= 5) {
         actorState.avalanche = 0
@@ -494,7 +498,7 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
         triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'DAMAGE', amount: damage, target: targetSide, sourceHp: getHp(actorSide), targetHp: result.after, sourceHpDelta: 0, targetHpDelta: result.delta, roll, text: `${itemName(def, quality)} 引发雪崩，造成 ${damage} 点伤害` })
       }
     }
-    if (advanced === 'FREEZE_STACK' && roll >= 4) {
+    if (!sacrificeReplacesSmallEffect && advanced === 'FREEZE_STACK' && roll >= 4) {
       actorState.freeze += 1
       if (actorState.freeze >= 10) {
         actorState.freeze = 0
@@ -502,51 +506,51 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
         triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'UTILITY', amount: 2, target: targetSide, sourceHp: getHp(actorSide), targetHp: getHp(targetSide), sourceHpDelta: 0, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 冻结敌人 2 秒` })
       }
     }
-    if (advanced === 'SHIELD_ON_NON_LUCKY' && actor.luckyNumber !== roll) {
+    if (!sacrificeReplacesSmallEffect && advanced === 'SHIELD_ON_NON_LUCKY' && actor.luckyNumber !== roll) {
       applyShield(actorSide, qualityAmount(5, quality))
       triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'UTILITY', amount: qualityAmount(5, quality), target: actorSide, sourceHp: getHp(actorSide), targetHp: getHp(targetSide), sourceHpDelta: 0, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 获得 ${qualityAmount(5, quality)} 点护盾` })
     }
-    if (advanced === 'GAIN_SHIELD' || advanced === 'SHIELD_IMMUNITY') {
+    if (!sacrificeReplacesSmallEffect && (advanced === 'GAIN_SHIELD' || advanced === 'SHIELD_IMMUNITY')) {
       applyShield(actorSide, amount)
       triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'UTILITY', amount, target: actorSide, sourceHp: getHp(actorSide), targetHp: getHp(targetSide), sourceHpDelta: 0, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 获得 ${amount} 点护盾` })
     }
-    if (advanced === 'GAIN_SHIELD_THORNS') {
+    if (!sacrificeReplacesSmallEffect && advanced === 'GAIN_SHIELD_THORNS') {
       applyShield(actorSide, amount)
       actorState.thorns += qualityAmount(1, quality)
       triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'UTILITY', amount, target: actorSide, sourceHp: getHp(actorSide), targetHp: getHp(targetSide), sourceHpDelta: 0, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 获得 ${amount} 点护盾与 ${qualityAmount(1, quality)} 层【荆棘】` })
     }
-    if (advanced === 'CLEANSE_ON_LUCKY' && actor.luckyNumber === roll) {
+    if (!sacrificeReplacesSmallEffect && advanced === 'CLEANSE_ON_LUCKY' && actor.luckyNumber === roll) {
       actorState.poison = 0
       actorState.weak = 0
       triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'UTILITY', amount: 0, target: actorSide, sourceHp: getHp(actorSide), targetHp: getHp(targetSide), sourceHpDelta: 0, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 驱散所有负面状态` })
     }
 
-    if (advanced === 'ADJACENT_DAMAGE_BONUS') {
+    if (!sacrificeReplacesSmallEffect && advanced === 'ADJACENT_DAMAGE_BONUS') {
       for (const adjacent of adjacentItems(actor, item)) actorState.adjacentDamageBonus[adjacent.id] = (actorState.adjacentDamageBonus[adjacent.id] ?? 0) + qualityAmount(4, quality)
     }
-    if (advanced === 'TRIGGER_ADJACENT' || advanced === 'ADJACENT_TEMP_TRIGGER' || (advanced === 'ADJACENT_ON_EXTRA_ROLL' && extra)) {
+    if (!sacrificeReplacesSmallEffect && (advanced === 'TRIGGER_ADJACENT' || advanced === 'ADJACENT_TEMP_TRIGGER' || (advanced === 'ADJACENT_ON_EXTRA_ROLL' && extra))) {
       queueItems(queue, adjacentItems(actor, item))
     }
-    if (advanced === 'TRIGGER_MINUS_THREE' && roll >= 4) {
+    if (!sacrificeReplacesSmallEffect && advanced === 'TRIGGER_MINUS_THREE' && roll >= 4) {
       queueItems(queue, triggerOrder(actor.items).filter((entry) => itemDef(entry.defId).dice.includes(roll - 3)))
     }
-    if (advanced === 'LARGE_TRIGGERS_NON_LARGE' && isLarge(def, actor)) {
+    if (!sacrificeReplacesSmallEffect && advanced === 'LARGE_TRIGGERS_NON_LARGE' && isLarge(def, actor)) {
       const candidates = triggerOrder(actor.items).filter((entry) => !isLarge(itemDef(entry.defId), actor))
       if (candidates.length > 0) queueItems(queue, [candidates[Math.floor(rng() * candidates.length)]])
     }
-    if (advanced === 'SMALL_TRIGGERS_LARGE' && def.size === 1) {
+    if (sacrificeReplacesSmallEffect) {
       queueItems(queue, triggerOrder(actor.items).filter((entry) => isLarge(itemDef(entry.defId), actor)))
     }
-    if (advanced === 'EXTRA_ROLL_TRIGGERS_ALL' && extra && allowExtraRollFanout) {
+    if (!sacrificeReplacesSmallEffect && advanced === 'EXTRA_ROLL_TRIGGERS_ALL' && extra && allowExtraRollFanout) {
       queueItems(queue, triggerOrder(actor.items), false)
     }
-    if (advanced === 'ROLL_COUNTER_EXTRA' && actorState.rollCount % 4 === 0) {
+    if (!sacrificeReplacesSmallEffect && advanced === 'ROLL_COUNTER_EXTRA' && actorState.rollCount % 4 === 0) {
       processed.extraRollRequests += 1
     }
-    if ((advanced === 'EXTRA_ROLL_CHANCE' && rng() < 0.2) || (advanced === 'EXTRA_ROLL_RECURSE' && extra && rng() < 0.2)) {
+    if (!sacrificeReplacesSmallEffect && ((advanced === 'EXTRA_ROLL_CHANCE' && rng() < 0.2) || (advanced === 'EXTRA_ROLL_RECURSE' && extra && rng() < 0.2))) {
       processed.extraRollRequests += 1
     }
-    if (advanced === 'MAX_HP_ON_EXTRA_ROLL' && extra) {
+    if (!sacrificeReplacesSmallEffect && advanced === 'MAX_HP_ON_EXTRA_ROLL' && extra) {
       actorState.maxHp += qualityAmount(1, quality)
       setHp(actorSide, getHp(actorSide) + qualityAmount(1, quality))
       triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'HEAL', amount: qualityAmount(1, quality), target: actorSide, sourceHp: getHp(actorSide), targetHp: getHp(targetSide), sourceHpDelta: qualityAmount(1, quality), targetHpDelta: 0, roll, text: `${itemName(def, quality)} 使最大生命值 +${qualityAmount(1, quality)}` })

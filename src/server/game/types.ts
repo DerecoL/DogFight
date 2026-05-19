@@ -146,6 +146,8 @@ export type BattleEvent = {
   opponentHp: number
   playerMaxHp: number
   opponentMaxHp: number
+  playerShield: number
+  opponentShield: number
   roll?: number
   itemId?: string
   defId?: string

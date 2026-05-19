@@ -46,6 +46,7 @@ model Run {
   user        User     @relation(fields: [userId], references: [id])
   items       ItemInstance[]
   battles     BattleLog[]
+  dogfightParticipant DogfightParticipant?
 }
 
 model ItemInstance {
@@ -108,4 +109,63 @@ model BattleLog {
   log       String
   createdAt DateTime @default(now())
   run       Run      @relation(fields: [runId], references: [id], onDelete: Cascade)
+}
+
+model DogfightRoom {
+  id                  String   @id @default(cuid())
+  hostUserId          String
+  status              String   @default("WAITING")
+  currentRound        Int      @default(0)
+  maxPlayers          Int      @default(8)
+  readyDeadline       DateTime?
+  winnerParticipantId String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  participants DogfightParticipant[]
+  battles      DogfightBattle[]
+
+  @@index([status])
+  @@index([hostUserId])
+}
+
+model DogfightParticipant {
+  id              String   @id @default(cuid())
+  roomId          String
+  userId          String
+  runId           String   @unique
+  nickname        String
+  isHost          Boolean  @default(false)
+  ready           Boolean  @default(false)
+  eliminated      Boolean  @default(false)
+  eliminatedRound Int?
+  placement       Int?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  room DogfightRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  run  Run          @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@unique([roomId, userId])
+  @@index([roomId])
+  @@index([userId])
+}
+
+model DogfightBattle {
+  id             String   @id @default(cuid())
+  roomId         String
+  round          Int
+  participantAId String
+  participantBId String?
+  opponentKind   String
+  winnerSide     String
+  winnerParticipantId String?
+  result         String
+  createdAt      DateTime @default(now())
+
+  room DogfightRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@index([roomId, round])
+  @@index([participantAId])
+  @@index([participantBId])
 }
