@@ -113,6 +113,31 @@ describeWithDatabase('run API', () => {
     expect(battled.body.battle.playerSnapshot).toMatchObject({ dogType: 'EMPEROR', luckyNumber: 5 })
   })
 
+  it('uses strategic offline dogs when no real ghost is available', async () => {
+    const agent = request.agent(app.server)
+    await app.ready()
+
+    await agent.post('/api/auth/register').send({ email: `offline${Date.now()}@dog.test`, password: 'dogdice' }).expect(200)
+    const created = await agent.post('/api/runs').send({ dogType: 'SHIBA' }).expect(200)
+    const runId = created.body.run.id
+
+    await prisma.run.update({
+      where: { id: runId },
+      data: { round: 6, wins: 5, losses: 1, phase: 'SHOP' },
+    })
+
+    const matched = await agent.post(`/api/runs/${runId}/battle/match`).send({}).expect(200)
+    expect(matched.body.run.matchedGhost.ghostId).toBeNull()
+    expect(matched.body.run.matchedGhost.relics.length).toBeGreaterThan(0)
+    expect(matched.body.run.matchedGhost.items.some((item: { defId: string }) =>
+      ['shiba-', 'samoyed-', 'mutt-', 'bully-', 'emperor-'].some((prefix) => item.defId.startsWith(prefix)),
+    )).toBe(true)
+
+    const battled = await agent.post(`/api/runs/${runId}/battle/start`).send({}).expect(200)
+    expect(battled.body.battle.opponentSnapshot.items.length).toBeGreaterThan(0)
+    expect(battled.body.battle.opponentSnapshot.relics.length).toBeGreaterThan(0)
+  })
+
   it('upgrades matching item copies by click or drag target', async () => {
     const agent = request.agent(app.server)
     await app.ready()
