@@ -145,7 +145,7 @@ function relicWithEffect(fighter: FighterSnapshot, effect: string) {
   return relicsOf(fighter).find((relic) => relicDef(relic.relicId).effect === effect) ?? null
 }
 
-function hasShieldImmunity(fighter: FighterSnapshot, shield: number) {
+function hasShieldStatusMitigation(fighter: FighterSnapshot, shield: number) {
   return shield > 0 && triggerOrder(fighter.items).some((item) => itemDef(item.defId).advancedEffect === 'SHIELD_IMMUNITY')
 }
 
@@ -325,16 +325,23 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
     state[side].shield += amount
   }
 
+  const statusAmountAfterShieldMitigation = (target: Side, targetFighter: FighterSnapshot, amount: number) => {
+    if (!hasShieldStatusMitigation(targetFighter, state[target].shield)) return amount
+    return Math.ceil(amount / 2)
+  }
+
   const addPoison = (target: Side, targetFighter: FighterSnapshot, amount: number) => {
-    if (hasShieldImmunity(targetFighter, state[target].shield)) return false
-    state[target].poison += amount
-    return true
+    const applied = statusAmountAfterShieldMitigation(target, targetFighter, amount)
+    if (applied <= 0) return 0
+    state[target].poison += applied
+    return applied
   }
 
   const addWeak = (target: Side, targetFighter: FighterSnapshot, amount: number) => {
-    if (hasShieldImmunity(targetFighter, state[target].shield)) return false
-    state[target].weak += amount
-    return true
+    const applied = statusAmountAfterShieldMitigation(target, targetFighter, amount)
+    if (applied <= 0) return 0
+    state[target].weak += applied
+    return applied
   }
 
   const playerOpeningThorns = relicWithEffect(player, 'OPENING_THORNS')
@@ -494,8 +501,11 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
           text: `${itemName(def, quality)} 对【虚弱】目标额外造成 ${bonus} 点真实伤害`,
         })
       }
-      if (advanced === 'APPLY_WEAK_ON_HIT' && addWeak(targetSide, targetFighter, qualityAmount(1, quality))) {
-        triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'UTILITY', amount: targetState.weak, target: targetSide, sourceHp: getHp(actorSide), targetHp: getHp(targetSide), sourceHpDelta: 0, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 施加 ${qualityAmount(1, quality)} 层【虚弱】` })
+      if (advanced === 'APPLY_WEAK_ON_HIT') {
+        const appliedWeak = addWeak(targetSide, targetFighter, qualityAmount(1, quality))
+        if (appliedWeak > 0) {
+          triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'UTILITY', amount: targetState.weak, target: targetSide, sourceHp: getHp(actorSide), targetHp: getHp(targetSide), sourceHpDelta: 0, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 施加 ${appliedWeak} 层【虚弱】` })
+        }
       }
       if (!recoveryBlocked && advanced === 'LIFESTEAL' && after < before) {
         const healed = applyHeal(actorSide, before - after)
@@ -534,18 +544,21 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
     }
 
     if (!sacrificeReplacesSmallEffect && advanced === 'POISON_ON_ROLL') {
-      if (addPoison(targetSide, targetFighter, qualityAmount(3, quality))) {
-        triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'POISON', amount: targetState.poison, target: targetSide, sourceHp: getHp(actorSide), targetHp: getHp(targetSide), sourceHpDelta: 0, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 叠加 ${qualityAmount(3, quality)} 层【中毒】` })
+      const appliedPoison = addPoison(targetSide, targetFighter, 3)
+      if (appliedPoison > 0) {
+        triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'POISON', amount: targetState.poison, target: targetSide, sourceHp: getHp(actorSide), targetHp: getHp(targetSide), sourceHpDelta: 0, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 叠加 ${appliedPoison} 层【中毒】` })
       }
     }
     if (!sacrificeReplacesSmallEffect && advanced === 'APPLY_POISON') {
-      if (addPoison(targetSide, targetFighter, amount)) {
-        triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'POISON', amount: targetState.poison, target: targetSide, sourceHp: getHp(actorSide), targetHp: getHp(targetSide), sourceHpDelta: 0, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 叠加 ${amount} 层【中毒】` })
+      const appliedPoison = addPoison(targetSide, targetFighter, amount)
+      if (appliedPoison > 0) {
+        triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'POISON', amount: targetState.poison, target: targetSide, sourceHp: getHp(actorSide), targetHp: getHp(targetSide), sourceHpDelta: 0, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 叠加 ${appliedPoison} 层【中毒】` })
       }
     }
     if (!sacrificeReplacesSmallEffect && advanced === 'POISON_AND_DISABLE_RIGHTMOST') {
-      if (addPoison(targetSide, targetFighter, amount)) {
-        triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'POISON', amount: targetState.poison, target: targetSide, sourceHp: getHp(actorSide), targetHp: getHp(targetSide), sourceHpDelta: 0, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 叠加 ${amount} 层【中毒】` })
+      const appliedPoison = addPoison(targetSide, targetFighter, amount)
+      if (appliedPoison > 0) {
+        triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'POISON', amount: targetState.poison, target: targetSide, sourceHp: getHp(actorSide), targetHp: getHp(targetSide), sourceHpDelta: 0, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 叠加 ${appliedPoison} 层【中毒】` })
       }
       const rightmost = triggerOrder(targetFighter.items).at(-1)
       if (rightmost) {
@@ -558,8 +571,9 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
       triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'UTILITY', amount: actorState.thorns, target: actorSide, sourceHp: getHp(actorSide), targetHp: getHp(targetSide), sourceHpDelta: 0, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 获得 ${qualityAmount(1, quality)} 层【荆棘】` })
     }
     if (!sacrificeReplacesSmallEffect && advanced === 'APPLY_WEAK' && rng() < 0.5) {
-      if (addWeak(targetSide, targetFighter, qualityAmount(1, quality))) {
-        triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'UTILITY', amount: targetState.weak, target: targetSide, sourceHp: getHp(actorSide), targetHp: getHp(targetSide), sourceHpDelta: 0, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 施加 ${qualityAmount(1, quality)} 层【虚弱】` })
+      const appliedWeak = addWeak(targetSide, targetFighter, qualityAmount(1, quality))
+      if (appliedWeak > 0) {
+        triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'UTILITY', amount: targetState.weak, target: targetSide, sourceHp: getHp(actorSide), targetHp: getHp(targetSide), sourceHpDelta: 0, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 施加 ${appliedWeak} 层【虚弱】` })
       }
     }
     if (!sacrificeReplacesSmallEffect && advanced === 'AVALANCHE' && roll <= 3) {
@@ -616,7 +630,7 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
       queueItems(queue, triggerOrder(actor.items).filter((entry) => isLarge(itemDef(entry.defId), actor)))
     }
     if (!sacrificeReplacesSmallEffect && advanced === 'EXTRA_ROLL_TRIGGERS_ALL' && extra && allowExtraRollFanout) {
-      queueItems(queue, triggerOrder(actor.items), false)
+      queueItems(queue, triggerOrder(actor.items).filter((entry) => entry.id !== item.id).slice(0, 3), false)
     }
     if (!sacrificeReplacesSmallEffect && advanced === 'ROLL_COUNTER_EXTRA' && actorState.rollCount % 4 === 0) {
       processed.extraRollRequests += 1

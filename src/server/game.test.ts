@@ -587,7 +587,7 @@ describe('battle simulation', () => {
         { id: 'poison', defId: 'shiba-poison', quality: 'DIAMOND', area: 'EQUIPMENT', x: 0, y: 0 },
       ],
     }
-    const result = simulateBattle(player, opponent, 'poison-bypasses-shield')
+    const result = simulateBattle(player, opponent, 'shield-first-3')
     const poisonApply = result.events.find((event) => event.defId === 'shiba-poison' && event.effectType === 'POISON')
     const poisonTick = result.events.find((event) => event.kind === 'POISON' && event.target === 'player')
 
@@ -604,12 +604,12 @@ describe('battle simulation', () => {
       losses: 0,
       round: 6,
       items: [
-        { id: 'counter', defId: 'mutt-counting-collar', quality: 'GOLD', area: 'EQUIPMENT', x: 0, y: 0 },
-        { id: 'chase-car', defId: 'mutt-chase-car', quality: 'DIAMOND', area: 'EQUIPMENT', x: 2, y: 0 },
-        { id: 'bite-a', defId: 'starter-1', quality: 'BRONZE', area: 'EQUIPMENT', x: 3, y: 0 },
-        { id: 'bite-b', defId: 'starter-1', quality: 'BRONZE', area: 'EQUIPMENT', x: 4, y: 0 },
-        { id: 'bite-c', defId: 'starter-1', quality: 'BRONZE', area: 'EQUIPMENT', x: 5, y: 0 },
-        { id: 'bite-d', defId: 'starter-1', quality: 'BRONZE', area: 'EQUIPMENT', x: 6, y: 0 },
+        { id: 'chase-car', defId: 'mutt-chase-car', quality: 'DIAMOND', area: 'EQUIPMENT', x: 0, y: 0 },
+        { id: 'bite-a', defId: 'starter-2', quality: 'BRONZE', area: 'EQUIPMENT', x: 1, y: 0 },
+        { id: 'bite-b', defId: 'starter-2', quality: 'BRONZE', area: 'EQUIPMENT', x: 2, y: 0 },
+        { id: 'bite-c', defId: 'starter-2', quality: 'BRONZE', area: 'EQUIPMENT', x: 3, y: 0 },
+        { id: 'bite-d', defId: 'starter-2', quality: 'BRONZE', area: 'EQUIPMENT', x: 4, y: 0 },
+        { id: 'counter', defId: 'mutt-counting-collar', quality: 'GOLD', area: 'EQUIPMENT', x: 5, y: 0 },
       ],
     }
     const opponent: FighterSnapshot = { name: 'O', dogType: 'SHIBA', wins: 0, losses: 0, round: 6, items: [] }

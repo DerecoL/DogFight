@@ -127,8 +127,8 @@ export const ITEM_DEFS: ItemDef[] = [
     advancedEffect: 'POISON_AND_DISABLE_RIGHTMOST',
     defaultQuality: 'GOLD',
   }),
-  slotItem('v3-golden-kennel', '不可侵犯的纯金狗窝', 4, 18, [4, 5], ['shield', 'immune'], { type: 'UTILITY', amount: 25, qualityBase: 'DIAMOND' }, {
-    description: '获得 25 点护盾。只要你拥有护盾，你免疫所有【中毒】和【虚弱】的施加。',
+  slotItem('v3-golden-kennel', '不可侵犯的纯金狗窝', 4, 18, [4, 5], ['shield', 'immune'], { type: 'UTILITY', amount: 18, qualityBase: 'DIAMOND' }, {
+    description: '获得 18 点护盾。只要你拥有护盾，你受到的【中毒】和【虚弱】层数减半（向上取整）。',
     advancedEffect: 'SHIELD_IMMUNITY',
     defaultQuality: 'DIAMOND',
   }),
@@ -140,7 +140,7 @@ export const CLASS_REWARD_DEFS: ItemDef[] = [
   classItem('SHIBA', 3, 'shiba-swallow-katana', '燕回太刀', 1, [1, 2, 3], ['extra-roll', 'small'], '20%概率会额外投掷一次（可叠加，最多3次）', 'EXTRA_ROLL_CHANCE', 'GOLD', { type: 'DAMAGE', amount: 5 }),
   classItem('SHIBA', 6, 'shiba-shadow-clone', '忍法·影分身', 1, [1, 2, 3], ['small'], '每次投掷会投掷两次，选取更接近1~3的那次', 'ROLL_TWO_PICK_SMALL', 'DIAMOND'),
   classItem('SHIBA', 6, 'shiba-break', '忍法·破', 1, [1, 2, 3], ['small'], '装备将不按照点数触发，按照其容量触发', 'TRIGGER_BY_SIZE', 'DIAMOND'),
-  classItem('SHIBA', 6, 'shiba-poison', '忍法·剧毒', 1, [1, 2, 3, 4, 5, 6], ['poison'], '每次投掷都会对敌人叠加3层【中毒】', 'POISON_ON_ROLL', 'DIAMOND'),
+  classItem('SHIBA', 6, 'shiba-poison', '忍法·剧毒', 1, [1, 2, 3, 4, 5, 6], ['poison'], '每次投掷都会对敌人叠加3层【中毒】（不随品质提升）', 'POISON_ON_ROLL', 'DIAMOND'),
 
   classItem('SAMOYED', 3, 'samoyed-soft-fur', '松软毛皮', 2, [4, 5, 6], ['big', 'heal'], '每次触发恢复10的血量', 'NONE', 'GOLD', { type: 'HEAL', amount: 10 }),
   classItem('SAMOYED', 3, 'samoyed-thorn-fur', '荆棘毛发', 2, [4, 5, 6], ['big', 'thorn'], '每次触发有 50% 概率获得1层【荆棘】', 'GAIN_THORNS', 'GOLD'),
@@ -153,7 +153,7 @@ export const CLASS_REWARD_DEFS: ItemDef[] = [
   classItem('MUTT', 3, 'mutt-counting-collar', '计数项圈', 2, [1, 2, 3, 4, 5, 6], ['extra-roll'], '战斗中每发生 4 次投掷，立即进行一次额外投掷', 'ROLL_COUNTER_EXTRA', 'GOLD'),
   classItem('MUTT', 3, 'mutt-charged-collar', '充能项圈', 1, [1, 2, 3, 4, 5, 6], ['extra-roll'], '发生额外投掷时，触发该装备【相邻】的装备1次', 'ADJACENT_ON_EXTRA_ROLL', 'GOLD'),
   classItem('MUTT', 6, 'mutt-chase-tail', '咬尾巴', 3, [1, 2, 3, 4, 5, 6], ['extra-roll'], '你的“额外投掷”也有 20% 的概率再次触发额外投掷（无嵌套上限）。且单局每一次连续投掷，使所有伤害临时提升10%', 'EXTRA_ROLL_RECURSE', 'DIAMOND'),
-  classItem('MUTT', 6, 'mutt-chase-car', '追车车', 1, [1, 2, 3, 4, 5, 6], ['extra-roll'], '额外投掷会额外触发你所有的装备1次', 'EXTRA_ROLL_TRIGGERS_ALL', 'DIAMOND'),
+  classItem('MUTT', 6, 'mutt-chase-car', '追车车', 1, [1, 2, 3, 4, 5, 6], ['extra-roll'], '额外投掷会额外触发最多3件其他装备1次', 'EXTRA_ROLL_TRIGGERS_ALL', 'DIAMOND'),
   classItem('MUTT', 6, 'mutt-eat-air', '吃空气', 4, [1, 2, 3, 4, 5, 6], ['extra-roll'], '战斗开始后的前 10 秒内，基础投掷频率固定提升2倍，作为代价，此期间你无法通过任何途径获得治疗与护盾', 'DOUBLE_RATE_FIRST_TEN', 'DIAMOND'),
 
   classItem('BULLY', 3, 'bully-vault', '恶霸金库', 2, [1, 2, 3, 4, 5, 6], ['large'], '每回合战斗结束后获得一个【大型物品】', 'POST_BATTLE_LARGE_ITEM', 'GOLD'),
@@ -237,8 +237,8 @@ export function itemDescription(itemId: string, quality?: string | null) {
   if (advanced === 'HEAL_OR_MAX_HP') return `恢复 ${amount} 点生命值。如果你当前处于满血，则永久提升自身 ${one} 点最大生命值。`
   if (advanced === 'LIFESTEAL') return `${baseEffect}并将造成伤害的 100% 转化为自身治疗。`
   if (advanced === 'POISON_AND_DISABLE_RIGHTMOST') return `对敌方施加 ${amount} 层【中毒】，并使敌方最右侧的一个装备【失效】一次。`
-  if (advanced === 'SHIELD_IMMUNITY') return `获得 ${amount} 点护盾。只要你拥有护盾，你免疫所有【中毒】和【虚弱】的施加。`
-  if (advanced === 'POISON_ON_ROLL') return `${baseEffect}每次投掷都会对敌人叠加 ${qualityAmount(3, currentQuality)} 层【中毒】。`
+  if (advanced === 'SHIELD_IMMUNITY') return `获得 ${amount} 点护盾。只要你拥有护盾，你受到的【中毒】和【虚弱】层数减半（向上取整）。`
+  if (advanced === 'POISON_ON_ROLL') return `${baseEffect}每次投掷都会对敌人叠加 3 层【中毒】（不随品质提升）。`
   if (advanced === 'GAIN_THORNS') return `${baseEffect}每次触发有 50% 概率获得 ${one} 层【荆棘】。`
   if (advanced === 'APPLY_WEAK') return `${baseEffect}每次触发有 50% 概率给敌人施加 ${one} 层【虚弱】。`
   if (advanced === 'MAX_HP_ON_EXTRA_ROLL') return `每当系统触发职业特性的“额外投掷”时，永久使你最大生命值 +${one}。`
