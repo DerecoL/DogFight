@@ -45,6 +45,7 @@ describe('buildStandaloneIndex', () => {
       expect(html).not.toContain('src="/assets/')
       expect(html).not.toContain('href="/assets/')
       expect(launcher).toContain('set "DOGFIGHT_OUTPUT=%TEMP%\\DogFight-standalone-index.html"')
+      expect(launcher).toContain('$idx=$text.LastIndexOf($marker)')
       expect(launcher).toContain('__DOGFIGHT_HTML_PAYLOAD_BELOW__')
       expect(launcher).toContain('window.__mockApiLoaded = true;')
       expect(launcher).not.toContain('src="/assets/')
@@ -58,5 +59,28 @@ describe('buildStandaloneIndex', () => {
     const packageJson = JSON.parse(await readFile(path.resolve('package.json'), 'utf8'))
     expect(packageJson.scripts.build).toContain('vite build')
     expect(packageJson.scripts.build).toContain('node scripts/package-click-index.mjs')
+  })
+
+  test('default standalone mock uses a build-scoped save key', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'dogfight-standalone-build-'))
+    try {
+      const distDir = path.join(root, 'dist')
+      const assetsDir = path.join(distDir, 'assets')
+      await mkdir(assetsDir, { recursive: true })
+      await writeFile(
+        path.join(distDir, 'index.html'),
+        '<!doctype html><html><head><script type="module" src="/assets/app.js"></script></head><body><div id="root"></div></body></html>',
+      )
+      await writeFile(path.join(assetsDir, 'app.js'), 'console.log("app")')
+
+      const outputFile = path.join(root, 'click-index.html')
+      await buildStandaloneIndex({ distDir, outputFile })
+
+      const html = await readFile(outputFile, 'utf8')
+      expect(html).toContain('window.__DOGFIGHT_STANDALONE_BUILD_ID__')
+      expect(html).toContain("'dogfight:standalone-state:' + buildId")
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
   })
 })

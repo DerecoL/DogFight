@@ -45,7 +45,7 @@ function createLauncher(html) {
     'setlocal',
     'set "DOGFIGHT_SELF=%~f0"',
     'set "DOGFIGHT_OUTPUT=%TEMP%\\DogFight-standalone-index.html"',
-    'powershell -NoProfile -ExecutionPolicy Bypass -Command "$self=$env:DOGFIGHT_SELF; $out=$env:DOGFIGHT_OUTPUT; $marker=\'__DOGFIGHT_HTML_PAYLOAD_BELOW__\'; $text=[IO.File]::ReadAllText($self,[Text.Encoding]::UTF8); $idx=$text.IndexOf($marker); if($idx -lt 0){ exit 1 }; $payload=$text.Substring($idx + $marker.Length).TrimStart([char]13,[char]10); $utf8=New-Object System.Text.UTF8Encoding($false); [IO.File]::WriteAllText($out,$payload,$utf8)"',
+    'powershell -NoProfile -ExecutionPolicy Bypass -Command "$self=$env:DOGFIGHT_SELF; $out=$env:DOGFIGHT_OUTPUT; $marker=\'__DOGFIGHT_HTML_PAYLOAD_BELOW__\'; $text=[IO.File]::ReadAllText($self,[Text.Encoding]::UTF8); $idx=$text.LastIndexOf($marker); if($idx -lt 0){ exit 1 }; $payload=$text.Substring($idx + $marker.Length).TrimStart([char]13,[char]10); $utf8=New-Object System.Text.UTF8Encoding($false); [IO.File]::WriteAllText($out,$payload,$utf8)"',
     'if errorlevel 1 (',
     '  echo Failed to unpack DogFight.',
     '  pause',
@@ -109,11 +109,13 @@ function titleFrom(html) {
   return html.match(/<title>(.*?)<\/title>/i)?.[1] ?? 'DogFight'
 }
 
-function defaultMockApiScript() {
+function defaultMockApiScript(buildId = new Date().toISOString().replace(/[-:.TZ]/g, '')) {
   return String.raw`
 (() => {
   window.__DOGFIGHT_STANDALONE__ = true;
-  const storageKey = 'dogfight:standalone-state';
+  const buildId = '__DOGFIGHT_BUILD_ID__';
+  window.__DOGFIGHT_STANDALONE_BUILD_ID__ = buildId;
+  const storageKey = 'dogfight:standalone-state:' + buildId;
   const qualities = ['BRONZE', 'SILVER', 'GOLD', 'DIAMOND'];
   const itemDefs = [
     ...[1, 2, 3, 4, 5, 6].map((n) => itemDef('starter-' + n, n + '点牙咬', 1, 2, [n], ['starter'], 'DAMAGE', 5)),
@@ -520,20 +522,22 @@ function defaultMockApiScript() {
     return originalFetch(input, options);
   };
 })();
-`
+`.replace('__DOGFIGHT_BUILD_ID__', buildId)
 }
 
 export async function buildStandaloneIndex({
   distDir = defaultDistDir,
   outputFile = defaultOutputFile,
   launcherFile = defaultLauncherFile,
-  mockApiScript = defaultMockApiScript(),
+  mockApiScript,
 } = {}) {
   const indexHtml = await readFile(path.join(distDir, 'index.html'), 'utf8')
   const assetMap = await createAssetMap(distDir)
   const cssRefs = findAssetRefs(indexHtml, 'link', 'href').filter((ref) => ref.endsWith('.css'))
   const jsRefs = findAssetRefs(indexHtml, 'script', 'src').filter((ref) => ref.endsWith('.js'))
   const iconRef = findAssetRefs(indexHtml, 'link', 'href').find((ref) => /\.(png|svg|ico)$/i.test(ref))
+  const buildId = new Date().toISOString().replace(/[-:.TZ]/g, '')
+  const resolvedMockApiScript = mockApiScript ?? defaultMockApiScript(buildId)
 
   const styles = []
   for (const ref of cssRefs) {
@@ -560,7 +564,7 @@ export async function buildStandaloneIndex({
     '  </head>',
     '  <body>',
     '    <div id="root"></div>',
-    `    <script>${escapeScript(mockApiScript)}</script>`,
+    `    <script>${escapeScript(resolvedMockApiScript)}</script>`,
     `    <script type="module">${escapeScript(scripts.join('\n'))}</script>`,
     '  </body>',
     '</html>',
