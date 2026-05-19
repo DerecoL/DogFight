@@ -116,11 +116,11 @@ const dogTraits: Record<DogType, string> = {
   EMPEROR: '指定幸运数字，命中时 50% 概率使触发效果翻倍',
 }
 const dogAssets: Record<DogType, string> = {
-  SHIBA: '/assets/dogs/shiba.png',
-  SAMOYED: '/assets/dogs/samoyed.png',
-  MUTT: '/assets/dogs/mutt.png',
-  BULLY: '/assets/dogs/bully.png',
-  EMPEROR: '/assets/dogs/emperor.png',
+  SHIBA: '/assets/dogs/shiba.webp',
+  SAMOYED: '/assets/dogs/samoyed.webp',
+  MUTT: '/assets/dogs/mutt.webp',
+  BULLY: '/assets/dogs/bully.webp',
+  EMPEROR: '/assets/dogs/emperor.webp',
 }
 const gameIcon = '/assets/game-icon.png'
 const backgroundMusicSrc = '/assets/audio/the-final-inventory.mp3'

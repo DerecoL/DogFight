@@ -19,13 +19,13 @@ describe('selection screen structure', () => {
   it('offers dog emperor with a lucky-number selector and picture avatars', () => {
     expect(app).toContain("type DogType = 'SHIBA' | 'SAMOYED' | 'MUTT' | 'BULLY' | 'EMPEROR'")
     expect(app).toContain("EMPEROR: '狗皇帝'")
-    expect(app).toContain("EMPEROR: '/assets/dogs/emperor.png'")
+    expect(app).toContain("EMPEROR: '/assets/dogs/emperor.webp'")
     expect(app).toContain('luckyNumber')
     expect(app).toContain('幸运数字')
-    expect(app).toContain("SHIBA: '/assets/dogs/shiba.png'")
-    expect(app).toContain("SAMOYED: '/assets/dogs/samoyed.png'")
-    expect(app).toContain("MUTT: '/assets/dogs/mutt.png'")
-    expect(app).toContain("BULLY: '/assets/dogs/bully.png'")
+    expect(app).toContain("SHIBA: '/assets/dogs/shiba.webp'")
+    expect(app).toContain("SAMOYED: '/assets/dogs/samoyed.webp'")
+    expect(app).toContain("MUTT: '/assets/dogs/mutt.webp'")
+    expect(app).toContain("BULLY: '/assets/dogs/bully.webp'")
   })
 
   it('keeps shop choices in a seven-slot board and pads missing choices with blanks', () => {

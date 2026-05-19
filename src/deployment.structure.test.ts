@@ -18,6 +18,8 @@ describe('production deployment assets', () => {
 
     expect(caddyfile).toContain('reverse_proxy api:4000')
     expect(caddyfile).toContain('root * /srv')
+    expect(caddyfile).toContain('handle /assets/*')
+    expect(caddyfile).toContain('Cache-Control "public, max-age=604800"')
     expect(caddyfile).toContain('try_files {path} /index.html')
   })
 
