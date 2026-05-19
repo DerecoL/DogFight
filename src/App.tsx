@@ -283,6 +283,10 @@ function effectText(def: ItemDef, quality: ItemQuality = 'BRONZE') {
   return `${def.effect.type === 'HEAL' ? '回复' : '造成'} ${amount} ${def.effect.type === 'HEAL' ? '生命' : '伤害'}`
 }
 
+function sellValueForItem(def: ItemDef) {
+  return def.tags.includes('starter') ? 1 : Math.floor(def.price / 2)
+}
+
 function maxHealthForRound(round: number) {
   const completedRounds = Math.max(0, Math.floor(round))
   const earlyRounds = Math.min(completedRounds, EARLY_HP_GROWTH_ROUNDS)
@@ -1470,6 +1474,7 @@ function FloatingTip({ run, item, offer, anchor, onClose, onBuy, onSell, onUpgra
   const isOffer = Boolean(offer)
   const quality = normalizeQuality(item?.quality ?? offer?.quality)
   const canAfford = !offer || run.gold >= offer.price
+  const sellValue = item ? sellValueForItem(item.def) : null
   const style = anchor ? { '--tip-x': `${anchor.x}px`, '--tip-y': `${anchor.y}px` } as React.CSSProperties : undefined
   return (
     <aside className="floating-tip" style={style}>
@@ -1516,7 +1521,7 @@ function FloatingTip({ run, item, offer, anchor, onClose, onBuy, onSell, onUpgra
             )}
             {onSell ? (
               <button className="danger-button wide" onClick={onSell}>
-                <BadgeDollarSign size={18} /> 出售
+                <BadgeDollarSign size={18} /> 出售 +{sellValue}
               </button>
             ) : !onUpgrade ? (
               <small className="disabled-reason">战斗中仅查看物品详情</small>

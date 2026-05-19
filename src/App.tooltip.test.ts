@@ -39,4 +39,11 @@ describe('item detail tooltip interactions', () => {
     expect(css).toContain('.tip-dice')
     expect(css).toContain('.tip-description')
   })
+
+  it('shows the sell value next to the sell action for inspected items', () => {
+    expect(app).toContain('function sellValueForItem(def: ItemDef)')
+    expect(app).toContain("def.tags.includes('starter') ? 1 : Math.floor(def.price / 2)")
+    expect(app).toContain('const sellValue = item ? sellValueForItem(item.def) : null')
+    expect(app).toContain('出售 +{sellValue}')
+  })
 })
