@@ -158,6 +158,42 @@ describeWithDatabase('run API', () => {
     expect(finished.body.run.gold).toBe(bought.body.run.gold + 7)
   })
 
+  it('keeps casual runs active until the fifth loss', async () => {
+    const agent = request.agent(app.server)
+    await app.ready()
+
+    await agent.post('/api/auth/register').send({ email: `loss-limit${Date.now()}@dog.test`, password: 'dogdice' }).expect(200)
+    const created = await agent.post('/api/runs').send({ dogType: 'SHIBA' }).expect(200)
+    const runId = created.body.run.id
+    const losingBattle = {
+      winner: 'opponent',
+      duration: 1,
+      playerHp: 0,
+      opponentHp: 1,
+      playerMaxHp: 10,
+      opponentMaxHp: 10,
+      events: [],
+      playerSnapshot: { name: 'P', dogType: 'SHIBA', wins: 0, losses: 3, round: 4, items: [] },
+      opponentSnapshot: { name: 'O', dogType: 'MUTT', wins: 0, losses: 0, round: 4, items: [] },
+    }
+
+    await prisma.run.update({
+      where: { id: runId },
+      data: { losses: 3, round: 4, phase: 'BATTLE', lastBattle: JSON.stringify(losingBattle) },
+    })
+
+    const fourthLoss = await agent.post(`/api/runs/${runId}/battle/finish`).send({}).expect(200)
+    expect(fourthLoss.body.run).toMatchObject({ losses: 4, status: 'ACTIVE' })
+
+    await prisma.run.update({
+      where: { id: runId },
+      data: { phase: 'BATTLE', lastBattle: JSON.stringify({ ...losingBattle, playerSnapshot: { ...losingBattle.playerSnapshot, losses: 4, round: 5 } }) },
+    })
+
+    const fifthLoss = await agent.post(`/api/runs/${runId}/battle/finish`).send({}).expect(200)
+    expect(fifthLoss.body.run).toMatchObject({ losses: 5, status: 'COMPLETE', phase: 'COMPLETE' })
+  })
+
   it('returns the current player history across multiple runs', async () => {
     const agent = request.agent(app.server)
     await app.ready()
@@ -168,7 +204,14 @@ describeWithDatabase('run API', () => {
     const first = await agent.post('/api/runs').send({ dogType: 'SHIBA' }).expect(200)
     await prisma.run.update({
       where: { id: first.body.run.id },
-      data: { wins: 8, losses: 2, round: 10, phase: 'CHOICE', status: 'COMPLETE' },
+      data: {
+        wins: 8,
+        losses: 2,
+        round: 10,
+        phase: 'CHOICE',
+        status: 'COMPLETE',
+        relics: JSON.stringify([{ id: 'history-relic', relicId: 'midas-left', quality: 'BRONZE', slot: 0 }]),
+      },
     })
 
     const second = await agent.post('/api/runs').send({ dogType: 'MUTT' }).expect(200)
@@ -194,6 +237,12 @@ describeWithDatabase('run API', () => {
     })
     expect(history.body.history.recentRuns.map((run: { id: string }) => run.id)).toContain(first.body.run.id)
     expect(history.body.history.recentRuns.map((run: { id: string }) => run.id)).toContain(second.body.run.id)
+    const firstHistoryRun = history.body.history.recentRuns.find((run: { id: string }) => run.id === first.body.run.id)
+    expect(firstHistoryRun).toMatchObject({
+      mode: 'CASUAL',
+      items: expect.arrayContaining([expect.objectContaining({ defId: 'starter-1', def: expect.objectContaining({ name: expect.any(String) }) })]),
+      relics: [expect.objectContaining({ relicId: 'midas-left', def: expect.objectContaining({ name: expect.any(String) }) })],
+    })
   })
 
   it('creates dog emperor runs with a saved lucky number', async () => {
@@ -292,6 +341,42 @@ describeWithDatabase('run API', () => {
     expect(bought.body.run.items).toHaveLength(created.body.run.items.length + 13)
     expect(bought.body.run.items.find((item: { id: string }) => item.id === owned.id)).toMatchObject({ quality: 'SILVER' })
     expect(bought.body.run.items.filter((item: { defId: string }) => item.defId === 'small-bite')).toHaveLength(1)
+  })
+
+  it('lets fourth-dimensional kennel place one item in the thirteenth equipment slot', async () => {
+    const agent = request.agent(app.server)
+    await app.ready()
+
+    await agent.post('/api/auth/register').send({ email: `space${Date.now()}@dog.test`, password: 'dogdice' }).expect(200)
+    const created = await agent.post('/api/runs').send({ dogType: 'SHIBA' }).expect(200)
+    const runId = created.body.run.id
+    const extra = await prisma.itemInstance.create({
+      data: { runId, defId: 'starter-1', quality: 'BRONZE', area: 'BAG', x: 0, y: 0 },
+    })
+    await prisma.itemInstance.createMany({
+      data: Array.from({ length: 6 }, (_, index) => ({
+        runId,
+        defId: 'starter-1',
+        quality: 'BRONZE',
+        area: 'EQUIPMENT',
+        x: index + 6,
+        y: 0,
+      })),
+    })
+
+    await agent.post(`/api/runs/${runId}/items/move`).send({ itemId: extra.id, area: 'EQUIPMENT', x: 12, y: 0 }).expect(400)
+
+    await prisma.run.update({
+      where: { id: runId },
+      data: { relics: JSON.stringify([{ id: 'space-relic', relicId: 'v3-fourth-dimensional-kennel', quality: 'DIAMOND', slot: 0 }]) },
+    })
+    const moved = await agent.post(`/api/runs/${runId}/items/move`).send({ itemId: extra.id, area: 'EQUIPMENT', x: 12, y: 0 }).expect(200)
+
+    expect(moved.body.run.items.find((item: { id: string }) => item.id === extra.id)).toMatchObject({
+      area: 'EQUIPMENT',
+      x: 12,
+      y: 0,
+    })
   })
 
   it('rejects upgrades for mismatched, max-quality, or cross-user items', async () => {

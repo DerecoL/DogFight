@@ -13,9 +13,14 @@ describe('quality-adjusted item descriptions', () => {
   })
 
   it('shows upgraded shield and poison values for advanced equipment', () => {
-    expect(numbers('v3-golden-kennel', 'DIAMOND')).toContain('25')
+    expect(numbers('v3-golden-kennel', 'DIAMOND')).toContain('18')
     expect(numbers('v3-golden-kennel', 'DIAMOND')).not.toContain('84')
     expect(numbers('v3-fermented-trash-bin', 'DIAMOND')).toContain('17')
+  })
+
+  it('keeps shiba poison fixed instead of scaling by quality', () => {
+    expect(numbers('shiba-poison', 'DIAMOND')).toContain('3')
+    expect(numbers('shiba-poison', 'DIAMOND')).not.toContain('10')
   })
 
   it('shows upgraded base effects for described equipment and class rewards', () => {

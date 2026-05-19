@@ -168,6 +168,42 @@ describe('buildStandaloneIndex', () => {
     }
   })
 
+  test('standalone mock lets fourth-dimensional kennel place an item in the thirteenth equipment slot', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'dogfight-standalone-space-relic-'))
+    try {
+      const distDir = await createMinimalDist(root)
+      const outputFile = path.join(root, 'click-index.html')
+      const launcherFile = path.join(root, 'DogFight-standalone.cmd')
+      await buildStandaloneIndex({ distDir, outputFile, launcherFile })
+
+      const html = await readFile(outputFile, 'utf8')
+      const { window, localStorage, storageKey } = evaluateMockScript(extractMockScript(html))
+      await window.fetch('/api/auth/register', { method: 'POST', body: JSON.stringify({ email: 'space@dog.test', password: 'dogdice' }) })
+      const created = await readJson(await window.fetch('/api/runs', { method: 'POST', body: JSON.stringify({ dogType: 'SHIBA' }) }))
+      const state = JSON.parse(localStorage.getItem(storageKey))
+      state.run.items = [
+        ...Array.from({ length: 12 }, (_, x) => ({ id: `equip-${x}`, defId: 'starter-1', quality: 'BRONZE', area: 'EQUIPMENT', x, y: 0 })),
+        { id: 'extra', defId: 'starter-1', quality: 'BRONZE', area: 'BAG', x: 0, y: 0 },
+      ]
+      localStorage.setItem(storageKey, JSON.stringify(state))
+
+      const blocked = await window.fetch(`/api/runs/${created.run.id}/items/move`, { method: 'POST', body: JSON.stringify({ itemId: 'extra', area: 'EQUIPMENT', x: 12, y: 0 }) })
+      expect(blocked.status).toBe(400)
+
+      const relicState = JSON.parse(localStorage.getItem(storageKey))
+      relicState.run.relics = [{ id: 'space-relic', relicId: 'v3-fourth-dimensional-kennel', quality: 'DIAMOND', slot: 0 }]
+      localStorage.setItem(storageKey, JSON.stringify(relicState))
+
+      const movedResponse = await window.fetch(`/api/runs/${created.run.id}/items/move`, { method: 'POST', body: JSON.stringify({ itemId: 'extra', area: 'EQUIPMENT', x: 12, y: 0 }) })
+      const moved = await readJson(movedResponse)
+
+      expect(movedResponse.status).toBe(200)
+      expect(moved.run.items.find((item) => item.id === 'extra')).toMatchObject({ area: 'EQUIPMENT', x: 12, y: 0 })
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   test('default standalone mock includes current class rewards, relics, and offline ghost builder flow', async () => {
     const root = await mkdtemp(path.join(tmpdir(), 'dogfight-standalone-current-data-'))
     try {

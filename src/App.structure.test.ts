@@ -42,6 +42,13 @@ describe('selection screen structure', () => {
     expect(css).toContain('.dogfight-room-list')
   })
 
+  it('shows five-loss tolerance for casual runs in the top banner', () => {
+    expect(app).toContain('value={`${5 - run.losses}`}')
+    expect(app).toContain("tone={5 - run.losses <= 1 ? 'danger' : 'safe'}")
+    expect(app).not.toContain('value={`${3 - run.losses}`}')
+    expect(app).not.toContain("tone={3 - run.losses <= 1 ? 'danger' : 'safe'}")
+  })
+
   it('wires peak arena to apex APIs and keeps the lobby button in the top banner', () => {
     expect(app).toContain('function ApexArena')
     expect(app).toContain("api<ApexOverview>('/apex')")
@@ -164,12 +171,25 @@ describe('selection screen structure', () => {
   it('shows player run history in the mode lobby as the multi-game battle record', () => {
     expect(app).toContain('type PlayerRunHistory')
     expect(app).toContain('const [runHistory, setRunHistory]')
+    expect(app).toContain('const [historyOverlayOpen, setHistoryOverlayOpen]')
+    expect(app).toContain('type HistoryModeTab')
     expect(app).toContain("api<{ history: PlayerRunHistory }>('/runs/history')")
     expect(app).toContain('function PlayerRunHistoryPanel')
-    expect(app).toContain('<PlayerRunHistoryPanel history={runHistory} />')
+    expect(app).toContain('function PlayerHistoryOverlay')
+    expect(app).toContain('<PlayerRunHistoryPanel history={runHistory} onOpen={() => setHistoryOverlayOpen(true)} />')
+    expect(app).toContain('<ModeLobby run={run}')
+    expect(app).toContain('<PlayerHistoryOverlay history={runHistory} onClose={() => setHistoryOverlayOpen(false)} />')
     expect(app).toContain('个人战绩')
     expect(app).toContain('最近对局')
+    expect(app).toContain('全部')
+    expect(app).toContain('休闲模式')
+    expect(app).toContain('斗狗模式')
+    expect(app).toContain('巅峰模式')
+    expect(app).toContain('天梯模式')
+    expect(app).toContain('查看装备')
     expect(css).toContain('.player-history-panel')
+    expect(css).toContain('.player-history-overlay')
+    expect(css).toContain('.history-mode-tabs')
     expect(css).toContain('.history-run-list')
   })
 

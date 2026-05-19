@@ -6,9 +6,18 @@ const DIMS: Record<Area, { w: number; h: number }> = {
   BAG: { w: 12, h: 1 },
 }
 
-export function canPlace(items: GameItem[], moving: GameItem, area: Area, x: number, y: number) {
+export type PlacementOptions = {
+  equipmentWidth?: number
+}
+
+function dimsFor(area: Area, options: PlacementOptions = {}) {
+  if (area === 'EQUIPMENT' && options.equipmentWidth) return { ...DIMS.EQUIPMENT, w: options.equipmentWidth }
+  return DIMS[area]
+}
+
+export function canPlace(items: GameItem[], moving: GameItem, area: Area, x: number, y: number, options: PlacementOptions = {}) {
   const def = itemDef(moving.defId)
-  const dims = DIMS[area]
+  const dims = dimsFor(area, options)
   if (def.height !== 1) return false
   if (x < 0 || y < 0 || x + def.width > dims.w || y + 1 > dims.h) return false
   const occupied = new Set<string>()
@@ -27,12 +36,12 @@ export function canPlace(items: GameItem[], moving: GameItem, area: Area, x: num
   return true
 }
 
-export function findSlot(items: GameItem[], defId: string, area: Area) {
+export function findSlot(items: GameItem[], defId: string, area: Area, options: PlacementOptions = {}) {
   const probe: GameItem = { id: '__new__', defId, quality: 'BRONZE', area, x: 0, y: 0 }
-  const dims = DIMS[area]
+  const dims = dimsFor(area, options)
   for (let y = 0; y < dims.h; y += 1) {
     for (let x = 0; x < dims.w; x += 1) {
-      if (canPlace(items, probe, area, x, y)) return { x, y }
+      if (canPlace(items, probe, area, x, y, options)) return { x, y }
     }
   }
   return null

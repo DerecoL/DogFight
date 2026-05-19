@@ -461,7 +461,7 @@ async function defaultMockApiScript(buildId = new Date().toISOString().replace(/
         saveState(state);
         return json({ run: publicRun(run) });
       }
-      const slot = findSlot(run.items, offer.defId, body.area || 'BAG');
+      const slot = findSlot(run.items, offer.defId, body.area || 'BAG', typeof equipmentWidthForRun === 'function' ? equipmentWidthForRun(run) : 12);
       if (!slot) return error('目标区域空间不足');
       run.gold -= offer.price;
       run.shopItems = run.shopItems.filter((entry) => entry.offerId !== offer.offerId);
@@ -482,7 +482,7 @@ async function defaultMockApiScript(buildId = new Date().toISOString().replace(/
       const item = run.items.find((entry) => entry.id === body.itemId);
       if (!item) return error('道具不存在', 404);
       const candidate = { ...item, area: body.area, x: Number(body.x), y: Number(body.y) };
-      if (!canPlace(run.items, candidate)) return error('目标位置不可放置');
+      if (!canPlace(run.items, candidate, candidate.area, candidate.x, candidate.y, typeof equipmentWidthForRun === 'function' ? equipmentWidthForRun(run) : 12)) return error('目标位置不可放置');
       Object.assign(item, candidate);
       saveState(state);
       return json({ run: publicRun(run) });
@@ -866,10 +866,15 @@ async function currentMockApiScript(buildId) {
     return [1, 2, 3, 4, 5, 6].map((n, index) => ({ id: id(state, 'item'), defId: 'starter-' + n, quality: 'BRONZE', area: 'EQUIPMENT', x: index, y: 0 }));
   }
 
-  function canPlace(items, moving, area = moving.area, x = moving.x, y = moving.y) {
+  function equipmentWidthForRun(run) {
+    return run.relics?.some((relic) => relicDefsById[relic.relicId]?.effect === 'EXTRA_EQUIPMENT_REDUCED_EFFECT') ? 13 : 12;
+  }
+
+  function canPlace(items, moving, area = moving.area, x = moving.x, y = moving.y, equipmentWidth = 12) {
     const def = defs[moving.defId];
     if (!def || def.height !== 1) return false;
-    if (x < 0 || y < 0 || x + def.width > 12 || y + 1 > 1) return false;
+    const maxWidth = area === 'EQUIPMENT' ? equipmentWidth : 12;
+    if (x < 0 || y < 0 || x + def.width > maxWidth || y + 1 > 1) return false;
     const occupied = new Set();
     for (const item of items) {
       if (item.id === moving.id || item.area !== area) continue;
@@ -882,11 +887,12 @@ async function currentMockApiScript(buildId) {
     return true;
   }
 
-  function findSlot(items, defId, area) {
+  function findSlot(items, defId, area, equipmentWidth = 12) {
     const def = defs[defId] || defs['starter-1'];
     const probe = { id: '__new__', defId, quality: 'BRONZE', area, x: 0, y: 0 };
-    for (let x = 0; x <= 12 - def.width; x += 1) {
-      if (canPlace(items, probe, area, x, 0)) return { x, y: 0 };
+    const maxWidth = area === 'EQUIPMENT' ? equipmentWidth : 12;
+    for (let x = 0; x <= maxWidth - def.width; x += 1) {
+      if (canPlace(items, probe, area, x, 0, equipmentWidth)) return { x, y: 0 };
     }
     return null;
   }
@@ -1303,7 +1309,7 @@ async function currentMockApiScript(buildId) {
       }
       if (!offer) return error('商品不存在', 404);
       if (run.gold < offer.price) return error('金币不足');
-      const slot = findSlot(run.items, offer.defId, body.area || 'BAG');
+      const slot = findSlot(run.items, offer.defId, body.area || 'BAG', typeof equipmentWidthForRun === 'function' ? equipmentWidthForRun(run) : 12);
       if (!slot) return error('目标区域空间不足');
       run.gold -= offer.price;
       run.shopItems = run.shopItems.filter((entry) => entry.offerId !== offer.offerId);
@@ -1324,7 +1330,7 @@ async function currentMockApiScript(buildId) {
       const item = run.items.find((entry) => entry.id === body.itemId);
       if (!item) return error('道具不存在', 404);
       const candidate = { ...item, area: body.area, x: Number(body.x), y: Number(body.y) };
-      if (!canPlace(run.items, candidate, candidate.area, candidate.x, candidate.y)) return error('目标位置不可放置');
+      if (!canPlace(run.items, candidate, candidate.area, candidate.x, candidate.y, typeof equipmentWidthForRun === 'function' ? equipmentWidthForRun(run) : 12)) return error('目标位置不可放置');
       Object.assign(item, candidate);
       saveState(state);
       return json({ run: publicRun(run) });

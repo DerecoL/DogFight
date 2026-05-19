@@ -78,10 +78,15 @@ export function publicRun(run: Run & { items: ItemInstance[] }) {
   }
 }
 
-type RunHistorySource = Pick<Run, 'id' | 'dogType' | 'luckyNumber' | 'wins' | 'losses' | 'round' | 'status' | 'phase' | 'createdAt' | 'updatedAt'>
+type RunHistoryItemSource = Pick<ItemInstance, 'id' | 'runId' | 'defId' | 'quality' | 'area' | 'x' | 'y'>
+type RunHistorySource = Pick<Run, 'id' | 'dogType' | 'luckyNumber' | 'wins' | 'losses' | 'round' | 'status' | 'phase' | 'createdAt' | 'updatedAt'> & {
+  relics?: string
+  items?: RunHistoryItemSource[]
+}
 
 export type PublicRunHistoryEntry = {
   id: string
+  mode: 'CASUAL'
   dogType: DogType
   luckyNumber: number | null
   wins: number
@@ -89,6 +94,8 @@ export type PublicRunHistoryEntry = {
   round: number
   status: string
   phase: Phase
+  items: Array<GameItem & { def: ReturnType<typeof itemDefForQuality> }>
+  relics: ReturnType<typeof publicRelics>
   createdAt: string
   updatedAt: string
 }
@@ -107,6 +114,7 @@ export type PublicRunHistory = {
 function toHistoryEntry(run: RunHistorySource): PublicRunHistoryEntry {
   return {
     id: run.id,
+    mode: 'CASUAL',
     dogType: run.dogType as DogType,
     luckyNumber: run.luckyNumber,
     wins: run.wins,
@@ -114,6 +122,10 @@ function toHistoryEntry(run: RunHistorySource): PublicRunHistoryEntry {
     round: run.round,
     status: run.status,
     phase: run.phase as Phase,
+    items: (run.items ?? [])
+      .map((item) => ({ id: item.id, defId: item.defId, quality: normalizeQuality(item.quality), area: item.area as GameItem['area'], x: item.x, y: item.y }))
+      .map((item) => ({ ...item, def: itemDefForQuality(item.defId, item.quality) })),
+    relics: publicRelics({ relics: run.relics ?? '[]' }),
     createdAt: run.createdAt.toISOString(),
     updatedAt: run.updatedAt.toISOString(),
   }
@@ -137,7 +149,7 @@ export function publicRunHistory(runs: RunHistorySource[]): PublicRunHistory {
     totalWins: runs.reduce((sum, run) => sum + run.wins, 0),
     totalLosses: runs.reduce((sum, run) => sum + run.losses, 0),
     bestRun: bestRun ? toHistoryEntry(bestRun) : null,
-    recentRuns: runs.slice(0, 5).map(toHistoryEntry),
+    recentRuns: runs.map(toHistoryEntry),
   }
 }
 

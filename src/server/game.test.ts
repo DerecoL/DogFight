@@ -29,6 +29,22 @@ describe('grid placement', () => {
     expect(canPlace(items, moving, 'BAG', 8, 1)).toBe(false)
   })
 
+  it('allows the equipment row to expand to a thirteenth slot', () => {
+    const items = Array.from({ length: 12 }, (_, index) => ({
+      id: `filled-${index}`,
+      defId: 'starter-1',
+      quality: 'BRONZE' as const,
+      area: 'EQUIPMENT' as const,
+      x: index,
+      y: 0,
+    }))
+    const moving = { id: 'new', defId: 'starter-1', quality: 'BRONZE' as const, area: 'EQUIPMENT' as const, x: 12, y: 0 }
+
+    expect(canPlace(items, moving, 'EQUIPMENT', 12, 0)).toBe(false)
+    expect(canPlace(items, moving, 'EQUIPMENT', 12, 0, { equipmentWidth: 13 })).toBe(true)
+    expect(findSlot(items, 'starter-1', 'EQUIPMENT', { equipmentWidth: 13 })).toEqual({ x: 12, y: 0 })
+  })
+
   it('orders equipment from left to right, then top to bottom within a column', () => {
     const ordered = triggerOrder([
       { id: 'b', defId: 'starter-1', quality: 'BRONZE', area: 'EQUIPMENT', x: 1, y: 0 },
@@ -455,8 +471,10 @@ describe('battle simulation', () => {
       losses: 0,
       round: 0,
       items: [
-        { id: 'shield-a', defId: 'v3-golden-kennel', quality: 'DIAMOND', area: 'EQUIPMENT', x: 0, y: 0 },
-        { id: 'shield-b', defId: 'v3-golden-kennel', quality: 'DIAMOND', area: 'EQUIPMENT', x: 4, y: 0 },
+        { id: 'shield-a', defId: 'v3-wooden-shield', quality: 'DIAMOND', area: 'EQUIPMENT', x: 0, y: 0 },
+        { id: 'shield-b', defId: 'v3-wooden-shield', quality: 'DIAMOND', area: 'EQUIPMENT', x: 2, y: 0 },
+        { id: 'shield-c', defId: 'v3-wooden-shield', quality: 'DIAMOND', area: 'EQUIPMENT', x: 4, y: 0 },
+        { id: 'shield-d', defId: 'v3-wooden-shield', quality: 'DIAMOND', area: 'EQUIPMENT', x: 6, y: 0 },
       ],
     }
     const opponent: FighterSnapshot = {
@@ -470,7 +488,7 @@ describe('battle simulation', () => {
       ],
     }
     const result = simulateBattle(player, opponent, 'shield-2')
-    const shieldEvents = result.events.filter((event) => event.itemId === 'shield-a' || event.itemId === 'shield-b')
+    const shieldEvents = result.events.filter((event) => event.itemId?.startsWith('shield-'))
     const absorbedDamage = result.events.find((event) => event.actor === 'opponent' && event.kind === 'ITEM' && event.effectType === 'DAMAGE' && event.targetHpDelta === 0)
 
     expect(shieldEvents.length).toBeGreaterThanOrEqual(2)
@@ -522,7 +540,7 @@ describe('battle simulation', () => {
     const result = simulateBattle(player, opponent, 'shield-ui-events')
     const shieldEvent = result.events.find((event) => event.itemId === 'shield')
 
-    expect(shieldEvent).toMatchObject({ amount: 25, playerShield: 25 })
+    expect(shieldEvent).toMatchObject({ amount: 18, playerShield: 18 })
   })
 
   it('records positive and negative status snapshots on battle events', () => {
@@ -543,12 +561,12 @@ describe('battle simulation', () => {
     const poisonTick = result.events.find((event) => event.kind === 'POISON' && event.target === 'opponent')
     const shieldEvent = result.events.find((event) => event.defId === 'v3-cone-collar')
 
-    expect(poisonApply?.opponentStatuses?.negative).toContainEqual(expect.objectContaining({ type: 'poison', stacks: 10, nextTickIn: 1, tickDamage: 10 }))
-    expect(poisonTick?.opponentStatuses?.negative).toContainEqual(expect.objectContaining({ type: 'poison', stacks: 10, tickDamage: 10 }))
+    expect(poisonApply?.opponentStatuses?.negative).toContainEqual(expect.objectContaining({ type: 'poison', stacks: 3, nextTickIn: 1, tickDamage: 3 }))
+    expect(poisonTick?.opponentStatuses?.negative).toContainEqual(expect.objectContaining({ type: 'poison', stacks: 3, tickDamage: 3 }))
     expect(shieldEvent?.playerStatuses?.positive).toContainEqual(expect.objectContaining({ type: 'shield', amount: 3 }))
   })
 
-  it('makes poison bypass shield and end battle when health reaches zero', () => {
+  it('lets golden kennel halve poison instead of fully blocking it', () => {
     const player: FighterSnapshot = {
       name: 'P',
       dogType: 'SHIBA',
@@ -570,33 +588,41 @@ describe('battle simulation', () => {
       ],
     }
     const result = simulateBattle(player, opponent, 'poison-bypasses-shield')
-    const poisonTicks = result.events.filter((event) => event.kind === 'POISON' && event.target === 'player')
+    const poisonApply = result.events.find((event) => event.defId === 'shiba-poison' && event.effectType === 'POISON')
+    const poisonTick = result.events.find((event) => event.kind === 'POISON' && event.target === 'player')
 
-    expect(poisonTicks.length).toBeGreaterThan(0)
-    expect(poisonTicks.every((event, index, ticks) => index === 0 || event.playerHp < ticks[index - 1].playerHp)).toBe(true)
-    expect(result.playerHp).toBe(0)
-    expect(result.winner).toBe('opponent')
+    expect(poisonApply?.amount).toBe(2)
+    expect(poisonApply?.playerStatuses?.negative).toContainEqual(expect.objectContaining({ type: 'poison', stacks: 2 }))
+    expect(poisonTick).toMatchObject({ amount: 2, target: 'player' })
   })
 
-  it('caps chained class reward triggers and records a readable log entry', () => {
+  it('limits chase car extra-roll fanout to three equipment triggers', () => {
     const player: FighterSnapshot = {
       name: 'P',
       dogType: 'MUTT',
       wins: 0,
       losses: 0,
       round: 6,
-      items: Array.from({ length: 12 }, (_, index) => ({
-        id: `chainer-${index}`,
-        defId: 'mutt-chase-car',
-        quality: 'DIAMOND' as const,
-        area: 'EQUIPMENT' as const,
-        x: index,
-        y: 0,
-      })),
+      items: [
+        { id: 'counter', defId: 'mutt-counting-collar', quality: 'GOLD', area: 'EQUIPMENT', x: 0, y: 0 },
+        { id: 'chase-car', defId: 'mutt-chase-car', quality: 'DIAMOND', area: 'EQUIPMENT', x: 2, y: 0 },
+        { id: 'bite-a', defId: 'starter-1', quality: 'BRONZE', area: 'EQUIPMENT', x: 3, y: 0 },
+        { id: 'bite-b', defId: 'starter-1', quality: 'BRONZE', area: 'EQUIPMENT', x: 4, y: 0 },
+        { id: 'bite-c', defId: 'starter-1', quality: 'BRONZE', area: 'EQUIPMENT', x: 5, y: 0 },
+        { id: 'bite-d', defId: 'starter-1', quality: 'BRONZE', area: 'EQUIPMENT', x: 6, y: 0 },
+      ],
     }
     const opponent: FighterSnapshot = { name: 'O', dogType: 'SHIBA', wins: 0, losses: 0, round: 6, items: [] }
-    const result = simulateBattle(player, opponent, 'plain-10')
+    const result = simulateBattle(player, opponent, 'mutt-chase-car-fanout-limit')
+    const firstExtraRoll = result.events.find((event) => event.kind === 'ROLL' && event.actor === 'player' && event.text.includes('额外'))
+    const extraRollDamage = result.events.filter((event) =>
+      event.time === firstExtraRoll?.time
+      && event.actor === 'player'
+      && event.kind === 'ITEM'
+      && event.effectType === 'DAMAGE'
+    )
 
-    expect(result.events.some((event) => event.kind === 'ITEM' && event.text.includes('触发队列达到上限'))).toBe(true)
+    expect(firstExtraRoll).toBeDefined()
+    expect(extraRollDamage.length).toBeLessThanOrEqual(3)
   })
 })

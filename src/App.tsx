@@ -43,6 +43,8 @@ type ShopType = 'GENERAL' | 'LARGE' | 'MEDIUM' | 'SMALL' | 'SMALL_DICE' | 'BIG_D
 type ItemQuality = 'BRONZE' | 'SILVER' | 'GOLD' | 'DIAMOND'
 type GameMode = 'CASUAL' | 'LADDER' | 'DOGFIGHT' | 'PEAK'
 type AppScreen = 'LOBBY' | 'CASUAL' | 'DOGFIGHT' | 'PEAK'
+type HistoryModeTab = 'ALL' | 'CASUAL' | 'DOGFIGHT' | 'PEAK' | 'LADDER'
+type HistoryRunMode = Exclude<HistoryModeTab, 'ALL'>
 
 type ItemDef = {
   id: string
@@ -133,6 +135,9 @@ type Run = {
   items: Item[]
 }
 type PlayerRunHistoryEntry = Pick<Run, 'id' | 'dogType' | 'luckyNumber' | 'wins' | 'losses' | 'round' | 'status' | 'phase'> & {
+  mode: HistoryRunMode
+  items: Item[]
+  relics: Relic[]
   createdAt: string
   updatedAt: string
 }
@@ -298,6 +303,8 @@ const qualityLabel: Record<ItemQuality, string> = {
 }
 const DOG_SELECTION_SLOT_COUNT = 8
 const SHOP_CHOICE_SLOT_COUNT = 7
+const BASE_EQUIPMENT_SLOT_COUNT = 12
+const EXTRA_EQUIPMENT_SLOT_COUNT = 13
 const BASE_MAX_HP = 100
 const EARLY_ROUND_HP_GROWTH = 20
 const LATE_ROUND_HP_GROWTH = 50
@@ -312,6 +319,13 @@ const emptyRunHistory: PlayerRunHistory = {
   bestRun: null,
   recentRuns: [],
 }
+const historyModeTabs: Array<{ id: HistoryModeTab; label: string }> = [
+  { id: 'ALL', label: '全部' },
+  { id: 'CASUAL', label: '休闲模式' },
+  { id: 'DOGFIGHT', label: '斗狗模式' },
+  { id: 'PEAK', label: '巅峰模式' },
+  { id: 'LADDER', label: '天梯模式' },
+]
 const dogOptions: DogType[] = ['SHIBA', 'SAMOYED', 'MUTT', 'BULLY', 'EMPEROR']
 const shopChoiceOrder: ShopType[] = ['GENERAL', 'LARGE', 'MEDIUM', 'SMALL', 'SMALL_DICE', 'BIG_DICE', 'RELIC']
 const dogStrategies: Record<DogType, string> = {
@@ -382,6 +396,10 @@ function qualityClass(quality?: string) {
 
 function qualityAmountFrom(amount: number, quality?: string, baseQuality?: string) {
   return Math.round(amount * (1.5 ** qualityOrder.indexOf(normalizeQuality(quality))) / (1.5 ** qualityOrder.indexOf(normalizeQuality(baseQuality))))
+}
+
+function equipmentSlotCount(relics?: Relic[]) {
+  return relics?.some((relic) => relic.def.effect === 'EXTRA_EQUIPMENT_REDUCED_EFFECT') ? EXTRA_EQUIPMENT_SLOT_COUNT : BASE_EQUIPMENT_SLOT_COUNT
 }
 
 function effectText(def: ItemDef, quality: ItemQuality = 'BRONZE') {
@@ -515,6 +533,7 @@ export default function App() {
   const [musicBlocked, setMusicBlocked] = useState(false)
   const [appHasAudioFocus, setAppHasAudioFocus] = useState(() => !document.hidden && document.hasFocus())
   const [runHistory, setRunHistory] = useState<PlayerRunHistory>(emptyRunHistory)
+  const [historyOverlayOpen, setHistoryOverlayOpen] = useState(false)
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
   const hasBattle = Boolean(battle)
@@ -737,7 +756,9 @@ export default function App() {
   if (appScreen === 'LOBBY') {
     return (
       <Shell run={run ?? undefined} error={error} musicEnabled={musicEnabled} musicBlocked={musicBlocked} onToggleMusic={toggleMusic} onLogout={() => action(() => api('/auth/logout', { method: 'POST' }).then(() => ({ user: null })))}>
-        <ModeLobby run={run} runHistory={runHistory} onEnterCasual={() => setAppScreen('CASUAL')} onEnterDogfight={() => setAppScreen('DOGFIGHT')} onEnterPeak={() => setAppScreen('PEAK')} />
+        <PlayerRunHistoryPanel history={runHistory} onOpen={() => setHistoryOverlayOpen(true)} />
+        <ModeLobby run={run} runHistory={runHistory} onOpen={() => setHistoryOverlayOpen(true)} onEnterCasual={() => setAppScreen('CASUAL')} onEnterDogfight={() => setAppScreen('DOGFIGHT')} onEnterPeak={() => setAppScreen('PEAK')} />
+        {historyOverlayOpen && <PlayerHistoryOverlay history={runHistory} onClose={() => setHistoryOverlayOpen(false)} />}
       </Shell>
     )
   }
@@ -765,7 +786,6 @@ export default function App() {
       </Shell>
     )
   }
-
   return (
     <Shell run={run} error={error} musicEnabled={musicEnabled} musicBlocked={musicBlocked} onToggleMusic={toggleMusic} onOpenLobby={() => setAppScreen('LOBBY')} onLogout={() => action(() => api('/auth/logout', { method: 'POST' }).then(() => ({ user: null })))}>
       {!battle && run.phase === 'CHOICE' && (
@@ -931,15 +951,14 @@ const modeCards: Array<{
   },
 ]
 
-function ModeLobby({ run, runHistory, onEnterCasual, onEnterDogfight, onEnterPeak }: { run: Run | null; runHistory: PlayerRunHistory; onEnterCasual: () => void; onEnterDogfight: () => void; onEnterPeak: () => void }) {
+function ModeLobby({ run, runHistory, onOpen, onEnterCasual, onEnterDogfight, onEnterPeak }: { run: Run | null; runHistory: PlayerRunHistory; onOpen: () => void; onEnterCasual: () => void; onEnterDogfight: () => void; onEnterPeak: () => void }) {
   const casualAction = run ? '继续休闲模式' : '开始休闲模式'
   return (
-    <section className="mode-lobby-screen">
+    <section className="mode-lobby-screen" data-history-count={runHistory.totalRuns} data-history-action={onOpen.name}>
       <div className="screen-heading centered">
         <h2>模式大厅</h2>
         <p>选择本次要进入的竞技方式。休闲模式结束后的狗可以送入巅峰竞技场。</p>
       </div>
-      <PlayerRunHistoryPanel history={runHistory} />
       <div className="mode-grid">
         {modeCards.map((mode) => (
           <article key={mode.id} className={mode.locked ? 'mode-card locked' : 'mode-card available'}>
@@ -972,7 +991,7 @@ function ModeLobby({ run, runHistory, onEnterCasual, onEnterDogfight, onEnterPea
   )
 }
 
-function PlayerRunHistoryPanel({ history }: { history: PlayerRunHistory }) {
+function PlayerRunHistoryPanel({ history, onOpen }: { history: PlayerRunHistory; onOpen: () => void }) {
   const bestRun = history.bestRun
   const winRate = history.totalWins + history.totalLosses > 0
     ? Math.round((history.totalWins / (history.totalWins + history.totalLosses)) * 100)
@@ -994,6 +1013,7 @@ function PlayerRunHistoryPanel({ history }: { history: PlayerRunHistory }) {
             <strong>暂无对局</strong>
           )}
         </div>
+        <button className="history-open-action" type="button" onClick={onOpen}>查看详情和装备</button>
       </div>
       <div className="history-run-list" aria-label="最近对局">
         {history.recentRuns.length > 0 ? history.recentRuns.map((entry) => (
@@ -1019,6 +1039,153 @@ function runStatusText(status: string) {
   if (status === 'COMPLETE') return '已完成'
   if (status === 'ABANDONED') return '已换狗'
   return '已记录'
+}
+
+function PlayerHistoryOverlay({ history, onClose }: { history: PlayerRunHistory; onClose: () => void }) {
+  const [activeTab, setActiveTab] = useState<HistoryModeTab>('ALL')
+  const [selectedRunId, setSelectedRunId] = useState<string | null>(null)
+  const [inspectedItem, setInspectedItem] = useState<Item | null>(null)
+  const [tipAnchor, setTipAnchor] = useState<TipAnchor | null>(null)
+  const runs = activeTab === 'ALL' ? history.recentRuns : history.recentRuns.filter((entry) => entry.mode === activeTab)
+  const selectedRun = runs.find((entry) => entry.id === selectedRunId) ?? runs[0] ?? null
+  const bestRun = history.bestRun
+
+  const closeTip = () => {
+    setInspectedItem(null)
+    setTipAnchor(null)
+  }
+  const inspectItem = (item: Item, element: HTMLElement) => {
+    setInspectedItem(item)
+    setTipAnchor(getFloatingTipPosition(element))
+  }
+
+  return (
+    <div className="player-history-overlay" role="dialog" aria-modal="true" aria-label="个人战绩详情">
+      <section className="player-history-page">
+        <header className="history-page-header">
+          <div>
+            <span>个人战绩</span>
+            <h2>{history.totalWins}胜 {history.totalLosses}败</h2>
+            <p>共 {history.totalRuns} 局 · 进行中 {history.activeRuns} 局 · 已完成 {history.completedRuns} 局</p>
+          </div>
+          <div className="history-page-best">
+            <small>最佳成绩</small>
+            <strong>{bestRun ? `${dogNames[bestRun.dogType]} · ${bestRun.wins}胜 ${bestRun.losses}败` : '暂无对局'}</strong>
+          </div>
+          <button className="icon-button" title="关闭个人战绩" aria-label="关闭个人战绩" onClick={onClose}>
+            <span aria-hidden="true">×</span>
+          </button>
+        </header>
+
+        <div className="history-mode-tabs" role="tablist" aria-label="战绩模式">
+          {historyModeTabs.map((tab) => {
+            const count = tab.id === 'ALL' ? history.recentRuns.length : history.recentRuns.filter((entry) => entry.mode === tab.id).length
+            return (
+              <button key={tab.id} type="button" className={activeTab === tab.id ? 'active' : ''} onClick={() => { setActiveTab(tab.id); setSelectedRunId(null); closeTip() }}>
+                {tab.label}<small>{count}</small>
+              </button>
+            )
+          })}
+        </div>
+
+        <div className="history-detail-layout">
+          <section className="history-run-browser" aria-label="历史对局列表">
+            {runs.length > 0 ? runs.map((entry) => (
+              <button key={entry.id} type="button" className={`history-detail-row ${selectedRun?.id === entry.id ? 'selected' : ''}`} onClick={() => { setSelectedRunId(entry.id); closeTip() }}>
+                <img className="dog-avatar small" src={dogAssets[entry.dogType]} alt="" />
+                <span>{dogNames[entry.dogType]}</span>
+                <strong>{entry.wins}胜 {entry.losses}败</strong>
+                <small>{runStatusText(entry.status)} · 第 {entry.round} 回合 · 装备 {entry.items.length}</small>
+              </button>
+            )) : (
+              <div className="history-empty-state">
+                <strong>{historyModeTabs.find((tab) => tab.id === activeTab)?.label}暂无记录</strong>
+                <p>这个页签已经预留，后续模式接入历史数据后会显示详情。</p>
+              </div>
+            )}
+          </section>
+
+          <section className="history-selected-run" aria-label="对局详情">
+            {selectedRun ? (
+              <HistoryRunDetails entry={selectedRun} inspectedItem={inspectedItem} tipAnchor={tipAnchor} onInspectItem={inspectItem} onCloseTip={closeTip} />
+            ) : (
+              <div className="history-empty-state">
+                <strong>没有可查看的对局</strong>
+                <p>开始或完成一局后，会在这里显示装备和遗物详情。</p>
+              </div>
+            )}
+          </section>
+        </div>
+      </section>
+    </div>
+  )
+}
+
+function HistoryRunDetails({ entry, inspectedItem, tipAnchor, onInspectItem, onCloseTip }: { entry: PlayerRunHistoryEntry; inspectedItem: Item | null; tipAnchor: TipAnchor | null; onInspectItem: (item: Item, element: HTMLElement) => void; onCloseTip: () => void }) {
+  const equipment = entry.items.filter((item) => item.area === 'EQUIPMENT')
+  const bag = entry.items.filter((item) => item.area === 'BAG')
+  const tipRun: Run = {
+    id: entry.id,
+    dogType: entry.dogType,
+    luckyNumber: entry.luckyNumber,
+    wins: entry.wins,
+    losses: entry.losses,
+    round: entry.round,
+    gold: 0,
+    phase: entry.phase,
+    status: entry.status,
+    shopType: 'GENERAL',
+    shopItems: [],
+    choices: [],
+    classRewardChoices: [],
+    relicChoices: [],
+    relics: entry.relics,
+    refreshCost: 1,
+    matchedGhost: null,
+    lastBattle: null,
+    items: entry.items,
+  }
+
+  return (
+    <div className="history-run-details">
+      <div className="history-run-title">
+        <div>
+          <span>{historyModeTabs.find((tab) => tab.id === entry.mode)?.label}</span>
+          <h3>{dogNames[entry.dogType]} · {entry.wins}胜 {entry.losses}败</h3>
+          <p>{runStatusText(entry.status)} · 第 {entry.round} 回合 · {new Date(entry.updatedAt).toLocaleString()}</p>
+        </div>
+      </div>
+      <div className="battle-equipment-row player history-equipment-preview">
+        <div className="battle-row-title">
+          <span>历史装备栏</span>
+          <small>点击查看装备</small>
+        </div>
+        <div className="battle-slot-grid" style={{ gridTemplateColumns: `repeat(${equipmentSlotCount(entry.relics)}, minmax(0, 1fr))` }}>
+          {Array.from({ length: equipmentSlotCount(entry.relics) }).map((_, x) => <i key={x} className="battle-slot" style={{ gridColumn: x + 1, gridRow: 1 }} />)}
+          {equipment.map((item) => (
+            <button
+              type="button"
+              key={item.id}
+              className={`battle-item item-card ${itemTone(item.def)} ${qualityClass(item.quality)}`}
+              style={{ gridColumn: `${item.x + 1} / span ${item.def.width}`, gridRow: 1 }}
+              title={`${qualityLabel[normalizeQuality(item.quality)]} ${item.def.name} · ${effectText(item.def, normalizeQuality(item.quality))}`}
+              onClick={(event) => onInspectItem(item, event.currentTarget)}
+            >
+              <img className="item-icon" src={itemIcon(item.def)} alt="" />
+              <span className="quality-chip">{qualityLabel[normalizeQuality(item.quality)]}</span>
+              <span>{item.def.name}</span>
+              <small><Dice5 size={12} /> {item.def.dice.join('/')}</small>
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="history-inventory-summary">
+        <RelicRail relics={entry.relics} />
+        <p>遗物 {entry.relics.length} 个 · 背包物品 {bag.length} 个</p>
+      </div>
+      <FloatingTip run={tipRun} item={inspectedItem} offer={null} anchor={tipAnchor} onClose={onCloseTip} onBuy={null} onSell={null} onUpgrade={null} />
+    </div>
+  )
 }
 
 function DogfightLobby() {
@@ -1715,7 +1882,7 @@ function TopBar({ run, musicEnabled, musicBlocked, onToggleMusic, onOpenLobby, o
       {run && (
         <div className="stats">
           <ResourcePill icon={<Trophy size={16} />} label="胜场" value={`${run.wins}/12`} tone="win" />
-          <ResourcePill icon={<Shield size={16} />} label="容错" value={`${3 - run.losses}`} tone={3 - run.losses <= 1 ? 'danger' : 'safe'} />
+          <ResourcePill icon={<Shield size={16} />} label="容错" value={`${5 - run.losses}`} tone={5 - run.losses <= 1 ? 'danger' : 'safe'} />
           <ResourcePill icon={<Coins size={16} />} label="金币" value={run.gold} tone="gold" />
           <ResourcePill icon={<Dice5 size={16} />} label="回合" value={run.round} tone="round" />
         </div>
@@ -1975,12 +2142,13 @@ function SizePreview({ size }: { size: number }) {
 }
 
 function InventoryBoard({ run, selectedItemId, draggingItemId, onSelectItem, onSlotClick }: { run: Run; selectedItemId: string | null; draggingItemId: string | null; onSelectItem: (itemId: string, element: HTMLElement) => void; onSlotClick: (area: Area, x: number, y: number) => void }) {
+  const equipmentSlots = equipmentSlotCount(run.relics)
   return (
     <section className="inventory-board expanded">
-      <GridPanel title="装备栏" subtitle="12 格单行，从左向右触发" icon={<Grid3X3 size={18} />} area="EQUIPMENT" w={12} h={1} items={run.items} selectedItemId={selectedItemId} draggingItemId={draggingItemId} onSelectItem={onSelectItem} onSlotClick={onSlotClick} />
+      <GridPanel title="装备栏" subtitle={`${equipmentSlots} 格单行，从左向右触发`} icon={<Grid3X3 size={18} />} area="EQUIPMENT" w={equipmentSlots} h={1} items={run.items} selectedItemId={selectedItemId} draggingItemId={draggingItemId} onSelectItem={onSelectItem} onSlotClick={onSlotClick} />
       <div className="bag-relic-row">
         <RelicRail relics={run.relics ?? []} />
-        <GridPanel title="背包" subtitle="12 格单行，战斗中默认不生效" icon={<Backpack size={18} />} area="BAG" w={12} h={1} items={run.items} selectedItemId={selectedItemId} draggingItemId={draggingItemId} onSelectItem={onSelectItem} onSlotClick={onSlotClick} />
+        <GridPanel title="背包" subtitle={`${BASE_EQUIPMENT_SLOT_COUNT} 格单行，战斗中默认不生效`} icon={<Backpack size={18} />} area="BAG" w={BASE_EQUIPMENT_SLOT_COUNT} h={1} items={run.items} selectedItemId={selectedItemId} draggingItemId={draggingItemId} onSelectItem={onSelectItem} onSlotClick={onSlotClick} />
       </div>
     </section>
   )
@@ -2292,14 +2460,15 @@ function BattleView({ run, battle, currentEvent, eventIndex, speed, score, onSpe
 function BattleEquipmentRow({ owner, snapshot, activeEvent, onInspect }: { owner: 'player' | 'opponent'; snapshot: BattleSnapshot; activeEvent?: BattleEvent; onInspect: (item: Item, element: HTMLElement) => void }) {
   const items = snapshot.items.filter((item) => item.area === 'EQUIPMENT')
   const activeItemId = activeEvent?.actor === owner && activeEvent.kind === 'ITEM' ? activeEvent.itemId : null
+  const slots = equipmentSlotCount(snapshot.relics)
   return (
     <div className={`battle-equipment-row ${owner}`}>
       <div className="battle-row-title">
         <span>{owner === 'player' ? '你的装备栏' : '对手装备栏'}</span>
         <small>{snapshot.name} · {dogNames[snapshot.dogType]}</small>
       </div>
-      <div className="battle-slot-grid" style={{ gridTemplateColumns: 'repeat(12, minmax(0, 1fr))' }}>
-        {Array.from({ length: 12 }).map((_, x) => <i key={x} className="battle-slot" style={{ gridColumn: x + 1, gridRow: 1 }} />)}
+      <div className="battle-slot-grid" style={{ gridTemplateColumns: `repeat(${slots}, minmax(0, 1fr))` }}>
+        {Array.from({ length: slots }).map((_, x) => <i key={x} className="battle-slot" style={{ gridColumn: x + 1, gridRow: 1 }} />)}
         {items.map((item) => (
           <button
             type="button"

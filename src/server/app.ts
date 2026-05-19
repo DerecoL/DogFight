@@ -11,7 +11,7 @@ import { registerDogfightRoutes } from './dogfight'
 import { publicErrorMessage } from './errors'
 import { buildApexSeedEntries, resolveApexChallenge, type ApexOpponent } from './game/apex'
 import { itemDef, itemDefForQuality, relicDef, relicDefForQuality } from './game/data'
-import { canPlace, findSlot } from './game/grid'
+import { canPlace, findSlot, type PlacementOptions } from './game/grid'
 import { canUpgradePair, nextQuality, normalizeQuality } from './game/quality'
 import { simulateBattle } from './game/battle'
 import { STARTING_GOLD, isTrainingMatchRound } from './game/matchmaking'
@@ -106,6 +106,11 @@ export function buildApp() {
     relics: parseJson<RelicInstance[]>(entry.relics, []).map((relic) => ({ ...relic, def: relicDefForQuality(relic.relicId, relic.quality) })),
   })
 
+  const placementOptionsForRun = (run: { relics: string }): PlacementOptions => {
+    const hasExtraEquipment = relicsFromRun(run).some((relic) => relicDef(relic.relicId).effect === 'EXTRA_EQUIPMENT_REDUCED_EFFECT')
+    return hasExtraEquipment ? { equipmentWidth: 13 } : {}
+  }
+
   const ensureApexSeeds = async () => {
     const count = await prisma.apexEntry.count()
     if (count > 0) return
@@ -199,8 +204,10 @@ export function buildApp() {
         round: true,
         status: true,
         phase: true,
+        relics: true,
         createdAt: true,
         updatedAt: true,
+        items: true,
       },
     })
     return { history: publicRunHistory(runs) }
@@ -365,7 +372,7 @@ export function buildApp() {
       return { run: publicRun(updated) }
     }
 
-    const slot = findSlot(items, offer.defId, body.area)
+    const slot = findSlot(items, offer.defId, body.area, placementOptionsForRun(run))
     if (!slot) return reply.code(400).send({ error: '目标区域空间不足' })
     const updated = await prisma.run.update({
       where: { id: run.id },
@@ -402,7 +409,7 @@ export function buildApp() {
     const item = run.items.find((entry) => entry.id === body.itemId)
     if (!item) return reply.code(404).send({ error: '道具不存在' })
     const gameItems = toGameItems(run.items)
-    if (!canPlace(gameItems, { id: item.id, defId: item.defId, quality: normalizeQuality(item.quality), area: body.area, x: body.x, y: body.y }, body.area, body.x, body.y)) {
+    if (!canPlace(gameItems, { id: item.id, defId: item.defId, quality: normalizeQuality(item.quality), area: body.area, x: body.x, y: body.y }, body.area, body.x, body.y, placementOptionsForRun(run))) {
       return reply.code(400).send({ error: '目标位置不可放置' })
     }
     await prisma.itemInstance.update({ where: { id: item.id }, data: { area: body.area, x: body.x, y: body.y } })
@@ -577,7 +584,7 @@ export function buildApp() {
     const wins = run.wins + (playerWon ? 1 : 0)
     const losses = run.losses + (playerWon ? 0 : 1)
     const battleRecord = createFinishedBattleRecord(result, wins, losses)
-    const status = wins >= 12 || losses >= 3 ? 'COMPLETE' : 'ACTIVE'
+    const status = wins >= 12 || losses >= 5 ? 'COMPLETE' : 'ACTIVE'
     const nextRound = run.round + 1
     const nextClassRewards = classRewardChoices(run.dogType as DogType, nextRound)
     const phase = status === 'COMPLETE'

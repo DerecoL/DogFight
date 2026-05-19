@@ -78,6 +78,8 @@ describe('player run history', () => {
         round: 3,
         status: 'ACTIVE',
         phase: 'SHOP',
+        relics: JSON.stringify([{ id: 'r1', relicId: 'midas-left', quality: 'BRONZE', slot: 0 }]),
+        items: [{ id: 'item-1', runId: 'active-run', defId: 'small-bite', quality: 'SILVER', area: 'EQUIPMENT', x: 0, y: 0 }],
         createdAt: new Date('2026-05-19T10:00:00Z'),
         updatedAt: new Date('2026-05-19T10:10:00Z'),
       },
@@ -125,5 +127,10 @@ describe('player run history', () => {
       },
     })
     expect(history.recentRuns.map((run) => run.id)).toEqual(['active-run', 'best-run', 'abandoned-run'])
+    expect(history.recentRuns[0]).toMatchObject({
+      mode: 'CASUAL',
+      items: [{ defId: 'small-bite', quality: 'SILVER', def: { id: 'small-bite' } }],
+      relics: [{ relicId: 'midas-left', quality: 'BRONZE', def: { id: 'midas-left' } }],
+    })
   })
 })
