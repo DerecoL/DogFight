@@ -78,6 +78,12 @@ describe('selection screen structure', () => {
     expect(css).toContain('.battle-continue-row')
   })
 
+  it('defers battle result data updates until playback is continued', () => {
+    expect(app).toContain("run.phase === 'BATTLE'")
+    expect(app).toContain('/battle/finish')
+    expect(app).toContain("run.phase === 'BATTLE' && isFinished")
+  })
+
   it('renders battle health bars as a percentage of max health', () => {
     expect(app).toContain('playerMaxHp')
     expect(app).toContain('opponentMaxHp')

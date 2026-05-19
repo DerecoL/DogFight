@@ -156,8 +156,11 @@ describe('buildStandaloneIndex', () => {
       localStorage.setItem(storageKey, JSON.stringify(state))
 
       const battled = await readJson(await window.fetch(`/api/runs/${runId}/battle/start`, { method: 'POST', body: '{}' }))
-      expect(battled.run).toMatchObject({ round: 3, phase: 'CLASS_REWARD' })
-      expect(battled.run.classRewardChoices.map((choice) => choice.defId)).toEqual([
+      expect(battled.run).toMatchObject({ round: 2, phase: 'BATTLE', wins: 0, losses: 0 })
+
+      const finished = await readJson(await window.fetch(`/api/runs/${runId}/battle/finish`, { method: 'POST', body: '{}' }))
+      expect(finished.run).toMatchObject({ round: 3, phase: 'CLASS_REWARD' })
+      expect(finished.run.classRewardChoices.map((choice) => choice.defId)).toEqual([
         'shiba-speed-katana',
         'shiba-great-katana',
         'shiba-swallow-katana',

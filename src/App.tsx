@@ -453,6 +453,19 @@ export default function App() {
     void action(() => api(`/runs/${run.id}/items/upgrade`, { method: 'POST', body: JSON.stringify({ itemId, targetItemId }) }))
   }
 
+  const finishBattle = async () => {
+    if (!run) return
+    setError('')
+    try {
+      const data = await api<{ run: Run }>(`/runs/${run.id}/battle/finish`, { method: 'POST' })
+      setRun(data.run)
+      setBattle(null)
+      setEventIndex(0)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '操作失败')
+    }
+  }
+
   const onInspectOffer = (offerId: string, element: HTMLElement) => {
     setSelectedOfferId(offerId)
     setSelectedItemId(null)
@@ -662,7 +675,7 @@ export default function App() {
         </DndContext>
       )}
 
-      {(run.phase === 'COMPLETE' || battle) && (
+      {(run.phase === 'BATTLE' || run.phase === 'COMPLETE' || battle) && (
         <BattleView
           run={run}
           battle={battle}
@@ -671,10 +684,7 @@ export default function App() {
           speed={speed}
           score={score}
           onSpeed={setSpeed}
-          onContinue={() => {
-            setBattle(null)
-            setEventIndex(0)
-          }}
+          onContinue={() => void finishBattle()}
           onRestart={() => setRun(null)}
         />
       )}
@@ -1319,7 +1329,7 @@ function BattleView({ run, battle, currentEvent, eventIndex, speed, score, onSpe
           <p>{run.wins} 胜 / {run.losses} 败 · 积分 {score}</p>
           <button className="primary action-button" onClick={onRestart}>重新选择狗狗</button>
         </div>
-      ) : battle && isFinished && (
+      ) : run.phase === 'BATTLE' && isFinished && (
         <div className="battle-continue-row">
           <button className="primary action-button" onClick={onContinue}>
             <ArrowRight size={18} /> 继续

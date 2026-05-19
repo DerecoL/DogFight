@@ -41,6 +41,17 @@ describeWithDatabase('run API', () => {
     expect(me.body.user).toMatchObject({ email, nickname: '猛犬教练' })
   })
 
+  it('returns a clear conflict when registering an existing email', async () => {
+    const agent = request.agent(app.server)
+    await app.ready()
+
+    const email = `duplicate${Date.now()}@dog.test`
+    await agent.post('/api/auth/register').send({ email, password: 'dogdice' }).expect(200)
+
+    const duplicate = await agent.post('/api/auth/register').send({ email, password: 'dogdice' }).expect(409)
+    expect(duplicate.body.error).toContain('邮箱已注册')
+  })
+
   it('uses saved nicknames for player ghosts and battle snapshots', async () => {
     const first = request.agent(app.server)
     const second = request.agent(app.server)
@@ -88,9 +99,18 @@ describeWithDatabase('run API', () => {
 
     const battled = await agent.post(`/api/runs/${created.body.run.id}/battle/start`).send({}).expect(200)
     expect(battled.body.battle.events.length).toBeGreaterThan(0)
-    expect(['SHOP', 'CHOICE', 'COMPLETE']).toContain(battled.body.run.phase)
-    expect(battled.body.run.round).toBe(1)
-    expect(battled.body.run.gold).toBe(bought.body.run.gold + 7)
+    expect(battled.body.run).toMatchObject({
+      phase: 'BATTLE',
+      round: 0,
+      wins: matched.body.run.wins,
+      losses: matched.body.run.losses,
+      gold: bought.body.run.gold,
+    })
+
+    const finished = await agent.post(`/api/runs/${created.body.run.id}/battle/finish`).send({}).expect(200)
+    expect(['SHOP', 'CHOICE', 'COMPLETE']).toContain(finished.body.run.phase)
+    expect(finished.body.run.round).toBe(1)
+    expect(finished.body.run.gold).toBe(bought.body.run.gold + 7)
   })
 
   it('creates dog emperor runs with a saved lucky number', async () => {
@@ -197,8 +217,11 @@ describeWithDatabase('run API', () => {
     })
 
     const battled = await agent.post(`/api/runs/${runId}/battle/start`).send({}).expect(200)
-    expect(battled.body.run).toMatchObject({ round: 3, phase: 'CLASS_REWARD' })
-    expect(battled.body.run.classRewardChoices.map((choice: { defId: string }) => choice.defId)).toEqual([
+    expect(battled.body.run).toMatchObject({ round: 2, phase: 'BATTLE' })
+
+    const finished = await agent.post(`/api/runs/${runId}/battle/finish`).send({}).expect(200)
+    expect(finished.body.run).toMatchObject({ round: 3, phase: 'CLASS_REWARD' })
+    expect(finished.body.run.classRewardChoices.map((choice: { defId: string }) => choice.defId)).toEqual([
       'shiba-speed-katana',
       'shiba-great-katana',
       'shiba-swallow-katana',

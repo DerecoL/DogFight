@@ -501,9 +501,16 @@ async function defaultMockApiScript(buildId = new Date().toISOString().replace(/
     if (action === '/battle/start' && method === 'POST') {
       if (run.phase !== 'MATCH') return error('请先匹配对手');
       const battle = simulateBattle(run, user);
-      finishBattle(state, battle);
+      run.phase = 'BATTLE';
+      run.lastBattle = battle;
       saveState(state);
       return json({ run: publicRun(state.run), battle });
+    }
+    if (action === '/battle/finish' && method === 'POST') {
+      if (run.phase !== 'BATTLE' || !run.lastBattle) return error('当前没有待结算战斗');
+      finishBattle(state, run.lastBattle);
+      saveState(state);
+      return json({ run: publicRun(state.run) });
     }
     return error('离线单文件版本暂不支持该操作', 404);
   }
@@ -1106,9 +1113,16 @@ async function currentMockApiScript(buildId) {
     if (action === '/battle/start' && method === 'POST') {
       if (run.phase !== 'MATCH') return error('请先匹配对手');
       const battle = simulateBattle(run, user);
-      finishBattle(state, battle);
+      run.phase = 'BATTLE';
+      run.lastBattle = battle;
       saveState(state);
       return json({ run: publicRun(state.run), battle: publicBattle(battle) });
+    }
+    if (action === '/battle/finish' && method === 'POST') {
+      if (run.phase !== 'BATTLE' || !run.lastBattle) return error('当前没有待结算战斗');
+      finishBattle(state, run.lastBattle);
+      saveState(state);
+      return json({ run: publicRun(state.run) });
     }
     return error('离线单文件版本暂不支持该操作', 404);
   }

@@ -3,6 +3,7 @@ import cookie from '@fastify/cookie'
 import cors from '@fastify/cors'
 import jwt from '@fastify/jwt'
 import Fastify from 'fastify'
+import { Prisma } from '@prisma/client'
 import { z } from 'zod'
 import { cookieOptionsForEnv, resolveServerConfig } from './config'
 import { prisma } from './db'
@@ -11,7 +12,7 @@ import { itemDef, relicDef } from './game/data'
 import { canPlace, findSlot } from './game/grid'
 import { canUpgradePair, nextQuality, normalizeQuality } from './game/quality'
 import { simulateBattle } from './game/battle'
-import type { DogType, FighterSnapshot, ShopOffer, ShopType } from './game/types'
+import type { BattleResult, DogType, FighterSnapshot, ShopOffer, ShopType } from './game/types'
 import { applyRelicChoice, classRewardChoices, initialItems, makeChoices, makeRelicChoices, makeShop, parseJson, publicRun, relicsFromRun, seedGhost, snapshotFromRun, toGameItems } from './state'
 
 declare module 'fastify' {
@@ -65,7 +66,14 @@ export function buildApp() {
   app.post('/api/auth/register', async (request, reply) => {
     const body = z.object({ email: z.string().email(), password: z.string().min(6) }).parse(request.body)
     const passwordHash = await bcrypt.hash(body.password, 10)
-    const user = await prisma.user.create({ data: { email: body.email.toLowerCase(), passwordHash } })
+    const email = body.email.toLowerCase()
+    const user = await prisma.user.create({ data: { email, passwordHash } }).catch((error: unknown) => {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        return null
+      }
+      throw error
+    })
+    if (!user) return reply.code(409).send({ error: '邮箱已注册，请直接登录' })
     const token = app.jwt.sign({ userId: user.id })
     reply.setCookie('token', token, authCookieOptions)
     return { user: publicUser(user), needsNickname: true }
@@ -353,6 +361,22 @@ export function buildApp() {
     const opponent = parseJson<(FighterSnapshot & { ghostId?: string | null }) | null>(run.matchedGhost || '', null)
     if (!opponent) return reply.code(400).send({ error: '没有匹配对手' })
     const result = simulateBattle(snapshotFromRun(run, playerName), opponent, `${run.id}-${Date.now()}`)
+    const updated = await prisma.run.update({
+      where: { id: run.id },
+      data: { phase: 'BATTLE', lastBattle: JSON.stringify(result) },
+      include: { items: true },
+    })
+    await prisma.battleLog.create({ data: { runId: run.id, ghostId: opponent.ghostId, result: result.winner, log: JSON.stringify(result) } })
+    return { run: publicRun(updated), battle: result }
+  })
+
+  app.post('/api/runs/:runId/battle/finish', async (request, reply) => {
+    const userId = requireUser(request.userId)
+    const { runId } = z.object({ runId: z.string() }).parse(request.params)
+    const run = await prisma.run.findFirstOrThrow({ where: { id: runId, userId }, include: { items: true } })
+    if (run.phase !== 'BATTLE') return reply.code(400).send({ error: '当前没有待结算战斗' })
+    const result = parseJson<BattleResult | null>(run.lastBattle || '', null)
+    if (!result) return reply.code(400).send({ error: '没有可结算的战斗结果' })
     const playerWon = result.winner === 'player'
     const wins = run.wins + (playerWon ? 1 : 0)
     const losses = run.losses + (playerWon ? 0 : 1)
@@ -385,9 +409,8 @@ export function buildApp() {
           ? { choices: JSON.stringify(makeChoices(`${run.id}-choices-${nextRound}`, nextRound)), shopItems: '[]' }
           : {}),
     }
-    await prisma.battleLog.create({ data: { runId: run.id, ghostId: opponent.ghostId, result: result.winner, log: JSON.stringify(result) } })
     const updated = await prisma.run.update({ where: { id: run.id }, data: updateData, include: { items: true } })
-    return { run: publicRun(updated), battle: result }
+    return { run: publicRun(updated) }
   })
 
   return app
