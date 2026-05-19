@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { itemDef } from './data'
 import { canPlace } from './grid'
 import { buildOfflineFighter } from './offline-builder'
+import { seedGhost } from '../state'
 import type { DogType, GameItem } from './types'
 
 function assertLegalEquipment(items: GameItem[]) {
@@ -63,5 +64,14 @@ describe('offline dog builder', () => {
     expect(fighter.items.some((item) => itemDef(item.defId).kind === 'CLASS_EQUIPMENT')).toBe(false)
     expect(fighter.relics ?? []).toHaveLength(0)
     assertLegalEquipment(fighter.items)
+  })
+
+  it('routes seedGhost through the offline builder fallback', () => {
+    const ghost = seedGhost(6, 5, 1)
+
+    expect(ghost.name).toBe('种子狗狗 R6')
+    expect(ghost.items.some((item) => itemDef(item.defId).kind === 'CLASS_EQUIPMENT')).toBe(true)
+    expect(ghost.relics?.length).toBeGreaterThan(0)
+    assertLegalEquipment(ghost.items)
   })
 })

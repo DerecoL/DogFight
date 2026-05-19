@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import type { ItemInstance, Run } from '@prisma/client'
 import { CLASS_REWARD_DEFS, RELIC_DEFS, itemDef, relicDef } from './game/data'
-import { findSlot } from './game/grid'
+import { buildOfflineFighter } from './game/offline-builder'
 import { normalizeQuality } from './game/quality'
 import { createRng } from './game/rng'
 import { createChoices, createShop } from './game/shop'
@@ -137,14 +137,5 @@ export function snapshotFromRun(run: Run & { items: ItemInstance[] }, name = '�
 }
 
 export function seedGhost(round: number, wins: number, losses: number): FighterSnapshot {
-  const dogTypes: DogType[] = ['SHIBA', 'SAMOYED', 'MUTT', 'BULLY', 'EMPEROR']
-  const dogType = dogTypes[(round + wins + losses) % dogTypes.length]
-  const luckyNumber = dogType === 'EMPEROR' ? ((round + wins + losses) % 6) + 1 : null
-  const items: GameItem[] = initialItems().map((item) => ({ ...item, id: randomUUID(), area: 'EQUIPMENT' }))
-  const upgrades = ['small-bite', 'rubber-ball', 'spiked-collar', 'giant-bone']
-  for (let i = 0; i < Math.min(round + wins, upgrades.length); i += 1) {
-    const slot = findSlot(items, upgrades[i], 'EQUIPMENT')
-    if (slot) items.push({ id: randomUUID(), defId: upgrades[i], quality: 'BRONZE', area: 'EQUIPMENT', ...slot })
-  }
-  return { name: `种子狗狗 R${round}`, dogType, luckyNumber, wins, losses, round, items, relics: [] }
+  return buildOfflineFighter({ round, wins, losses })
 }
