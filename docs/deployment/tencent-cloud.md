@@ -79,7 +79,7 @@ JWT_SECRET=replace-with-a-long-random-secret
 - `SERVER_USER`：SSH 用户，通常是 `ubuntu`。
 - `SERVER_SSH_KEY`：可以登录服务器的 SSH 私钥。
 - `DEPLOY_PATH`：默认 `/opt/dogfight`。
-- `DEPLOY_REPO_TOKEN`：对私有仓库有读取权限的 GitHub token。
+- `DEPLOY_REPO_TOKEN`：可选。公开仓库可以不填；如果仓库改为私有，则填写有仓库读取权限的 GitHub token。
 - `PRODUCTION_ENV`：完整 `.env.production` 内容。
 
 当前 workflow 会在推送到 `main` 或手动触发时执行：
@@ -136,4 +136,3 @@ ls -lh /opt/dogfight/backups
 - API 提示数据库不可用：检查 `.env.production` 中 `DATABASE_URL`、`POSTGRES_USER`、`POSTGRES_DB`、`POSTGRES_PASSWORD` 是否一致，并查看 `docker compose ps` 中 `postgres` 健康状态。
 - HTTPS 无法访问：检查域名解析、防火墙 `80/443`、`DOMAIN` 环境变量和 Caddy 容器日志。
 - 玩家数据丢失风险：不要执行删除 `postgres_data` volume 的命令；部署应用时使用 `docker compose up -d --build`，不要清理生产数据卷。
-

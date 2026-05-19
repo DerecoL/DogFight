@@ -19,7 +19,7 @@
 - [ ] 腾讯云服务器公网 IPv4：用于 `SERVER_HOST` 和域名解析。
 - [ ] SSH 登录用户：通常为 `ubuntu`，但需要以实际服务器为准。
 - [ ] SSH 私钥：用于 GitHub Actions 登录服务器，保存到 `SERVER_SSH_KEY`。
-- [ ] GitHub 仓库读取 token：保存到 `DEPLOY_REPO_TOKEN`，用于服务器拉取私有仓库。
+- [ ] GitHub 仓库读取 token：公开仓库可以暂不配置；如果仓库改为私有，再保存到 `DEPLOY_REPO_TOKEN`。
 - [ ] 部署目录：默认 `/opt/dogfight`，需要确认服务器上不会与其他项目冲突。
 - [ ] 生产域名：用于 `DOMAIN` 和 DNS `A` 记录。
 - [ ] ICP 备案状态：如果面向中国大陆公网访问，需要确认备案完成。
@@ -50,4 +50,3 @@
 - 部署更新使用 `docker compose up -d --build`；不要用会重建并删除 volume 的命令。
 - 恢复数据库前先在测试环境验证备份文件可用。
 - 修改备份保留天数前，先确认服务器磁盘容量和数据恢复目标。
-

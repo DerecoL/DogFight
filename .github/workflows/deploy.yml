@@ -20,7 +20,14 @@ jobs:
             set -euo pipefail
 
             DEPLOY_PATH="${{ secrets.DEPLOY_PATH }}"
-            REPO_URL="https://x-access-token:${{ secrets.DEPLOY_REPO_TOKEN }}@github.com/${{ github.repository }}.git"
+            DEPLOY_REPO_TOKEN="${{ secrets.DEPLOY_REPO_TOKEN }}"
+            if [ -n "$DEPLOY_REPO_TOKEN" ]; then
+              REPO_URL="https://x-access-token:${DEPLOY_REPO_TOKEN}@github.com/${{ github.repository }}.git"
+            else
+              REPO_URL="https://github.com/${{ github.repository }}.git"
+            fi
+
+            git config --global http.version HTTP/1.1
 
             mkdir -p "$DEPLOY_PATH"
             if [ ! -d "$DEPLOY_PATH/.git" ]; then
