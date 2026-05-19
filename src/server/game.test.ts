@@ -61,6 +61,26 @@ describe('shop generation', () => {
     expect(offers).toHaveLength(5)
     expect(offers.every((offer) => offer.price >= 1)).toBe(true)
   })
+
+  it('does not offer gold or diamond equipment before round 3', () => {
+    const offers = createShop('LARGE', () => 0.7, 2)
+
+    expect(offers.every((offer) => offer.quality === 'BRONZE' || offer.quality === 'SILVER')).toBe(true)
+  })
+
+  it('does not offer diamond equipment before round 6', () => {
+    const offers = createShop('LARGE', () => 0.99, 5)
+
+    expect(offers.every((offer) => offer.quality !== 'DIAMOND')).toBe(true)
+  })
+
+  it('prices direct diamond equipment as a late-game premium purchase', () => {
+    const [offer] = createShop('LARGE', () => 0.99, 6)
+
+    expect(offer.defId).toBe('v3-golden-kennel')
+    expect(offer.quality).toBe('DIAMOND')
+    expect(offer.price).toBe(72)
+  })
 })
 
 describe('dog and item definitions', () => {
@@ -525,7 +545,7 @@ describe('battle simulation', () => {
     expect(result.events.every((event) => typeof event.playerShield === 'number' && typeof event.opponentShield === 'number')).toBe(true)
   })
 
-  it('applies the golden kennel shield as its authored diamond value', () => {
+  it('applies the golden kennel shield as its toned-down diamond value', () => {
     const player: FighterSnapshot = {
       name: 'P',
       dogType: 'SHIBA',
@@ -540,7 +560,7 @@ describe('battle simulation', () => {
     const result = simulateBattle(player, opponent, 'shield-ui-events')
     const shieldEvent = result.events.find((event) => event.itemId === 'shield')
 
-    expect(shieldEvent).toMatchObject({ amount: 18, playerShield: 18 })
+    expect(shieldEvent).toMatchObject({ amount: 14, playerShield: 14 })
   })
 
   it('records positive and negative status snapshots on battle events', () => {

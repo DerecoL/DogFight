@@ -201,8 +201,8 @@ export function applyRelicChoice(currentRelics: RelicInstance[], relicId: string
   return [...relics, { id: randomUUID(), relicId, quality: relicDefn.defaultQuality, slot: relics.length }]
 }
 
-export function makeShop(type: ShopType, seed: string) {
-  return createShop(type, createRng(seed))
+export function makeShop(type: ShopType, seed: string, round = 0) {
+  return createShop(type, createRng(seed), round)
 }
 
 export function makeChoices(seed: string, round = 0) {

@@ -121,7 +121,7 @@ function classRewardDefs(dogType: DogType, profile: OfflineBuildProfile, round: 
 
 function shopDefs(profile: OfflineBuildProfile, round: number) {
   if (isTrainingMatchRound(round)) return []
-  const pools = profile.shopPreference.flatMap((shopType) => shopPool(shopType))
+  const pools = profile.shopPreference.flatMap((shopType) => shopPool(shopType, round))
   return uniqueById(pools).slice(0, Math.max(2, round + 1))
 }
 

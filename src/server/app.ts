@@ -225,7 +225,7 @@ export function buildApp() {
       return reply.code(400).send({ error: '狗皇帝需要选择 1-6 的幸运数字' })
     }
     await prisma.run.updateMany({ where: { userId, status: 'ACTIVE' }, data: { status: 'ABANDONED' } })
-    const shopItems = makeShop('GENERAL', `${userId}-new-shop`)
+    const shopItems = makeShop('GENERAL', `${userId}-new-shop`, 0)
     const run = await prisma.run.create({
       data: {
         userId,
@@ -332,7 +332,7 @@ export function buildApp() {
     const run = await prisma.run.findFirstOrThrow({ where: { id: runId, userId }, include: { items: true } })
     if (run.phase !== 'SHOP' || run.shopType === 'RELIC') return reply.code(400).send({ error: '当前不在普通商店' })
     if (run.gold < run.refreshCost) return reply.code(400).send({ error: '金币不足' })
-    const shopItems = makeShop(run.shopType as ShopType, `${run.id}-${Date.now()}-${run.refreshCost}`)
+    const shopItems = makeShop(run.shopType as ShopType, `${run.id}-${Date.now()}-${run.refreshCost}`, run.round)
     const updated = await prisma.run.update({
       where: { id: run.id },
       data: { gold: run.gold - run.refreshCost, refreshCost: run.refreshCost + 1, shopItems: JSON.stringify(shopItems) },
@@ -468,7 +468,7 @@ export function buildApp() {
     }
     const updated = await prisma.run.update({
       where: { id: run.id },
-      data: { phase: 'SHOP', shopType: body.shopType, refreshCost: 1, choices: '[]', shopItems: JSON.stringify(makeShop(body.shopType, `${run.id}-choice-${body.shopType}`)) },
+      data: { phase: 'SHOP', shopType: body.shopType, refreshCost: 1, choices: '[]', shopItems: JSON.stringify(makeShop(body.shopType, `${run.id}-choice-${body.shopType}`, run.round)) },
       include: { items: true },
     })
     return { run: publicRun(updated) }
@@ -608,7 +608,7 @@ export function buildApp() {
       classRewardChoices: phase === 'CLASS_REWARD' ? JSON.stringify(nextClassRewards) : '[]',
       relicChoices: '[]',
       ...(phase === 'SHOP'
-        ? { shopType: 'GENERAL', shopItems: JSON.stringify(makeShop('GENERAL', `${run.id}-round-${nextRound}`)), choices: '[]' }
+        ? { shopType: 'GENERAL', shopItems: JSON.stringify(makeShop('GENERAL', `${run.id}-round-${nextRound}`, nextRound)), choices: '[]' }
         : phase === 'CHOICE'
           ? { choices: JSON.stringify(makeChoices(`${run.id}-choices-${nextRound}`, nextRound)), shopItems: '[]' }
           : {}),

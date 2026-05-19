@@ -1,24 +1,37 @@
 import { randomUUID } from 'node:crypto'
 import { SHOP_CHOICES, shopPool } from './data'
+import { normalizeQuality } from './quality'
 import { pick } from './rng'
-import type { ShopOffer, ShopType } from './types'
+import type { ItemDef, ItemQuality, ShopOffer, ShopType } from './types'
 
-export function createShop(type: ShopType, rng: () => number): ShopOffer[] {
-  const pool = shopPool(type)
+const QUALITY_PRICE_MULTIPLIER: Record<ItemQuality, number> = {
+  BRONZE: 1,
+  SILVER: 1.5,
+  GOLD: 2,
+  DIAMOND: 4,
+}
+
+function shopPrice(def: ItemDef, discount: number) {
+  const quality = normalizeQuality(def.defaultQuality)
+  return Math.max(1, Math.floor(def.price * QUALITY_PRICE_MULTIPLIER[quality] * discount))
+}
+
+export function createShop(type: ShopType, rng: () => number, round = 0): ShopOffer[] {
+  const pool = shopPool(type, round)
   const offers: ShopOffer[] = Array.from({ length: 5 }, () => {
     const def = pick(rng, pool)
     const discount = rng() < 0.2 ? pick(rng, [0.5, 0.6, 0.7, 0.8]) : 1
     return {
       offerId: randomUUID(),
       defId: def.id,
-      price: Math.max(1, Math.floor(def.price * discount)),
+      price: shopPrice(def, discount),
       discount,
       quality: def.defaultQuality ?? 'BRONZE' as const,
     }
   })
   if (type === 'GENERAL' && offers.every((offer) => offer.price > 5)) {
-    const affordable = [...pool].sort((a, b) => a.price - b.price)[0]
-    offers[0] = { offerId: randomUUID(), defId: affordable.id, price: affordable.price, discount: 1, quality: affordable.defaultQuality ?? 'BRONZE' }
+    const affordable = [...pool].sort((a, b) => shopPrice(a, 1) - shopPrice(b, 1))[0]
+    offers[0] = { offerId: randomUUID(), defId: affordable.id, price: shopPrice(affordable, 1), discount: 1, quality: affordable.defaultQuality ?? 'BRONZE' }
   }
   return offers
 }

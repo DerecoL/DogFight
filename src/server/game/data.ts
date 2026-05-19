@@ -127,8 +127,8 @@ export const ITEM_DEFS: ItemDef[] = [
     advancedEffect: 'POISON_AND_DISABLE_RIGHTMOST',
     defaultQuality: 'GOLD',
   }),
-  slotItem('v3-golden-kennel', '不可侵犯的纯金狗窝', 4, 18, [4, 5], ['shield', 'immune'], { type: 'UTILITY', amount: 18, qualityBase: 'DIAMOND' }, {
-    description: '获得 18 点护盾。只要你拥有护盾，你受到的【中毒】和【虚弱】层数减半（向上取整）。',
+  slotItem('v3-golden-kennel', '不可侵犯的纯金狗窝', 4, 18, [4, 5], ['shield', 'immune'], { type: 'UTILITY', amount: 14, qualityBase: 'DIAMOND' }, {
+    description: '获得 14 点护盾。只要你拥有护盾，你受到的【中毒】和【虚弱】层数减半（向上取整）。',
     advancedEffect: 'SHIELD_IMMUNITY',
     defaultQuality: 'DIAMOND',
   }),
@@ -336,9 +336,18 @@ export function relicDefForQuality(relicId: string, quality?: string | null): Re
   return { ...def, description: relicDescription(relicId, quality) }
 }
 
-export function shopPool(type: ShopType) {
+export function isShopQualityAvailable(quality: ItemQuality | undefined, round: number) {
+  const currentQuality = normalizeQuality(quality)
+  const currentRound = Math.max(0, Math.floor(round))
+  if (currentRound < 3) return currentQuality === 'BRONZE' || currentQuality === 'SILVER'
+  if (currentRound < 6) return currentQuality !== 'DIAMOND'
+  return true
+}
+
+export function shopPool(type: ShopType, round = Number.POSITIVE_INFINITY) {
   return ITEM_DEFS.filter((item) => {
     if (item.tags.includes('starter')) return false
+    if (!isShopQualityAvailable(item.defaultQuality, round)) return false
     if (type === 'GENERAL') return true
     if (type === 'LARGE') return item.size === 4
     if (type === 'MEDIUM') return item.size === 2 || item.size === 3
