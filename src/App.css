@@ -2310,8 +2310,60 @@ input {
   border-top: 2px dashed var(--line);
 }
 
-.dogfight-picker .dog-select-screen { padding: 0; }
-.dogfight-picker .dog-select-layout { grid-template-columns: 1fr; }
+.dogfight-picker .dog-select-screen {
+  width: 100%;
+  padding: 0;
+}
+.dogfight-picker .dog-select {
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+.dogfight-picker .dog-card-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.dogfight-picker .dog-card {
+  min-height: 0;
+  padding: 8px;
+  gap: 6px;
+}
+.dogfight-picker .dog-art-frame {
+  max-width: 92px;
+}
+.dogfight-picker .dog-avatar {
+  width: 68px;
+  height: 68px;
+}
+.dogfight-picker .dog-card small {
+  display: none;
+}
+.dogfight-picker .tag-row {
+  gap: 4px;
+}
+.dogfight-picker .tag-row b {
+  min-height: 21px;
+  padding: 2px 6px;
+  font-size: 11px;
+}
+.dogfight-picker .dog-detail-panel {
+  gap: 8px;
+  padding: 10px;
+  border-width: 2px;
+  box-shadow: none;
+}
+.dogfight-picker .dog-detail-art {
+  display: none;
+}
+.dogfight-picker .detail-box {
+  padding: 8px;
+}
+.dogfight-picker .detail-box p {
+  font-size: 13px;
+  line-height: 1.4;
+}
+.dogfight-picker .lucky-number-picker {
+  padding: 8px;
+}
 .dogfight-picker .screen-heading { display: none; }
 
 .dogfight-room-card {
@@ -2457,6 +2509,19 @@ input {
 }
 
 @media (max-width: 900px) {
+  .dogfight-layout,
+  .dogfight-room-columns {
+    grid-template-columns: 1fr;
+  }
+
+  .dogfight-room-card {
+    grid-template-columns: 1fr;
+  }
+
+  .dogfight-room-card .action-button {
+    justify-self: start;
+  }
+
   .page-nav {
     display: none;
   }

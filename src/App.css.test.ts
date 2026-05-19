@@ -98,4 +98,19 @@ describe('equipment layout scale', () => {
     expect(cssRule('.ceremony-reward-preview')).toContain('grid-template-columns')
     expect(cssRule('.ceremony-skip-hint')).toContain('letter-spacing: 0')
   })
+
+  it('keeps dogfight dog selection constrained inside the room action panel', () => {
+    expect(css).not.toContain('.dogfight-picker .dog-select-layout')
+    expect(cssRule('.dogfight-picker .dog-select')).toContain('grid-template-columns: 1fr')
+    expect(cssRule('.dogfight-picker .dog-card-grid')).toContain('grid-template-columns: repeat(2, minmax(0, 1fr))')
+    expect(cssRule('.dogfight-picker .dog-detail-panel')).toContain('box-shadow: none')
+    expect(cssRule('.dogfight-picker .dog-detail-art')).toContain('display: none')
+  })
+
+  it('stacks dogfight room columns on narrow screens', () => {
+    expect(css).toContain('.dogfight-layout,')
+    expect(css).toContain('.dogfight-room-columns {')
+    expect(css).toContain('.dogfight-room-card {')
+    expect(css).toContain('grid-template-columns: 1fr')
+  })
 })

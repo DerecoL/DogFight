@@ -1468,8 +1468,40 @@ function ApexArena() {
 }
 
 function ApexSnapshotDetails({ entry }: { entry: ApexEntry }) {
+  const [inspectedItem, setInspectedItem] = useState<Item | null>(null)
+  const [tipAnchor, setTipAnchor] = useState<TipAnchor | null>(null)
   const equipment = entry.items.filter((item) => item.area === 'EQUIPMENT')
   const bag = entry.items.filter((item) => item.area === 'BAG')
+  const apexTipRun: Run = {
+    id: entry.id,
+    dogType: entry.dogType,
+    luckyNumber: entry.luckyNumber,
+    wins: entry.wins,
+    losses: entry.losses,
+    round: entry.round,
+    gold: 0,
+    phase: 'COMPLETE',
+    status: 'COMPLETE',
+    shopType: 'GENERAL',
+    shopItems: [],
+    choices: [],
+    classRewardChoices: [],
+    relicChoices: [],
+    relics: entry.relics,
+    refreshCost: 1,
+    matchedGhost: null,
+    lastBattle: null,
+    items: entry.items,
+  }
+  const setInspectedItemWithAnchor = (item: Item, element: HTMLElement) => {
+    setInspectedItem(item)
+    setTipAnchor(getFloatingTipPosition(element))
+  }
+  const closeTip = () => {
+    setInspectedItem(null)
+    setTipAnchor(null)
+  }
+
   return (
     <div className="apex-snapshot-details">
       <div className="battle-equipment-row player apex-equipment-preview">
@@ -1480,17 +1512,19 @@ function ApexSnapshotDetails({ entry }: { entry: ApexEntry }) {
         <div className="battle-slot-grid" style={{ gridTemplateColumns: 'repeat(12, minmax(0, 1fr))' }}>
           {Array.from({ length: 12 }).map((_, x) => <i key={x} className="battle-slot" style={{ gridColumn: x + 1, gridRow: 1 }} />)}
           {equipment.map((item) => (
-            <div
+            <button
+              type="button"
               key={item.id}
               className={`battle-item item-card ${itemTone(item.def)} ${qualityClass(item.quality)}`}
               style={{ gridColumn: `${item.x + 1} / span ${item.def.width}`, gridRow: 1 }}
               title={`${qualityLabel[normalizeQuality(item.quality)]} ${item.def.name} · ${effectText(item.def, normalizeQuality(item.quality))}`}
+              onClick={(event) => setInspectedItemWithAnchor(item, event.currentTarget)}
             >
               <img className="item-icon" src={itemIcon(item.def)} alt="" />
               <span className="quality-chip">{qualityLabel[normalizeQuality(item.quality)]}</span>
               <span>{item.def.name}</span>
               <small><Dice5 size={12} /> {item.def.dice.join('/')}</small>
-            </div>
+            </button>
           ))}
         </div>
       </div>
@@ -1498,6 +1532,7 @@ function ApexSnapshotDetails({ entry }: { entry: ApexEntry }) {
         <RelicRail relics={entry.relics} />
         <p>{entry.relics.length > 0 ? `遗物 ${entry.relics.length} 个` : '没有遗物'} · 背包物品 {bag.length} 个</p>
       </div>
+      <FloatingTip run={apexTipRun} item={inspectedItem} offer={null} anchor={tipAnchor} onClose={closeTip} onBuy={null} onSell={null} onUpgrade={null} />
     </div>
   )
 }
