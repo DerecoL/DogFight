@@ -23,11 +23,14 @@ export function createShop(type: ShopType, rng: () => number): ShopOffer[] {
   return offers
 }
 
-export function createChoices(rng: () => number): ShopType[] {
+export function createChoices(rng: () => number, round = 0): ShopType[] {
   const choices: ShopType[] = []
   while (choices.length < 3) {
     const next = pick(rng, SHOP_CHOICES)
     if (!choices.includes(next)) choices.push(next)
+  }
+  if (round >= 4 && rng() < 0.33) {
+    choices[Math.floor(rng() * choices.length)] = 'RELIC'
   }
   return choices
 }

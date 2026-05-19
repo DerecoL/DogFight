@@ -31,9 +31,9 @@ import {
 import './App.css'
 
 type DogType = 'SHIBA' | 'SAMOYED' | 'MUTT' | 'BULLY' | 'EMPEROR'
-type Phase = 'SHOP' | 'CHOICE' | 'MATCH' | 'BATTLE' | 'COMPLETE'
+type Phase = 'SHOP' | 'CHOICE' | 'CLASS_REWARD' | 'RELIC_CHOICE' | 'PREP' | 'MATCH' | 'BATTLE' | 'COMPLETE'
 type Area = 'EQUIPMENT' | 'BAG'
-type ShopType = 'GENERAL' | 'LARGE' | 'MEDIUM' | 'SMALL' | 'SMALL_DICE' | 'BIG_DICE'
+type ShopType = 'GENERAL' | 'LARGE' | 'MEDIUM' | 'SMALL' | 'SMALL_DICE' | 'BIG_DICE' | 'RELIC'
 type ItemQuality = 'BRONZE' | 'SILVER' | 'GOLD' | 'DIAMOND'
 
 type ItemDef = {
@@ -45,13 +45,19 @@ type ItemDef = {
   price: number
   dice: number[]
   tags: string[]
+  description?: string
+  defaultQuality?: ItemQuality
   effect: { type: string; amount: number }
 }
 type Item = { id: string; defId: string; quality: ItemQuality; area: Area; x: number; y: number; def: ItemDef }
 type ShopOffer = { offerId: string; defId: string; price: number; discount: number; quality?: ItemQuality; def?: ItemDef }
+type ClassRewardChoice = { defId: string; quality: ItemQuality; def: ItemDef }
+type RelicDef = { id: string; name: string; defaultQuality: ItemQuality; tags: string[]; description: string; effect: string }
+type Relic = { id: string; relicId: string; quality: ItemQuality; slot: number; def: RelicDef }
+type RelicChoice = { relicId: string; quality: ItemQuality; def: RelicDef }
 type BattleActor = 'player' | 'opponent' | 'system'
 type BattleTarget = 'player' | 'opponent' | 'both' | 'none'
-type BattleSnapshot = { name: string; dogType: DogType; luckyNumber?: number | null; wins: number; losses: number; round: number; items: Item[] }
+type BattleSnapshot = { name: string; dogType: DogType; luckyNumber?: number | null; wins: number; losses: number; round: number; items: Item[]; relics?: Relic[] }
 type BattleEvent = {
   time: number
   actor: BattleActor
@@ -90,6 +96,9 @@ type Run = {
   shopType: ShopType
   shopItems: ShopOffer[]
   choices: ShopType[]
+  classRewardChoices: ClassRewardChoice[]
+  relicChoices: RelicChoice[]
+  relics: Relic[]
   refreshCost: number
   matchedGhost: null | { name: string; dogType: DogType; luckyNumber?: number | null; wins: number; losses: number; round: number }
   lastBattle: Battle | null
@@ -123,6 +132,7 @@ const shopNames: Record<ShopType, string> = {
   SMALL: '小物品商店',
   SMALL_DICE: '小点商店',
   BIG_DICE: '大点商店',
+  RELIC: '遗物商店',
 }
 const itemIcons: Record<string, string> = {
   'starter-1': '/assets/items/bite.svg',
@@ -149,9 +159,9 @@ const qualityLabel: Record<ItemQuality, string> = {
   DIAMOND: '钻石',
 }
 const DOG_SELECTION_SLOT_COUNT = 8
-const SHOP_CHOICE_SLOT_COUNT = 6
+const SHOP_CHOICE_SLOT_COUNT = 7
 const dogOptions: DogType[] = ['SHIBA', 'SAMOYED', 'MUTT', 'BULLY', 'EMPEROR']
-const shopChoiceOrder: ShopType[] = ['GENERAL', 'LARGE', 'MEDIUM', 'SMALL', 'SMALL_DICE', 'BIG_DICE']
+const shopChoiceOrder: ShopType[] = ['GENERAL', 'LARGE', 'MEDIUM', 'SMALL', 'SMALL_DICE', 'BIG_DICE', 'RELIC']
 const dogStrategies: Record<DogType, string> = {
   SHIBA: '适合新手，专注于持续输出伤害',
   SAMOYED: '适合押大点构筑，爆发窗口更集中',
@@ -173,6 +183,21 @@ const shopDescriptions: Record<ShopType, string> = {
   SMALL: '提供低占格道具，适合填补装备缝隙',
   SMALL_DICE: '偏向小点触发道具，适合小点战术',
   BIG_DICE: '偏向大点触发道具，适合高点爆发',
+  RELIC: '免费选择一个遗物，强化骰子倾向和触发频率',
+}
+const ruleTerms: Record<string, { description: string; note: string }> = {
+  相邻: { description: '该物品左边和右边的第1个物品', note: '无' },
+  小点: { description: '投掷出1~3点', note: '无' },
+  大点: { description: '投掷出4~6点', note: '无' },
+  极值: { description: '投掷出1和6点', note: '无' },
+  荆棘: { description: '每次受到攻击对敌方玩家造成3点伤害（可叠加）', note: '无' },
+  中毒: { description: '造成2秒持续伤害，每秒结算1次（可叠加，叠加刷新持续时间）', note: '无' },
+  虚弱: { description: '玩家的下次攻击造成的伤害减少50%（可叠加层数，不叠加效果）', note: '无' },
+  大型物品: { description: '容量为4的物品', note: '恶霸袖标可让3格物品也按大型物品处理' },
+  中型物品: { description: '容量为2或3的物品', note: '无' },
+  小型物品: { description: '容量为1的物品', note: '无' },
+  失效: { description: '下次生效将不会有任何行为，生效后去除一层该效果', note: '无' },
+  天命数字: { description: '开局时确定的幸运数字', note: '狗皇帝专属规则' },
 }
 
 async function api<T>(url: string, options: RequestInit = {}): Promise<T> {
@@ -260,6 +285,34 @@ function useOutsideTipDismiss(active: boolean, onClose: () => void) {
     document.addEventListener('pointerdown', onPointerDown, true)
     return () => document.removeEventListener('pointerdown', onPointerDown, true)
   }, [active, onClose])
+}
+
+function RuleText({ text }: { text: string }) {
+  const [openTerm, setOpenTerm] = useState<string | null>(null)
+  const parts = text.split(/(【[^】]+】)/g).filter(Boolean)
+  return (
+    <>
+      {parts.map((part, index) => {
+        const match = part.match(/^【(.+)】$/)
+        if (!match) return <span key={`${part}-${index}`}>{part}</span>
+        const term = match[1]
+        const entry = ruleTerms[term]
+        if (!entry) return <strong key={`${term}-${index}`}>【{term}】</strong>
+        return (
+          <span className="rule-term-wrap" key={`${term}-${index}`}>
+            <button type="button" className="rule-term" onClick={(event) => { event.stopPropagation(); setOpenTerm(openTerm === term ? null : term) }}>【{term}】</button>
+            {openTerm === term && (
+              <span className="rule-tip" role="tooltip">
+                <b>{term}</b>
+                <span>{entry.description}</span>
+                {entry.note !== '无' && <small>{entry.note}</small>}
+              </span>
+            )}
+          </span>
+        )
+      })}
+    </>
+  )
 }
 
 export default function App() {
@@ -481,6 +534,32 @@ export default function App() {
         <ShopChoiceSelect choices={run.choices} onPick={(shopType) => action(() => api(`/runs/${run.id}/choice/select`, { method: 'POST', body: JSON.stringify({ shopType }) }))} />
       )}
 
+      {!battle && run.phase === 'CLASS_REWARD' && (
+        <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd}>
+          <section className="reward-workbench">
+            <ClassRewardSelect
+              choices={run.classRewardChoices}
+              onPick={(defId) => action(() => api(`/runs/${run.id}/class-reward/select`, { method: 'POST', body: JSON.stringify({ defId }) }))}
+            />
+            <InventoryBoard
+              run={run}
+              selectedItemId={selectedItemId}
+              draggingItemId={draggingItemId}
+              onSelectItem={onInspectItem}
+              onSlotClick={(area, x, y) => selectedItemId && moveItem(selectedItemId, area, x, y)}
+            />
+            <FloatingTip run={run} item={selectedItem} offer={null} anchor={tipAnchor} onClose={closeShopTip} onBuy={null} onSell={null} onUpgrade={selectedItem && canUpgradeItem(selectedItem, run.items) ? () => upgradeItem(selectedItem.id) : null} />
+          </section>
+          <DragOverlay dropAnimation={null} zIndex={1000}>
+            <DraggingItemOverlay item={draggingItem} />
+          </DragOverlay>
+        </DndContext>
+      )}
+
+      {!battle && run.phase === 'RELIC_CHOICE' && (
+        <RelicChoiceSelect choices={run.relicChoices} onPick={(relicId) => action(() => api(`/runs/${run.id}/relic/select`, { method: 'POST', body: JSON.stringify({ relicId }) }))} />
+      )}
+
       {!battle && run.phase === 'SHOP' && (
         <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd}>
           <section className="shop-workbench">
@@ -516,12 +595,21 @@ export default function App() {
         </DndContext>
       )}
 
-      {!battle && run.phase === 'MATCH' && (
+      {!battle && (run.phase === 'MATCH' || run.phase === 'PREP') && (
         <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd}>
           <section className="match-panel">
-            <img className="dog-avatar large" src={dogAssets[run.matchedGhost?.dogType ?? 'SHIBA']} alt="" />
-            <h2>匹配到 {run.matchedGhost?.name}</h2>
-            <p>{dogNames[run.matchedGhost?.dogType ?? 'SHIBA']} · {run.matchedGhost?.wins}胜 {run.matchedGhost?.losses}败 · 第 {run.matchedGhost?.round} 回合</p>
+            {run.phase === 'MATCH' ? (
+              <>
+                <img className="dog-avatar large" src={dogAssets[run.matchedGhost?.dogType ?? 'SHIBA']} alt="" />
+                <h2>匹配到 {run.matchedGhost?.name}</h2>
+                <p>{dogNames[run.matchedGhost?.dogType ?? 'SHIBA']} · {run.matchedGhost?.wins}胜 {run.matchedGhost?.losses}败 · 第 {run.matchedGhost?.round} 回合</p>
+              </>
+            ) : (
+              <>
+                <h2>整备阶段</h2>
+                <p>整理装备与遗物后再匹配对手。</p>
+              </>
+            )}
             <InventoryBoard run={run} selectedItemId={selectedItemId} draggingItemId={draggingItemId} onSelectItem={onInspectItem} onSlotClick={(area, x, y) => selectedItemId && moveItem(selectedItemId, area, x, y)} />
             <FloatingTip
               run={run}
@@ -533,8 +621,8 @@ export default function App() {
               onSell={null}
               onUpgrade={selectedItem && canUpgradeItem(selectedItem, run.items) ? () => upgradeItem(selectedItem.id) : null}
             />
-            <button className="primary action-button" onClick={() => action(() => api(`/runs/${run.id}/battle/start`, { method: 'POST' }))}>
-              <Dice5 size={18} /> 开始战斗
+            <button className="primary action-button" onClick={() => action(() => api(run.phase === 'PREP' ? `/runs/${run.id}/battle/match` : `/runs/${run.id}/battle/start`, { method: 'POST' }))}>
+              <Dice5 size={18} /> {run.phase === 'PREP' ? '匹配对手' : '开始战斗'}
             </button>
           </section>
           <DragOverlay dropAnimation={null} zIndex={1000}>
@@ -738,12 +826,59 @@ function ShopChoiceSelect({ choices, onPick }: { choices: ShopType[]; onPick: (s
 }
 
 function shopChoiceIcon(shopType: ShopType) {
+  if (shopType === 'RELIC') return <Trophy size={36} />
   if (shopType === 'LARGE') return <Backpack size={36} />
   if (shopType === 'MEDIUM') return <Shield size={36} />
   if (shopType === 'SMALL') return <ShoppingBag size={36} />
   if (shopType === 'SMALL_DICE') return <Dice5 size={36} />
   if (shopType === 'BIG_DICE') return <Coins size={36} />
   return <Swords size={36} />
+}
+
+function ClassRewardSelect({ choices, onPick }: { choices: ClassRewardChoice[]; onPick: (defId: string) => void }) {
+  const [selected, setSelected] = useState(choices[0]?.defId ?? '')
+  return (
+    <section className="reward-panel">
+      <div className="screen-heading centered">
+        <h2>选择职业装备</h2>
+        <p>先整理背包，再选择一个职业装备放入背包。</p>
+      </div>
+      <div className="reward-choice-grid">
+        {choices.map((choice) => (
+          <button key={choice.defId} className={`choice reward-choice ${selected === choice.defId ? 'selected' : ''}`} onClick={() => setSelected(choice.defId)}>
+            <strong>{choice.def.name}</strong>
+            <span className={`tip-tag ${qualityClass(choice.quality)}`}>{qualityLabel[choice.quality]}</span>
+            <span>{choice.def.size}格 · {choice.def.dice.join('/')}</span>
+            <span><RuleText text={choice.def.description ?? effectText(choice.def, choice.quality)} /></span>
+          </button>
+        ))}
+      </div>
+      <button className="primary action-button choice-submit" disabled={!selected} onClick={() => selected && onPick(selected)}>领取职业装备</button>
+    </section>
+  )
+}
+
+function RelicChoiceSelect({ choices, onPick }: { choices: RelicChoice[]; onPick: (relicId: string) => void }) {
+  const [selected, setSelected] = useState(choices[0]?.relicId ?? '')
+  return (
+    <section className="shop-choice-screen">
+      <div className="screen-heading centered">
+        <h2>选择遗物</h2>
+        <p>免费选择一个遗物；重复遗物会直接升级。</p>
+      </div>
+      <div className="choice-grid relic-choice-grid">
+        {choices.map((choice) => (
+          <button key={choice.relicId} className={`choice relic-choice ${selected === choice.relicId ? 'selected' : ''}`} onClick={() => setSelected(choice.relicId)}>
+            <Trophy size={36} />
+            <strong>{choice.def.name}</strong>
+            <span className={`tip-tag ${qualityClass(choice.quality)}`}>{qualityLabel[choice.quality]}</span>
+            <span><RuleText text={choice.def.description} /></span>
+          </button>
+        ))}
+      </div>
+      <button className="primary action-button choice-submit" disabled={!selected} onClick={() => selected && onPick(selected)}>获得遗物</button>
+    </section>
+  )
 }
 
 function ShopShelf({ run, selectedOfferId, draggingItemId, onInspectOffer, onReroll, onMatch }: { run: Run; selectedOfferId: string | null; draggingItemId: string | null; onInspectOffer: (offerId: string, element: HTMLElement) => void; onReroll: () => void; onMatch: () => void }) {
@@ -815,8 +950,38 @@ function InventoryBoard({ run, selectedItemId, draggingItemId, onSelectItem, onS
   return (
     <section className="inventory-board expanded">
       <GridPanel title="装备栏" subtitle="12 格单行，从左向右触发" icon={<Grid3X3 size={18} />} area="EQUIPMENT" w={12} h={1} items={run.items} selectedItemId={selectedItemId} draggingItemId={draggingItemId} onSelectItem={onSelectItem} onSlotClick={onSlotClick} />
-      <GridPanel title="背包" subtitle="12 格单行，战斗中默认不生效" icon={<Backpack size={18} />} area="BAG" w={12} h={1} items={run.items} selectedItemId={selectedItemId} draggingItemId={draggingItemId} onSelectItem={onSelectItem} onSlotClick={onSlotClick} />
+      <div className="bag-relic-row">
+        <GridPanel title="背包" subtitle="12 格单行，战斗中默认不生效" icon={<Backpack size={18} />} area="BAG" w={12} h={1} items={run.items} selectedItemId={selectedItemId} draggingItemId={draggingItemId} onSelectItem={onSelectItem} onSlotClick={onSlotClick} />
+        <RelicRail relics={run.relics ?? []} />
+      </div>
     </section>
+  )
+}
+
+function RelicRail({ relics }: { relics: Relic[] }) {
+  return (
+    <aside className="relic-rail">
+      <div className="grid-heading">
+        <h3><Trophy size={18} />遗物</h3>
+        <p>6槽，重复获得升级</p>
+      </div>
+      <div className="relic-slot-grid">
+        {Array.from({ length: 6 }).map((_, index) => {
+          const relic = relics.find((entry) => entry.slot === index)
+          return (
+            <div key={index} className={`relic-slot ${relic ? qualityClass(relic.quality) : ''}`}>
+              {relic ? (
+                <>
+                  <span className="quality-chip">{qualityLabel[relic.quality]}</span>
+                  <strong>{relic.def.name}</strong>
+                  <small><RuleText text={relic.def.description} /></small>
+                </>
+              ) : <span>空</span>}
+            </div>
+          )
+        })}
+      </div>
+    </aside>
   )
 }
 
@@ -933,7 +1098,7 @@ function FloatingTip({ run, item, offer, anchor, onClose, onBuy, onSell, onUpgra
         <Dice5 size={22} />
         {def.dice.map((face) => <span key={face}>{face}</span>)}
       </div>
-      <p className="tip-description">{effectText(def, quality)}</p>
+      <p className="tip-description"><RuleText text={def.description ?? effectText(def, quality)} /></p>
       {isOffer && (
         <div className="tip-price">
           <Coins size={16} />

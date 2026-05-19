@@ -35,6 +35,9 @@ model Run {
   shopType    String   @default("GENERAL")
   shopItems   String   @default("[]")
   choices     String   @default("[]")
+  classRewardChoices String @default("[]")
+  relicChoices String   @default("[]")
+  relics      String   @default("[]")
   refreshCost Int      @default(1)
   matchedGhost String?
   lastBattle  String?
@@ -69,6 +72,7 @@ model GhostSnapshot {
   losses    Int
   gold      Int
   items     String
+  relics    String   @default("[]")
   seed      String
   createdAt DateTime @default(now())
 

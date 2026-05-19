@@ -158,4 +158,55 @@ describeWithDatabase('run API', () => {
     await other.post('/api/auth/register').send({ email: `other${Date.now()}@dog.test`, password: 'dogdice' }).expect(200)
     await other.post(`/api/runs/${runId}/items/upgrade`).send({ itemId: second.id }).expect(404)
   })
+
+  it('runs class reward before round 3 shop choice and places the selected item in the bag', async () => {
+    const agent = request.agent(app.server)
+    await app.ready()
+
+    await agent.post('/api/auth/register').send({ email: `class${Date.now()}@dog.test`, password: 'dogdice' }).expect(200)
+    const created = await agent.post('/api/runs').send({ dogType: 'SHIBA' }).expect(200)
+    const runId = created.body.run.id
+    await prisma.run.update({
+      where: { id: runId },
+      data: { round: 2, phase: 'MATCH', matchedGhost: JSON.stringify({ name: 'O', dogType: 'MUTT', wins: 0, losses: 0, round: 2, items: [] }) },
+    })
+
+    const battled = await agent.post(`/api/runs/${runId}/battle/start`).send({}).expect(200)
+    expect(battled.body.run).toMatchObject({ round: 3, phase: 'CLASS_REWARD' })
+    expect(battled.body.run.classRewardChoices.map((choice: { defId: string }) => choice.defId)).toEqual([
+      'shiba-speed-katana',
+      'shiba-great-katana',
+      'shiba-swallow-katana',
+    ])
+
+    const selected = await agent.post(`/api/runs/${runId}/class-reward/select`).send({ defId: 'shiba-speed-katana' }).expect(200)
+    expect(selected.body.run.phase).toBe('CHOICE')
+    expect(selected.body.run.items.find((item: { defId: string }) => item.defId === 'shiba-speed-katana')).toMatchObject({
+      area: 'BAG',
+      quality: 'GOLD',
+    })
+  })
+
+  it('supports relic shop choice, free relic selection, direct PREP, and duplicate relic upgrades', async () => {
+    const agent = request.agent(app.server)
+    await app.ready()
+
+    await agent.post('/api/auth/register').send({ email: `relic${Date.now()}@dog.test`, password: 'dogdice' }).expect(200)
+    const created = await agent.post('/api/runs').send({ dogType: 'MUTT' }).expect(200)
+    const runId = created.body.run.id
+    await prisma.run.update({ where: { id: runId }, data: { round: 4, phase: 'CHOICE', choices: JSON.stringify(['RELIC']) } })
+
+    const relicChoice = await agent.post(`/api/runs/${runId}/choice/select`).send({ shopType: 'RELIC' }).expect(200)
+    expect(relicChoice.body.run).toMatchObject({ phase: 'RELIC_CHOICE', shopType: 'RELIC' })
+    expect(relicChoice.body.run.relicChoices).toHaveLength(3)
+
+    const firstRelic = relicChoice.body.run.relicChoices[0].relicId
+    const selected = await agent.post(`/api/runs/${runId}/relic/select`).send({ relicId: firstRelic }).expect(200)
+    expect(selected.body.run.phase).toBe('PREP')
+    expect(selected.body.run.relics).toContainEqual(expect.objectContaining({ relicId: firstRelic, quality: 'SILVER' }))
+
+    await prisma.run.update({ where: { id: runId }, data: { phase: 'RELIC_CHOICE', relicChoices: JSON.stringify([firstRelic]) } })
+    const upgraded = await agent.post(`/api/runs/${runId}/relic/select`).send({ relicId: firstRelic }).expect(200)
+    expect(upgraded.body.run.relics).toContainEqual(expect.objectContaining({ relicId: firstRelic, quality: 'GOLD' }))
+  })
 })

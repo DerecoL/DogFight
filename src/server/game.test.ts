@@ -280,7 +280,7 @@ describe('battle simulation', () => {
     }
     const opponent: FighterSnapshot = { name: 'O', dogType: 'SHIBA', wins: 0, losses: 0, round: 4, items: [] }
     const result = simulateBattle(player, opponent, 'structured-item-event')
-    const mapped = result.events.find((event) => event.kind === 'ITEM' && event.defId === 'lucky-paw')
+    const mapped = result.events.find((event) => event.kind === 'ITEM' && event.defId === 'lucky-paw' && event.text.includes('点金手·左'))
 
     expect(mapped).toMatchObject({ roll: 3, amount: 6, targetHpDelta: -6 })
     expect(mapped?.text).toContain('点金手·左')

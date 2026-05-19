@@ -28,8 +28,8 @@ describe('selection screen structure', () => {
     expect(app).toContain("BULLY: '/assets/dogs/bully.png'")
   })
 
-  it('keeps shop choices in a six-slot board and pads missing choices with blanks', () => {
-    expect(app).toContain('SHOP_CHOICE_SLOT_COUNT = 6')
+  it('keeps shop choices in a seven-slot board and pads missing choices with blanks', () => {
+    expect(app).toContain('SHOP_CHOICE_SLOT_COUNT = 7')
     expect(app).toContain('choice placeholder')
     expect(app).toContain('ShopChoiceSelect')
     expect(app).toContain("进入 {selectedChoice ? shopNames[selectedChoice] : '商店'}")
@@ -82,6 +82,15 @@ describe('selection screen structure', () => {
     expect(app).toContain('className="item-effect"')
     expect(app).toContain('effectText(item.def, normalizeQuality(item.quality))')
     expect(css).toContain('.item-effect')
+  })
+
+  it('renders class reward, relic slots, and rule term tooltip surfaces', () => {
+    expect(app).toContain('ClassRewardSelect')
+    expect(app).toContain('RelicChoiceSelect')
+    expect(app).toContain('RelicRail')
+    expect(app).toContain('RuleText')
+    expect(app).toContain('rule-term')
+    expect(app).toContain('rule-tip')
   })
 
   it('anchors dog card tags at the bottom for a consistent gallery rhythm', () => {

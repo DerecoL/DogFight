@@ -7,12 +7,12 @@ import { z } from 'zod'
 import { cookieOptionsForEnv, resolveServerConfig } from './config'
 import { prisma } from './db'
 import { publicErrorMessage } from './errors'
-import { itemDef } from './game/data'
+import { itemDef, relicDef } from './game/data'
 import { canPlace, findSlot } from './game/grid'
 import { canUpgradePair, nextQuality, normalizeQuality } from './game/quality'
 import { simulateBattle } from './game/battle'
 import type { DogType, FighterSnapshot, ShopOffer, ShopType } from './game/types'
-import { initialItems, makeChoices, makeShop, parseJson, publicRun, seedGhost, snapshotFromRun, toGameItems } from './state'
+import { applyRelicChoice, classRewardChoices, initialItems, makeChoices, makeRelicChoices, makeShop, parseJson, publicRun, relicsFromRun, seedGhost, snapshotFromRun, toGameItems } from './state'
 
 declare module 'fastify' {
   interface FastifyRequest {
@@ -140,7 +140,7 @@ export function buildApp() {
     const userId = requireUser(request.userId)
     const { runId } = z.object({ runId: z.string() }).parse(request.params)
     const run = await prisma.run.findFirstOrThrow({ where: { id: runId, userId }, include: { items: true } })
-    if (run.phase !== 'SHOP') return reply.code(400).send({ error: '当前不在商店' })
+    if (run.phase !== 'SHOP' || run.shopType === 'RELIC') return reply.code(400).send({ error: '当前不在普通商店' })
     if (run.gold < run.refreshCost) return reply.code(400).send({ error: '金币不足' })
     const shopItems = makeShop(run.shopType as ShopType, `${run.id}-${Date.now()}-${run.refreshCost}`)
     const updated = await prisma.run.update({
@@ -156,6 +156,7 @@ export function buildApp() {
     const { runId } = z.object({ runId: z.string() }).parse(request.params)
     const body = z.object({ offerId: z.string(), area: z.enum(['EQUIPMENT', 'BAG']).default('BAG') }).parse(request.body)
     const run = await prisma.run.findFirstOrThrow({ where: { id: runId, userId }, include: { items: true } })
+    if (run.phase !== 'SHOP' || run.shopType === 'RELIC') return reply.code(400).send({ error: '当前不在普通商店' })
     const offers = parseJson<ShopOffer[]>(run.shopItems, [])
     const offer = offers.find((entry) => entry.offerId === body.offerId)
     if (!offer) return reply.code(404).send({ error: '商品不存在' })
@@ -195,7 +196,7 @@ export function buildApp() {
     const { runId } = z.object({ runId: z.string() }).parse(request.params)
     const body = z.object({ itemId: z.string(), area: z.enum(['EQUIPMENT', 'BAG']), x: z.number().int(), y: z.number().int() }).parse(request.body)
     const run = await prisma.run.findFirstOrThrow({ where: { id: runId, userId }, include: { items: true } })
-    if (!['SHOP', 'MATCH'].includes(run.phase)) return reply.code(400).send({ error: '当前不能调整装备' })
+    if (!['SHOP', 'MATCH', 'CLASS_REWARD', 'PREP'].includes(run.phase)) return reply.code(400).send({ error: '当前不能调整装备' })
     const item = run.items.find((entry) => entry.id === body.itemId)
     if (!item) return reply.code(404).send({ error: '道具不存在' })
     const gameItems = toGameItems(run.items)
@@ -213,7 +214,7 @@ export function buildApp() {
     const body = z.object({ itemId: z.string(), targetItemId: z.string().optional() }).parse(request.body)
     const run = await prisma.run.findFirst({ where: { id: runId, userId }, include: { items: true } })
     if (!run) return reply.code(404).send({ error: '跑局不存在' })
-    if (!['SHOP', 'MATCH'].includes(run.phase)) return reply.code(400).send({ error: '当前不能升级道具' })
+    if (!['SHOP', 'MATCH', 'CLASS_REWARD', 'PREP'].includes(run.phase)) return reply.code(400).send({ error: '当前不能升级道具' })
 
     const gameItems = toGameItems(run.items)
     const source = gameItems.find((entry) => entry.id === body.itemId)
@@ -241,14 +242,65 @@ export function buildApp() {
   app.post('/api/runs/:runId/choice/select', async (request, reply) => {
     const userId = requireUser(request.userId)
     const { runId } = z.object({ runId: z.string() }).parse(request.params)
-    const body = z.object({ shopType: z.enum(['GENERAL', 'LARGE', 'MEDIUM', 'SMALL', 'SMALL_DICE', 'BIG_DICE']) }).parse(request.body)
+    const body = z.object({ shopType: z.enum(['GENERAL', 'LARGE', 'MEDIUM', 'SMALL', 'SMALL_DICE', 'BIG_DICE', 'RELIC']) }).parse(request.body)
     const run = await prisma.run.findFirstOrThrow({ where: { id: runId, userId }, include: { items: true } })
     if (run.phase !== 'CHOICE') return reply.code(400).send({ error: '当前不在三选一' })
     const choices = parseJson<ShopType[]>(run.choices, [])
     if (!choices.includes(body.shopType)) return reply.code(400).send({ error: '无效选择' })
+    if (body.shopType === 'RELIC') {
+      const relicChoices = makeRelicChoices(run, `${run.id}-relic-${run.round}-${Date.now()}`)
+      if (relicChoices.length === 0) return reply.code(400).send({ error: '当前没有可选遗物' })
+      const updated = await prisma.run.update({
+        where: { id: run.id },
+        data: { phase: 'RELIC_CHOICE', shopType: 'RELIC', choices: '[]', shopItems: '[]', relicChoices: JSON.stringify(relicChoices) },
+        include: { items: true },
+      })
+      return { run: publicRun(updated) }
+    }
     const updated = await prisma.run.update({
       where: { id: run.id },
       data: { phase: 'SHOP', shopType: body.shopType, refreshCost: 1, choices: '[]', shopItems: JSON.stringify(makeShop(body.shopType, `${run.id}-choice-${body.shopType}`)) },
+      include: { items: true },
+    })
+    return { run: publicRun(updated) }
+  })
+
+  app.post('/api/runs/:runId/class-reward/select', async (request, reply) => {
+    const userId = requireUser(request.userId)
+    const { runId } = z.object({ runId: z.string() }).parse(request.params)
+    const body = z.object({ defId: z.string() }).parse(request.body)
+    const run = await prisma.run.findFirstOrThrow({ where: { id: runId, userId }, include: { items: true } })
+    if (run.phase !== 'CLASS_REWARD') return reply.code(400).send({ error: '当前不在职业奖励' })
+    const choices = parseJson<string[]>(run.classRewardChoices, [])
+    if (!choices.includes(body.defId)) return reply.code(400).send({ error: '无效职业装备' })
+    const def = itemDef(body.defId)
+    const slot = findSlot(toGameItems(run.items), body.defId, 'BAG')
+    if (!slot) return reply.code(400).send({ error: '背包空间不足，请先整理' })
+    const updated = await prisma.run.update({
+      where: { id: run.id },
+      data: {
+        phase: 'CHOICE',
+        classRewardChoices: '[]',
+        choices: JSON.stringify(makeChoices(`${run.id}-choices-${run.round}`, run.round)),
+        items: { create: { defId: body.defId, quality: normalizeQuality(def.defaultQuality), area: 'BAG', x: slot.x, y: slot.y } },
+      },
+      include: { items: true },
+    })
+    return { run: publicRun(updated) }
+  })
+
+  app.post('/api/runs/:runId/relic/select', async (request, reply) => {
+    const userId = requireUser(request.userId)
+    const { runId } = z.object({ runId: z.string() }).parse(request.params)
+    const body = z.object({ relicId: z.string() }).parse(request.body)
+    const run = await prisma.run.findFirstOrThrow({ where: { id: runId, userId }, include: { items: true } })
+    if (run.phase !== 'RELIC_CHOICE') return reply.code(400).send({ error: '当前不在遗物选择' })
+    const choices = parseJson<string[]>(run.relicChoices, [])
+    if (!choices.includes(body.relicId)) return reply.code(400).send({ error: '无效遗物' })
+    relicDef(body.relicId)
+    const updated = await prisma.run.update({
+      where: { id: run.id },
+      data: { phase: 'PREP', relicChoices: '[]', relics: JSON.stringify(applyRelicChoice(relicsFromRun(run), body.relicId)) },
       include: { items: true },
     })
     return { run: publicRun(updated) }
@@ -272,6 +324,7 @@ export function buildApp() {
         losses: run.losses,
         gold: run.gold,
         items: JSON.stringify(toGameItems(run.items)),
+        relics: JSON.stringify(relicsFromRun(run)),
         seed: `${run.id}-${run.round}-${run.wins}-${run.losses}`,
       },
     })
@@ -280,7 +333,7 @@ export function buildApp() {
       orderBy: { createdAt: 'desc' },
     })
     const opponent = ghost
-      ? { name: ghost.name, dogType: ghost.dogType as DogType, luckyNumber: ghost.luckyNumber, wins: ghost.wins, losses: ghost.losses, round: ghost.round, items: parseJson(ghost.items, []) }
+      ? { name: ghost.name, dogType: ghost.dogType as DogType, luckyNumber: ghost.luckyNumber, wins: ghost.wins, losses: ghost.losses, round: ghost.round, items: parseJson(ghost.items, []), relics: parseJson(ghost.relics, []) }
       : seedGhost(run.round, run.wins, run.losses)
     const updated = await prisma.run.update({
       where: { id: run.id },
@@ -304,8 +357,15 @@ export function buildApp() {
     const wins = run.wins + (playerWon ? 1 : 0)
     const losses = run.losses + (playerWon ? 0 : 1)
     const status = wins >= 12 || losses >= 3 ? 'COMPLETE' : 'ACTIVE'
-    const phase = status === 'COMPLETE' ? 'COMPLETE' : run.round + 1 <= 2 ? 'SHOP' : 'CHOICE'
     const nextRound = run.round + 1
+    const nextClassRewards = classRewardChoices(run.dogType as DogType, nextRound)
+    const phase = status === 'COMPLETE'
+      ? 'COMPLETE'
+      : nextClassRewards.length > 0
+        ? 'CLASS_REWARD'
+        : nextRound <= 2
+          ? 'SHOP'
+          : 'CHOICE'
     const roundIncome = 5 + nextRound * 2
     const updateData = {
       wins,
@@ -317,10 +377,12 @@ export function buildApp() {
       lastBattle: JSON.stringify(result),
       matchedGhost: null,
       refreshCost: 1,
+      classRewardChoices: phase === 'CLASS_REWARD' ? JSON.stringify(nextClassRewards) : '[]',
+      relicChoices: '[]',
       ...(phase === 'SHOP'
         ? { shopType: 'GENERAL', shopItems: JSON.stringify(makeShop('GENERAL', `${run.id}-round-${nextRound}`)), choices: '[]' }
         : phase === 'CHOICE'
-          ? { choices: JSON.stringify(makeChoices(`${run.id}-choices-${nextRound}`)), shopItems: '[]' }
+          ? { choices: JSON.stringify(makeChoices(`${run.id}-choices-${nextRound}`, nextRound)), shopItems: '[]' }
           : {}),
     }
     await prisma.battleLog.create({ data: { runId: run.id, ghostId: opponent.ghostId, result: result.winner, log: JSON.stringify(result) } })
