@@ -158,7 +158,12 @@ async function defaultMockApiScript(buildId = new Date().toISOString().replace(/
 
   function loadState() {
     try {
-      return JSON.parse(localStorage.getItem(storageKey)) || defaultState();
+      const state = JSON.parse(localStorage.getItem(storageKey)) || defaultState();
+      if (state.user?.email && !state.user.account) {
+        state.user.account = state.user.email;
+        delete state.user.email;
+      }
+      return state;
     } catch {
       return defaultState();
     }
@@ -392,7 +397,7 @@ async function defaultMockApiScript(buildId = new Date().toISOString().replace(/
     if ((pathname === '/auth/login' || pathname === '/auth/register') && method === 'POST') {
       state.user = {
         id: 'local-user',
-        email: body.email || 'player@dogdice.test',
+        account: body.account || body.email || 'player-000001',
         nickname: pathname.endsWith('register') ? null : '本地玩家',
       };
       saveState(state);
@@ -549,10 +554,18 @@ async function defaultMockApiScript(buildId = new Date().toISOString().replace(/
 
 async function loadStandaloneGameData() {
   const dataModule = await import(pathToFileURL(path.resolve('src/server/game/data.ts')).href)
+  const qualities = ['BRONZE', 'SILVER', 'GOLD', 'DIAMOND']
+  const itemDescriptions = Object.fromEntries(
+    [...dataModule.ITEM_DEFS, ...dataModule.CLASS_REWARD_DEFS].map((def) => [
+      def.id,
+      Object.fromEntries(qualities.map((quality) => [quality, dataModule.itemDefForQuality(def.id, quality).description])),
+    ]),
+  )
   return {
     itemDefs: dataModule.ITEM_DEFS,
     classRewardDefs: dataModule.CLASS_REWARD_DEFS,
     relicDefs: dataModule.RELIC_DEFS,
+    itemDescriptions,
   }
 }
 
@@ -590,7 +603,12 @@ async function currentMockApiScript(buildId) {
 
   function loadState() {
     try {
-      return JSON.parse(localStorage.getItem(storageKey)) || defaultState();
+      const state = JSON.parse(localStorage.getItem(storageKey)) || defaultState();
+      if (state.user?.email && !state.user.account) {
+        state.user.account = state.user.email;
+        delete state.user.email;
+      }
+      return state;
     } catch {
       return defaultState();
     }
@@ -714,8 +732,15 @@ async function currentMockApiScript(buildId) {
     return def ? { ...def, description: relicDescription(relicId, quality) } : def;
   }
 
+  function itemDefForQuality(defId, quality) {
+    const def = defs[defId] || defs['starter-1'];
+    const currentQuality = normalizeQuality(quality);
+    return { ...def, description: gameData.itemDescriptions?.[def.id]?.[currentQuality] ?? def.description };
+  }
+
   function publicItem(item) {
-    return { ...item, quality: normalizeQuality(item.quality), def: defs[item.defId] || defs['starter-1'] };
+    const quality = normalizeQuality(item.quality);
+    return { ...item, quality, def: itemDefForQuality(item.defId, quality) };
   }
 
   function normalizeRelics(relics) {
@@ -748,8 +773,14 @@ async function currentMockApiScript(buildId) {
     if (!run) return null;
     return {
       ...run,
-      shopItems: (run.shopItems || []).map((offer) => ({ ...offer, quality: normalizeQuality(offer.quality), def: defs[offer.defId] || defs['starter-1'] })),
-      classRewardChoices: (run.classRewardChoices || []).map((defId) => ({ defId, def: defs[defId], quality: normalizeQuality(defs[defId]?.defaultQuality) })),
+      shopItems: (run.shopItems || []).map((offer) => {
+        const quality = normalizeQuality(offer.quality);
+        return { ...offer, quality, def: itemDefForQuality(offer.defId, quality) };
+      }),
+      classRewardChoices: (run.classRewardChoices || []).map((defId) => {
+        const quality = normalizeQuality(defs[defId]?.defaultQuality);
+        return { defId, def: itemDefForQuality(defId, quality), quality };
+      }),
       relicChoices: (run.relicChoices || []).map((relicId) => {
         const quality = relicChoiceQuality(run.relics || [], relicId);
         return { relicId, def: relicDefForQuality(relicId, quality), quality };
@@ -1225,7 +1256,7 @@ async function currentMockApiScript(buildId) {
       return json({ ok: true });
     }
     if ((pathname === '/auth/login' || pathname === '/auth/register') && method === 'POST') {
-      state.user = { id: 'local-user', email: body.email || 'player@dogdice.test', nickname: pathname.endsWith('register') ? null : '本地玩家' };
+      state.user = { id: 'local-user', account: body.account || body.email || 'player-000001', nickname: pathname.endsWith('register') ? null : '本地玩家' };
       saveState(state);
       return json(pathname.endsWith('register') ? { user: state.user, needsNickname: true } : { user: state.user, activeRun: publicRun(state.run) });
     }

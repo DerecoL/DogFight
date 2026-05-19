@@ -49,29 +49,29 @@ describeWithDatabase('run API', () => {
 
     await request(app.server).post('/api/profile/nickname').send({ nickname: '游客' }).expect(401)
 
-    const email = `nickname${Date.now()}@dog.test`
-    const registered = await agent.post('/api/auth/register').send({ email, password: 'dogdice' }).expect(200)
+    const account = `nickname-${Date.now()}`
+    const registered = await agent.post('/api/auth/register').send({ account, password: 'dogdice' }).expect(200)
     expect(registered.body.needsNickname).toBe(true)
-    expect(registered.body.user).toMatchObject({ email, nickname: null })
+    expect(registered.body.user).toMatchObject({ account, nickname: null })
 
     await agent.post('/api/profile/nickname').send({ nickname: ' ' }).expect(400)
 
     const updated = await agent.post('/api/profile/nickname').send({ nickname: '  猛犬教练  ' }).expect(200)
-    expect(updated.body.user).toMatchObject({ email, nickname: '猛犬教练' })
+    expect(updated.body.user).toMatchObject({ account, nickname: '猛犬教练' })
 
     const me = await agent.get('/api/me').expect(200)
-    expect(me.body.user).toMatchObject({ email, nickname: '猛犬教练' })
+    expect(me.body.user).toMatchObject({ account, nickname: '猛犬教练' })
   })
 
-  it('returns a clear conflict when registering an existing email', async () => {
+  it('returns a clear conflict when registering an existing account', async () => {
     const agent = request.agent(app.server)
     await app.ready()
 
-    const email = `duplicate${Date.now()}@dog.test`
-    await agent.post('/api/auth/register').send({ email, password: 'dogdice' }).expect(200)
+    const account = `duplicate-${Date.now()}`
+    await agent.post('/api/auth/register').send({ account, password: 'dogdice' }).expect(200)
 
-    const duplicate = await agent.post('/api/auth/register').send({ email, password: 'dogdice' }).expect(409)
-    expect(duplicate.body.error).toContain('邮箱已注册')
+    const duplicate = await agent.post('/api/auth/register').send({ account, password: 'dogdice' }).expect(409)
+    expect(duplicate.body.error).toContain('账号已注册')
   })
 
   it('uses saved nicknames for player ghosts and battle snapshots', async () => {

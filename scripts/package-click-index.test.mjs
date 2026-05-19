@@ -239,6 +239,41 @@ describe('buildStandaloneIndex', () => {
     }
   })
 
+  test('standalone mock returns quality-adjusted item descriptions for every public item surface', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'dogfight-standalone-item-descriptions-'))
+    try {
+      const distDir = await createMinimalDist(root)
+      const outputFile = path.join(root, 'click-index.html')
+      const launcherFile = path.join(root, 'DogFight-standalone.cmd')
+      await buildStandaloneIndex({ distDir, outputFile, launcherFile })
+
+      const html = await readFile(outputFile, 'utf8')
+      const { window, localStorage, storageKey } = evaluateMockScript(extractMockScript(html))
+      await window.fetch('/api/auth/register', { method: 'POST', body: JSON.stringify({ email: 'descriptions@dog.test', password: 'dogdice' }) })
+      const created = await readJson(await window.fetch('/api/runs', { method: 'POST', body: JSON.stringify({ dogType: 'SHIBA' }) }))
+      const state = JSON.parse(localStorage.getItem(storageKey))
+      state.run.items = [
+        { id: 'sword', defId: 'v3-large-bone-sword', quality: 'DIAMOND', area: 'EQUIPMENT', x: 0, y: 0 },
+      ]
+      state.run.shopItems = [
+        { offerId: 'sword-offer', defId: 'v3-large-bone-sword', price: 6, discount: 1, quality: 'DIAMOND' },
+      ]
+      localStorage.setItem(storageKey, JSON.stringify(state))
+
+      const me = await readJson(await window.fetch('/api/me'))
+      const item = me.activeRun.items.find((entry) => entry.id === 'sword')
+      const offer = me.activeRun.shopItems.find((entry) => entry.offerId === 'sword-offer')
+
+      expect(item.def.description).toContain('27')
+      expect(item.def.description).not.toContain('8')
+      expect(offer.def.description).toContain('27')
+      expect(offer.def.description).not.toContain('8')
+      expect(created.run.items[0].def.description).toContain('5')
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   test('standalone mock applies shiba poison class reward during battle', async () => {
     const root = await mkdtemp(path.join(tmpdir(), 'dogfight-standalone-poison-'))
     try {

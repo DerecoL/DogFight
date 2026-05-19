@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { itemDefForQuality } from './game/data'
+import { ALL_ITEM_DEFS, itemDefForQuality } from './game/data'
+import { ITEM_QUALITIES, qualityAmountFrom } from './game/quality'
 
 function numbers(defId: string, quality: 'GOLD' | 'DIAMOND') {
   return itemDefForQuality(defId, quality).description?.match(/\d+/g) ?? []
@@ -23,5 +24,15 @@ describe('quality-adjusted item descriptions', () => {
     expect(numbers('shiba-speed-katana', 'DIAMOND')).toContain('20')
     expect(numbers('shiba-great-katana', 'DIAMOND')).toContain('27')
     expect(numbers('shiba-swallow-katana', 'DIAMOND')).toContain('17')
+  })
+
+  it('uses effective item values in every quality-adjusted item description', () => {
+    for (const def of ALL_ITEM_DEFS) {
+      if (def.effect.amount <= 0) continue
+      for (const quality of ITEM_QUALITIES) {
+        const effective = qualityAmountFrom(def.effect.amount, quality, def.effect.qualityBase)
+        expect(itemDefForQuality(def.id, quality).description, `${def.id} ${quality}`).toContain(String(effective))
+      }
+    }
   })
 })
