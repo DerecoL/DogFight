@@ -104,6 +104,21 @@ describe('selection screen structure', () => {
     expect(rowMarkup.indexOf('<RelicRail')).toBeLessThan(rowMarkup.indexOf('area="BAG"'))
   })
 
+  it('keeps relic rail slots icon-only and moves details into a click tip', () => {
+    expect(app).toContain('const [selectedRelicId, setSelectedRelicId] = useState<string | null>(null)')
+    expect(app).toContain('className="relic-icon-button"')
+    expect(app).toContain('<RelicFloatingTip')
+    expect(app).toContain('className="relic-floating-tip floating-tip"')
+    expect(app).toContain('setSelectedRelicId(selectedRelicId === relic.id ? null : relic.id)')
+
+    const relicRailStart = app.indexOf('function RelicRail')
+    const relicRailEnd = app.indexOf('function GridPanel', relicRailStart)
+    const relicRailMarkup = app.slice(relicRailStart, relicRailEnd)
+
+    expect(relicRailMarkup).not.toContain('<strong>{relic.def.name}</strong>')
+    expect(relicRailMarkup).not.toContain('<small><RuleText text={relic.def.description} /></small>')
+  })
+
   it('gates class reward selection behind a dismissible awakening ceremony', () => {
     expect(app).toContain('classRewardCeremonyKey')
     expect(app).toContain('ceremonyDismissedRounds')

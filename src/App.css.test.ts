@@ -50,6 +50,15 @@ describe('equipment layout scale', () => {
     expect(cssRule('.bag-relic-row')).toContain('grid-template-columns: 220px minmax(0, 1fr)')
   })
 
+  it('keeps relic slots from resizing around text content', () => {
+    expect(cssRule('.relic-slot')).toContain('aspect-ratio: 1')
+    expect(cssRule('.relic-slot')).toContain('padding: 6px')
+    expect(cssRule('.relic-icon-button')).toContain('width: 100%')
+    expect(cssRule('.relic-icon-button')).toContain('aspect-ratio: 1')
+    expect(cssRule('.relic-floating-tip')).toContain('width: min(320px, calc(100vw - 28px))')
+    expect(cssRule('.floating-tip.relic-floating-tip')).toContain('width: min(320px, calc(100vw - 28px))')
+  })
+
   it('uses the provided hand-drawn cream UI structure', () => {
     expect(css).toContain('--page: #fff4e4')
     expect(css).toContain('--ink: #3d2d25')

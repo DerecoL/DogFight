@@ -1025,6 +1025,9 @@ function InventoryBoard({ run, selectedItemId, draggingItemId, onSelectItem, onS
 }
 
 function RelicRail({ relics }: { relics: Relic[] }) {
+  const [selectedRelicId, setSelectedRelicId] = useState<string | null>(null)
+  const [relicTipAnchor, setRelicTipAnchor] = useState<TipAnchor | null>(null)
+  const selectedRelic = relics.find((relic) => relic.id === selectedRelicId) ?? null
   return (
     <aside className="relic-rail">
       <div className="grid-heading">
@@ -1037,16 +1040,48 @@ function RelicRail({ relics }: { relics: Relic[] }) {
           return (
             <div key={index} className={`relic-slot ${relic ? qualityClass(relic.quality) : ''}`}>
               {relic ? (
-                <>
-                  <span className="quality-chip">{qualityLabel[relic.quality]}</span>
-                  <strong>{relic.def.name}</strong>
-                  <small><RuleText text={relic.def.description} /></small>
-                </>
-              ) : <span>空</span>}
+                <button
+                  type="button"
+                  className="relic-icon-button"
+                  aria-label={`${qualityLabel[relic.quality]}遗物：${relic.def.name}`}
+                  aria-pressed={selectedRelicId === relic.id}
+                  title={`${qualityLabel[relic.quality]} ${relic.def.name}`}
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    setSelectedRelicId(selectedRelicId === relic.id ? null : relic.id)
+                    setRelicTipAnchor(selectedRelicId === relic.id ? null : getFloatingTipPosition(event.currentTarget))
+                  }}
+                >
+                  <Trophy size={30} aria-hidden="true" />
+                  <span className="relic-quality-dot" aria-hidden="true" />
+                </button>
+              ) : <span className="relic-empty-mark" aria-hidden="true" />}
             </div>
           )
         })}
       </div>
+      <RelicFloatingTip relic={selectedRelic} anchor={relicTipAnchor} onClose={() => { setSelectedRelicId(null); setRelicTipAnchor(null) }} />
+    </aside>
+  )
+}
+
+function RelicFloatingTip({ relic, anchor, onClose }: { relic: Relic | null; anchor: TipAnchor | null; onClose: () => void }) {
+  useOutsideTipDismiss(Boolean(relic), onClose)
+  if (!relic) return null
+  const style = anchor ? { '--tip-x': `${anchor.x}px`, '--tip-y': `${anchor.y}px` } as React.CSSProperties : undefined
+  return (
+    <aside className="relic-floating-tip floating-tip" style={style}>
+      <div className="tip-tags">
+        <span className={`tip-tag ${qualityClass(relic.quality)}`}>{qualityLabel[relic.quality]}</span>
+        {relic.def.tags.map((tag) => <span key={tag} className="tip-tag">{tag}</span>)}
+      </div>
+      <div className="relic-tip-identity">
+        <span className={`relic-tip-icon ${qualityClass(relic.quality)}`}>
+          <Trophy size={44} aria-hidden="true" />
+        </span>
+        <h3>{relic.def.name}</h3>
+      </div>
+      <p className="tip-description"><RuleText text={relic.def.description} /></p>
     </aside>
   )
 }
