@@ -584,15 +584,16 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
       if (safety) initialQueue.push(safety)
       fighterState.emptyRolls = 0
     }
-    const queue = [...initialQueue]
-    const processed = { count: 0, capped: false }
+    const queue = initialQueue.map((item) => ({ item, allowExtraRollFanout: true }))
+    const processed = { count: 0, capped: false, extraRollRequests: 0 }
     while (queue.length > 0 && processed.count < TRIGGER_QUEUE_CAP) {
-      const item = queue.shift()
-      if (!item) continue
+      const entry = queue.shift()
+      if (!entry) continue
+      const { item, allowExtraRollFanout } = entry
       const def = itemDef(item.defId)
       const context = matchingContext(fighter, def, roll)
       processed.count += 1
-      for (const trigger of executeItem(actorSide, fighter, item, roll, context.scale, context.note, queue, processed, extra)) {
+      for (const trigger of executeItem(actorSide, fighter, item, roll, context.scale, context.note, queue, processed, extra, allowExtraRollFanout)) {
         push({
           time,
           actor: actorSide,
@@ -616,6 +617,31 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
         actor: actorSide,
         kind: 'ITEM',
         text: `触发队列达到上限 ${TRIGGER_QUEUE_CAP}，后续联动已截断`,
+        effectType: 'UTILITY',
+        target: 'none',
+      })
+    }
+    return processed.extraRollRequests
+  }
+
+  const resolveActorChain = (time: number, actorSide: Side, extra = false, allowMuttTrait = false) => {
+    const fighter = actorSide === 'player' ? player : opponent
+    let pendingExtraRolls = resolveActor(time, actorSide, extra)
+    if (allowMuttTrait && fighter.dogType === 'MUTT' && rng() < 0.2) pendingExtraRolls += 1
+
+    let resolvedExtraRolls = 0
+    while (pendingExtraRolls > 0 && resolvedExtraRolls < EXTRA_ROLL_CHAIN_CAP) {
+      pendingExtraRolls -= 1
+      resolvedExtraRolls += 1
+      pendingExtraRolls += resolveActor(time, actorSide, true)
+    }
+
+    if (pendingExtraRolls > 0) {
+      push({
+        time,
+        actor: actorSide,
+        kind: 'ITEM',
+        text: `额外投掷链达到上限 ${EXTRA_ROLL_CHAIN_CAP}，后续额外投掷已截断`,
         effectType: 'UTILITY',
         target: 'none',
       })
@@ -647,10 +673,9 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
 
   for (let time = 1; time <= 120; time += 1) {
     for (const actor of ['player', 'opponent'] as const) {
-      resolveActor(time, actor)
+      resolveActorChain(time, actor, false, true)
       const fighter = actor === 'player' ? player : opponent
-      if (fighter.dogType === 'MUTT' && rng() < 0.2) resolveActor(time, actor, true)
-      if (hasRelic(fighter, 'HUSKY_ENGINE') && time % 6 === 0) resolveActor(time, actor, true)
+      if (hasRelic(fighter, 'HUSKY_ENGINE') && time % 6 === 0) resolveActorChain(time, actor, true)
 
       if (playerHp <= 0 || opponentHp <= 0) {
         return finish(time, `战斗结束：${currentLeadText()}`)
