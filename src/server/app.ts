@@ -10,12 +10,12 @@ import { prisma } from './db'
 import { registerDogfightRoutes } from './dogfight'
 import { publicErrorMessage } from './errors'
 import { buildApexSeedEntries, resolveApexChallenge, type ApexOpponent } from './game/apex'
-import { itemDef, relicDef } from './game/data'
+import { itemDef, relicDef, relicDefForQuality } from './game/data'
 import { canPlace, findSlot } from './game/grid'
 import { canUpgradePair, nextQuality, normalizeQuality } from './game/quality'
 import { simulateBattle } from './game/battle'
 import { STARTING_GOLD, isTrainingMatchRound } from './game/matchmaking'
-import type { BattleResult, DogType, FighterSnapshot, ShopOffer, ShopType } from './game/types'
+import type { BattleResult, DogType, FighterSnapshot, GameItem, RelicInstance, ShopOffer, ShopType } from './game/types'
 import { applyRelicChoice, classRewardChoices, initialItems, makeChoices, makeRelicChoices, makeShop, parseJson, publicRun, relicsFromRun, seedGhost, snapshotFromRun, toGameItems } from './state'
 
 declare module 'fastify' {
@@ -88,6 +88,8 @@ export function buildApp() {
     challengeWins: entry.challengeWins,
     isSeed: entry.isSeed,
     createdAt: entry.createdAt,
+    items: parseJson<GameItem[]>(entry.items, []).map((item) => ({ ...item, def: itemDef(item.defId) })),
+    relics: parseJson<RelicInstance[]>(entry.relics, []).map((relic) => ({ ...relic, def: relicDefForQuality(relic.relicId, relic.quality) })),
   })
 
   const ensureApexSeeds = async () => {

@@ -133,6 +133,8 @@ type ApexEntry = {
   challengeWins: number
   isSeed: boolean
   createdAt: string
+  items: Item[]
+  relics: Relic[]
 }
 type ApexBattleSummary = {
   opponentId: string
@@ -343,6 +345,10 @@ function qualityAmount(amount: number, quality?: string) {
 function effectText(def: ItemDef, quality: ItemQuality = 'BRONZE') {
   const amount = qualityAmount(def.effect.amount, quality)
   return `${def.effect.type === 'HEAL' ? '回复' : '造成'} ${amount} ${def.effect.type === 'HEAL' ? '生命' : '伤害'}`
+}
+
+function sellValueForItem(def: ItemDef) {
+  return def.tags.includes('starter') ? 1 : Math.floor(def.price / 2)
 }
 
 function maxHealthForRound(round: number) {
@@ -902,6 +908,7 @@ function DogfightLobby() {
   const [pendingAction, setPendingAction] = useState<'CREATE' | 'JOIN' | 'MATCH' | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const roomId = room?.id ?? null
 
   const loadRooms = async () => {
     setError('')
@@ -927,19 +934,30 @@ function DogfightLobby() {
   }
 
   useEffect(() => {
-    void loadRooms()
+    let active = true
+    api<DogfightRoomsResponse>('/dogfight/rooms')
+      .then((data) => {
+        if (active) setRooms(data.rooms)
+      })
+      .catch((err) => {
+        if (active) setError(err instanceof Error ? err.message : '斗狗房间加载失败')
+      })
+      .finally(() => {
+        if (active) setLoading(false)
+      })
+    return () => { active = false }
   }, [])
 
   useEffect(() => {
     const timer = window.setInterval(() => {
-      if (room) {
-        void loadRoom(room.id)
+      if (roomId) {
+        void loadRoom(roomId)
       } else {
         void loadRooms()
       }
     }, 2_000)
     return () => window.clearInterval(timer)
-  }, [room?.id])
+  }, [roomId])
 
   const enterWithDog = async (choice: { dogType: DogType; luckyNumber?: number }) => {
     setError('')
@@ -1028,6 +1046,7 @@ function DogfightRoomView({ room, onRoomChange, onLeave }: { room: DogfightRoom;
   const [eventIndex, setEventIndex] = useState(0)
   const [speed, setSpeed] = useState(1)
   const [error, setError] = useState('')
+  const [now, setNow] = useState(() => Date.now())
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
   const run = room.currentRun
   const selectedItem = run?.items.find((item) => item.id === selectedItemId) || null
@@ -1042,6 +1061,11 @@ function DogfightRoomView({ room, onRoomChange, onLeave }: { room: DogfightRoom;
     }, 420 / speed)
     return () => window.clearInterval(timer)
   }, [battle, speed])
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 1000)
+    return () => window.clearInterval(timer)
+  }, [])
 
   const refreshRoom = async () => {
     const data = await api<DogfightRoomResponse>('/dogfight/rooms/' + room.id)
@@ -1131,7 +1155,7 @@ function DogfightRoomView({ room, onRoomChange, onLeave }: { room: DogfightRoom;
   }
 
   const battleRun = run ?? battleToRun(battle)
-  const deadline = room.readyDeadline ? Math.max(0, Math.ceil((new Date(room.readyDeadline).getTime() - Date.now()) / 1000)) : 0
+  const deadline = room.readyDeadline ? Math.max(0, Math.ceil((new Date(room.readyDeadline).getTime() - now) / 1000)) : 0
 
   return (
     <section className="dogfight-room-view">
@@ -1281,6 +1305,7 @@ function ApexArena() {
   const [overview, setOverview] = useState<ApexOverview | null>(null)
   const [report, setReport] = useState<ApexChallengeReport | null>(null)
   const [submittedEntry, setSubmittedEntry] = useState<ApexEntry | null>(null)
+  const [expandedEntryId, setExpandedEntryId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [submittingRunId, setSubmittingRunId] = useState<string | null>(null)
   const [error, setError] = useState('')
@@ -1386,20 +1411,61 @@ function ApexArena() {
           </div>
           <div className="apex-rank-list">
             {leaderboard.map((entry) => (
-              <article className={`apex-rank-row ${entry.isSeed ? 'seed' : 'player-entry'}`} key={entry.id}>
-                <b>#{entry.rank}</b>
-                <img className="dog-avatar small" src={dogAssets[entry.dogType]} alt="" />
-                <div>
-                  <strong>{entry.name}</strong>
-                  <p>{dogNames[entry.dogType]} · {entry.wins}胜{entry.losses}败 · 第 {entry.round} 回合</p>
-                </div>
-                <span>{entry.isSeed ? '种子' : `${entry.challengeWins}连胜`}</span>
-              </article>
+              <div className="apex-rank-entry" key={entry.id}>
+                <article className={`apex-rank-row ${entry.isSeed ? 'seed' : 'player-entry'}`}>
+                  <b>#{entry.rank}</b>
+                  <img className="dog-avatar small" src={dogAssets[entry.dogType]} alt="" />
+                  <div>
+                    <strong>{entry.name}</strong>
+                    <p>{dogNames[entry.dogType]} · {entry.wins}胜{entry.losses}败 · 第 {entry.round} 回合</p>
+                  </div>
+                  <span>{entry.isSeed ? '种子' : `${entry.challengeWins}连胜`}</span>
+                  <button className="secondary action-button apex-config-toggle" onClick={() => setExpandedEntryId(expandedEntryId === entry.id ? null : entry.id)}>
+                    {expandedEntryId === entry.id ? '收起配置' : '查看配置'}
+                  </button>
+                </article>
+                {expandedEntryId === entry.id && <ApexSnapshotDetails entry={entry} />}
+              </div>
             ))}
           </div>
         </section>
       </div>
     </section>
+  )
+}
+
+function ApexSnapshotDetails({ entry }: { entry: ApexEntry }) {
+  const equipment = entry.items.filter((item) => item.area === 'EQUIPMENT')
+  const bag = entry.items.filter((item) => item.area === 'BAG')
+  return (
+    <div className="apex-snapshot-details">
+      <div className="battle-equipment-row player apex-equipment-preview">
+        <div className="battle-row-title">
+          <span>巅峰装备栏</span>
+          <small>{entry.name} · {dogNames[entry.dogType]}</small>
+        </div>
+        <div className="battle-slot-grid" style={{ gridTemplateColumns: 'repeat(12, minmax(0, 1fr))' }}>
+          {Array.from({ length: 12 }).map((_, x) => <i key={x} className="battle-slot" style={{ gridColumn: x + 1, gridRow: 1 }} />)}
+          {equipment.map((item) => (
+            <div
+              key={item.id}
+              className={`battle-item item-card ${itemTone(item.def)} ${qualityClass(item.quality)}`}
+              style={{ gridColumn: `${item.x + 1} / span ${item.def.width}`, gridRow: 1 }}
+              title={`${qualityLabel[normalizeQuality(item.quality)]} ${item.def.name} · ${effectText(item.def, normalizeQuality(item.quality))}`}
+            >
+              <img className="item-icon" src={itemIcon(item.def)} alt="" />
+              <span className="quality-chip">{qualityLabel[normalizeQuality(item.quality)]}</span>
+              <span>{item.def.name}</span>
+              <small><Dice5 size={12} /> {item.def.dice.join('/')}</small>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="apex-relic-preview">
+        <RelicRail relics={entry.relics} />
+        <p>{entry.relics.length > 0 ? `遗物 ${entry.relics.length} 个` : '没有遗物'} · 背包物品 {bag.length} 个</p>
+      </div>
+    </div>
   )
 }
 
@@ -1924,6 +1990,7 @@ function FloatingTip({ run, item, offer, anchor, onClose, onBuy, onSell, onUpgra
   const isOffer = Boolean(offer)
   const quality = normalizeQuality(item?.quality ?? offer?.quality)
   const canAfford = !offer || run.gold >= offer.price
+  const sellValue = item ? sellValueForItem(item.def) : null
   const style = anchor ? { '--tip-x': `${anchor.x}px`, '--tip-y': `${anchor.y}px` } as React.CSSProperties : undefined
   return (
     <aside className="floating-tip" style={style}>
@@ -1970,7 +2037,7 @@ function FloatingTip({ run, item, offer, anchor, onClose, onBuy, onSell, onUpgra
             )}
             {onSell ? (
               <button className="danger-button wide" onClick={onSell}>
-                <BadgeDollarSign size={18} /> 出售
+                <BadgeDollarSign size={18} /> 出售 +{sellValue}
               </button>
             ) : !onUpgrade ? (
               <small className="disabled-reason">战斗中仅查看物品详情</small>

@@ -335,10 +335,16 @@ describeWithDatabase('run API', () => {
     const overview = await agent.get('/api/apex').expect(200)
     expect(overview.body.leaderboard).toHaveLength(50)
     expect(overview.body.leaderboard[0]).toMatchObject({ rank: 1, isSeed: true })
+    expect(overview.body.leaderboard[0].items.length).toBeGreaterThan(0)
+    expect(overview.body.leaderboard[0].items[0].def).toMatchObject({ name: expect.any(String) })
+    expect(overview.body.leaderboard[0].relics.length).toBeGreaterThan(0)
+    expect(overview.body.leaderboard[0].relics[0].def).toMatchObject({ name: expect.any(String) })
     expect(overview.body.candidates.map((run: { id: string }) => run.id)).toContain(runId)
 
     const submitted = await agent.post('/api/apex/submit').send({ runId }).expect(200)
     expect(submitted.body.entry).toMatchObject({ sourceRunId: runId, isSeed: false, name: expect.stringContaining('Apex Player') })
+    expect(submitted.body.entry.items.length).toBeGreaterThan(0)
+    expect(submitted.body.entry.items[0].def).toMatchObject({ name: expect.any(String) })
     expect(submitted.body.report.battles.length).toBeGreaterThan(0)
     expect(submitted.body.leaderboard).toHaveLength(51)
 

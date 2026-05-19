@@ -1585,6 +1585,11 @@ input {
   gap: 10px;
 }
 
+.apex-rank-entry {
+  display: grid;
+  gap: 8px;
+}
+
 .apex-candidate-card,
 .apex-report {
   display: grid;
@@ -1595,7 +1600,7 @@ input {
 
 .apex-rank-row {
   display: grid;
-  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  grid-template-columns: auto auto minmax(0, 1fr) auto auto;
   gap: 12px;
   align-items: center;
 }
@@ -1629,6 +1634,33 @@ input {
   text-align: center;
   font-size: 12px;
   font-weight: 950;
+}
+
+.apex-config-toggle {
+  min-width: 94px;
+}
+
+.apex-snapshot-details {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid rgba(61, 45, 37, .22);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, .72);
+}
+
+.apex-equipment-preview {
+  --slot-w: 58px;
+  --slot-h: 82px;
+}
+
+.apex-relic-preview {
+  display: grid;
+  gap: 8px;
+}
+
+.apex-relic-preview .relic-rail {
+  width: 100%;
 }
 
 .apex-report {
@@ -2320,7 +2352,8 @@ input {
     grid-template-columns: auto auto minmax(0, 1fr);
   }
   .apex-candidate-card .action-button,
-  .apex-rank-row > span {
+  .apex-rank-row > span,
+  .apex-config-toggle {
     grid-column: 1 / -1;
     justify-self: start;
   }
