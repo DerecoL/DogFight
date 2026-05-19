@@ -47,6 +47,8 @@ describe('production deployment assets', () => {
     expect(workflow).toContain("--exclude='dist-click'")
     expect(workflow).toContain("--exclude='.pglite'")
     expect(workflow).toContain('"$RUNNER_TEMP/dogfight-source.tar.gz"')
+    expect(workflow).toContain('-o BatchMode=yes')
+    expect(workflow).toContain('-o ConnectTimeout=20')
     expect(workflow).not.toContain('tar -czf dogfight-source.tar.gz')
     expect(workflow).toContain('docker compose up -d --build')
     expect(workflow).toContain('DATABASE_URL')

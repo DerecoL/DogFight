@@ -35,12 +35,20 @@ jobs:
       - name: Upload source package
         run: |
           scp -i ~/.ssh/dogfight_deploy_key \
+            -o BatchMode=yes \
+            -o ConnectTimeout=20 \
+            -o ServerAliveInterval=15 \
+            -o ServerAliveCountMax=4 \
             "$RUNNER_TEMP/dogfight-source.tar.gz" \
             "${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:/tmp/dogfight-${{ github.sha }}.tar.gz"
 
       - name: Deploy to Tencent Cloud
         run: |
           ssh -i ~/.ssh/dogfight_deploy_key \
+            -o BatchMode=yes \
+            -o ConnectTimeout=20 \
+            -o ServerAliveInterval=15 \
+            -o ServerAliveCountMax=4 \
             "${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}" \
             "DEPLOY_PATH='${{ secrets.DEPLOY_PATH }}' ARCHIVE_PATH='/tmp/dogfight-${{ github.sha }}.tar.gz' bash -s" <<'REMOTE'
           set -euo pipefail
