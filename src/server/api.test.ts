@@ -60,11 +60,13 @@ describeWithDatabase('run API', () => {
     await first.post('/api/auth/register').send({ email: `ghost${Date.now()}@dog.test`, password: 'dogdice' }).expect(200)
     await first.post('/api/profile/nickname').send({ nickname: '猛犬教练' }).expect(200)
     const firstRun = await first.post('/api/runs').send({ dogType: 'SHIBA' }).expect(200)
+    await prisma.run.update({ where: { id: firstRun.body.run.id }, data: { round: 2 } })
     await first.post(`/api/runs/${firstRun.body.run.id}/battle/match`).send({}).expect(200)
 
     await second.post('/api/auth/register').send({ email: `challenger${Date.now()}@dog.test`, password: 'dogdice' }).expect(200)
     await second.post('/api/profile/nickname').send({ nickname: '挑战者' }).expect(200)
     const secondRun = await second.post('/api/runs').send({ dogType: 'MUTT' }).expect(200)
+    await prisma.run.update({ where: { id: secondRun.body.run.id }, data: { round: 2 } })
 
     const matched = await second.post(`/api/runs/${secondRun.body.run.id}/battle/match`).send({}).expect(200)
     expect(matched.body.run.matchedGhost.name).toBe('猛犬教练')
@@ -74,6 +76,26 @@ describeWithDatabase('run API', () => {
     expect(battled.body.battle.opponentSnapshot.name).toBe('猛犬教练')
   })
 
+  it('uses offline training opponents for the first two rounds even when real ghosts exist', async () => {
+    const first = request.agent(app.server)
+    const second = request.agent(app.server)
+    await app.ready()
+
+    await first.post('/api/auth/register').send({ email: `earlyghost${Date.now()}@dog.test`, password: 'dogdice' }).expect(200)
+    const firstRun = await first.post('/api/runs').send({ dogType: 'SHIBA' }).expect(200)
+    await first.post(`/api/runs/${firstRun.body.run.id}/battle/match`).send({}).expect(200)
+
+    await second.post('/api/auth/register').send({ email: `earlychallenger${Date.now()}@dog.test`, password: 'dogdice' }).expect(200)
+    const secondRun = await second.post('/api/runs').send({ dogType: 'MUTT' }).expect(200)
+
+    const matched = await second.post(`/api/runs/${secondRun.body.run.id}/battle/match`).send({}).expect(200)
+    expect(matched.body.run.matchedGhost.ghostId).toBeNull()
+    expect(matched.body.run.matchedGhost.items).toHaveLength(3)
+    expect(matched.body.run.matchedGhost.items.every((item: { defId: string; quality: string }) =>
+      item.defId.startsWith('starter-') && item.quality === 'BRONZE',
+    )).toBe(true)
+  })
+
   it('supports register, create run, buy, match, and battle', async () => {
     const agent = request.agent(app.server)
     await app.ready()
@@ -81,6 +103,7 @@ describeWithDatabase('run API', () => {
     const email = `p${Date.now()}@dog.test`
     await agent.post('/api/auth/register').send({ email, password: 'dogdice' }).expect(200)
     const created = await agent.post('/api/runs').send({ dogType: 'SHIBA' }).expect(200)
+    expect(created.body.run.gold).toBe(10)
     expect(created.body.run.items).toHaveLength(6)
     expect(created.body.run.items.every((item: { quality: string }) => item.quality === 'BRONZE')).toBe(true)
     expect(created.body.run.shopItems.every((offer: { quality: string }) => offer.quality === 'BRONZE')).toBe(true)

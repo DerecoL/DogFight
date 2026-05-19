@@ -29,7 +29,7 @@ model Run {
   losses      Int      @default(0)
   round       Int      @default(0)
   luckyNumber Int?
-  gold        Int      @default(5)
+  gold        Int      @default(10)
   phase       String   @default("SHOP")
   status      String   @default("ACTIVE")
   shopType    String   @default("GENERAL")

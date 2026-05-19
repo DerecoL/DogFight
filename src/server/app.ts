@@ -12,6 +12,7 @@ import { itemDef, relicDef } from './game/data'
 import { canPlace, findSlot } from './game/grid'
 import { canUpgradePair, nextQuality, normalizeQuality } from './game/quality'
 import { simulateBattle } from './game/battle'
+import { STARTING_GOLD, isTrainingMatchRound } from './game/matchmaking'
 import type { BattleResult, DogType, FighterSnapshot, ShopOffer, ShopType } from './game/types'
 import { applyRelicChoice, classRewardChoices, initialItems, makeChoices, makeRelicChoices, makeShop, parseJson, publicRun, relicsFromRun, seedGhost, snapshotFromRun, toGameItems } from './state'
 
@@ -129,6 +130,7 @@ export function buildApp() {
         userId,
         dogType: body.dogType,
         luckyNumber: body.dogType === 'EMPEROR' ? body.luckyNumber : null,
+        gold: STARTING_GOLD,
         shopItems: JSON.stringify(shopItems),
         items: { create: initialItems().map(({ defId, area, x, y }) => ({ defId, area, x, y })) },
       },
@@ -336,10 +338,12 @@ export function buildApp() {
         seed: `${run.id}-${run.round}-${run.wins}-${run.losses}`,
       },
     })
-    const ghost = await prisma.ghostSnapshot.findFirst({
-      where: { round: run.round, NOT: { runId: run.id }, wins: { gte: Math.max(0, run.wins - 1), lte: run.wins + 1 }, losses: { gte: Math.max(0, run.losses - 1), lte: run.losses + 1 } },
-      orderBy: { createdAt: 'desc' },
-    })
+    const ghost = isTrainingMatchRound(run.round)
+      ? null
+      : await prisma.ghostSnapshot.findFirst({
+        where: { round: run.round, NOT: { runId: run.id }, wins: { gte: Math.max(0, run.wins - 1), lte: run.wins + 1 }, losses: { gte: Math.max(0, run.losses - 1), lte: run.losses + 1 } },
+        orderBy: { createdAt: 'desc' },
+      })
     const opponent = ghost
       ? { name: ghost.name, dogType: ghost.dogType as DogType, luckyNumber: ghost.luckyNumber, wins: ghost.wins, losses: ghost.losses, round: ghost.round, items: parseJson(ghost.items, []), relics: parseJson(ghost.relics, []) }
       : seedGhost(run.round, run.wins, run.losses)

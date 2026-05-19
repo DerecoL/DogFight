@@ -1,5 +1,6 @@
 import { CLASS_REWARD_DEFS, RELIC_DEFS, itemDef, shopPool } from './data'
 import { canPlace } from './grid'
+import { isTrainingMatchRound } from './matchmaking'
 import { nextQuality, normalizeQuality } from './quality'
 import { createRng } from './rng'
 import type { DogType, FighterSnapshot, GameItem, ItemDef, ItemQuality, RelicInstance, ShopType } from './types'
@@ -119,6 +120,7 @@ function classRewardDefs(dogType: DogType, profile: OfflineBuildProfile, round: 
 }
 
 function shopDefs(profile: OfflineBuildProfile, round: number) {
+  if (isTrainingMatchRound(round)) return []
   const pools = profile.shopPreference.flatMap((shopType) => shopPool(shopType))
   return uniqueById(pools).slice(0, Math.max(2, round + 1))
 }
