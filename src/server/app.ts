@@ -172,15 +172,34 @@ export function buildApp() {
     if (!offer) return reply.code(404).send({ error: '商品不存在' })
     if (run.gold < offer.price) return reply.code(400).send({ error: '金币不足' })
     const items = toGameItems(run.items)
+    const offerQuality = normalizeQuality(offer.quality)
+    const remaining = offers.filter((entry) => entry.offerId !== body.offerId)
+    const upgradeTarget = items.find((entry) =>
+      entry.defId === offer.defId
+      && normalizeQuality(entry.quality) === offerQuality
+      && nextQuality(entry.quality) !== null
+    )
+    const upgradedQuality = upgradeTarget ? nextQuality(upgradeTarget.quality) : null
+    if (upgradeTarget && upgradedQuality) {
+      const [, updated] = await prisma.$transaction([
+        prisma.itemInstance.update({ where: { id: upgradeTarget.id }, data: { quality: upgradedQuality } }),
+        prisma.run.update({
+          where: { id: run.id },
+          data: { gold: run.gold - offer.price, shopItems: JSON.stringify(remaining) },
+          include: { items: true },
+        }),
+      ])
+      return { run: publicRun(updated) }
+    }
+
     const slot = findSlot(items, offer.defId, body.area)
     if (!slot) return reply.code(400).send({ error: '目标区域空间不足' })
-    const remaining = offers.filter((entry) => entry.offerId !== body.offerId)
     const updated = await prisma.run.update({
       where: { id: run.id },
       data: {
         gold: run.gold - offer.price,
         shopItems: JSON.stringify(remaining),
-        items: { create: { defId: offer.defId, quality: normalizeQuality(offer.quality), area: body.area, x: slot.x, y: slot.y } },
+        items: { create: { defId: offer.defId, quality: offerQuality, area: body.area, x: slot.x, y: slot.y } },
       },
       include: { items: true },
     })

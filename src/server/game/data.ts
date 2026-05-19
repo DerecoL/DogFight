@@ -57,6 +57,80 @@ export const ITEM_DEFS: ItemDef[] = [
   slotItem('guard-vest', '护卫背心', 3, 8, [1, 3, 5], ['medium', 'heal'], { type: 'HEAL', amount: 8 }),
   slotItem('giant-bone', '巨型骨棒', 4, 10, [5, 6], ['large', 'big'], { type: 'DAMAGE', amount: 16 }),
   slotItem('dog-house', '小狗窝', 4, 9, [1, 2], ['large', 'small'], { type: 'HEAL', amount: 12 }),
+  slotItem('v3-broken-canine', '断裂的犬齿', 1, 3, [1, 2], ['small', 'weak'], { type: 'DAMAGE', amount: 3 }, {
+    description: '造成 3 点伤害。若目标处于【虚弱】，额外造成 4 点真实伤害。',
+    advancedEffect: 'TARGET_WEAK_BONUS_DAMAGE',
+    defaultQuality: 'BRONZE',
+  }),
+  slotItem('v3-chew-scratch-post', '耐咬磨爪柱', 1, 4, [1, 6], ['extreme', 'trigger'], { type: 'UTILITY', amount: 0 }, {
+    description: '使【相邻】装备的下一次触发伤害 +4。',
+    advancedEffect: 'ADJACENT_DAMAGE_BONUS',
+    defaultQuality: 'BRONZE',
+  }),
+  slotItem('v3-cone-collar', '耻辱圈(防咬套)', 1, 3, [1, 2, 3], ['small', 'shield'], { type: 'UTILITY', amount: 3 }, {
+    description: '获得 3 点护盾。',
+    advancedEffect: 'GAIN_SHIELD',
+    defaultQuality: 'BRONZE',
+  }),
+  slotItem('v3-dog-catnip', '特效狗薄荷', 1, 4, [3, 4], ['cleanse', 'heal'], { type: 'HEAL', amount: 4 }, {
+    description: '恢复 4 点生命值，并使自身的一层【中毒】或者【虚弱】失效。',
+    advancedEffect: 'CLEANSE_ONE',
+    defaultQuality: 'BRONZE',
+  }),
+  slotItem('v3-flea-disc', '跳蚤飞盘', 1, 4, [1], ['small', 'poison'], { type: 'UTILITY', amount: 2 }, {
+    description: '对敌人施加 2 层【中毒】。',
+    advancedEffect: 'APPLY_POISON',
+    defaultQuality: 'BRONZE',
+  }),
+  slotItem('v3-large-bone-sword', '大号磨牙骨剑', 2, 6, [3, 4, 5], ['stable', 'damage'], { type: 'DAMAGE', amount: 8 }, {
+    description: '造成 8 点伤害。',
+    defaultQuality: 'BRONZE',
+  }),
+  slotItem('v3-wooden-shield', '狗屋木板盾', 2, 6, [2, 3, 4], ['stable', 'shield'], { type: 'UTILITY', amount: 9 }, {
+    description: '获得 9 点护盾。',
+    advancedEffect: 'GAIN_SHIELD',
+    defaultQuality: 'BRONZE',
+  }),
+  slotItem('v3-spiked-vest', '带刺防爆冲胸背', 2, 7, [4, 5, 6], ['big', 'thorn', 'shield'], { type: 'UTILITY', amount: 6 }, {
+    description: '获得 6 点护盾，并获得 1 层【荆棘】。',
+    advancedEffect: 'GAIN_SHIELD_THORNS',
+    defaultQuality: 'BRONZE',
+  }),
+  slotItem('v3-hydrant-axe', '消防栓战斧', 3, 8, [5, 6], ['big', 'weak'], { type: 'DAMAGE', amount: 15 }, {
+    description: '造成 15 点伤害，并给敌人施加 1 层【虚弱】。',
+    advancedEffect: 'APPLY_WEAK_ON_HIT',
+    defaultQuality: 'BRONZE',
+  }),
+  slotItem('v3-dinosaur-leg-bone', '巨型恐龙腿骨', 4, 10, [6], ['big', 'shield-break'], { type: 'DAMAGE', amount: 25 }, {
+    description: '造成 25 点伤害。如果敌方有护盾，该次伤害直接对护盾造成 2 倍伤害。',
+    advancedEffect: 'DOUBLE_SHIELD_DAMAGE',
+    defaultQuality: 'BRONZE',
+  }),
+  slotItem('v3-auto-waterer', '全自动饮水机', 4, 9, [1, 2, 3], ['small', 'growth', 'heal'], { type: 'HEAL', amount: 10 }, {
+    description: '恢复 10 点生命值。如果你当前处于满血，则永久提升自身 1 点最大生命值。',
+    advancedEffect: 'HEAL_OR_MAX_HP',
+    defaultQuality: 'BRONZE',
+  }),
+  slotItem('v3-night-patrol-light', '夜巡犬探照灯', 2, 12, [1, 2, 3], ['small', 'trigger'], { type: 'UTILITY', amount: 0 }, {
+    description: '使你【相邻】的装备触发概率在接下来的 2 秒内暂时提升（底层权重翻倍）。',
+    advancedEffect: 'ADJACENT_TEMP_TRIGGER',
+    defaultQuality: 'GOLD',
+  }),
+  slotItem('v3-blood-mad-fang', '嗜血疯狗之牙', 2, 12, [1, 6], ['extreme', 'heal'], { type: 'DAMAGE', amount: 6 }, {
+    description: '造成 6 点伤害，并将造成伤害的 100% 转化为自身治疗。',
+    advancedEffect: 'LIFESTEAL',
+    defaultQuality: 'GOLD',
+  }),
+  slotItem('v3-fermented-trash-bin', '发酵的翻倒垃圾桶', 4, 14, [4, 5, 6], ['big', 'poison', 'disable'], { type: 'UTILITY', amount: 5 }, {
+    description: '对敌方施加 5 层【中毒】，并使敌方最右侧的一个装备【失效】一次。',
+    advancedEffect: 'POISON_AND_DISABLE_RIGHTMOST',
+    defaultQuality: 'GOLD',
+  }),
+  slotItem('v3-golden-kennel', '不可侵犯的纯金狗窝', 4, 18, [4, 5], ['shield', 'immune'], { type: 'UTILITY', amount: 25 }, {
+    description: '获得 25 点护盾。只要你拥有护盾，你免疫所有【中毒】和【虚弱】的施加。',
+    advancedEffect: 'SHIELD_IMMUNITY',
+    defaultQuality: 'DIAMOND',
+  }),
 ]
 
 export const CLASS_REWARD_DEFS: ItemDef[] = [
@@ -101,6 +175,13 @@ export const RELIC_DEFS: RelicDef[] = [
   { id: 'midas-right', name: '点金手·右', unlockRound: 3, defaultQuality: 'SILVER', tags: ['small'], effect: 'MIRROR_SMALL_TO_BIG', description: '你场上所有绑定在 1~3 点数的道具，现在在掷出对应加3的点数（即4~6）时也会触发，但效果降低 50%' },
   { id: 'half-die-left', name: '半截骰·左', unlockRound: 3, defaultQuality: 'SILVER', tags: ['big'], effect: 'ONLY_BIG_HALF_EFFECT', description: '你只能投掷出4~6的点数，但所有装备效果降低50%' },
   { id: 'half-die-right', name: '半截骰·右', unlockRound: 3, defaultQuality: 'SILVER', tags: ['small'], effect: 'ONLY_SMALL_HALF_EFFECT', description: '你只能投掷出1~3的点数，但所有装备效果降低50%' },
+  { id: 'v3-two-sided-gold-tag', name: '两面金狗牌', unlockRound: 3, defaultQuality: 'SILVER', tags: ['extreme'], effect: 'EXTREME_ROLL_BIAS', description: '你的投掷结果出现【极值】（1和6）的概率绝对值提升 30%。' },
+  { id: 'v3-balanced-food-bowl', name: '平衡狗粮盆', unlockRound: 3, defaultQuality: 'SILVER', tags: ['middle'], effect: 'MIDDLE_ROLL_BIAS', description: '你的投掷结果出现 3 和 4 的概率绝对值提升 30%。' },
+  { id: 'v3-lucky-foxtail', name: '幸运狗尾草', unlockRound: 3, defaultQuality: 'GOLD', tags: ['pity', 'large'], effect: 'EMPTY_ROLL_LARGE_SAFETY', description: '当你连续 2 次投掷“空过”时，第 3 次投掷必定为你随机触发一件【大型物品】（若没有则触发中型）。' },
+  { id: 'v3-bad-dog-manual', name: '坏狗狗作案手册', unlockRound: 3, defaultQuality: 'GOLD', tags: ['poison'], effect: 'POISON_TICK_BONUS', description: '敌方身上的【中毒】状态每次结算时，额外造成 2 点伤害。' },
+  { id: 'v3-fluffed-spike-collar', name: '炸毛护颈圈', unlockRound: 3, defaultQuality: 'GOLD', tags: ['thorn'], effect: 'OPENING_THORNS', description: '战斗开始时，你直接获得 5 层【荆棘】。' },
+  { id: 'v3-husky-engine', name: '哈士奇永动机', unlockRound: 3, defaultQuality: 'DIAMOND', tags: ['attack-speed'], effect: 'HUSKY_ENGINE', description: '你的基础投掷间隔从 1 秒缩短至 0.85 秒。（全局攻速提升）' },
+  { id: 'v3-fourth-dimensional-kennel', name: '四次元狗窝', unlockRound: 3, defaultQuality: 'DIAMOND', tags: ['space'], effect: 'EXTRA_EQUIPMENT_REDUCED_EFFECT', description: '你可以突破背包限制，将第 13 个装备放入战斗区，但你所有装备的触发效果降低 15%。' },
 ]
 
 export const TERM_DEFS = [

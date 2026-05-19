@@ -77,7 +77,21 @@ describe('dog and item definitions', () => {
       '燕回太刀',
     ])
     expect(CLASS_REWARD_DEFS.filter((item) => item.classDog === 'BULLY' && item.unlockRound === 6)).toHaveLength(3)
-    expect(RELIC_DEFS.map((relic) => relic.name)).toEqual(['点金手·左', '点金手·右', '半截骰·左', '半截骰·右'])
+    expect(RELIC_DEFS.map((relic) => relic.name)).toEqual(expect.arrayContaining(['点金手·左', '点金手·右', '半截骰·左', '半截骰·右']))
+  })
+
+  it('appends V3 common equipment and relic definitions without removing the existing pool', () => {
+    expect(itemDef('small-bite')).toMatchObject({ size: 1 })
+    expect(itemDef('v3-cone-collar')).toMatchObject({ size: 1, effect: { type: 'UTILITY', amount: 3 } })
+    expect(itemDef('v3-golden-kennel')).toMatchObject({ size: 4, defaultQuality: 'DIAMOND' })
+    expect(shopPool('SMALL').some((item) => item.id === 'v3-flea-disc')).toBe(true)
+    expect(shopPool('LARGE').some((item) => item.id === 'v3-dinosaur-leg-bone')).toBe(true)
+    expect(RELIC_DEFS.map((relic) => relic.id)).toEqual(expect.arrayContaining([
+      'midas-left',
+      'v3-two-sided-gold-tag',
+      'v3-bad-dog-manual',
+      'v3-husky-engine',
+    ]))
   })
 })
 
@@ -336,6 +350,93 @@ describe('battle simulation', () => {
 
     expect(rolls.every((roll) => roll != null && roll <= 3)).toBe(true)
     expect(itemEvent).toMatchObject({ amount: 2, targetHpDelta: -2 })
+  })
+
+  it('does not let mutt extra-roll support items loop during a normal roll', () => {
+    const player: FighterSnapshot = {
+      name: 'P',
+      dogType: 'MUTT',
+      wins: 0,
+      losses: 0,
+      round: 6,
+      items: [
+        { id: 'chase-car', defId: 'mutt-chase-car', quality: 'DIAMOND', area: 'EQUIPMENT', x: 0, y: 0 },
+        { id: 'bite', defId: 'starter-1', quality: 'BRONZE', area: 'EQUIPMENT', x: 1, y: 0 },
+      ],
+    }
+    const opponent: FighterSnapshot = { name: 'O', dogType: 'SHIBA', wins: 0, losses: 0, round: 6, items: [] }
+    const result = simulateBattle(player, opponent, 'mutt-normal-roll-no-loop')
+    const firstPlayerRoll = result.events.find((event) => event.kind === 'ROLL' && event.actor === 'player')
+    const firstRollDamageItems = result.events.filter(
+      (event) => event.kind === 'ITEM'
+        && event.actor === 'player'
+        && event.time === firstPlayerRoll?.time
+        && event.effectType === 'DAMAGE',
+    )
+
+    expect(firstPlayerRoll?.roll).toBe(4)
+    expect(firstRollDamageItems).toEqual([])
+  })
+
+  it('lets shields stack above max health and absorb normal damage before health', () => {
+    const player: FighterSnapshot = {
+      name: 'P',
+      dogType: 'SHIBA',
+      wins: 0,
+      losses: 0,
+      round: 0,
+      items: [
+        { id: 'shield-a', defId: 'v3-golden-kennel', quality: 'DIAMOND', area: 'EQUIPMENT', x: 0, y: 0 },
+        { id: 'shield-b', defId: 'v3-golden-kennel', quality: 'DIAMOND', area: 'EQUIPMENT', x: 4, y: 0 },
+      ],
+    }
+    const opponent: FighterSnapshot = {
+      name: 'O',
+      dogType: 'SHIBA',
+      wins: 0,
+      losses: 0,
+      round: 0,
+      items: [
+        { id: 'bite', defId: 'starter-1', quality: 'BRONZE', area: 'EQUIPMENT', x: 0, y: 0 },
+      ],
+    }
+    const result = simulateBattle(player, opponent, 'shield-2')
+    const shieldEvents = result.events.filter((event) => event.itemId === 'shield-a' || event.itemId === 'shield-b')
+    const absorbedDamage = result.events.find((event) => event.actor === 'opponent' && event.kind === 'ITEM' && event.effectType === 'DAMAGE' && event.targetHpDelta === 0)
+
+    expect(shieldEvents.length).toBeGreaterThanOrEqual(2)
+    expect(shieldEvents.reduce((sum, event) => sum + (event.amount ?? 0), 0)).toBeGreaterThan(100)
+    expect(absorbedDamage).toMatchObject({ playerHp: 100, targetHpDelta: 0 })
+  })
+
+  it('makes poison bypass shield and end battle when health reaches zero', () => {
+    const player: FighterSnapshot = {
+      name: 'P',
+      dogType: 'SHIBA',
+      wins: 0,
+      losses: 0,
+      round: 0,
+      items: [
+        { id: 'shield', defId: 'v3-golden-kennel', quality: 'DIAMOND', area: 'EQUIPMENT', x: 0, y: 0 },
+      ],
+    }
+    const opponent: FighterSnapshot = {
+      name: 'O',
+      dogType: 'SHIBA',
+      wins: 0,
+      losses: 0,
+      round: 0,
+      items: [
+        { id: 'poison', defId: 'shiba-poison', quality: 'DIAMOND', area: 'EQUIPMENT', x: 0, y: 0 },
+      ],
+    }
+    const result = simulateBattle(player, opponent, 'poison-bypasses-shield')
+    const poisonTicks = result.events.filter((event) => event.kind === 'POISON' && event.target === 'player')
+
+    expect(poisonTicks.length).toBeGreaterThan(0)
+    expect(poisonTicks.every((event, index, ticks) => index === 0 || event.playerHp < ticks[index - 1].playerHp)).toBe(true)
+    expect(result.playerHp).toBe(0)
+    expect(result.winner).toBe('opponent')
   })
 
   it('caps chained class reward triggers and records a readable log entry', () => {

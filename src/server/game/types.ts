@@ -35,6 +35,19 @@ export type AdvancedEffect =
   | 'ADJACENT_USES_LUCKY'
   | 'OPENING_FORCE_LUCKY'
   | 'ONLY_LUCKY_DOUBLE'
+  | 'TARGET_WEAK_BONUS_DAMAGE'
+  | 'ADJACENT_DAMAGE_BONUS'
+  | 'CLEANSE_ONE'
+  | 'APPLY_POISON'
+  | 'GAIN_SHIELD'
+  | 'GAIN_SHIELD_THORNS'
+  | 'APPLY_WEAK_ON_HIT'
+  | 'DOUBLE_SHIELD_DAMAGE'
+  | 'HEAL_OR_MAX_HP'
+  | 'ADJACENT_TEMP_TRIGGER'
+  | 'LIFESTEAL'
+  | 'POISON_AND_DISABLE_RIGHTMOST'
+  | 'SHIELD_IMMUNITY'
 
 export type ItemDef = {
   id: string
@@ -74,7 +87,18 @@ export type ShopOffer = {
   quality?: ItemQuality
 }
 
-export type RelicEffect = 'MIRROR_BIG_TO_SMALL' | 'MIRROR_SMALL_TO_BIG' | 'ONLY_BIG_HALF_EFFECT' | 'ONLY_SMALL_HALF_EFFECT'
+export type RelicEffect =
+  | 'MIRROR_BIG_TO_SMALL'
+  | 'MIRROR_SMALL_TO_BIG'
+  | 'ONLY_BIG_HALF_EFFECT'
+  | 'ONLY_SMALL_HALF_EFFECT'
+  | 'EXTREME_ROLL_BIAS'
+  | 'MIDDLE_ROLL_BIAS'
+  | 'EMPTY_ROLL_LARGE_SAFETY'
+  | 'POISON_TICK_BONUS'
+  | 'OPENING_THORNS'
+  | 'HUSKY_ENGINE'
+  | 'EXTRA_EQUIPMENT_REDUCED_EFFECT'
 
 export type RelicDef = {
   id: string

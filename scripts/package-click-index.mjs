@@ -443,11 +443,20 @@ async function defaultMockApiScript(buildId = new Date().toISOString().replace(/
       const offer = run.shopItems.find((entry) => entry.offerId === body.offerId);
       if (!offer) return error('商品不存在', 404);
       if (run.gold < offer.price) return error('金币不足');
+      const offerQuality = normalizeQuality(offer.quality);
+      const upgradeTarget = run.items.find((entry) => entry.defId === offer.defId && normalizeQuality(entry.quality) === offerQuality && nextQuality(entry.quality));
+      if (upgradeTarget) {
+        upgradeTarget.quality = nextQuality(upgradeTarget.quality);
+        run.gold -= offer.price;
+        run.shopItems = run.shopItems.filter((entry) => entry.offerId !== offer.offerId);
+        saveState(state);
+        return json({ run: publicRun(run) });
+      }
       const slot = findSlot(run.items, offer.defId, body.area || 'BAG');
       if (!slot) return error('目标区域空间不足');
       run.gold -= offer.price;
       run.shopItems = run.shopItems.filter((entry) => entry.offerId !== offer.offerId);
-      run.items.push({ id: id(state, 'item'), defId: offer.defId, quality: offer.quality || 'BRONZE', area: body.area || 'BAG', ...slot });
+      run.items.push({ id: id(state, 'item'), defId: offer.defId, quality: offerQuality, area: body.area || 'BAG', ...slot });
       saveState(state);
       return json({ run: publicRun(run) });
     }
@@ -930,6 +939,118 @@ async function currentMockApiScript(buildId) {
     return { winner, duration: Number(time.toFixed(1)), playerHp: Math.max(0, playerHp), opponentHp: Math.max(0, opponentHp), events, playerSnapshot: snapshot(user.nickname || '本地玩家', run), opponentSnapshot: snapshot(opponent.name, opponent) };
   }
 
+  function simulateBattleV3(run, user) {
+    const opponent = run.matchedGhost || createGhost(run);
+    let playerHp = 100;
+    let opponentHp = 100;
+    const state = {
+      player: { shield: 0, poison: 0, weak: 0, thorns: 0, disabledItemIds: [] },
+      opponent: { shield: 0, poison: 0, weak: 0, thorns: 0, disabledItemIds: [] },
+    };
+    const events = [];
+    let time = 0;
+    const push = (event) => events.push({ ...event, time: Number(time.toFixed(1)), playerHp: Math.max(0, playerHp), opponentHp: Math.max(0, opponentHp) });
+    const hpOf = (side) => side === 'player' ? playerHp : opponentHp;
+    const setHp = (side, hp) => {
+      if (side === 'player') playerHp = hp;
+      else opponentHp = hp;
+    };
+    const opponentOf = (side) => side === 'player' ? 'opponent' : 'player';
+    const fighterOf = (side) => side === 'player' ? run : opponent;
+    const equippedOf = (fighter) => (fighter.items || []).filter((item) => item.area === 'EQUIPMENT').sort((a, b) => a.x - b.x);
+    const hasRelicEffect = (fighter, effect) => normalizeRelics(fighter.relics || []).some((relic) => relicDefsById[relic.relicId]?.effect === effect);
+    const hasShieldImmunity = (side) => state[side].shield > 0 && equippedOf(fighterOf(side)).some((item) => defs[item.defId]?.advancedEffect === 'SHIELD_IMMUNITY');
+    const applyDamage = (side, amount, shieldDamage = amount) => {
+      const before = hpOf(side);
+      const shieldBefore = state[side].shield;
+      const shieldUsed = Math.min(shieldBefore, shieldDamage);
+      state[side].shield -= shieldUsed;
+      const absorbed = shieldBefore > 0 ? Math.min(amount, shieldUsed) : 0;
+      const after = Math.max(0, before - (amount - absorbed));
+      setHp(side, after);
+      return { before, after, delta: after - before };
+    };
+    const applyDirectHealthDamage = (side, amount) => {
+      const before = hpOf(side);
+      const after = Math.max(0, before - amount);
+      setHp(side, after);
+      return { before, after, delta: after - before };
+    };
+    const addPoison = (side, amount) => {
+      if (hasShieldImmunity(side)) return false;
+      state[side].poison += amount;
+      return true;
+    };
+    const addWeak = (side, amount) => {
+      if (hasShieldImmunity(side)) return false;
+      state[side].weak += amount;
+      return true;
+    };
+    if (hasRelicEffect(run, 'OPENING_THORNS')) state.player.thorns += 5;
+    if (hasRelicEffect(opponent, 'OPENING_THORNS')) state.opponent.thorns += 5;
+    push({ actor: 'system', kind: 'ROLL', target: 'none', text: '战斗开始，双方自动掷骰。' });
+    for (let round = 0; round < 10 && playerHp > 0 && opponentHp > 0; round += 1) {
+      for (const side of ['player', 'opponent']) {
+        if (playerHp <= 0 || opponentHp <= 0) break;
+        const fighter = fighterOf(side);
+        const roll = ((round + (side === 'player' ? run.id.length : 3)) % 6) + 1;
+        time += 0.8;
+        push({ actor: side, kind: 'ROLL', effectType: 'ROLL', target: 'none', roll, text: (side === 'player' ? '玩家' : '对手') + '掷出 ' + roll + ' 点。' });
+        for (const item of equippedOf(fighter)) {
+          const def = defs[item.defId];
+          if (!def || !def.dice.includes(roll)) continue;
+          if (state[side].disabledItemIds.includes(item.id)) {
+            state[side].disabledItemIds = state[side].disabledItemIds.filter((id) => id !== item.id);
+            push({ actor: side, kind: 'ITEM', itemId: item.id, defId: item.defId, effectType: 'UTILITY', amount: 0, target: 'none', text: def.name + ' 被【失效】抵消。' });
+            continue;
+          }
+          const target = opponentOf(side);
+          const advanced = def.advancedEffect || 'NONE';
+          const amount = qualityAmount(def.effect?.amount || 0, item.quality);
+          time += 0.25;
+          if (def.effect?.type === 'HEAL') {
+            setHp(side, Math.min(100, hpOf(side) + amount));
+            if (advanced === 'CLEANSE_ONE') {
+              if (state[side].poison > 0) state[side].poison -= 1;
+              else if (state[side].weak > 0) state[side].weak -= 1;
+            }
+            push({ actor: side, kind: 'ITEM', itemId: item.id, defId: item.defId, effectType: 'HEAL', amount, target: side, text: def.name + ' 回复 ' + amount + ' 生命。' });
+          } else if (advanced === 'GAIN_SHIELD' || advanced === 'SHIELD_IMMUNITY') {
+            state[side].shield += amount;
+            push({ actor: side, kind: 'ITEM', itemId: item.id, defId: item.defId, effectType: 'UTILITY', amount, target: side, text: def.name + ' 获得 ' + amount + ' 点护盾。' });
+          } else if (advanced === 'GAIN_SHIELD_THORNS') {
+            state[side].shield += amount;
+            state[side].thorns += qualityAmount(1, item.quality);
+            push({ actor: side, kind: 'ITEM', itemId: item.id, defId: item.defId, effectType: 'UTILITY', amount, target: side, text: def.name + ' 获得护盾与荆棘。' });
+          } else if (advanced === 'APPLY_POISON' || advanced === 'POISON_AND_DISABLE_RIGHTMOST') {
+            if (addPoison(target, amount)) push({ actor: side, kind: 'ITEM', itemId: item.id, defId: item.defId, effectType: 'POISON', amount, target, text: def.name + ' 叠加 ' + amount + ' 层【中毒】。' });
+            if (advanced === 'POISON_AND_DISABLE_RIGHTMOST') {
+              const rightmost = equippedOf(fighterOf(target)).at(-1);
+              if (rightmost) state[target].disabledItemIds.push(rightmost.id);
+            }
+          } else {
+            const result = applyDamage(target, amount, advanced === 'DOUBLE_SHIELD_DAMAGE' ? amount * 2 : amount);
+            if (advanced === 'APPLY_WEAK_ON_HIT') addWeak(target, qualityAmount(1, item.quality));
+            if (advanced === 'LIFESTEAL') setHp(side, Math.min(100, hpOf(side) + Math.max(0, -result.delta)));
+            push({ actor: side, kind: 'ITEM', itemId: item.id, defId: item.defId, effectType: 'DAMAGE', amount: Math.max(0, -result.delta), target, text: def.name + ' 造成 ' + Math.max(0, -result.delta) + ' 点伤害。' });
+          }
+          if (playerHp <= 0 || opponentHp <= 0) break;
+        }
+      }
+      for (const side of ['player', 'opponent']) {
+        if (state[side].poison <= 0) continue;
+        const source = side === 'player' ? opponent : run;
+        const damage = state[side].poison + (hasRelicEffect(source, 'POISON_TICK_BONUS') ? 2 : 0);
+        const result = applyDirectHealthDamage(side, damage);
+        push({ actor: 'system', kind: 'POISON', effectType: 'POISON', amount: damage, target: side, text: '【中毒】结算，' + (side === 'player' ? '玩家' : '对手') + '受到 ' + Math.max(0, -result.delta) + ' 点伤害。' });
+      }
+    }
+    const winner = playerHp >= opponentHp ? 'player' : 'opponent';
+    time += 0.5;
+    push({ actor: 'system', kind: 'END', target: 'none', text: winner === 'player' ? '你赢下了这一局。' : '对手赢下了这一局。' });
+    return { winner, duration: Number(time.toFixed(1)), playerHp: Math.max(0, playerHp), opponentHp: Math.max(0, opponentHp), events, playerSnapshot: snapshot(user.nickname || '本地玩家', run), opponentSnapshot: snapshot(opponent.name, opponent) };
+  }
+
   function finishBattle(state, battle) {
     const run = state.run;
     const playerWon = battle.winner === 'player';
@@ -1021,13 +1142,24 @@ async function currentMockApiScript(buildId) {
     }
     if (action === '/shop/buy' && method === 'POST') {
       const offer = run.shopItems.find((entry) => entry.offerId === body.offerId);
+      const offerQuality = offer ? normalizeQuality(offer.quality) : 'BRONZE';
+      if (offer && run.gold >= offer.price) {
+        const upgradeTarget = run.items.find((entry) => entry.defId === offer.defId && normalizeQuality(entry.quality) === offerQuality && nextQuality(entry.quality));
+        if (upgradeTarget) {
+          upgradeTarget.quality = nextQuality(upgradeTarget.quality);
+          run.gold -= offer.price;
+          run.shopItems = run.shopItems.filter((entry) => entry.offerId !== offer.offerId);
+          saveState(state);
+          return json({ run: publicRun(run) });
+        }
+      }
       if (!offer) return error('商品不存在', 404);
       if (run.gold < offer.price) return error('金币不足');
       const slot = findSlot(run.items, offer.defId, body.area || 'BAG');
       if (!slot) return error('目标区域空间不足');
       run.gold -= offer.price;
       run.shopItems = run.shopItems.filter((entry) => entry.offerId !== offer.offerId);
-      run.items.push({ id: id(state, 'item'), defId: offer.defId, quality: offer.quality || 'BRONZE', area: body.area || 'BAG', ...slot });
+      run.items.push({ id: id(state, 'item'), defId: offer.defId, quality: offerQuality, area: body.area || 'BAG', ...slot });
       saveState(state);
       return json({ run: publicRun(run) });
     }
@@ -1112,7 +1244,7 @@ async function currentMockApiScript(buildId) {
     }
     if (action === '/battle/start' && method === 'POST') {
       if (run.phase !== 'MATCH') return error('请先匹配对手');
-      const battle = simulateBattle(run, user);
+      const battle = simulateBattleV3(run, user);
       run.phase = 'BATTLE';
       run.lastBattle = battle;
       saveState(state);

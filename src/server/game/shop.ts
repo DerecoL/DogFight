@@ -13,12 +13,12 @@ export function createShop(type: ShopType, rng: () => number): ShopOffer[] {
       defId: def.id,
       price: Math.max(1, Math.floor(def.price * discount)),
       discount,
-      quality: 'BRONZE' as const,
+      quality: def.defaultQuality ?? 'BRONZE' as const,
     }
   })
   if (type === 'GENERAL' && offers.every((offer) => offer.price > 5)) {
     const affordable = [...pool].sort((a, b) => a.price - b.price)[0]
-    offers[0] = { offerId: randomUUID(), defId: affordable.id, price: affordable.price, discount: 1, quality: 'BRONZE' }
+    offers[0] = { offerId: randomUUID(), defId: affordable.id, price: affordable.price, discount: 1, quality: affordable.defaultQuality ?? 'BRONZE' }
   }
   return offers
 }

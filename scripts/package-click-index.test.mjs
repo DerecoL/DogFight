@@ -132,6 +132,42 @@ describe('buildStandaloneIndex', () => {
     }
   })
 
+  test('standalone mock buys a matching shop item as an immediate upgrade when the bag is full', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'dogfight-standalone-buy-upgrade-'))
+    try {
+      const distDir = await createMinimalDist(root)
+      const outputFile = path.join(root, 'click-index.html')
+      const launcherFile = path.join(root, 'DogFight-standalone.cmd')
+      await buildStandaloneIndex({ distDir, outputFile, launcherFile })
+
+      const html = await readFile(outputFile, 'utf8')
+      const { window, localStorage, storageKey } = evaluateMockScript(extractMockScript(html))
+      await window.fetch('/api/auth/register', { method: 'POST', body: JSON.stringify({ email: 'a@dog.test', password: 'dogdice' }) })
+      const created = await readJson(await window.fetch('/api/runs', { method: 'POST', body: JSON.stringify({ dogType: 'SHIBA' }) }))
+      const offer = { offerId: 'upgrade-small-bite', defId: 'small-bite', price: 3, discount: 1, quality: 'BRONZE' }
+      const state = JSON.parse(localStorage.getItem(storageKey))
+      state.run.gold = 10
+      state.run.shopItems = [offer]
+      state.run.items = [
+        ...state.run.items,
+        { id: 'owned-small-bite', defId: 'small-bite', quality: 'BRONZE', area: 'EQUIPMENT', x: 6, y: 0 },
+        ...Array.from({ length: 12 }, (_, x) => ({ id: `bag-${x}`, defId: 'starter-1', quality: 'BRONZE', area: 'BAG', x, y: 0 })),
+      ]
+      localStorage.setItem(storageKey, JSON.stringify(state))
+
+      const boughtResponse = await window.fetch(`/api/runs/${created.run.id}/shop/buy`, { method: 'POST', body: JSON.stringify({ offerId: offer.offerId, area: 'BAG' }) })
+      const bought = await readJson(boughtResponse)
+
+      expect(boughtResponse.status).toBe(200)
+      expect(bought.run.gold).toBe(7)
+      expect(bought.run.shopItems).toEqual([])
+      expect(bought.run.items.find((item) => item.id === 'owned-small-bite')).toMatchObject({ quality: 'SILVER' })
+      expect(bought.run.items.filter((item) => item.defId === 'small-bite')).toHaveLength(1)
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   test('default standalone mock includes current class rewards, relics, and offline ghost builder flow', async () => {
     const root = await mkdtemp(path.join(tmpdir(), 'dogfight-standalone-current-data-'))
     try {
@@ -182,10 +218,11 @@ describe('buildStandaloneIndex', () => {
       expect(relicChoice.run).toMatchObject({ phase: 'RELIC_CHOICE', shopType: 'RELIC' })
       expect(relicChoice.run.relicChoices).toHaveLength(3)
 
-      const firstRelic = relicChoice.run.relicChoices[0].relicId
+      const firstRelicChoice = relicChoice.run.relicChoices[0]
+      const firstRelic = firstRelicChoice.relicId
       const relicSelected = await readJson(await window.fetch(`/api/runs/${runId}/relic/select`, { method: 'POST', body: JSON.stringify({ relicId: firstRelic }) }))
       expect(relicSelected.run.phase).toBe('PREP')
-      expect(relicSelected.run.relics).toContainEqual(expect.objectContaining({ relicId: firstRelic, quality: 'SILVER' }))
+      expect(relicSelected.run.relics).toContainEqual(expect.objectContaining({ relicId: firstRelic, quality: firstRelicChoice.quality }))
 
       const ghostState = JSON.parse(localStorage.getItem(storageKey))
       ghostState.run.round = 6

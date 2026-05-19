@@ -2,6 +2,7 @@ import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import request from 'supertest'
 import { buildApp } from './app'
 import { prisma } from './db'
+import { nextQuality } from './game/quality'
 
 const databaseUrl = process.env.TEST_DATABASE_URL || process.env.DATABASE_URL || ''
 const describeWithDatabase = databaseUrl.startsWith('postgresql://') || databaseUrl.startsWith('postgres://') ? describe : describe.skip
@@ -106,7 +107,7 @@ describeWithDatabase('run API', () => {
     expect(created.body.run.gold).toBe(10)
     expect(created.body.run.items).toHaveLength(6)
     expect(created.body.run.items.every((item: { quality: string }) => item.quality === 'BRONZE')).toBe(true)
-    expect(created.body.run.shopItems.every((offer: { quality: string }) => offer.quality === 'BRONZE')).toBe(true)
+    expect(created.body.run.shopItems.every((offer: { quality: string }) => ['BRONZE', 'SILVER', 'GOLD', 'DIAMOND'].includes(offer.quality))).toBe(true)
     expect(created.body.run.phase).toBe('SHOP')
 
     const affordable = created.body.run.shopItems.find((offer: { price: number }) => offer.price <= created.body.run.gold)
@@ -205,6 +206,35 @@ describeWithDatabase('run API', () => {
     expect(dragged.body.run.items.some((item: { id: string }) => item.id === draggedCopy.id)).toBe(false)
   })
 
+  it('buys a matching shop item as an immediate upgrade when the bag is full', async () => {
+    const agent = request.agent(app.server)
+    await app.ready()
+
+    await agent.post('/api/auth/register').send({ email: `fullbag${Date.now()}@dog.test`, password: 'dogdice' }).expect(200)
+    const created = await agent.post('/api/runs').send({ dogType: 'SHIBA' }).expect(200)
+    const runId = created.body.run.id
+    const offer = { offerId: 'upgrade-small-bite', defId: 'small-bite', price: 3, discount: 1, quality: 'BRONZE' }
+
+    const owned = await prisma.itemInstance.create({
+      data: { runId, defId: 'small-bite', quality: 'BRONZE', area: 'EQUIPMENT', x: 6, y: 0 },
+    })
+    await prisma.itemInstance.createMany({
+      data: Array.from({ length: 12 }, (_, x) => ({ runId, defId: 'starter-1', area: 'BAG', x, y: 0 })),
+    })
+    await prisma.run.update({
+      where: { id: runId },
+      data: { gold: 10, shopItems: JSON.stringify([offer]) },
+    })
+
+    const bought = await agent.post(`/api/runs/${runId}/shop/buy`).send({ offerId: offer.offerId, area: 'BAG' }).expect(200)
+
+    expect(bought.body.run.gold).toBe(7)
+    expect(bought.body.run.shopItems).toEqual([])
+    expect(bought.body.run.items).toHaveLength(created.body.run.items.length + 13)
+    expect(bought.body.run.items.find((item: { id: string }) => item.id === owned.id)).toMatchObject({ quality: 'SILVER' })
+    expect(bought.body.run.items.filter((item: { defId: string }) => item.defId === 'small-bite')).toHaveLength(1)
+  })
+
   it('rejects upgrades for mismatched, max-quality, or cross-user items', async () => {
     const agent = request.agent(app.server)
     await app.ready()
@@ -271,13 +301,16 @@ describeWithDatabase('run API', () => {
     expect(relicChoice.body.run).toMatchObject({ phase: 'RELIC_CHOICE', shopType: 'RELIC' })
     expect(relicChoice.body.run.relicChoices).toHaveLength(3)
 
-    const firstRelic = relicChoice.body.run.relicChoices[0].relicId
+    const firstRelicChoice = relicChoice.body.run.relicChoices.find((choice: { quality: string }) => choice.quality !== 'DIAMOND')
+      ?? { relicId: 'midas-left', quality: 'SILVER' }
+    const firstRelic = firstRelicChoice.relicId
+    await prisma.run.update({ where: { id: runId }, data: { relicChoices: JSON.stringify([firstRelic]) } })
     const selected = await agent.post(`/api/runs/${runId}/relic/select`).send({ relicId: firstRelic }).expect(200)
     expect(selected.body.run.phase).toBe('PREP')
-    expect(selected.body.run.relics).toContainEqual(expect.objectContaining({ relicId: firstRelic, quality: 'SILVER' }))
+    expect(selected.body.run.relics).toContainEqual(expect.objectContaining({ relicId: firstRelic, quality: firstRelicChoice.quality }))
 
     await prisma.run.update({ where: { id: runId }, data: { phase: 'RELIC_CHOICE', relicChoices: JSON.stringify([firstRelic]) } })
     const upgraded = await agent.post(`/api/runs/${runId}/relic/select`).send({ relicId: firstRelic }).expect(200)
-    expect(upgraded.body.run.relics).toContainEqual(expect.objectContaining({ relicId: firstRelic, quality: 'GOLD' }))
+    expect(upgraded.body.run.relics).toContainEqual(expect.objectContaining({ relicId: firstRelic, quality: nextQuality(firstRelicChoice.quality) }))
   })
 })
