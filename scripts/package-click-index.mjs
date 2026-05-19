@@ -636,6 +636,76 @@ async function currentMockApiScript(buildId) {
     return Math.round(amount * Math.pow(1.5, qualities.indexOf(normalizeQuality(quality))));
   }
 
+  function qualityMultiplier(quality) {
+    return Math.pow(1.5, qualities.indexOf(normalizeQuality(quality)));
+  }
+
+  function relicQualityRatio(def, quality) {
+    return qualityMultiplier(quality) / qualityMultiplier(def.defaultQuality);
+  }
+
+  function clamp(value, min, max) {
+    return Math.max(min, Math.min(max, value));
+  }
+
+  function relicEffectScale(relicId, quality) {
+    const def = relicDefsById[relicId];
+    return def ? clamp(0.5 * relicQualityRatio(def, quality), 0.25, 1) : 1;
+  }
+
+  function relicRollBiasChance(relicId, quality) {
+    const def = relicDefsById[relicId];
+    return def ? clamp(0.3 * relicQualityRatio(def, quality), 0, 0.95) : 0;
+  }
+
+  function relicOpeningThorns(relicId, quality) {
+    const def = relicDefsById[relicId];
+    return def ? Math.max(1, Math.round(5 * relicQualityRatio(def, quality))) : 0;
+  }
+
+  function relicPoisonTickBonus(relicId, quality) {
+    const def = relicDefsById[relicId];
+    return def ? Math.max(1, Math.round(2 * relicQualityRatio(def, quality))) : 0;
+  }
+
+  function relicEmptyRollMisses(relicId, quality) {
+    const def = relicDefsById[relicId];
+    return def ? Math.max(1, Math.round(2 / relicQualityRatio(def, quality))) : 3;
+  }
+
+  function relicEquipmentEffectScale(relicId, quality) {
+    const def = relicDefsById[relicId];
+    return def ? clamp(0.85 * relicQualityRatio(def, quality), 0.5, 1) : 1;
+  }
+
+  function relicDescription(relicId, quality) {
+    const def = relicDefsById[relicId];
+    if (!def) return '';
+    const retained = Math.round(relicEffectScale(relicId, quality) * 100);
+    const rollBias = Math.round(relicRollBiasChance(relicId, quality) * 100);
+    const effectReduction = 100 - retained;
+    const extraEquipmentReduction = 100 - Math.round(relicEquipmentEffectScale(relicId, quality) * 100);
+    const descriptions = {
+      MIRROR_BIG_TO_SMALL: '你场上所有绑定在 4~6 点数的道具，现在在掷出对应减3的点数（即1~3）时也会触发，映射触发保留 ' + retained + '% 效果',
+      MIRROR_SMALL_TO_BIG: '你场上所有绑定在 1~3 点数的道具，现在在掷出对应加3的点数（即4~6）时也会触发，映射触发保留 ' + retained + '% 效果',
+      ONLY_BIG_HALF_EFFECT: '你只能掷出4~6的点数，但所有装备效果降低 ' + effectReduction + '%',
+      ONLY_SMALL_HALF_EFFECT: '你只能掷出1~3的点数，但所有装备效果降低 ' + effectReduction + '%',
+      EXTREME_ROLL_BIAS: '你的投掷结果出现【极值】（1和6）的概率绝对值提升 ' + rollBias + '%。',
+      MIDDLE_ROLL_BIAS: '你的投掷结果出现 3 和 4 的概率绝对值提升 ' + rollBias + '%。',
+      EMPTY_ROLL_LARGE_SAFETY: '当你连续 ' + relicEmptyRollMisses(relicId, quality) + ' 次投掷“空过”时，下一次投掷必定为你随机触发一件【大型物品】（若没有则触发中型）。',
+      POISON_TICK_BONUS: '敌方身上的【中毒】状态每次结算时，额外造成 ' + relicPoisonTickBonus(relicId, quality) + ' 点伤害。',
+      OPENING_THORNS: '战斗开始时，你直接获得 ' + relicOpeningThorns(relicId, quality) + ' 层【荆棘】。',
+      HUSKY_ENGINE: def.description,
+      EXTRA_EQUIPMENT_REDUCED_EFFECT: '你可以突破背包限制，将第 13 个装备放入战斗区，但你所有装备的触发效果降低 ' + extraEquipmentReduction + '%。',
+    };
+    return descriptions[def.effect] || def.description;
+  }
+
+  function relicDefForQuality(relicId, quality) {
+    const def = relicDefsById[relicId];
+    return def ? { ...def, description: relicDescription(relicId, quality) } : def;
+  }
+
   function publicItem(item) {
     return { ...item, quality: normalizeQuality(item.quality), def: defs[item.defId] || defs['starter-1'] };
   }
@@ -648,7 +718,12 @@ async function currentMockApiScript(buildId) {
   }
 
   function publicRelics(relics) {
-    return normalizeRelics(relics).map((relic) => ({ ...relic, def: relicDefsById[relic.relicId] }));
+    return normalizeRelics(relics).map((relic) => ({ ...relic, def: relicDefForQuality(relic.relicId, relic.quality) }));
+  }
+
+  function relicChoiceQuality(relics, relicId) {
+    const existing = normalizeRelics(relics).find((relic) => relic.relicId === relicId);
+    return existing ? nextQuality(existing.quality) || existing.quality : relicDefsById[relicId]?.defaultQuality || 'BRONZE';
   }
 
   function publicSnapshot(snapshot) {
@@ -667,7 +742,10 @@ async function currentMockApiScript(buildId) {
       ...run,
       shopItems: (run.shopItems || []).map((offer) => ({ ...offer, quality: normalizeQuality(offer.quality), def: defs[offer.defId] || defs['starter-1'] })),
       classRewardChoices: (run.classRewardChoices || []).map((defId) => ({ defId, def: defs[defId], quality: normalizeQuality(defs[defId]?.defaultQuality) })),
-      relicChoices: (run.relicChoices || []).map((relicId) => ({ relicId, def: relicDefsById[relicId], quality: relicDefsById[relicId]?.defaultQuality || 'BRONZE' })),
+      relicChoices: (run.relicChoices || []).map((relicId) => {
+        const quality = relicChoiceQuality(run.relics || [], relicId);
+        return { relicId, def: relicDefForQuality(relicId, quality), quality };
+      }),
       relics: publicRelics(run.relics || []),
       matchedGhost: run.matchedGhost ? publicSnapshot(run.matchedGhost) : null,
       lastBattle: publicBattle(run.lastBattle),
@@ -958,7 +1036,8 @@ async function currentMockApiScript(buildId) {
     const opponentOf = (side) => side === 'player' ? 'opponent' : 'player';
     const fighterOf = (side) => side === 'player' ? run : opponent;
     const equippedOf = (fighter) => (fighter.items || []).filter((item) => item.area === 'EQUIPMENT').sort((a, b) => a.x - b.x);
-    const hasRelicEffect = (fighter, effect) => normalizeRelics(fighter.relics || []).some((relic) => relicDefsById[relic.relicId]?.effect === effect);
+    const relicWithEffect = (fighter, effect) => normalizeRelics(fighter.relics || []).find((relic) => relicDefsById[relic.relicId]?.effect === effect) || null;
+    const hasRelicEffect = (fighter, effect) => Boolean(relicWithEffect(fighter, effect));
     const hasShieldImmunity = (side) => state[side].shield > 0 && equippedOf(fighterOf(side)).some((item) => defs[item.defId]?.advancedEffect === 'SHIELD_IMMUNITY');
     const applyDamage = (side, amount, shieldDamage = amount) => {
       const before = hpOf(side);
@@ -986,8 +1065,10 @@ async function currentMockApiScript(buildId) {
       state[side].weak += amount;
       return true;
     };
-    if (hasRelicEffect(run, 'OPENING_THORNS')) state.player.thorns += 5;
-    if (hasRelicEffect(opponent, 'OPENING_THORNS')) state.opponent.thorns += 5;
+    const playerOpeningThorns = relicWithEffect(run, 'OPENING_THORNS');
+    const opponentOpeningThorns = relicWithEffect(opponent, 'OPENING_THORNS');
+    if (playerOpeningThorns) state.player.thorns += relicOpeningThorns(playerOpeningThorns.relicId, playerOpeningThorns.quality);
+    if (opponentOpeningThorns) state.opponent.thorns += relicOpeningThorns(opponentOpeningThorns.relicId, opponentOpeningThorns.quality);
     push({ actor: 'system', kind: 'ROLL', target: 'none', text: '战斗开始，双方自动掷骰。' });
     for (let round = 0; round < 10 && playerHp > 0 && opponentHp > 0; round += 1) {
       for (const side of ['player', 'opponent']) {
@@ -1040,7 +1121,8 @@ async function currentMockApiScript(buildId) {
       for (const side of ['player', 'opponent']) {
         if (state[side].poison <= 0) continue;
         const source = side === 'player' ? opponent : run;
-        const damage = state[side].poison + (hasRelicEffect(source, 'POISON_TICK_BONUS') ? 2 : 0);
+        const poisonBonusRelic = relicWithEffect(source, 'POISON_TICK_BONUS');
+        const damage = state[side].poison + (poisonBonusRelic ? relicPoisonTickBonus(poisonBonusRelic.relicId, poisonBonusRelic.quality) : 0);
         const result = applyDirectHealthDamage(side, damage);
         push({ actor: 'system', kind: 'POISON', effectType: 'POISON', amount: damage, target: side, text: '【中毒】结算，' + (side === 'player' ? '玩家' : '对手') + '受到 ' + Math.max(0, -result.delta) + ' 点伤害。' });
       }

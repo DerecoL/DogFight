@@ -1,4 +1,5 @@
-import type { AdvancedEffect, DogType, ItemDef, ItemQuality, RelicDef, ShopType } from './types'
+import { normalizeQuality, qualityMultiplier } from './quality'
+import type { AdvancedEffect, DogType, ItemDef, ItemQuality, RelicDef, RelicEffect, ShopType } from './types'
 
 export const DOGS: Record<DogType, { name: string; trait: string }> = {
   SHIBA: { name: '柴犬', trait: '20% 概率改掷为小点 1/2/3' },
@@ -211,6 +212,76 @@ export function relicDef(id: string) {
   const found = RELIC_DEFS.find((relic) => relic.id === id)
   if (!found) throw new Error(`Unknown relic def ${id}`)
   return found
+}
+
+function relicQualityRatio(def: RelicDef, quality?: string | null) {
+  return qualityMultiplier(normalizeQuality(quality)) / qualityMultiplier(def.defaultQuality)
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, value))
+}
+
+function roundPercent(value: number) {
+  return Math.round(value * 100)
+}
+
+export function relicEffectScale(relicId: string, quality?: string | null) {
+  const def = relicDef(relicId)
+  return clamp(0.5 * relicQualityRatio(def, quality), 0.25, 1)
+}
+
+export function relicRollBiasChance(relicId: string, quality?: string | null) {
+  const def = relicDef(relicId)
+  return clamp(0.3 * relicQualityRatio(def, quality), 0, 0.95)
+}
+
+export function relicOpeningThorns(relicId: string, quality?: string | null) {
+  const def = relicDef(relicId)
+  return Math.max(1, Math.round(5 * relicQualityRatio(def, quality)))
+}
+
+export function relicPoisonTickBonus(relicId: string, quality?: string | null) {
+  const def = relicDef(relicId)
+  return Math.max(1, Math.round(2 * relicQualityRatio(def, quality)))
+}
+
+export function relicEmptyRollMisses(relicId: string, quality?: string | null) {
+  const def = relicDef(relicId)
+  return Math.max(1, Math.round(2 / relicQualityRatio(def, quality)))
+}
+
+export function relicEquipmentEffectScale(relicId: string, quality?: string | null) {
+  const def = relicDef(relicId)
+  return clamp(0.85 * relicQualityRatio(def, quality), 0.5, 1)
+}
+
+export function relicDescription(relicId: string, quality?: string | null) {
+  const def = relicDef(relicId)
+  const currentQuality = normalizeQuality(quality)
+  const retained = roundPercent(relicEffectScale(relicId, currentQuality))
+  const rollBias = roundPercent(relicRollBiasChance(relicId, currentQuality))
+  const effectReduction = 100 - retained
+  const extraEquipmentReduction = 100 - roundPercent(relicEquipmentEffectScale(relicId, currentQuality))
+  const descriptions: Record<RelicEffect, string> = {
+    MIRROR_BIG_TO_SMALL: `你场上所有绑定在 4~6 点数的道具，现在在掷出对应减3的点数（即1~3）时也会触发，映射触发保留 ${retained}% 效果`,
+    MIRROR_SMALL_TO_BIG: `你场上所有绑定在 1~3 点数的道具，现在在掷出对应加3的点数（即4~6）时也会触发，映射触发保留 ${retained}% 效果`,
+    ONLY_BIG_HALF_EFFECT: `你只能掷出4~6的点数，但所有装备效果降低 ${effectReduction}%`,
+    ONLY_SMALL_HALF_EFFECT: `你只能掷出1~3的点数，但所有装备效果降低 ${effectReduction}%`,
+    EXTREME_ROLL_BIAS: `你的投掷结果出现【极值】（1和6）的概率绝对值提升 ${rollBias}%。`,
+    MIDDLE_ROLL_BIAS: `你的投掷结果出现 3 和 4 的概率绝对值提升 ${rollBias}%。`,
+    EMPTY_ROLL_LARGE_SAFETY: `当你连续 ${relicEmptyRollMisses(relicId, currentQuality)} 次投掷“空过”时，下一次投掷必定为你随机触发一件【大型物品】（若没有则触发中型）。`,
+    POISON_TICK_BONUS: `敌方身上的【中毒】状态每次结算时，额外造成 ${relicPoisonTickBonus(relicId, currentQuality)} 点伤害。`,
+    OPENING_THORNS: `战斗开始时，你直接获得 ${relicOpeningThorns(relicId, currentQuality)} 层【荆棘】。`,
+    HUSKY_ENGINE: def.description,
+    EXTRA_EQUIPMENT_REDUCED_EFFECT: `你可以突破背包限制，将第 13 个装备放入战斗区，但你所有装备的触发效果降低 ${extraEquipmentReduction}%。`,
+  }
+  return descriptions[def.effect]
+}
+
+export function relicDefForQuality(relicId: string, quality?: string | null): RelicDef {
+  const def = relicDef(relicId)
+  return { ...def, description: relicDescription(relicId, quality) }
 }
 
 export function shopPool(type: ShopType) {

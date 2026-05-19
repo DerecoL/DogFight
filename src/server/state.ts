@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto'
 import type { ItemInstance, Run } from '@prisma/client'
-import { CLASS_REWARD_DEFS, RELIC_DEFS, itemDef, relicDef } from './game/data'
+import { CLASS_REWARD_DEFS, RELIC_DEFS, itemDef, relicDef, relicDefForQuality } from './game/data'
 import { buildOfflineFighter } from './game/offline-builder'
-import { normalizeQuality } from './game/quality'
+import { nextQuality, normalizeQuality } from './game/quality'
 import { createRng } from './game/rng'
 import { createChoices, createShop } from './game/shop'
 import type { DogType, FighterSnapshot, GameItem, ItemQuality, Phase, RelicInstance, ShopOffer, ShopType } from './game/types'
@@ -36,7 +36,12 @@ export function relicsFromRun(run: Pick<Run, 'relics'>) {
 }
 
 export function publicRelics(run: Pick<Run, 'relics'>) {
-  return relicsFromRun(run).map((relic) => ({ ...relic, def: relicDef(relic.relicId) }))
+  return relicsFromRun(run).map((relic) => ({ ...relic, def: relicDefForQuality(relic.relicId, relic.quality) }))
+}
+
+function relicChoiceQuality(relics: RelicInstance[], relicId: string) {
+  const existing = relics.find((relic) => relic.relicId === relicId)
+  return existing ? nextQuality(existing.quality) ?? existing.quality : relicDef(relicId).defaultQuality
 }
 
 export function publicRun(run: Run & { items: ItemInstance[] }) {
@@ -54,7 +59,10 @@ export function publicRun(run: Run & { items: ItemInstance[] }) {
     shopItems: parseJson<ShopOffer[]>(run.shopItems, []).map((offer) => ({ ...offer, quality: normalizeQuality(offer.quality), def: itemDef(offer.defId) })),
     choices: parseJson<ShopType[]>(run.choices, []),
     classRewardChoices: parseJson<string[]>(run.classRewardChoices, []).map((defId) => ({ defId, def: itemDef(defId), quality: normalizeQuality(itemDef(defId).defaultQuality) })),
-    relicChoices: parseJson<string[]>(run.relicChoices, []).map((relicId) => ({ relicId, def: relicDef(relicId), quality: relicDef(relicId).defaultQuality })),
+    relicChoices: parseJson<string[]>(run.relicChoices, []).map((relicId) => {
+      const quality = relicChoiceQuality(relicsFromRun(run), relicId)
+      return { relicId, def: relicDefForQuality(relicId, quality), quality }
+    }),
     relics: publicRelics(run),
     refreshCost: run.refreshCost,
     matchedGhost: run.matchedGhost ? parseJson(run.matchedGhost, null) : null,

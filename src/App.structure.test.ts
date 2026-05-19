@@ -119,6 +119,9 @@ describe('selection screen structure', () => {
   it('keeps relic rail slots icon-only and moves details into a click tip', () => {
     expect(app).toContain('const [selectedRelicId, setSelectedRelicId] = useState<string | null>(null)')
     expect(app).toContain('className="relic-icon-button"')
+    expect(app).toContain('function RelicGlyph')
+    expect(app).toContain('<RelicGlyph relic={relic} size={30} />')
+    expect(app).toContain('<RelicGlyph relic={relic} size={44} />')
     expect(app).toContain('<RelicFloatingTip')
     expect(app).toContain('className="relic-floating-tip floating-tip"')
     expect(app).toContain('setSelectedRelicId(selectedRelicId === relic.id ? null : relic.id)')

@@ -331,6 +331,26 @@ describe('battle simulation', () => {
     expect(result.playerSnapshot.relics?.[0]).toMatchObject({ relicId: 'midas-left', def: { name: '点金手·左' } })
   })
 
+  it('scales point-mapping relic strength by quality', () => {
+    const relics: RelicInstance[] = [{ id: 'r1', relicId: 'midas-left', quality: 'GOLD', slot: 0 }]
+    const player: FighterSnapshot = {
+      name: 'P',
+      dogType: 'SHIBA',
+      wins: 0,
+      losses: 0,
+      round: 4,
+      relics,
+      items: [
+        { id: 'big-copy', defId: 'lucky-paw', quality: 'BRONZE', area: 'EQUIPMENT', x: 0, y: 0 },
+      ],
+    }
+    const opponent: FighterSnapshot = { name: 'O', dogType: 'SHIBA', wins: 0, losses: 0, round: 4, items: [] }
+    const result = simulateBattle(player, opponent, 'structured-item-event')
+    const mapped = result.events.find((event) => event.kind === 'ITEM' && event.defId === 'lucky-paw' && event.text.includes('点金手·左'))
+
+    expect(mapped).toMatchObject({ roll: 3, amount: 9, targetHpDelta: -9 })
+  })
+
   it('lets half-die relics restrict rolls while reducing equipment effects', () => {
     const player: FighterSnapshot = {
       name: 'P',
@@ -350,6 +370,27 @@ describe('battle simulation', () => {
 
     expect(rolls.every((roll) => roll != null && roll <= 3)).toBe(true)
     expect(itemEvent).toMatchObject({ amount: 2, targetHpDelta: -2 })
+  })
+
+  it('scales half-die relic penalties by quality', () => {
+    const player: FighterSnapshot = {
+      name: 'P',
+      dogType: 'SAMOYED',
+      wins: 0,
+      losses: 0,
+      round: 4,
+      relics: [{ id: 'r1', relicId: 'half-die-right', quality: 'GOLD', slot: 0 }],
+      items: [
+        { id: 'small-copy', defId: 'small-bite', quality: 'BRONZE', area: 'EQUIPMENT', x: 0, y: 0 },
+      ],
+    }
+    const opponent: FighterSnapshot = { name: 'O', dogType: 'SHIBA', wins: 0, losses: 0, round: 4, items: [] }
+    const result = simulateBattle(player, opponent, 'plain-10')
+    const rolls = result.events.filter((event) => event.kind === 'ROLL' && event.actor === 'player').map((event) => event.roll)
+    const itemEvent = result.events.find((event) => event.kind === 'ITEM' && event.actor === 'player')
+
+    expect(rolls.every((roll) => roll != null && roll <= 3)).toBe(true)
+    expect(itemEvent).toMatchObject({ amount: 3, targetHpDelta: -3 })
   })
 
   it('does not let mutt extra-roll support items loop during a normal roll', () => {

@@ -1,4 +1,15 @@
-import { DOGS, itemDef, relicDef } from './data'
+import {
+  DOGS,
+  itemDef,
+  relicDef,
+  relicDefForQuality,
+  relicEffectScale,
+  relicEmptyRollMisses,
+  relicEquipmentEffectScale,
+  relicOpeningThorns,
+  relicPoisonTickBonus,
+  relicRollBiasChance,
+} from './data'
 import { triggerOrder } from './grid'
 import { normalizeQuality, qualityAmount, QUALITY_LABELS } from './quality'
 import { createRng } from './rng'
@@ -118,6 +129,10 @@ function hasRelic(fighter: FighterSnapshot, effect: string) {
   return relicsOf(fighter).some((relic) => relicDef(relic.relicId).effect === effect)
 }
 
+function relicWithEffect(fighter: FighterSnapshot, effect: string) {
+  return relicsOf(fighter).find((relic) => relicDef(relic.relicId).effect === effect) ?? null
+}
+
 function hasShieldImmunity(fighter: FighterSnapshot, shield: number) {
   return shield > 0 && triggerOrder(fighter.items).some((item) => itemDef(item.defId).advancedEffect === 'SHIELD_IMMUNITY')
 }
@@ -126,7 +141,7 @@ function toBattleSnapshot(fighter: FighterSnapshot): BattleFighterSnapshot {
   return {
     ...fighter,
     items: fighter.items.map((item) => ({ ...item, quality: normalizeQuality(item.quality), def: itemDef(item.defId) })),
-    relics: relicsOf(fighter).map((relic) => ({ ...relic, quality: normalizeQuality(relic.quality), def: relicDef(relic.relicId) })),
+    relics: relicsOf(fighter).map((relic) => ({ ...relic, quality: normalizeQuality(relic.quality), def: relicDefForQuality(relic.relicId, relic.quality) })),
   }
 }
 
@@ -138,11 +153,13 @@ function isLarge(def: ItemDef, actor: FighterSnapshot) {
 function matchingContext(actor: FighterSnapshot, def: ItemDef, roll: number) {
   if (def.dice.includes(roll)) return { matches: true, scale: 1, note: '' }
 
-  if (hasRelic(actor, 'MIRROR_BIG_TO_SMALL') && roll <= 3 && def.dice.includes(roll + 3)) {
-    return { matches: true, scale: 0.5, note: '（点金手·左映射）' }
+  const bigToSmall = relicWithEffect(actor, 'MIRROR_BIG_TO_SMALL')
+  if (bigToSmall && roll <= 3 && def.dice.includes(roll + 3)) {
+    return { matches: true, scale: relicEffectScale(bigToSmall.relicId, bigToSmall.quality), note: '（点金手·左映射）' }
   }
-  if (hasRelic(actor, 'MIRROR_SMALL_TO_BIG') && roll >= 4 && def.dice.includes(roll - 3)) {
-    return { matches: true, scale: 0.5, note: '（点金手·右映射）' }
+  const smallToBig = relicWithEffect(actor, 'MIRROR_SMALL_TO_BIG')
+  if (smallToBig && roll >= 4 && def.dice.includes(roll - 3)) {
+    return { matches: true, scale: relicEffectScale(smallToBig.relicId, smallToBig.quality), note: '（点金手·右映射）' }
   }
   if (triggerOrder(actor.items).some((item) => itemDef(item.defId).advancedEffect === 'TRIGGER_BY_SIZE') && def.size === roll) {
     return { matches: true, scale: 1, note: '（按容量触发）' }
@@ -157,14 +174,18 @@ function restrictRollByRelic(fighter: FighterSnapshot, roll: number) {
 }
 
 function biasRollByRelic(fighter: FighterSnapshot, roll: number, rng: () => number) {
-  if (hasRelic(fighter, 'EXTREME_ROLL_BIAS') && rng() < 0.3) return rng() < 0.5 ? 1 : 6
-  if (hasRelic(fighter, 'MIDDLE_ROLL_BIAS') && rng() < 0.3) return rng() < 0.5 ? 3 : 4
+  const extremeBias = relicWithEffect(fighter, 'EXTREME_ROLL_BIAS')
+  if (extremeBias && rng() < relicRollBiasChance(extremeBias.relicId, extremeBias.quality)) return rng() < 0.5 ? 1 : 6
+  const middleBias = relicWithEffect(fighter, 'MIDDLE_ROLL_BIAS')
+  if (middleBias && rng() < relicRollBiasChance(middleBias.relicId, middleBias.quality)) return rng() < 0.5 ? 3 : 4
   return roll
 }
 
 function globalEffectScale(actor: FighterSnapshot) {
-  let scale = hasRelic(actor, 'ONLY_BIG_HALF_EFFECT') || hasRelic(actor, 'ONLY_SMALL_HALF_EFFECT') ? 0.5 : 1
-  if (hasRelic(actor, 'EXTRA_EQUIPMENT_REDUCED_EFFECT')) scale *= 0.85
+  const halfDie = relicWithEffect(actor, 'ONLY_BIG_HALF_EFFECT') ?? relicWithEffect(actor, 'ONLY_SMALL_HALF_EFFECT')
+  let scale = halfDie ? relicEffectScale(halfDie.relicId, halfDie.quality) : 1
+  const extraEquipment = relicWithEffect(actor, 'EXTRA_EQUIPMENT_REDUCED_EFFECT')
+  if (extraEquipment) scale *= relicEquipmentEffectScale(extraEquipment.relicId, extraEquipment.quality)
   return scale
 }
 
@@ -253,8 +274,10 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
     return true
   }
 
-  if (hasRelic(player, 'OPENING_THORNS')) state.player.thorns += 5
-  if (hasRelic(opponent, 'OPENING_THORNS')) state.opponent.thorns += 5
+  const playerOpeningThorns = relicWithEffect(player, 'OPENING_THORNS')
+  const opponentOpeningThorns = relicWithEffect(opponent, 'OPENING_THORNS')
+  if (playerOpeningThorns) state.player.thorns += relicOpeningThorns(playerOpeningThorns.relicId, playerOpeningThorns.quality)
+  if (opponentOpeningThorns) state.opponent.thorns += relicOpeningThorns(opponentOpeningThorns.relicId, opponentOpeningThorns.quality)
 
   const executeItem = (
     actorSide: Side,
@@ -578,7 +601,8 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
     const initialQueue = triggerOrder(fighter.items).filter((item) => matchingContext(fighter, itemDef(item.defId), roll).matches)
     if (initialQueue.length === 0) fighterState.emptyRolls += 1
     else fighterState.emptyRolls = 0
-    if (initialQueue.length === 0 && hasRelic(fighter, 'EMPTY_ROLL_LARGE_SAFETY') && fighterState.emptyRolls >= 3) {
+    const emptyRollSafety = relicWithEffect(fighter, 'EMPTY_ROLL_LARGE_SAFETY')
+    if (initialQueue.length === 0 && emptyRollSafety && fighterState.emptyRolls >= relicEmptyRollMisses(emptyRollSafety.relicId, emptyRollSafety.quality)) {
       const safety = triggerOrder(fighter.items).find((item) => isLarge(itemDef(item.defId), fighter))
         ?? triggerOrder(fighter.items).find((item) => [2, 3].includes(itemDef(item.defId).size))
       if (safety) initialQueue.push(safety)
@@ -686,7 +710,8 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
       if (state[side].poison > 0) {
         const before = getHp(side)
         const poisonedBy = side === 'player' ? opponent : player
-        const damage = state[side].poison + (hasRelic(poisonedBy, 'POISON_TICK_BONUS') ? 2 : 0)
+        const poisonBonusRelic = relicWithEffect(poisonedBy, 'POISON_TICK_BONUS')
+        const damage = state[side].poison + (poisonBonusRelic ? relicPoisonTickBonus(poisonBonusRelic.relicId, poisonBonusRelic.quality) : 0)
         const result = applyDirectHealthDamage(side, damage)
         push({
           time,

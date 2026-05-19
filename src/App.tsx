@@ -1077,7 +1077,7 @@ function RelicRail({ relics }: { relics: Relic[] }) {
                     setRelicTipAnchor(selectedRelicId === relic.id ? null : getFloatingTipPosition(event.currentTarget))
                   }}
                 >
-                  <Trophy size={30} aria-hidden="true" />
+                  <RelicGlyph relic={relic} size={30} />
                   <span className="relic-quality-dot" aria-hidden="true" />
                 </button>
               ) : <span className="relic-empty-mark" aria-hidden="true" />}
@@ -1088,6 +1088,15 @@ function RelicRail({ relics }: { relics: Relic[] }) {
       <RelicFloatingTip relic={selectedRelic} anchor={relicTipAnchor} onClose={() => { setSelectedRelicId(null); setRelicTipAnchor(null) }} />
     </aside>
   )
+}
+
+function RelicGlyph({ relic, size }: { relic: Relic; size: number }) {
+  const effect = relic.def.effect
+  if (effect.includes('MIRROR') || effect.includes('GOLD')) return <BadgeDollarSign size={size} aria-hidden="true" />
+  if (effect.includes('ROLL') || effect.includes('DIE') || effect.includes('BIAS') || effect.includes('ONLY_')) return <Dice5 size={size} aria-hidden="true" />
+  if (effect.includes('SAFETY') || effect.includes('THORNS')) return <Shield size={size} aria-hidden="true" />
+  if (effect.includes('EQUIPMENT')) return <Backpack size={size} aria-hidden="true" />
+  return <Trophy size={size} aria-hidden="true" />
 }
 
 function RelicFloatingTip({ relic, anchor, onClose }: { relic: Relic | null; anchor: TipAnchor | null; onClose: () => void }) {
@@ -1102,7 +1111,7 @@ function RelicFloatingTip({ relic, anchor, onClose }: { relic: Relic | null; anc
       </div>
       <div className="relic-tip-identity">
         <span className={`relic-tip-icon ${qualityClass(relic.quality)}`}>
-          <Trophy size={44} aria-hidden="true" />
+          <RelicGlyph relic={relic} size={44} />
         </span>
         <h3>{relic.def.name}</h3>
       </div>

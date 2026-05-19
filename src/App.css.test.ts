@@ -51,10 +51,16 @@ describe('equipment layout scale', () => {
   })
 
   it('keeps relic slots from resizing around text content', () => {
+    expect(cssRule(':root')).toContain('--relic-slot-size: 86px')
+    expect(cssRule('.relic-slot-grid')).toContain('grid-template-columns: repeat(2, var(--relic-slot-size))')
+    expect(cssRule('.relic-slot-grid')).toContain('grid-template-rows: repeat(3, var(--relic-slot-size))')
     expect(cssRule('.relic-slot')).toContain('aspect-ratio: 1')
+    expect(cssRule('.relic-slot')).toContain('width: var(--relic-slot-size)')
+    expect(cssRule('.relic-slot')).toContain('height: var(--relic-slot-size)')
     expect(cssRule('.relic-slot')).toContain('padding: 6px')
     expect(cssRule('.relic-icon-button')).toContain('width: 100%')
     expect(cssRule('.relic-icon-button')).toContain('aspect-ratio: 1')
+    expect(css).not.toMatch(/\.relic-slot-grid\s*\{[^}]*grid-template-columns:\s*repeat\(6,\s*minmax\(0,\s*1fr\)\)/s)
     expect(cssRule('.relic-floating-tip')).toContain('width: min(320px, calc(100vw - 28px))')
     expect(cssRule('.floating-tip.relic-floating-tip')).toContain('width: min(320px, calc(100vw - 28px))')
   })
