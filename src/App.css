@@ -165,7 +165,7 @@ input {
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 14px;
 }
-.dog-card, .choice, .shop-shelf, .inventory-board, .match-panel, .battle-panel, .last-battle-record {
+.dog-card, .choice, .shop-shelf, .inventory-board, .match-panel, .battle-panel {
   background: rgba(255, 250, 241, .94);
   border: 1px solid var(--line);
   border-radius: 18px;
@@ -193,29 +193,6 @@ input {
 
 .shop-workbench { display: grid; gap: 14px; position: relative; min-width: 0; max-width: 100%; }
 .reward-workbench { display: grid; gap: 14px; position: relative; min-width: 0; max-width: 100%; }
-.last-battle-record {
-  display: grid;
-  gap: 12px;
-  width: min(1240px, 100%);
-  margin: 0 auto;
-  padding: 14px;
-  position: relative;
-}
-.last-battle-summary {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-}
-.last-battle-summary span {
-  color: var(--blue);
-  font-size: 12px;
-  font-weight: 950;
-}
-.last-battle-summary p {
-  text-align: right;
-  font-weight: 800;
-}
 .class-reward-ceremony {
   min-height: min(720px, calc(100vh - 148px));
   width: min(1180px, 100%);
@@ -1296,7 +1273,12 @@ input {
 
 .auth-panel .row {
   display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
+}
+
+.auth-panel .row .action-button {
+  width: 100%;
 }
 
 .topbar {
@@ -1517,6 +1499,82 @@ input {
   display: grid;
   grid-template-columns: repeat(2, minmax(260px, 1fr));
   gap: 14px;
+}
+
+.player-history-panel {
+  width: 100%;
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  background: var(--paper);
+  border: 3px solid var(--ink);
+  border-radius: 10px;
+  box-shadow: 6px 7px 0 rgba(61, 45, 37, .22);
+}
+
+.history-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.history-summary span,
+.history-best small {
+  color: var(--blue);
+  font-size: 12px;
+  font-weight: 950;
+}
+
+.history-summary h2 {
+  margin: 2px 0;
+}
+
+.history-summary p,
+.history-best strong,
+.history-run-row small {
+  color: rgba(61, 45, 37, .74);
+  font-weight: 850;
+}
+
+.history-best {
+  display: grid;
+  justify-items: end;
+  gap: 4px;
+  text-align: right;
+}
+
+.history-run-list {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.history-run-row {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+  padding: 10px;
+  background: #fff7d6;
+  border: 2px solid rgba(61, 45, 37, .28);
+  border-radius: 8px;
+}
+
+.history-run-row span,
+.history-run-row strong,
+.history-run-row small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.history-run-row span {
+  font-size: 12px;
+  font-weight: 950;
+}
+
+.history-run-row.empty {
+  grid-column: 1 / -1;
 }
 
 .mode-card {
@@ -2458,14 +2516,16 @@ input {
 
 @media (max-width: 1180px) {
   :root { --slot-w: 78px; --slot-h: 96px; --board-slot-h: 210px; }
+  .history-run-list { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .offer-row { grid-template-columns: repeat(3, minmax(150px, 1fr)); }
 }
 @media (max-width: 760px) {
   :root { --slot-w: 58px; --slot-h: 82px; --board-slot-h: 150px; }
   .app-shell { padding: 0 12px 24px; }
   .topbar { height: auto; align-items: flex-start; flex-direction: column; }
-  .last-battle-summary { align-items: flex-start; flex-direction: column; }
-  .last-battle-summary p { text-align: left; }
+  .history-summary { align-items: flex-start; flex-direction: column; }
+  .history-best { justify-items: start; text-align: left; }
+  .history-run-list { grid-template-columns: 1fr; }
   .offer-row { grid-template-columns: 1fr; }
   .battle-hud { grid-template-columns: 1fr; }
   .battle-toolbar { align-items: flex-start; flex-direction: column; }

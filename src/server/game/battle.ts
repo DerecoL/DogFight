@@ -12,7 +12,7 @@ import {
   itemDefForQuality,
 } from './data'
 import { triggerOrder } from './grid'
-import { normalizeQuality, qualityAmount, QUALITY_LABELS } from './quality'
+import { normalizeQuality, qualityAmount, qualityAmountFrom, QUALITY_LABELS } from './quality'
 import { createRng } from './rng'
 import type {
   BattleEvent,
@@ -424,7 +424,7 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
     const doubled = bullyDoubled || emperorDoubled
     const multiplier = bullyQuad ? 4 : doubled ? 2 : 1
     const traitText = bullyQuad ? '（恶霸4倍翻倍）' : bullyDoubled ? '（恶霸翻倍）' : emperorDoubled ? '（狗皇帝幸运翻倍）' : ''
-    let amount = roundScaled(qualityAmount(def.effect.amount, quality) * multiplier, scale * globalEffectScale(actor))
+    let amount = roundScaled(qualityAmountFrom(def.effect.amount, quality, def.effect.qualityBase) * multiplier, scale * globalEffectScale(actor))
     const damageBonus = actorState.adjacentDamageBonus[item.id] ?? 0
     if (damageBonus > 0 && (def.effect.type === 'DAMAGE' || def.effect.type === 'DAMAGE_SELF_SHIELD')) {
       amount += damageBonus

@@ -12,7 +12,8 @@ describe('quality-adjusted item descriptions', () => {
   })
 
   it('shows upgraded shield and poison values for advanced equipment', () => {
-    expect(numbers('v3-golden-kennel', 'DIAMOND')).toContain('84')
+    expect(numbers('v3-golden-kennel', 'DIAMOND')).toContain('25')
+    expect(numbers('v3-golden-kennel', 'DIAMOND')).not.toContain('84')
     expect(numbers('v3-fermented-trash-bin', 'DIAMOND')).toContain('17')
   })
 

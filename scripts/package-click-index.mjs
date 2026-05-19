@@ -181,6 +181,10 @@ async function defaultMockApiScript(buildId = new Date().toISOString().replace(/
     return Math.round(amount * Math.pow(1.5, Math.max(0, qualities.indexOf(quality || 'BRONZE'))));
   }
 
+  function qualityAmountFrom(amount, quality, baseQuality) {
+    return Math.round(amount * Math.pow(1.5, Math.max(0, qualities.indexOf(quality || 'BRONZE'))) / Math.pow(1.5, Math.max(0, qualities.indexOf(baseQuality || 'BRONZE'))));
+  }
+
   function publicItem(item) {
     return { ...item, quality: item.quality || 'BRONZE', def: defs[item.defId] || defs['starter-1'] };
   }
@@ -323,7 +327,7 @@ async function defaultMockApiScript(buildId = new Date().toISOString().replace(/
         for (const item of equipped) {
           const def = defs[item.defId];
           if (!def || !def.dice.includes(roll)) continue;
-          const amount = qualityAmount(def.effect.amount, item.quality);
+          const amount = qualityAmountFrom(def.effect.amount, item.quality, def.effect?.qualityBase);
           time += 0.25;
           if (def.effect.type === 'HEAL') {
             if (side.actor === 'player') playerHp = Math.min(100, playerHp + amount);
@@ -634,6 +638,10 @@ async function currentMockApiScript(buildId) {
 
   function qualityAmount(amount, quality) {
     return Math.round(amount * Math.pow(1.5, qualities.indexOf(normalizeQuality(quality))));
+  }
+
+  function qualityAmountFrom(amount, quality, baseQuality) {
+    return Math.round(amount * qualityMultiplier(quality) / qualityMultiplier(baseQuality));
   }
 
   function qualityMultiplier(quality) {
@@ -994,7 +1002,7 @@ async function currentMockApiScript(buildId) {
         for (const item of equipped) {
           const def = defs[item.defId];
           if (!def || !def.dice.includes(roll)) continue;
-          const amount = qualityAmount(def.effect?.amount || 0, item.quality);
+          const amount = qualityAmountFrom(def.effect?.amount || 0, item.quality, def.effect?.qualityBase);
           time += 0.25;
           if (def.effect?.type === 'HEAL') {
             if (side.actor === 'player') playerHp = Math.min(100, playerHp + amount);
@@ -1111,7 +1119,7 @@ async function currentMockApiScript(buildId) {
           }
           const target = opponentOf(side);
           const advanced = def.advancedEffect || 'NONE';
-          const amount = qualityAmount(def.effect?.amount || 0, item.quality);
+          const amount = qualityAmountFrom(def.effect?.amount || 0, item.quality, def.effect?.qualityBase);
           time += 0.25;
           if (def.effect?.type === 'HEAL') {
             setHp(side, Math.min(100, hpOf(side) + amount));

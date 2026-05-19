@@ -67,6 +67,7 @@ export type ItemDef = {
   effect: {
     type: 'DAMAGE' | 'HEAL' | 'DAMAGE_SELF_SHIELD' | 'UTILITY'
     amount: number
+    qualityBase?: ItemQuality
   }
 }
 

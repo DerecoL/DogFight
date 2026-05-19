@@ -16,7 +16,7 @@ import { canUpgradePair, nextQuality, normalizeQuality } from './game/quality'
 import { simulateBattle } from './game/battle'
 import { STARTING_GOLD, isTrainingMatchRound } from './game/matchmaking'
 import type { BattleResult, DogType, FighterSnapshot, GameItem, RelicInstance, ShopOffer, ShopType } from './game/types'
-import { applyRelicChoice, classRewardChoices, createFinishedBattleRecord, initialItems, makeChoices, makeRelicChoices, makeShop, parseJson, postBattleLargeItemReward, publicRun, relicsFromRun, seedGhost, snapshotFromRun, toGameItems } from './state'
+import { applyRelicChoice, classRewardChoices, createFinishedBattleRecord, initialItems, makeChoices, makeRelicChoices, makeShop, parseJson, postBattleLargeItemReward, publicRun, publicRunHistory, relicsFromRun, seedGhost, snapshotFromRun, toGameItems } from './state'
 
 declare module 'fastify' {
   interface FastifyRequest {
@@ -58,9 +58,23 @@ export function buildApp() {
     return userId
   }
 
-  const publicUser = (user: { id: string; email: string; nickname: string | null }) => ({
+  const normalizeAccount = (value: string) => value.trim().toLowerCase()
+  const accountSchema = z.string()
+    .trim()
+    .min(3, '账号至少需要 3 个字符')
+    .max(64, '账号最多 64 个字符')
+    .refine((value) => !/\s/.test(value), '账号不能包含空白字符')
+  const authBodySchema = z.object({
+    account: accountSchema.optional(),
+    email: accountSchema.optional(),
+    password: z.string().min(6),
+  }).refine((body) => body.account || body.email, { message: '账号不能为空' })
+
+  const authAccountFrom = (body: z.infer<typeof authBodySchema>) => normalizeAccount(body.account ?? body.email ?? '')
+
+  const publicUser = (user: { id: string; account: string; nickname: string | null }) => ({
     id: user.id,
-    email: user.email,
+    account: user.account,
     nickname: user.nickname,
   })
 
@@ -123,25 +137,26 @@ export function buildApp() {
   app.get('/api/health', async () => ({ ok: true }))
 
   app.post('/api/auth/register', async (request, reply) => {
-    const body = z.object({ email: z.string().email(), password: z.string().min(6) }).parse(request.body)
+    const body = authBodySchema.parse(request.body)
     const passwordHash = await bcrypt.hash(body.password, 10)
-    const email = body.email.toLowerCase()
-    const user = await prisma.user.create({ data: { email, passwordHash } }).catch((error: unknown) => {
+    const account = authAccountFrom(body)
+    const user = await prisma.user.create({ data: { account, passwordHash } }).catch((error: unknown) => {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
         return null
       }
       throw error
     })
-    if (!user) return reply.code(409).send({ error: '邮箱已注册，请直接登录' })
+    if (!user) return reply.code(409).send({ error: '账号已注册，请直接登录' })
     const token = app.jwt.sign({ userId: user.id })
     reply.setCookie('token', token, authCookieOptions)
     return { user: publicUser(user), needsNickname: true }
   })
 
   app.post('/api/auth/login', async (request, reply) => {
-    const body = z.object({ email: z.string().email(), password: z.string().min(6) }).parse(request.body)
-    const user = await prisma.user.findUnique({ where: { email: body.email.toLowerCase() } })
-    if (!user || !(await bcrypt.compare(body.password, user.passwordHash))) return reply.code(401).send({ error: '邮箱或密码错误' })
+    const body = authBodySchema.parse(request.body)
+    const account = authAccountFrom(body)
+    const user = await prisma.user.findUnique({ where: { account } })
+    if (!user || !(await bcrypt.compare(body.password, user.passwordHash))) return reply.code(401).send({ error: '账号或密码错误' })
     const token = app.jwt.sign({ userId: user.id })
     reply.setCookie('token', token, authCookieOptions)
     return { user: publicUser(user) }
@@ -168,6 +183,27 @@ export function buildApp() {
     const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } })
     const activeRun = await prisma.run.findFirst({ where: { userId, status: 'ACTIVE' }, orderBy: { createdAt: 'desc' }, include: { items: true } })
     return { user: publicUser(user), activeRun: activeRun ? publicRun(activeRun) : null }
+  })
+
+  app.get('/api/runs/history', async (request) => {
+    const userId = requireUser(request.userId)
+    const runs = await prisma.run.findMany({
+      where: { userId },
+      orderBy: { updatedAt: 'desc' },
+      select: {
+        id: true,
+        dogType: true,
+        luckyNumber: true,
+        wins: true,
+        losses: true,
+        round: true,
+        status: true,
+        phase: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    })
+    return { history: publicRunHistory(runs) }
   })
 
   app.post('/api/runs', async (request, reply) => {
@@ -235,7 +271,7 @@ export function buildApp() {
     if (existing) return reply.code(409).send({ error: 'This dog has already entered apex arena' })
 
     const leaderboard = await apexLeaderboard()
-    const challengerName = `${user.nickname ?? user.email.split('@')[0]}#${user.id.slice(0, 6)}`
+    const challengerName = `${user.nickname ?? user.account}#${user.id.slice(0, 6)}`
     const challenger = snapshotFromRun(run, challengerName)
     const opponents: ApexOpponent[] = leaderboard.map((entry) => ({
       id: entry.id,

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import {
   DndContext,
   DragOverlay,
@@ -55,7 +55,7 @@ type ItemDef = {
   tags: string[]
   description?: string
   defaultQuality?: ItemQuality
-  effect: { type: string; amount: number }
+  effect: { type: string; amount: number; qualityBase?: ItemQuality }
 }
 type Item = { id: string; defId: string; quality: ItemQuality; area: Area; x: number; y: number; def: ItemDef }
 type ShopOffer = { offerId: string; defId: string; price: number; discount: number; quality?: ItemQuality; def?: ItemDef }
@@ -132,7 +132,21 @@ type Run = {
   lastBattle: Battle | null
   items: Item[]
 }
-type AuthUser = { id: string; email: string; nickname: string | null }
+type PlayerRunHistoryEntry = Pick<Run, 'id' | 'dogType' | 'luckyNumber' | 'wins' | 'losses' | 'round' | 'status' | 'phase'> & {
+  createdAt: string
+  updatedAt: string
+}
+type PlayerRunHistory = {
+  totalRuns: number
+  activeRuns: number
+  completedRuns: number
+  abandonedRuns: number
+  totalWins: number
+  totalLosses: number
+  bestRun: PlayerRunHistoryEntry | null
+  recentRuns: PlayerRunHistoryEntry[]
+}
+type AuthUser = { id: string; account: string; nickname: string | null }
 type TipAnchor = { x: number; y: number }
 type ApexEntry = {
   id: string
@@ -245,6 +259,10 @@ const dogAssets: Record<DogType, string> = {
 const gameIcon = '/assets/game-icon.png'
 const backgroundMusicSrc = '/assets/audio/the-final-inventory.mp3'
 const musicPreferenceKey = 'dogfight:background-music'
+
+function createDefaultAccount() {
+  return `player-${Math.floor(100000 + Math.random() * 900000)}`
+}
 const shopNames: Record<ShopType, string> = {
   GENERAL: '通用商店',
   LARGE: '大物品商店',
@@ -284,6 +302,16 @@ const BASE_MAX_HP = 100
 const EARLY_ROUND_HP_GROWTH = 20
 const LATE_ROUND_HP_GROWTH = 50
 const EARLY_HP_GROWTH_ROUNDS = 6
+const emptyRunHistory: PlayerRunHistory = {
+  totalRuns: 0,
+  activeRuns: 0,
+  completedRuns: 0,
+  abandonedRuns: 0,
+  totalWins: 0,
+  totalLosses: 0,
+  bestRun: null,
+  recentRuns: [],
+}
 const dogOptions: DogType[] = ['SHIBA', 'SAMOYED', 'MUTT', 'BULLY', 'EMPEROR']
 const shopChoiceOrder: ShopType[] = ['GENERAL', 'LARGE', 'MEDIUM', 'SMALL', 'SMALL_DICE', 'BIG_DICE', 'RELIC']
 const dogStrategies: Record<DogType, string> = {
@@ -352,12 +380,12 @@ function qualityClass(quality?: string) {
   return `quality-${normalizeQuality(quality).toLowerCase()}`
 }
 
-function qualityAmount(amount: number, quality?: string) {
-  return Math.round(amount * (1.5 ** qualityOrder.indexOf(normalizeQuality(quality))))
+function qualityAmountFrom(amount: number, quality?: string, baseQuality?: string) {
+  return Math.round(amount * (1.5 ** qualityOrder.indexOf(normalizeQuality(quality))) / (1.5 ** qualityOrder.indexOf(normalizeQuality(baseQuality))))
 }
 
 function effectText(def: ItemDef, quality: ItemQuality = 'BRONZE') {
-  const amount = qualityAmount(def.effect.amount, quality)
+  const amount = qualityAmountFrom(def.effect.amount, quality, def.effect.qualityBase)
   if (def.effect.type === 'HEAL') return `回复 ${amount} 生命`
   if (def.effect.type === 'DAMAGE' || def.effect.type === 'DAMAGE_SELF_SHIELD') return `造成 ${amount} 伤害`
   if (def.effect.type === 'UTILITY') {
@@ -468,7 +496,7 @@ function RuleText({ text }: { text: string }) {
 }
 
 export default function App() {
-  const [email, setEmail] = useState('player@dogdice.test')
+  const [account, setAccount] = useState(createDefaultAccount)
   const [password, setPassword] = useState('dogdice')
   const [appScreen, setAppScreen] = useState<AppScreen>('LOBBY')
   const [user, setUser] = useState<AuthUser | null>(null)
@@ -486,18 +514,25 @@ export default function App() {
   const [musicEnabled, setMusicEnabled] = useState(() => localStorage.getItem(musicPreferenceKey) !== 'off')
   const [musicBlocked, setMusicBlocked] = useState(false)
   const [appHasAudioFocus, setAppHasAudioFocus] = useState(() => !document.hidden && document.hasFocus())
+  const [runHistory, setRunHistory] = useState<PlayerRunHistory>(emptyRunHistory)
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
   const hasBattle = Boolean(battle)
+
+  const loadRunHistory = useCallback(async () => {
+    const data = await api<{ history: PlayerRunHistory }>('/runs/history')
+    setRunHistory(data.history)
+  }, [])
 
   useEffect(() => {
     api<{ user: AuthUser; activeRun: Run | null }>('/me')
       .then((data) => {
         setUser(data.user)
         setRun(data.activeRun)
+        void loadRunHistory().catch(() => undefined)
       })
       .catch(() => undefined)
-  }, [])
+  }, [loadRunHistory])
 
   useEffect(() => {
     if (!battle) return
@@ -565,16 +600,19 @@ export default function App() {
         setAppScreen('LOBBY')
         if (!data.user) {
           setRun(null)
+          setRunHistory(emptyRunHistory)
         } else if ('activeRun' in data) {
           setRun(data.activeRun ?? null)
         }
         setNeedsNicknameSetup(Boolean(data.user && data.needsNickname))
+        if (data.user) void loadRunHistory().catch(() => undefined)
       } else {
         setRun(data.run)
         if (data.battle) {
           setEventIndex(0)
           setBattle(data.battle)
         }
+        void loadRunHistory().catch(() => undefined)
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : '操作失败')
@@ -600,6 +638,7 @@ export default function App() {
       setRun(data.run)
       setBattle(null)
       setEventIndex(0)
+      void loadRunHistory().catch(() => undefined)
     } catch (err) {
       setError(err instanceof Error ? err.message : '操作失败')
     }
@@ -675,12 +714,12 @@ export default function App() {
               <p>摆好装备，掷骰触发，挑战异步狗狗对手。</p>
             </div>
           </div>
-          <label>邮箱<input value={email} onChange={(e) => setEmail(e.target.value)} /></label>
+          <label>账号<input value={account} autoCapitalize="none" onChange={(e) => setAccount(e.target.value)} /></label>
           <label>密码<input type="password" value={password} onChange={(e) => setPassword(e.target.value)} /></label>
           {error && <p className="error">{error}</p>}
           <div className="row">
-            <button className="action-button" onClick={() => action(() => api('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }))}>登录</button>
-            <button className="secondary action-button" onClick={() => action(() => api('/auth/register', { method: 'POST', body: JSON.stringify({ email, password }) }))}>注册</button>
+            <button className="action-button" onClick={() => action(() => api('/auth/login', { method: 'POST', body: JSON.stringify({ account, password }) }))}>登录</button>
+            <button className="secondary action-button" onClick={() => action(() => api('/auth/register', { method: 'POST', body: JSON.stringify({ account, password }) }))}>注册</button>
           </div>
         </section>
       </main>
@@ -698,7 +737,7 @@ export default function App() {
   if (appScreen === 'LOBBY') {
     return (
       <Shell run={run ?? undefined} error={error} musicEnabled={musicEnabled} musicBlocked={musicBlocked} onToggleMusic={toggleMusic} onLogout={() => action(() => api('/auth/logout', { method: 'POST' }).then(() => ({ user: null })))}>
-        <ModeLobby run={run} onEnterCasual={() => setAppScreen('CASUAL')} onEnterDogfight={() => setAppScreen('DOGFIGHT')} onEnterPeak={() => setAppScreen('PEAK')} />
+        <ModeLobby run={run} runHistory={runHistory} onEnterCasual={() => setAppScreen('CASUAL')} onEnterDogfight={() => setAppScreen('DOGFIGHT')} onEnterPeak={() => setAppScreen('PEAK')} />
       </Shell>
     )
   }
@@ -729,8 +768,6 @@ export default function App() {
 
   return (
     <Shell run={run} error={error} musicEnabled={musicEnabled} musicBlocked={musicBlocked} onToggleMusic={toggleMusic} onOpenLobby={() => setAppScreen('LOBBY')} onLogout={() => action(() => api('/auth/logout', { method: 'POST' }).then(() => ({ user: null })))}>
-      {!battle && run.lastBattle && run.phase !== 'COMPLETE' && <LastBattleRecord run={run} />}
-
       {!battle && run.phase === 'CHOICE' && (
         <ShopChoiceSelect choices={run.choices} onPick={(shopType) => action(() => api(`/runs/${run.id}/choice/select`, { method: 'POST', body: JSON.stringify({ shopType }) }))} />
       )}
@@ -894,7 +931,7 @@ const modeCards: Array<{
   },
 ]
 
-function ModeLobby({ run, onEnterCasual, onEnterDogfight, onEnterPeak }: { run: Run | null; onEnterCasual: () => void; onEnterDogfight: () => void; onEnterPeak: () => void }) {
+function ModeLobby({ run, runHistory, onEnterCasual, onEnterDogfight, onEnterPeak }: { run: Run | null; runHistory: PlayerRunHistory; onEnterCasual: () => void; onEnterDogfight: () => void; onEnterPeak: () => void }) {
   const casualAction = run ? '继续休闲模式' : '开始休闲模式'
   return (
     <section className="mode-lobby-screen">
@@ -902,6 +939,7 @@ function ModeLobby({ run, onEnterCasual, onEnterDogfight, onEnterPeak }: { run: 
         <h2>模式大厅</h2>
         <p>选择本次要进入的竞技方式。休闲模式结束后的狗可以送入巅峰竞技场。</p>
       </div>
+      <PlayerRunHistoryPanel history={runHistory} />
       <div className="mode-grid">
         {modeCards.map((mode) => (
           <article key={mode.id} className={mode.locked ? 'mode-card locked' : 'mode-card available'}>
@@ -932,6 +970,55 @@ function ModeLobby({ run, onEnterCasual, onEnterDogfight, onEnterPeak }: { run: 
       </div>
     </section>
   )
+}
+
+function PlayerRunHistoryPanel({ history }: { history: PlayerRunHistory }) {
+  const bestRun = history.bestRun
+  const winRate = history.totalWins + history.totalLosses > 0
+    ? Math.round((history.totalWins / (history.totalWins + history.totalLosses)) * 100)
+    : 0
+
+  return (
+    <section className="player-history-panel" aria-label="个人战绩">
+      <div className="history-summary">
+        <div>
+          <span>个人战绩</span>
+          <h2>{history.totalWins}胜 {history.totalLosses}败</h2>
+          <p>共 {history.totalRuns} 局 · 胜率 {winRate}% · 完成 {history.completedRuns} 局</p>
+        </div>
+        <div className="history-best">
+          <small>最佳成绩</small>
+          {bestRun ? (
+            <strong>{dogNames[bestRun.dogType]} · {bestRun.wins}胜 {bestRun.losses}败 · 第 {bestRun.round} 回合</strong>
+          ) : (
+            <strong>暂无对局</strong>
+          )}
+        </div>
+      </div>
+      <div className="history-run-list" aria-label="最近对局">
+        {history.recentRuns.length > 0 ? history.recentRuns.map((entry) => (
+          <div className="history-run-row" key={entry.id}>
+            <span>{dogNames[entry.dogType]}</span>
+            <strong>{entry.wins}胜 {entry.losses}败</strong>
+            <small>{runStatusText(entry.status)} · 第 {entry.round} 回合</small>
+          </div>
+        )) : (
+          <div className="history-run-row empty">
+            <span>最近对局</span>
+            <strong>还没有记录</strong>
+            <small>开始一局后会自动统计</small>
+          </div>
+        )}
+      </div>
+    </section>
+  )
+}
+
+function runStatusText(status: string) {
+  if (status === 'ACTIVE') return '进行中'
+  if (status === 'COMPLETE') return '已完成'
+  if (status === 'ABANDONED') return '已换狗'
+  return '已记录'
 }
 
 function DogfightLobby() {
@@ -2115,58 +2202,6 @@ function FloatingTip({ run, item, offer, anchor, onClose, onBuy, onSell, onUpgra
         {!canAfford && <small className="disabled-reason">金币不足，还差 {(offer?.price ?? 0) - run.gold} 金币。</small>}
       </div>
     </aside>
-  )
-}
-
-function LastBattleRecord({ run }: { run: Run }) {
-  const [battleTip, setBattleTip] = useState<{ item: Item; anchor: TipAnchor } | null>(null)
-  const battle = run.lastBattle
-  if (!battle) return null
-  const snapshot = battle.playerSnapshot ?? {
-    name: '你的狗狗',
-    dogType: run.dogType,
-    luckyNumber: run.luckyNumber,
-    wins: run.wins,
-    losses: run.losses,
-    round: Math.max(0, run.round - 1),
-    items: run.items,
-  }
-  const opponentSnapshot = battle.opponentSnapshot ?? {
-    name: run.matchedGhost?.name ?? '上一局对手',
-    dogType: run.matchedGhost?.dogType ?? 'MUTT',
-    luckyNumber: run.matchedGhost?.luckyNumber ?? null,
-    wins: run.matchedGhost?.wins ?? 0,
-    losses: run.matchedGhost?.losses ?? 0,
-    round: Math.max(0, run.round - 1),
-    items: [] as Item[],
-  }
-  const resultText = battle.winner === 'player' ? '胜利' : '失败'
-  const hpText = `${Math.max(0, Math.round(battle.playerHp))}/${battle.playerMaxHp} vs ${Math.max(0, Math.round(battle.opponentHp))}/${battle.opponentMaxHp}`
-
-  return (
-    <section className="last-battle-record">
-      <div className="last-battle-summary">
-        <div>
-          <span>上一局对战记录</span>
-          <h2>{resultText} · {snapshot.wins}胜 {snapshot.losses}败</h2>
-        </div>
-        <p>对手 {opponentSnapshot.name} · {dogNames[opponentSnapshot.dogType]} · 结束血量 {hpText}</p>
-      </div>
-      <BattleEquipmentRow owner="player" snapshot={snapshot} onInspect={(item, element) => setBattleTip({ item, anchor: getFloatingTipPosition(element) })} />
-      <BattleEquipmentRow owner="opponent" snapshot={opponentSnapshot} onInspect={(item, element) => setBattleTip({ item, anchor: getFloatingTipPosition(element) })} />
-      {battleTip && (
-        <FloatingTip
-          run={run}
-          item={battleTip.item}
-          offer={null}
-          anchor={battleTip.anchor}
-          onClose={() => setBattleTip(null)}
-          onBuy={null}
-          onSell={null}
-          onUpgrade={null}
-        />
-      )}
-    </section>
   )
 }
 

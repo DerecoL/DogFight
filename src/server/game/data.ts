@@ -1,4 +1,4 @@
-import { normalizeQuality, qualityAmount, qualityMultiplier } from './quality'
+import { normalizeQuality, qualityAmount, qualityAmountFrom, qualityMultiplier } from './quality'
 import type { AdvancedEffect, DogType, ItemDef, ItemQuality, RelicDef, RelicEffect, ShopType } from './types'
 
 export const DOGS: Record<DogType, { name: string; trait: string }> = {
@@ -127,7 +127,7 @@ export const ITEM_DEFS: ItemDef[] = [
     advancedEffect: 'POISON_AND_DISABLE_RIGHTMOST',
     defaultQuality: 'GOLD',
   }),
-  slotItem('v3-golden-kennel', '不可侵犯的纯金狗窝', 4, 18, [4, 5], ['shield', 'immune'], { type: 'UTILITY', amount: 25 }, {
+  slotItem('v3-golden-kennel', '不可侵犯的纯金狗窝', 4, 18, [4, 5], ['shield', 'immune'], { type: 'UTILITY', amount: 25, qualityBase: 'DIAMOND' }, {
     description: '获得 25 点护盾。只要你拥有护盾，你免疫所有【中毒】和【虚弱】的施加。',
     advancedEffect: 'SHIELD_IMMUNITY',
     defaultQuality: 'DIAMOND',
@@ -219,7 +219,7 @@ function itemEffectUnit(type: ItemDef['effect']['type']) {
 export function itemDescription(itemId: string, quality?: string | null) {
   const def = itemDef(itemId)
   const currentQuality = normalizeQuality(quality)
-  const amount = qualityAmount(def.effect.amount, currentQuality)
+  const amount = qualityAmountFrom(def.effect.amount, currentQuality, def.effect.qualityBase)
   const one = qualityAmount(1, currentQuality)
   const advanced = def.advancedEffect ?? 'NONE'
   const baseEffect = def.effect.amount > 0

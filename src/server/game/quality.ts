@@ -27,6 +27,10 @@ export function qualityAmount(amount: number, quality?: string | null) {
   return Math.round(amount * qualityMultiplier(quality))
 }
 
+export function qualityAmountFrom(amount: number, quality?: string | null, baseQuality?: string | null) {
+  return Math.round(amount * qualityMultiplier(quality) / qualityMultiplier(baseQuality))
+}
+
 export function canUpgradePair(source: GameItem, target: GameItem) {
   return source.id !== target.id
     && source.defId === target.defId

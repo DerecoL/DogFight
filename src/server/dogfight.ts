@@ -43,8 +43,8 @@ function readyDeadlineFromNow() {
   return new Date(Date.now() + DOGFIGHT_READY_MS)
 }
 
-function playerName(user: { id: string; email: string; nickname: string | null }) {
-  return user.nickname ?? user.email.split('@')[0] ?? `玩家${user.id.slice(0, 6)}`
+function playerName(user: { id: string; account: string; nickname: string | null }) {
+  return user.nickname ?? user.account ?? `玩家${user.id.slice(0, 6)}`
 }
 
 function validateDogChoice(body: unknown) {

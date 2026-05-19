@@ -26,6 +26,23 @@ afterAll(async () => {
 })
 
 describeWithDatabase('run API', () => {
+  it('registers and logs in with an account instead of requiring an email address', async () => {
+    const registering = request.agent(app.server)
+    const loggingIn = request.agent(app.server)
+    await app.ready()
+
+    const account = `player-${Date.now()}`
+    const registered = await registering.post('/api/auth/register').send({ account, password: 'dogdice' }).expect(200)
+    expect(registered.body.user).toMatchObject({ account, nickname: null })
+    expect(registered.body.user).not.toHaveProperty('email')
+
+    const loggedIn = await loggingIn.post('/api/auth/login').send({ account, password: 'dogdice' }).expect(200)
+    expect(loggedIn.body.user).toMatchObject({ account, nickname: null })
+
+    const duplicate = await request(app.server).post('/api/auth/register').send({ account, password: 'dogdice' }).expect(409)
+    expect(duplicate.body.error).toContain('账号已注册')
+  })
+
   it('requires newly registered players to set a valid nickname before first play', async () => {
     const agent = request.agent(app.server)
     await app.ready()
@@ -139,6 +156,44 @@ describeWithDatabase('run API', () => {
     expect(['SHOP', 'CHOICE', 'COMPLETE']).toContain(finished.body.run.phase)
     expect(finished.body.run.round).toBe(1)
     expect(finished.body.run.gold).toBe(bought.body.run.gold + 7)
+  })
+
+  it('returns the current player history across multiple runs', async () => {
+    const agent = request.agent(app.server)
+    await app.ready()
+
+    const email = `history${Date.now()}@dog.test`
+    await agent.post('/api/auth/register').send({ email, password: 'dogdice' }).expect(200)
+
+    const first = await agent.post('/api/runs').send({ dogType: 'SHIBA' }).expect(200)
+    await prisma.run.update({
+      where: { id: first.body.run.id },
+      data: { wins: 8, losses: 2, round: 10, phase: 'CHOICE', status: 'COMPLETE' },
+    })
+
+    const second = await agent.post('/api/runs').send({ dogType: 'MUTT' }).expect(200)
+    await prisma.run.update({
+      where: { id: second.body.run.id },
+      data: { wins: 3, losses: 1, round: 4, phase: 'SHOP', status: 'ACTIVE' },
+    })
+
+    const history = await agent.get('/api/runs/history').expect(200)
+
+    expect(history.body.history).toMatchObject({
+      totalRuns: 2,
+      activeRuns: 1,
+      completedRuns: 1,
+      totalWins: 11,
+      totalLosses: 3,
+      bestRun: {
+        id: first.body.run.id,
+        wins: 8,
+        losses: 2,
+        status: 'COMPLETE',
+      },
+    })
+    expect(history.body.history.recentRuns.map((run: { id: string }) => run.id)).toContain(first.body.run.id)
+    expect(history.body.history.recentRuns.map((run: { id: string }) => run.id)).toContain(second.body.run.id)
   })
 
   it('creates dog emperor runs with a saved lucky number', async () => {

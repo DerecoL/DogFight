@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createFinishedBattleRecord, postBattleLargeItemReward, publicRelics } from './state'
+import { createFinishedBattleRecord, postBattleLargeItemReward, publicRelics, publicRunHistory } from './state'
 
 describe('public run relic data', () => {
   it('returns quality-adjusted relic descriptions for upgraded relics', () => {
@@ -63,5 +63,67 @@ describe('finished battle records', () => {
     expect(record.playerSnapshot.losses).toBe(1)
     expect(record.opponentSnapshot.wins).toBe(2)
     expect(record.opponentSnapshot.losses).toBe(1)
+  })
+})
+
+describe('player run history', () => {
+  it('summarizes multiple runs for the current player', () => {
+    const history = publicRunHistory([
+      {
+        id: 'active-run',
+        dogType: 'SHIBA',
+        luckyNumber: null,
+        wins: 2,
+        losses: 1,
+        round: 3,
+        status: 'ACTIVE',
+        phase: 'SHOP',
+        createdAt: new Date('2026-05-19T10:00:00Z'),
+        updatedAt: new Date('2026-05-19T10:10:00Z'),
+      },
+      {
+        id: 'best-run',
+        dogType: 'EMPEROR',
+        luckyNumber: 6,
+        wins: 12,
+        losses: 1,
+        round: 13,
+        status: 'COMPLETE',
+        phase: 'COMPLETE',
+        createdAt: new Date('2026-05-18T10:00:00Z'),
+        updatedAt: new Date('2026-05-18T11:00:00Z'),
+      },
+      {
+        id: 'abandoned-run',
+        dogType: 'MUTT',
+        luckyNumber: null,
+        wins: 1,
+        losses: 2,
+        round: 4,
+        status: 'ABANDONED',
+        phase: 'CHOICE',
+        createdAt: new Date('2026-05-17T10:00:00Z'),
+        updatedAt: new Date('2026-05-17T10:20:00Z'),
+      },
+    ])
+
+    expect(history).toMatchObject({
+      totalRuns: 3,
+      activeRuns: 1,
+      completedRuns: 1,
+      abandonedRuns: 1,
+      totalWins: 15,
+      totalLosses: 4,
+      bestRun: {
+        id: 'best-run',
+        dogType: 'EMPEROR',
+        luckyNumber: 6,
+        wins: 12,
+        losses: 1,
+        round: 13,
+        status: 'COMPLETE',
+      },
+    })
+    expect(history.recentRuns.map((run) => run.id)).toEqual(['active-run', 'best-run', 'abandoned-run'])
   })
 })

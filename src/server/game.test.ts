@@ -507,6 +507,24 @@ describe('battle simulation', () => {
     expect(result.events.every((event) => typeof event.playerShield === 'number' && typeof event.opponentShield === 'number')).toBe(true)
   })
 
+  it('applies the golden kennel shield as its authored diamond value', () => {
+    const player: FighterSnapshot = {
+      name: 'P',
+      dogType: 'SHIBA',
+      wins: 0,
+      losses: 0,
+      round: 0,
+      items: [
+        { id: 'shield', defId: 'v3-golden-kennel', quality: 'DIAMOND', area: 'EQUIPMENT', x: 0, y: 0 },
+      ],
+    }
+    const opponent: FighterSnapshot = { name: 'O', dogType: 'SHIBA', wins: 0, losses: 0, round: 0, items: [] }
+    const result = simulateBattle(player, opponent, 'shield-ui-events')
+    const shieldEvent = result.events.find((event) => event.itemId === 'shield')
+
+    expect(shieldEvent).toMatchObject({ amount: 25, playerShield: 25 })
+  })
+
   it('records positive and negative status snapshots on battle events', () => {
     const player: FighterSnapshot = {
       name: 'P',

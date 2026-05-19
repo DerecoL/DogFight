@@ -78,6 +78,69 @@ export function publicRun(run: Run & { items: ItemInstance[] }) {
   }
 }
 
+type RunHistorySource = Pick<Run, 'id' | 'dogType' | 'luckyNumber' | 'wins' | 'losses' | 'round' | 'status' | 'phase' | 'createdAt' | 'updatedAt'>
+
+export type PublicRunHistoryEntry = {
+  id: string
+  dogType: DogType
+  luckyNumber: number | null
+  wins: number
+  losses: number
+  round: number
+  status: string
+  phase: Phase
+  createdAt: string
+  updatedAt: string
+}
+
+export type PublicRunHistory = {
+  totalRuns: number
+  activeRuns: number
+  completedRuns: number
+  abandonedRuns: number
+  totalWins: number
+  totalLosses: number
+  bestRun: PublicRunHistoryEntry | null
+  recentRuns: PublicRunHistoryEntry[]
+}
+
+function toHistoryEntry(run: RunHistorySource): PublicRunHistoryEntry {
+  return {
+    id: run.id,
+    dogType: run.dogType as DogType,
+    luckyNumber: run.luckyNumber,
+    wins: run.wins,
+    losses: run.losses,
+    round: run.round,
+    status: run.status,
+    phase: run.phase as Phase,
+    createdAt: run.createdAt.toISOString(),
+    updatedAt: run.updatedAt.toISOString(),
+  }
+}
+
+export function publicRunHistory(runs: RunHistorySource[]): PublicRunHistory {
+  const bestRun = runs.length > 0
+    ? [...runs].sort((a, b) =>
+      b.wins - a.wins
+      || a.losses - b.losses
+      || b.round - a.round
+      || b.updatedAt.getTime() - a.updatedAt.getTime(),
+    )[0]
+    : null
+
+  return {
+    totalRuns: runs.length,
+    activeRuns: runs.filter((run) => run.status === 'ACTIVE').length,
+    completedRuns: runs.filter((run) => run.status === 'COMPLETE').length,
+    abandonedRuns: runs.filter((run) => run.status === 'ABANDONED').length,
+    totalWins: runs.reduce((sum, run) => sum + run.wins, 0),
+    totalLosses: runs.reduce((sum, run) => sum + run.losses, 0),
+    bestRun: bestRun ? toHistoryEntry(bestRun) : null,
+    recentRuns: runs.slice(0, 5).map(toHistoryEntry),
+  }
+}
+
 export function initialItems() {
   return [1, 2, 3, 4, 5, 6].map((n, index) => ({
     id: randomUUID(),

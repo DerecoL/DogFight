@@ -154,15 +154,23 @@ describe('selection screen structure', () => {
     expect(app).toContain("run.phase === 'BATTLE' && isFinished")
   })
 
-  it('shows the previous battle record with final record and equipment snapshots outside playback', () => {
-    expect(app).toContain('function LastBattleRecord')
-    expect(app).toContain('run.lastBattle &&')
-    expect(app).toContain('<LastBattleRecord run={run} />')
-    expect(app).toContain('className="last-battle-record"')
-    expect(app).toContain('snapshot.wins')
-    expect(app).toContain('snapshot.losses')
-    expect(app).toContain('<BattleEquipmentRow owner="player"')
-    expect(css).toContain('.last-battle-record')
+  it('does not show the previous battle snapshot outside playback', () => {
+    expect(app).not.toContain('function LastBattleRecord')
+    expect(app).not.toContain('<LastBattleRecord run={run} />')
+    expect(app).not.toContain('className="last-battle-record"')
+    expect(css).not.toContain('.last-battle-record')
+  })
+
+  it('shows player run history in the mode lobby as the multi-game battle record', () => {
+    expect(app).toContain('type PlayerRunHistory')
+    expect(app).toContain('const [runHistory, setRunHistory]')
+    expect(app).toContain("api<{ history: PlayerRunHistory }>('/runs/history')")
+    expect(app).toContain('function PlayerRunHistoryPanel')
+    expect(app).toContain('<PlayerRunHistoryPanel history={runHistory} />')
+    expect(app).toContain('个人战绩')
+    expect(app).toContain('最近对局')
+    expect(css).toContain('.player-history-panel')
+    expect(css).toContain('.history-run-list')
   })
 
   it('renders battle health bars as a percentage of max health', () => {
@@ -282,6 +290,18 @@ describe('selection screen structure', () => {
     expect(app).toContain('needsNickname')
     expect(app).toContain('NicknameSetup')
     expect(app).toContain('/profile/nickname')
+  })
+
+  it('uses account and password auth controls with balanced login buttons', () => {
+    expect(app).toContain('type AuthUser = { id: string; account: string; nickname: string | null }')
+    expect(app).toContain('function createDefaultAccount')
+    expect(app).toContain('const [account, setAccount]')
+    expect(app).toContain('JSON.stringify({ account, password })')
+    expect(app).toContain('<label>账号<input')
+    expect(app).not.toContain('<label>邮箱<input')
+    expect(css).toContain('grid-template-columns: repeat(2, minmax(0, 1fr))')
+    expect(css).toContain('.auth-panel .row .action-button')
+    expect(css).toContain('width: 100%')
   })
 
   it('wires default-on background music through the logged-in shell', () => {
