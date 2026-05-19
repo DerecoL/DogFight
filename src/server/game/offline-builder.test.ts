@@ -49,6 +49,31 @@ describe('offline dog builder', () => {
     expect(new Set([...builds.values()].map((items) => items.join(','))).size).toBeGreaterThan(1)
   })
 
+  it('selects at most one class reward from each unlocked reward round', () => {
+    for (const dogType of ['SHIBA', 'SAMOYED', 'MUTT', 'BULLY', 'EMPEROR'] as DogType[]) {
+      const fighter = buildOfflineFighter({ dogType, round: 6, wins: 8, losses: 0 })
+      const classRewards = fighter.items
+        .map((item) => itemDef(item.defId))
+        .filter((def) => def.kind === 'CLASS_EQUIPMENT')
+      const unlockRounds = classRewards.map((def) => def.unlockRound)
+
+      expect(classRewards).toHaveLength(2)
+      expect(new Set(unlockRounds).size).toBe(classRewards.length)
+      expect(unlockRounds).toContain(3)
+      expect(unlockRounds).toContain(6)
+    }
+  })
+
+  it('keeps class rewards at their default quality even for strong records', () => {
+    const fighter = buildOfflineFighter({ dogType: 'SHIBA', round: 5, wins: 12, losses: 0 })
+    const classItems = fighter.items.filter((item) => itemDef(item.defId).kind === 'CLASS_EQUIPMENT')
+
+    expect(classItems.length).toBeGreaterThan(0)
+    for (const item of classItems) {
+      expect(item.quality).toBe(itemDef(item.defId).defaultQuality)
+    }
+  })
+
   it('upgrades repeated core equipment as the record gets stronger', () => {
     const fighter = buildOfflineFighter({ dogType: 'BULLY', round: 8, wins: 8, losses: 0 })
 

@@ -104,11 +104,18 @@ function starterDefs(profile: OfflineBuildProfile, round: number) {
 function classRewardDefs(dogType: DogType, profile: OfflineBuildProfile, round: number) {
   if (round < 3) return []
   const unlocked = CLASS_REWARD_DEFS.filter((def) => def.classDog === dogType && def.unlockRound && def.unlockRound <= round)
-  return unlocked.sort((a, b) => {
+
+  const byUnlockRound = new Map<number, ItemDef[]>()
+  for (const def of unlocked) {
+    if (!def.unlockRound) continue
+    byUnlockRound.set(def.unlockRound, [...(byUnlockRound.get(def.unlockRound) ?? []), def])
+  }
+
+  return [...byUnlockRound.entries()].sort(([roundA], [roundB]) => roundA - roundB).map(([, defs]) => defs.sort((a, b) => {
     const preferredA = profile.classRewards.indexOf(a.id)
     const preferredB = profile.classRewards.indexOf(b.id)
     return (preferredA === -1 ? 99 : preferredA) - (preferredB === -1 ? 99 : preferredB)
-  }).slice(0, round >= 6 ? 2 : 1)
+  })[0])
 }
 
 function shopDefs(profile: OfflineBuildProfile, round: number) {
@@ -118,6 +125,7 @@ function shopDefs(profile: OfflineBuildProfile, round: number) {
 
 function qualityFor(def: ItemDef, input: OfflineBuildInput) {
   const base = normalizeQuality(def.defaultQuality)
+  if (def.kind === 'CLASS_EQUIPMENT') return base
   if (input.round <= 1) return def.tags.includes('starter') ? 'BRONZE' : 'SILVER'
 
   const strength = input.round + input.wins - input.losses
