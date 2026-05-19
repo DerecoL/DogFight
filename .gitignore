@@ -3,6 +3,7 @@ logs
 *.log
 .codex-logs
 .superpowers
+.worktrees/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
