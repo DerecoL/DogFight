@@ -1103,6 +1103,9 @@ async function currentMockApiScript(buildId) {
             state[side].shield += amount;
             state[side].thorns += qualityAmount(1, item.quality);
             push({ actor: side, kind: 'ITEM', itemId: item.id, defId: item.defId, effectType: 'UTILITY', amount, target: side, text: def.name + ' 获得护盾与荆棘。' });
+          } else if (advanced === 'POISON_ON_ROLL') {
+            const poisonAmount = qualityAmount(3, item.quality);
+            if (addPoison(target, poisonAmount)) push({ actor: side, kind: 'ITEM', itemId: item.id, defId: item.defId, effectType: 'POISON', amount: poisonAmount, target, text: def.name + ' 叠加 ' + poisonAmount + ' 层【中毒】。' });
           } else if (advanced === 'APPLY_POISON' || advanced === 'POISON_AND_DISABLE_RIGHTMOST') {
             if (addPoison(target, amount)) push({ actor: side, kind: 'ITEM', itemId: item.id, defId: item.defId, effectType: 'POISON', amount, target, text: def.name + ' 叠加 ' + amount + ' 层【中毒】。' });
             if (advanced === 'POISON_AND_DISABLE_RIGHTMOST') {

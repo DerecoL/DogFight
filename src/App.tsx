@@ -66,6 +66,17 @@ type RelicChoice = { relicId: string; quality: ItemQuality; def: RelicDef }
 type BattleActor = 'player' | 'opponent' | 'system'
 type BattleTarget = 'player' | 'opponent' | 'both' | 'none'
 type BattleSnapshot = { name: string; dogType: DogType; luckyNumber?: number | null; wins: number; losses: number; round: number; items: Item[]; relics?: Relic[] }
+type BattleStatusEntry = {
+  type: 'shield' | 'thorns' | 'extraRoll' | 'poison' | 'weak' | 'freeze' | 'disabled' | string
+  label: string
+  tone: 'positive' | 'negative'
+  amount?: number
+  stacks?: number
+  remaining?: number
+  nextTickIn?: number
+  tickDamage?: number
+}
+type BattleStatusRows = { positive: BattleStatusEntry[]; negative: BattleStatusEntry[] }
 type BattleEvent = {
   time: number
   actor: BattleActor
@@ -77,6 +88,9 @@ type BattleEvent = {
   opponentMaxHp: number
   playerShield?: number
   opponentShield?: number
+  playerStatuses?: BattleStatusRows
+  opponentStatuses?: BattleStatusRows
+  statusChanged?: string[]
   roll?: number
   itemId?: string
   defId?: string
@@ -344,7 +358,16 @@ function qualityAmount(amount: number, quality?: string) {
 
 function effectText(def: ItemDef, quality: ItemQuality = 'BRONZE') {
   const amount = qualityAmount(def.effect.amount, quality)
-  return `${def.effect.type === 'HEAL' ? '回复' : '造成'} ${amount} ${def.effect.type === 'HEAL' ? '生命' : '伤害'}`
+  if (def.effect.type === 'HEAL') return `回复 ${amount} 生命`
+  if (def.effect.type === 'DAMAGE' || def.effect.type === 'DAMAGE_SELF_SHIELD') return `造成 ${amount} 伤害`
+  if (def.effect.type === 'UTILITY') {
+    if (def.tags.includes('shield')) return `获得 ${amount} 护盾`
+    if (def.tags.includes('poison')) return `施加 ${amount} 中毒`
+    if (def.tags.includes('weak')) return `施加 ${amount} 虚弱`
+    if (def.tags.includes('cleanse')) return `回复 ${amount} 生命`
+    if (amount > 0) return `效果 ${amount}`
+  }
+  return '特殊效果'
 }
 
 function sellValueForItem(def: ItemDef) {
@@ -367,7 +390,15 @@ function diceToneText(def: ItemDef) {
 }
 
 function effectToneText(def: ItemDef) {
-  return def.effect.type === 'HEAL' ? '回复' : '攻击'
+  if (def.effect.type === 'HEAL') return '回复'
+  if (def.effect.type === 'UTILITY') {
+    if (def.tags.includes('shield')) return '护盾'
+    if (def.tags.includes('poison')) return '中毒'
+    if (def.tags.includes('weak')) return '虚弱'
+    if (def.tags.includes('cleanse')) return '净化'
+    return '特殊'
+  }
+  return '攻击'
 }
 
 function canUpgradeItem(item: Item, items: Item[]) {
@@ -698,6 +729,8 @@ export default function App() {
 
   return (
     <Shell run={run} error={error} musicEnabled={musicEnabled} musicBlocked={musicBlocked} onToggleMusic={toggleMusic} onOpenLobby={() => setAppScreen('LOBBY')} onLogout={() => action(() => api('/auth/logout', { method: 'POST' }).then(() => ({ user: null })))}>
+      {!battle && run.lastBattle && run.phase !== 'COMPLETE' && <LastBattleRecord run={run} />}
+
       {!battle && run.phase === 'CHOICE' && (
         <ShopChoiceSelect choices={run.choices} onPick={(shopType) => action(() => api(`/runs/${run.id}/choice/select`, { method: 'POST', body: JSON.stringify({ shopType }) }))} />
       )}
@@ -2050,6 +2083,58 @@ function FloatingTip({ run, item, offer, anchor, onClose, onBuy, onSell, onUpgra
   )
 }
 
+function LastBattleRecord({ run }: { run: Run }) {
+  const [battleTip, setBattleTip] = useState<{ item: Item; anchor: TipAnchor } | null>(null)
+  const battle = run.lastBattle
+  if (!battle) return null
+  const snapshot = battle.playerSnapshot ?? {
+    name: '你的狗狗',
+    dogType: run.dogType,
+    luckyNumber: run.luckyNumber,
+    wins: run.wins,
+    losses: run.losses,
+    round: Math.max(0, run.round - 1),
+    items: run.items,
+  }
+  const opponentSnapshot = battle.opponentSnapshot ?? {
+    name: run.matchedGhost?.name ?? '上一局对手',
+    dogType: run.matchedGhost?.dogType ?? 'MUTT',
+    luckyNumber: run.matchedGhost?.luckyNumber ?? null,
+    wins: run.matchedGhost?.wins ?? 0,
+    losses: run.matchedGhost?.losses ?? 0,
+    round: Math.max(0, run.round - 1),
+    items: [] as Item[],
+  }
+  const resultText = battle.winner === 'player' ? '胜利' : '失败'
+  const hpText = `${Math.max(0, Math.round(battle.playerHp))}/${battle.playerMaxHp} vs ${Math.max(0, Math.round(battle.opponentHp))}/${battle.opponentMaxHp}`
+
+  return (
+    <section className="last-battle-record">
+      <div className="last-battle-summary">
+        <div>
+          <span>上一局对战记录</span>
+          <h2>{resultText} · {snapshot.wins}胜 {snapshot.losses}败</h2>
+        </div>
+        <p>对手 {opponentSnapshot.name} · {dogNames[opponentSnapshot.dogType]} · 结束血量 {hpText}</p>
+      </div>
+      <BattleEquipmentRow owner="player" snapshot={snapshot} onInspect={(item, element) => setBattleTip({ item, anchor: getFloatingTipPosition(element) })} />
+      <BattleEquipmentRow owner="opponent" snapshot={opponentSnapshot} onInspect={(item, element) => setBattleTip({ item, anchor: getFloatingTipPosition(element) })} />
+      {battleTip && (
+        <FloatingTip
+          run={run}
+          item={battleTip.item}
+          offer={null}
+          anchor={battleTip.anchor}
+          onClose={() => setBattleTip(null)}
+          onBuy={null}
+          onSell={null}
+          onUpgrade={null}
+        />
+      )}
+    </section>
+  )
+}
+
 function BattleView({ run, battle, currentEvent, eventIndex, speed, score, onSpeed, onContinue, onRestart }: { run: Run; battle: Battle | null; currentEvent?: BattleEvent; eventIndex: number; speed: number; score: number; onSpeed: (speed: number) => void; onContinue: () => void; onRestart: () => void }) {
   const [logOpen, setLogOpen] = useState(false)
   const [battleTip, setBattleTip] = useState<{ item: Item; anchor: TipAnchor } | null>(null)
@@ -2212,11 +2297,23 @@ function BattleDog({ side, snapshot, hp, maxHp, shield, event, finished, winner 
   const hpPercent = maxHp > 0 ? (hp / maxHp) * 100 : 0
   const shieldValue = Math.max(0, Math.round(shield))
   const shieldPercent = maxHp > 0 ? (shieldValue / maxHp) * 100 : 0
+  const rows = side === 'player' ? event?.playerStatuses : event?.opponentStatuses
+  const positiveStatuses = rows?.positive ?? []
+  const negativeStatuses = rows?.negative ?? []
+  const poisonStatus = negativeStatuses.find((status) => status.type === 'poison')
+  const poisonPreviewPercent = maxHp > 0 ? ((poisonStatus?.tickDamage ?? 0) / maxHp) * 100 : 0
+  const poisonPreviewLeft = Math.max(0, Math.min(100, hpPercent - poisonPreviewPercent))
   return (
-    <div className={`battle-dog ${side} ${isActor ? 'attacking' : ''} ${isTarget && event?.effectType !== 'HEAL' ? 'hit' : ''} ${healing ? 'healing' : ''} ${won ? 'winner' : ''} ${lost ? 'loser' : ''}`}>
+    <div className={`battle-dog ${side} ${isActor ? 'attacking' : ''} ${isTarget && event?.effectType !== 'HEAL' ? 'hit' : ''} ${healing ? 'healing' : ''} ${poisonStatus ? 'poisoned' : ''} ${won ? 'winner' : ''} ${lost ? 'loser' : ''}`}>
       <div className="hp">
         <span><HeartPulse size={16} /> {snapshot.name}</span>
-        <div><i style={{ width: `${Math.max(0, Math.min(100, hpPercent))}%` }} /></div>
+        <StatusEffectRow tone="positive" statuses={positiveStatuses} />
+        <div className="hp-bar">
+          {shieldValue > 0 && <i className="hp-shield" style={{ width: `${Math.max(6, Math.min(100, shieldPercent))}%` }} />}
+          <i className="hp-current" style={{ width: `${Math.max(0, Math.min(100, hpPercent))}%` }} />
+          {poisonPreviewPercent > 0 && <i className="hp-preview poison" style={{ left: `${poisonPreviewLeft}%`, width: `${Math.max(3, Math.min(100, poisonPreviewPercent))}%` }} />}
+        </div>
+        <StatusEffectRow tone="negative" statuses={negativeStatuses} />
         <b>{Math.max(0, Math.round(hp))}/{maxHp}</b>
         {shieldValue > 0 && (
           <div className="shield-bar" aria-label={`护盾 ${shieldValue}`}>
@@ -2229,6 +2326,25 @@ function BattleDog({ side, snapshot, hp, maxHp, shield, event, finished, winner 
       <strong>{dogNames[snapshot.dogType]}</strong>
     </div>
   )
+}
+
+function StatusEffectRow({ tone, statuses }: { tone: 'positive' | 'negative'; statuses: BattleStatusEntry[] }) {
+  const visible = statuses.slice(0, 3)
+  const hidden = statuses.length - visible.length
+  return (
+    <div className={`status-effects ${tone}`}>
+      {visible.map((status) => <span key={`${tone}-${status.type}`} className={`status-chip ${status.type}`}>{statusText(status)}</span>)}
+      {hidden > 0 && <span className="status-chip more" title={statuses.map(statusText).join(' / ')}>+{hidden}</span>}
+    </div>
+  )
+}
+
+function statusText(status: BattleStatusEntry) {
+  if (status.type === 'poison') return `${status.label} ${status.stacks ?? 0}层 · ${status.nextTickIn ?? 1}s`
+  if (status.stacks != null) return `${status.label} ${status.stacks}层`
+  if (status.amount != null) return `${status.label} ${status.amount}`
+  if (status.remaining != null) return `${status.label} ${status.remaining}s`
+  return status.label
 }
 
 function BattleDice({ event, lastRoll }: { event?: BattleEvent; lastRoll?: BattleEvent }) {

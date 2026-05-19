@@ -137,6 +137,24 @@ export type BattleFighterSnapshot = Omit<FighterSnapshot, 'items'> & {
   relics?: BattleRelicSnapshot[]
 }
 
+export type BattleStatusType = 'shield' | 'thorns' | 'extraRoll' | 'poison' | 'weak' | 'freeze' | 'disabled'
+
+export type BattleStatusEntry = {
+  type: BattleStatusType
+  label: string
+  tone: 'positive' | 'negative'
+  amount?: number
+  stacks?: number
+  remaining?: number
+  nextTickIn?: number
+  tickDamage?: number
+}
+
+export type BattleStatusRows = {
+  positive: BattleStatusEntry[]
+  negative: BattleStatusEntry[]
+}
+
 export type BattleEvent = {
   time: number
   actor: 'player' | 'opponent' | 'system'
@@ -148,6 +166,9 @@ export type BattleEvent = {
   opponentMaxHp: number
   playerShield: number
   opponentShield: number
+  playerStatuses?: BattleStatusRows
+  opponentStatuses?: BattleStatusRows
+  statusChanged?: BattleStatusType[]
   roll?: number
   itemId?: string
   defId?: string

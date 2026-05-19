@@ -165,7 +165,7 @@ input {
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 14px;
 }
-.dog-card, .choice, .shop-shelf, .inventory-board, .match-panel, .battle-panel {
+.dog-card, .choice, .shop-shelf, .inventory-board, .match-panel, .battle-panel, .last-battle-record {
   background: rgba(255, 250, 241, .94);
   border: 1px solid var(--line);
   border-radius: 18px;
@@ -193,6 +193,29 @@ input {
 
 .shop-workbench { display: grid; gap: 14px; position: relative; min-width: 0; max-width: 100%; }
 .reward-workbench { display: grid; gap: 14px; position: relative; min-width: 0; max-width: 100%; }
+.last-battle-record {
+  display: grid;
+  gap: 12px;
+  width: min(1240px, 100%);
+  margin: 0 auto;
+  padding: 14px;
+  position: relative;
+}
+.last-battle-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+.last-battle-summary span {
+  color: var(--blue);
+  font-size: 12px;
+  font-weight: 950;
+}
+.last-battle-summary p {
+  text-align: right;
+  font-weight: 800;
+}
 .class-reward-ceremony {
   min-height: min(720px, calc(100vh - 148px));
   width: min(1180px, 100%);
@@ -890,6 +913,71 @@ input {
 .hp span { display: inline-flex; align-items: center; gap: 6px; font-weight: 850; }
 .hp div { height: 16px; overflow: hidden; background: #f2d7d7; border-radius: 999px; }
 .hp i { display: block; height: 100%; background: linear-gradient(90deg, #31b981, #8be05a); transition: width .2s ease; }
+.hp .status-effects {
+  height: auto;
+  min-height: 24px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px;
+  overflow: visible;
+  background: transparent;
+  border-radius: 0;
+}
+.status-effects.positive { justify-content: flex-start; }
+.status-effects.negative { justify-content: flex-start; }
+.status-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  min-height: 22px;
+  padding: 3px 7px;
+  border: 1px solid rgba(31, 41, 55, .12);
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 950;
+  line-height: 1;
+  white-space: nowrap;
+}
+.status-chip.shield,
+.status-chip.extraRoll { background: #dbeafe; color: #1d4ed8; }
+.status-chip.thorns { background: #fef3c7; color: #92400e; }
+.status-chip.poison { background: #dcfce7; color: #15803d; }
+.status-chip.weak { background: #ede9fe; color: #6d28d9; }
+.status-chip.freeze { background: #e0f2fe; color: #0369a1; }
+.status-chip.disabled,
+.status-chip.more { background: #e2e8f0; color: #334155; }
+.hp .hp-bar {
+  position: relative;
+  height: 18px;
+  overflow: hidden;
+  background: #f2d7d7;
+  border-radius: 999px;
+}
+.hp .hp-bar i {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  display: block;
+  height: 100%;
+  transition: width .2s ease, left .2s ease;
+}
+.hp-current {
+  left: 0;
+  z-index: 2;
+  background: linear-gradient(90deg, #31b981, #8be05a);
+}
+.hp-shield {
+  left: 0;
+  z-index: 1;
+  background: rgba(37, 99, 235, .24);
+  border-right: 3px solid rgba(37, 99, 235, .72);
+}
+.hp-preview.poison {
+  z-index: 3;
+  background: repeating-linear-gradient(-45deg, rgba(34, 197, 94, .5), rgba(34, 197, 94, .5) 5px, rgba(21, 128, 61, .24) 5px, rgba(21, 128, 61, .24) 10px);
+}
 .shield-bar {
   position: relative;
   height: 18px;
@@ -2317,6 +2405,8 @@ input {
   :root { --slot-w: 58px; --slot-h: 82px; --board-slot-h: 150px; }
   .app-shell { padding: 0 12px 24px; }
   .topbar { height: auto; align-items: flex-start; flex-direction: column; }
+  .last-battle-summary { align-items: flex-start; flex-direction: column; }
+  .last-battle-summary p { text-align: left; }
   .offer-row { grid-template-columns: 1fr; }
   .battle-hud { grid-template-columns: 1fr; }
   .battle-toolbar { align-items: flex-start; flex-direction: column; }

@@ -151,6 +151,17 @@ describe('selection screen structure', () => {
     expect(app).toContain("run.phase === 'BATTLE' && isFinished")
   })
 
+  it('shows the previous battle record with final record and equipment snapshots outside playback', () => {
+    expect(app).toContain('function LastBattleRecord')
+    expect(app).toContain('run.lastBattle &&')
+    expect(app).toContain('<LastBattleRecord run={run} />')
+    expect(app).toContain('className="last-battle-record"')
+    expect(app).toContain('snapshot.wins')
+    expect(app).toContain('snapshot.losses')
+    expect(app).toContain('<BattleEquipmentRow owner="player"')
+    expect(css).toContain('.last-battle-record')
+  })
+
   it('renders battle health bars as a percentage of max health', () => {
     expect(app).toContain('playerMaxHp')
     expect(app).toContain('opponentMaxHp')
@@ -164,6 +175,21 @@ describe('selection screen structure', () => {
     expect(app).toContain('shield={playerShield}')
     expect(app).toContain('className="shield-bar"')
     expect(css).toContain('.shield-bar')
+  })
+
+  it('renders positive statuses above health and negative statuses below with poison preview damage', () => {
+    expect(app).toContain('function StatusEffectRow')
+    expect(app).toContain('positiveStatuses')
+    expect(app).toContain('negativeStatuses')
+    expect(app).toContain('poisonPreviewPercent')
+    expect(css).toContain('.status-effects.positive')
+    expect(css).toContain('.status-effects.negative')
+    expect(css).toContain('.hp-preview.poison')
+  })
+
+  it('highlights poison battle effects with green damage and log styling', () => {
+    expect(app).toContain("event.effectType === 'POISON' ? '#22c55e'")
+    expect(css).toContain('.battle-log p.poison')
   })
 
   it('shows item effects directly on equipment cards', () => {

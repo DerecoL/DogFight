@@ -507,6 +507,29 @@ describe('battle simulation', () => {
     expect(result.events.every((event) => typeof event.playerShield === 'number' && typeof event.opponentShield === 'number')).toBe(true)
   })
 
+  it('records positive and negative status snapshots on battle events', () => {
+    const player: FighterSnapshot = {
+      name: 'P',
+      dogType: 'SHIBA',
+      wins: 0,
+      losses: 0,
+      round: 0,
+      items: [
+        { id: 'poison', defId: 'shiba-poison', quality: 'DIAMOND', area: 'EQUIPMENT', x: 0, y: 0 },
+        { id: 'shield', defId: 'v3-cone-collar', quality: 'BRONZE', area: 'EQUIPMENT', x: 1, y: 0 },
+      ],
+    }
+    const opponent: FighterSnapshot = { name: 'O', dogType: 'SHIBA', wins: 0, losses: 0, round: 0, items: [] }
+    const result = simulateBattle(player, opponent, 'status-snapshot')
+    const poisonApply = result.events.find((event) => event.defId === 'shiba-poison' && event.effectType === 'POISON')
+    const poisonTick = result.events.find((event) => event.kind === 'POISON' && event.target === 'opponent')
+    const shieldEvent = result.events.find((event) => event.defId === 'v3-cone-collar')
+
+    expect(poisonApply?.opponentStatuses?.negative).toContainEqual(expect.objectContaining({ type: 'poison', stacks: 10, nextTickIn: 1, tickDamage: 10 }))
+    expect(poisonTick?.opponentStatuses?.negative).toContainEqual(expect.objectContaining({ type: 'poison', stacks: 10, tickDamage: 10 }))
+    expect(shieldEvent?.playerStatuses?.positive).toContainEqual(expect.objectContaining({ type: 'shield', amount: 3 }))
+  })
+
   it('makes poison bypass shield and end battle when health reaches zero', () => {
     const player: FighterSnapshot = {
       name: 'P',

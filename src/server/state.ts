@@ -1,11 +1,12 @@
 import { randomUUID } from 'node:crypto'
 import type { ItemInstance, Run } from '@prisma/client'
-import { CLASS_REWARD_DEFS, RELIC_DEFS, itemDef, relicDef, relicDefForQuality } from './game/data'
+import { CLASS_REWARD_DEFS, RELIC_DEFS, itemDef, itemDefForQuality, relicDef, relicDefForQuality, shopPool } from './game/data'
 import { buildOfflineFighter } from './game/offline-builder'
+import { findSlot } from './game/grid'
 import { nextQuality, normalizeQuality } from './game/quality'
 import { createRng } from './game/rng'
 import { createChoices, createShop } from './game/shop'
-import type { DogType, FighterSnapshot, GameItem, ItemQuality, Phase, RelicInstance, ShopOffer, ShopType } from './game/types'
+import type { BattleResult, DogType, FighterSnapshot, GameItem, ItemQuality, Phase, RelicInstance, ShopOffer, ShopType } from './game/types'
 
 export function parseJson<T>(value: string, fallback: T): T {
   try {
@@ -56,9 +57,15 @@ export function publicRun(run: Run & { items: ItemInstance[] }) {
     phase: run.phase as Phase,
     status: run.status,
     shopType: run.shopType as ShopType,
-    shopItems: parseJson<ShopOffer[]>(run.shopItems, []).map((offer) => ({ ...offer, quality: normalizeQuality(offer.quality), def: itemDef(offer.defId) })),
+    shopItems: parseJson<ShopOffer[]>(run.shopItems, []).map((offer) => {
+      const quality = normalizeQuality(offer.quality)
+      return { ...offer, quality, def: itemDefForQuality(offer.defId, quality) }
+    }),
     choices: parseJson<ShopType[]>(run.choices, []),
-    classRewardChoices: parseJson<string[]>(run.classRewardChoices, []).map((defId) => ({ defId, def: itemDef(defId), quality: normalizeQuality(itemDef(defId).defaultQuality) })),
+    classRewardChoices: parseJson<string[]>(run.classRewardChoices, []).map((defId) => {
+      const quality = normalizeQuality(itemDef(defId).defaultQuality)
+      return { defId, def: itemDefForQuality(defId, quality), quality }
+    }),
     relicChoices: parseJson<string[]>(run.relicChoices, []).map((relicId) => {
       const quality = relicChoiceQuality(relicsFromRun(run), relicId)
       return { relicId, def: relicDefForQuality(relicId, quality), quality }
@@ -67,7 +74,7 @@ export function publicRun(run: Run & { items: ItemInstance[] }) {
     refreshCost: run.refreshCost,
     matchedGhost: run.matchedGhost ? parseJson(run.matchedGhost, null) : null,
     lastBattle: run.lastBattle ? parseJson(run.lastBattle, null) : null,
-    items: toGameItems(run.items).map((item) => ({ ...item, def: itemDef(item.defId) })),
+    items: toGameItems(run.items).map((item) => ({ ...item, def: itemDefForQuality(item.defId, item.quality) })),
   }
 }
 
@@ -141,6 +148,36 @@ export function snapshotFromRun(run: Run & { items: ItemInstance[] }, name = 'çŽ
     round: run.round,
     items: toGameItems(run.items),
     relics: relicsFromRun(run),
+  }
+}
+
+export function postBattleLargeItemReward(items: GameItem[], seed: string) {
+  const hasVault = items.some((item) => item.area === 'EQUIPMENT' && itemDef(item.defId).advancedEffect === 'POST_BATTLE_LARGE_ITEM')
+  if (!hasVault) return null
+
+  const pool = shopPool('LARGE')
+  const rng = createRng(seed)
+  const def = pool[Math.floor(rng() * pool.length)]
+  const slot = findSlot(items, def.id, 'BAG')
+  if (!slot) return null
+
+  return {
+    defId: def.id,
+    quality: normalizeQuality(def.defaultQuality),
+    area: 'BAG' as const,
+    x: slot.x,
+    y: slot.y,
+  }
+}
+
+export function createFinishedBattleRecord(result: BattleResult, wins: number, losses: number): BattleResult {
+  return {
+    ...result,
+    playerSnapshot: {
+      ...result.playerSnapshot,
+      wins,
+      losses,
+    },
   }
 }
 

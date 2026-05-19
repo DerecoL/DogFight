@@ -238,4 +238,37 @@ describe('buildStandaloneIndex', () => {
       await rm(root, { recursive: true, force: true })
     }
   })
+
+  test('standalone mock applies shiba poison class reward during battle', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'dogfight-standalone-poison-'))
+    try {
+      const distDir = await createMinimalDist(root)
+      const outputFile = path.join(root, 'click-index.html')
+      const launcherFile = path.join(root, 'DogFight-standalone.cmd')
+      await buildStandaloneIndex({ distDir, outputFile, launcherFile })
+
+      const html = await readFile(outputFile, 'utf8')
+      const { window, localStorage, storageKey } = evaluateMockScript(extractMockScript(html))
+      await window.fetch('/api/auth/register', { method: 'POST', body: JSON.stringify({ email: 'poison@dog.test', password: 'dogdice' }) })
+      const created = await readJson(await window.fetch('/api/runs', { method: 'POST', body: JSON.stringify({ dogType: 'SHIBA' }) }))
+      const runId = created.run.id
+      const state = JSON.parse(localStorage.getItem(storageKey))
+      state.run.round = 6
+      state.run.phase = 'MATCH'
+      state.run.items = [
+        { id: 'poison-class-reward', defId: 'shiba-poison', quality: 'DIAMOND', area: 'EQUIPMENT', x: 0, y: 0 },
+      ]
+      state.run.matchedGhost = { name: 'O', dogType: 'MUTT', wins: 0, losses: 0, round: 6, items: [], relics: [] }
+      localStorage.setItem(storageKey, JSON.stringify(state))
+
+      const battled = await readJson(await window.fetch(`/api/runs/${runId}/battle/start`, { method: 'POST', body: '{}' }))
+      const poisonApply = battled.battle.events.find((event) => event.kind === 'ITEM' && event.defId === 'shiba-poison' && event.effectType === 'POISON')
+      const poisonTick = battled.battle.events.find((event) => event.kind === 'POISON' && event.target === 'opponent')
+
+      expect(poisonApply).toMatchObject({ amount: 10, target: 'opponent' })
+      expect(poisonTick).toMatchObject({ amount: 10, target: 'opponent' })
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
 })

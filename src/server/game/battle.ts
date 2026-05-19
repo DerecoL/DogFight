@@ -9,6 +9,7 @@ import {
   relicOpeningThorns,
   relicPoisonTickBonus,
   relicRollBiasChance,
+  itemDefForQuality,
 } from './data'
 import { triggerOrder } from './grid'
 import { normalizeQuality, qualityAmount, QUALITY_LABELS } from './quality'
@@ -17,6 +18,7 @@ import type {
   BattleEvent,
   BattleFighterSnapshot,
   BattleResult,
+  BattleStatusRows,
   DogType,
   FighterSnapshot,
   GameItem,
@@ -74,6 +76,9 @@ type BattleSideState = {
   disabledLarge: number
   disabledItemIds: string[]
   adjacentDamageBonus: Record<string, number>
+  forcedItemDice: Record<string, number>
+  shibaSpeedStacks: number
+  shibaSpeedMeter: number
 }
 
 function maxHealthForRound(round: number) {
@@ -99,6 +104,9 @@ function createSideState(maxHp: number): BattleSideState {
     disabledLarge: 0,
     disabledItemIds: [],
     adjacentDamageBonus: {},
+    forcedItemDice: {},
+    shibaSpeedStacks: 0,
+    shibaSpeedMeter: 0,
   }
 }
 
@@ -140,17 +148,40 @@ function hasShieldImmunity(fighter: FighterSnapshot, shield: number) {
 function toBattleSnapshot(fighter: FighterSnapshot): BattleFighterSnapshot {
   return {
     ...fighter,
-    items: fighter.items.map((item) => ({ ...item, quality: normalizeQuality(item.quality), def: itemDef(item.defId) })),
+    items: fighter.items.map((item) => {
+      const quality = normalizeQuality(item.quality)
+      return { ...item, quality, def: itemDefForQuality(item.defId, quality) }
+    }),
     relics: relicsOf(fighter).map((relic) => ({ ...relic, quality: normalizeQuality(relic.quality), def: relicDefForQuality(relic.relicId, relic.quality) })),
   }
 }
 
 function isLarge(def: ItemDef, actor: FighterSnapshot) {
-  const sizeThreeIsLarge = triggerOrder(actor.items).some((item) => itemDef(item.defId).advancedEffect === 'SIZE_THREE_IS_LARGE')
+  const sizeThreeIsLarge = hasEquippedEffect(actor, 'SIZE_THREE_IS_LARGE')
   return def.size === 4 || (sizeThreeIsLarge && def.size === 3)
 }
 
-function matchingContext(actor: FighterSnapshot, def: ItemDef, roll: number) {
+function equippedItemsWithEffect(actor: FighterSnapshot, effect: string) {
+  return triggerOrder(actor.items).filter((item) => itemDef(item.defId).advancedEffect === effect)
+}
+
+function hasEquippedEffect(actor: FighterSnapshot, effect: string) {
+  return equippedItemsWithEffect(actor, effect).length > 0
+}
+
+function isAdjacentToEffect(actor: FighterSnapshot, item: GameItem, effect: string) {
+  return equippedItemsWithEffect(actor, effect).some((source) => adjacentItems(actor, source).some((adjacent) => adjacent.id === item.id))
+}
+
+function matchingContext(actor: FighterSnapshot, item: GameItem, roll: number, forcedItemDice: Record<string, number> = {}) {
+  const def = itemDef(item.defId)
+  const forcedDie = forcedItemDice[item.id]
+  if (forcedDie != null) return { matches: roll === forcedDie, scale: 1, note: roll === forcedDie ? '（圣旨改点）' : '' }
+
+  if (actor.dogType === 'EMPEROR' && actor.luckyNumber && isAdjacentToEffect(actor, item, 'ADJACENT_USES_LUCKY')) {
+    return { matches: roll === actor.luckyNumber, scale: 1, note: roll === actor.luckyNumber ? '（垂帘听政）' : '' }
+  }
+
   if (def.dice.includes(roll)) return { matches: true, scale: 1, note: '' }
 
   const bigToSmall = relicWithEffect(actor, 'MIRROR_BIG_TO_SMALL')
@@ -217,7 +248,31 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
   const playerSnapshot = toBattleSnapshot(player)
   const opponentSnapshot = toBattleSnapshot(opponent)
 
-  const push = (event: Omit<BattleEvent, 'playerHp' | 'opponentHp' | 'playerMaxHp' | 'opponentMaxHp' | 'playerShield' | 'opponentShield'>) => {
+  const poisonTickDamage = (side: Side) => {
+    if (state[side].poison <= 0) return 0
+    const poisonedBy = side === 'player' ? opponent : player
+    const poisonBonusRelic = relicWithEffect(poisonedBy, 'POISON_TICK_BONUS')
+    return state[side].poison + (poisonBonusRelic ? relicPoisonTickBonus(poisonBonusRelic.relicId, poisonBonusRelic.quality) : 0)
+  }
+
+  const statusRows = (side: Side): BattleStatusRows => {
+    const disabledCount = state[side].disabledLarge + state[side].disabledItemIds.length
+    return {
+      positive: [
+        ...(state[side].shield > 0 ? [{ type: 'shield' as const, label: '护盾', tone: 'positive' as const, amount: Math.round(state[side].shield) }] : []),
+        ...(state[side].thorns > 0 ? [{ type: 'thorns' as const, label: '荆棘', tone: 'positive' as const, stacks: state[side].thorns }] : []),
+        ...(state[side].shibaSpeedStacks > 0 ? [{ type: 'extraRoll' as const, label: '加速', tone: 'positive' as const, stacks: state[side].shibaSpeedStacks }] : []),
+      ],
+      negative: [
+        ...(state[side].poison > 0 ? [{ type: 'poison' as const, label: '中毒', tone: 'negative' as const, stacks: state[side].poison, nextTickIn: 1, tickDamage: poisonTickDamage(side) }] : []),
+        ...(state[side].weak > 0 ? [{ type: 'weak' as const, label: '虚弱', tone: 'negative' as const, stacks: state[side].weak }] : []),
+        ...(state[side].freeze > 0 ? [{ type: 'freeze' as const, label: '冻结', tone: 'negative' as const, remaining: state[side].freeze }] : []),
+        ...(disabledCount > 0 ? [{ type: 'disabled' as const, label: '失效', tone: 'negative' as const, amount: disabledCount }] : []),
+      ],
+    }
+  }
+
+  const push = (event: Omit<BattleEvent, 'playerHp' | 'opponentHp' | 'playerMaxHp' | 'opponentMaxHp' | 'playerShield' | 'opponentShield' | 'playerStatuses' | 'opponentStatuses'>) => {
     events.push({
       ...event,
       playerHp: Math.max(0, playerHp),
@@ -226,6 +281,8 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
       opponentMaxHp: state.opponent.maxHp,
       playerShield: Math.max(0, state.player.shield),
       opponentShield: Math.max(0, state.opponent.shield),
+      playerStatuses: statusRows('player'),
+      opponentStatuses: statusRows('opponent'),
     })
   }
 
@@ -280,11 +337,21 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
   const opponentOpeningThorns = relicWithEffect(opponent, 'OPENING_THORNS')
   if (playerOpeningThorns) state.player.thorns += relicOpeningThorns(playerOpeningThorns.relicId, playerOpeningThorns.quality)
   if (opponentOpeningThorns) state.opponent.thorns += relicOpeningThorns(opponentOpeningThorns.relicId, opponentOpeningThorns.quality)
+  const applyOpeningForceLucky = (source: FighterSnapshot) => {
+    if (source.dogType !== 'EMPEROR' || !source.luckyNumber || !hasEquippedEffect(source, 'OPENING_FORCE_LUCKY')) return
+    for (const side of ['player', 'opponent'] as const) {
+      const target = side === 'player' ? player : opponent
+      for (const item of triggerOrder(target.items).slice(0, 2)) state[side].forcedItemDice[item.id] = source.luckyNumber
+    }
+  }
+  applyOpeningForceLucky(player)
+  applyOpeningForceLucky(opponent)
 
   const executeItem = (
     actorSide: Side,
     actor: FighterSnapshot,
     item: GameItem,
+    time: number,
     roll: number,
     scale: number,
     note: string,
@@ -301,6 +368,7 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
     const actorState = state[actorSide]
     const targetState = state[targetSide]
     const advanced = def.advancedEffect ?? 'NONE'
+    const recoveryBlocked = time <= 10 && hasEquippedEffect(actor, 'DOUBLE_RATE_FIRST_TEN')
     const sacrificeReplacesSmallEffect = def.size === 1
       && triggerOrder(actor.items).some((entry) => itemDef(entry.defId).advancedEffect === 'SMALL_TRIGGERS_LARGE')
 
@@ -344,7 +412,9 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
 
     const bullyDoubled = actor.dogType === 'BULLY' && isLarge(def, actor) && rng() < BULLY_LARGE_EFFECT_CHANCE
     const bullyQuad = bullyDoubled && triggerOrder(actor.items).some((entry) => itemDef(entry.defId).advancedEffect === 'BULLY_QUADRUPLE_CHANCE') && rng() < 0.2
-    const emperorDoubled = actor.dogType === 'EMPEROR'
+    const emperorTraitDisabled = hasEquippedEffect(actor, 'ADJACENT_USES_LUCKY') || hasEquippedEffect(actor, 'ONLY_LUCKY_DOUBLE')
+    const emperorDoubled = !emperorTraitDisabled
+      && actor.dogType === 'EMPEROR'
       && actor.luckyNumber === roll
       && rng() < EMPEROR_LUCKY_EFFECT_CHANCE
     const doubled = bullyDoubled || emperorDoubled
@@ -423,13 +493,13 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
       if (advanced === 'APPLY_WEAK_ON_HIT' && addWeak(targetSide, targetFighter, qualityAmount(1, quality))) {
         triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'UTILITY', amount: targetState.weak, target: targetSide, sourceHp: getHp(actorSide), targetHp: getHp(targetSide), sourceHpDelta: 0, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 施加 ${qualityAmount(1, quality)} 层【虚弱】` })
       }
-      if (advanced === 'LIFESTEAL' && after < before) {
+      if (!recoveryBlocked && advanced === 'LIFESTEAL' && after < before) {
         const healed = applyHeal(actorSide, before - after)
         triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'HEAL', amount: before - after, target: actorSide, sourceHp: healed.after, targetHp: getHp(targetSide), sourceHpDelta: healed.delta, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 吸取 ${before - after} 点生命` })
       }
     }
 
-    if (!sacrificeReplacesSmallEffect && def.effect.type === 'HEAL') {
+    if (!sacrificeReplacesSmallEffect && !recoveryBlocked && def.effect.type === 'HEAL') {
       const wasFull = getHp(actorSide) >= actorState.maxHp
       const result = applyHeal(actorSide, amount)
       triggers.push({
@@ -506,15 +576,15 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
         triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'UTILITY', amount: 2, target: targetSide, sourceHp: getHp(actorSide), targetHp: getHp(targetSide), sourceHpDelta: 0, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 冻结敌人 2 秒` })
       }
     }
-    if (!sacrificeReplacesSmallEffect && advanced === 'SHIELD_ON_NON_LUCKY' && actor.luckyNumber !== roll) {
+    if (!sacrificeReplacesSmallEffect && !recoveryBlocked && advanced === 'SHIELD_ON_NON_LUCKY' && actor.luckyNumber !== roll) {
       applyShield(actorSide, qualityAmount(5, quality))
       triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'UTILITY', amount: qualityAmount(5, quality), target: actorSide, sourceHp: getHp(actorSide), targetHp: getHp(targetSide), sourceHpDelta: 0, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 获得 ${qualityAmount(5, quality)} 点护盾` })
     }
-    if (!sacrificeReplacesSmallEffect && (advanced === 'GAIN_SHIELD' || advanced === 'SHIELD_IMMUNITY')) {
+    if (!sacrificeReplacesSmallEffect && !recoveryBlocked && (advanced === 'GAIN_SHIELD' || advanced === 'SHIELD_IMMUNITY')) {
       applyShield(actorSide, amount)
       triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'UTILITY', amount, target: actorSide, sourceHp: getHp(actorSide), targetHp: getHp(targetSide), sourceHpDelta: 0, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 获得 ${amount} 点护盾` })
     }
-    if (!sacrificeReplacesSmallEffect && advanced === 'GAIN_SHIELD_THORNS') {
+    if (!sacrificeReplacesSmallEffect && !recoveryBlocked && advanced === 'GAIN_SHIELD_THORNS') {
       applyShield(actorSide, amount)
       actorState.thorns += qualityAmount(1, quality)
       triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'UTILITY', amount, target: actorSide, sourceHp: getHp(actorSide), targetHp: getHp(targetSide), sourceHpDelta: 0, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 获得 ${amount} 点护盾与 ${qualityAmount(1, quality)} 层【荆棘】` })
@@ -550,10 +620,14 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
     if (!sacrificeReplacesSmallEffect && ((advanced === 'EXTRA_ROLL_CHANCE' && rng() < 0.2) || (advanced === 'EXTRA_ROLL_RECURSE' && extra && rng() < 0.2))) {
       processed.extraRollRequests += 1
     }
-    if (!sacrificeReplacesSmallEffect && advanced === 'MAX_HP_ON_EXTRA_ROLL' && extra) {
+    if (!sacrificeReplacesSmallEffect && !recoveryBlocked && advanced === 'MAX_HP_ON_EXTRA_ROLL' && extra) {
       actorState.maxHp += qualityAmount(1, quality)
       setHp(actorSide, getHp(actorSide) + qualityAmount(1, quality))
       triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'HEAL', amount: qualityAmount(1, quality), target: actorSide, sourceHp: getHp(actorSide), targetHp: getHp(targetSide), sourceHpDelta: qualityAmount(1, quality), targetHpDelta: 0, roll, text: `${itemName(def, quality)} 使最大生命值 +${qualityAmount(1, quality)}` })
+    }
+
+    if (!sacrificeReplacesSmallEffect && advanced === 'SHIBA_SPEED') {
+      actorState.shibaSpeedStacks = Math.min(5, actorState.shibaSpeedStacks + 1)
     }
 
     if (processed.count >= TRIGGER_QUEUE_CAP && !processed.capped) {
@@ -602,7 +676,8 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
       text: `${fighter.name}${extra ? ' 额外' : ''}掷出 ${roll} 点（${DOGS[fighter.dogType].name}）`,
     })
 
-    const initialQueue = triggerOrder(fighter.items).filter((item) => matchingContext(fighter, itemDef(item.defId), roll).matches)
+    const initialQueue = triggerOrder(fighter.items).filter((item) => matchingContext(fighter, item, roll, fighterState.forcedItemDice).matches)
+    if (hasEquippedEffect(fighter, 'ONLY_LUCKY_DOUBLE') && fighter.luckyNumber !== roll) initialQueue.length = 0
     if (initialQueue.length === 0) fighterState.emptyRolls += 1
     else fighterState.emptyRolls = 0
     const emptyRollSafety = relicWithEffect(fighter, 'EMPTY_ROLL_LARGE_SAFETY')
@@ -612,16 +687,18 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
       if (safety) initialQueue.push(safety)
       fighterState.emptyRolls = 0
     }
-    const queue = initialQueue.map((item) => ({ item, allowExtraRollFanout: true }))
+    const queuedItems = hasEquippedEffect(fighter, 'ONLY_LUCKY_DOUBLE') && fighter.luckyNumber === roll
+      ? initialQueue.flatMap((item) => [item, item])
+      : initialQueue
+    const queue = queuedItems.map((item) => ({ item, allowExtraRollFanout: true }))
     const processed = { count: 0, capped: false, extraRollRequests: 0 }
     while (queue.length > 0 && processed.count < TRIGGER_QUEUE_CAP) {
       const entry = queue.shift()
       if (!entry) continue
       const { item, allowExtraRollFanout } = entry
-      const def = itemDef(item.defId)
-      const context = matchingContext(fighter, def, roll)
+      const context = matchingContext(fighter, item, roll, fighterState.forcedItemDice)
       processed.count += 1
-      for (const trigger of executeItem(actorSide, fighter, item, roll, context.scale, context.note, queue, processed, extra, allowExtraRollFanout)) {
+      for (const trigger of executeItem(actorSide, fighter, item, time, roll, context.scale, context.note, queue, processed, extra, allowExtraRollFanout)) {
         push({
           time,
           actor: actorSide,
@@ -676,6 +753,17 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
     }
   }
 
+  const resolveSpeedRolls = (time: number, actorSide: Side) => {
+    const fighterState = state[actorSide]
+    if (fighterState.shibaSpeedStacks <= 0) return
+    const interval = Math.max(0.5, 1 - fighterState.shibaSpeedStacks * 0.1)
+    fighterState.shibaSpeedMeter += (1 / interval) - 1
+    while (fighterState.shibaSpeedMeter >= 1) {
+      fighterState.shibaSpeedMeter -= 1
+      resolveActorChain(time, actorSide, true)
+    }
+  }
+
   const currentWinner = () => resolveWinnerByHealthPercent(
     { hp: playerHp, maxHp: state.player.maxHp },
     { hp: opponentHp, maxHp: state.opponent.maxHp },
@@ -703,6 +791,8 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
     for (const actor of ['player', 'opponent'] as const) {
       resolveActorChain(time, actor, false, true)
       const fighter = actor === 'player' ? player : opponent
+      if (time <= 10 && hasEquippedEffect(fighter, 'DOUBLE_RATE_FIRST_TEN')) resolveActorChain(time, actor, true)
+      resolveSpeedRolls(time, actor)
       if (hasRelic(fighter, 'HUSKY_ENGINE') && time % 6 === 0) resolveActorChain(time, actor, true)
 
       if (playerHp <= 0 || opponentHp <= 0) {

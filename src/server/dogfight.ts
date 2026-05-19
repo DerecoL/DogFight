@@ -8,7 +8,7 @@ import { STARTING_GOLD } from './game/matchmaking'
 import { normalizeQuality } from './game/quality'
 import { simulateBattle } from './game/battle'
 import type { BattleEvent, BattleResult, DogType, FighterSnapshot, ShopType } from './game/types'
-import { applyRelicChoice, classRewardChoices, initialItems, makeChoices, makeRelicChoices, makeShop, parseJson, publicRun, relicsFromRun, seedGhost, snapshotFromRun, toGameItems } from './state'
+import { applyRelicChoice, classRewardChoices, initialItems, makeChoices, makeRelicChoices, makeShop, parseJson, postBattleLargeItemReward, publicRun, relicsFromRun, seedGhost, snapshotFromRun, toGameItems } from './state'
 
 const DOGFIGHT_MAX_PLAYERS = 8
 const DOGFIGHT_READY_MS = 60_000
@@ -346,6 +346,9 @@ async function settleDogfightRoundIfReady(roomId: string, force = false) {
       const roundIncome = eliminated ? 0 : 5 + nextRound * 2
       const gold = participant.run.gold + participantResult.goldCompensation + roundIncome
       const phaseData = eliminated ? { phase: 'COMPLETE' } : nextPhaseData(participant.run, nextRound)
+      const postBattleReward = eliminated
+        ? null
+        : postBattleLargeItemReward(toGameItems(participant.run.items), `${participant.runId}-dogfight-post-battle-${nextRound}-${wins}-${losses}`)
 
       if (!eliminated) survivingIds.push(participant.id)
 
@@ -361,6 +364,7 @@ async function settleDogfightRoundIfReady(roomId: string, force = false) {
           lastBattle: null,
           refreshCost: 1,
           relicChoices: '[]',
+          ...(postBattleReward ? { items: { create: postBattleReward } } : {}),
           ...phaseData,
         },
       })

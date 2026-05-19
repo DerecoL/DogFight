@@ -1,4 +1,4 @@
-import { normalizeQuality, qualityMultiplier } from './quality'
+import { normalizeQuality, qualityAmount, qualityMultiplier } from './quality'
 import type { AdvancedEffect, DogType, ItemDef, ItemQuality, RelicDef, RelicEffect, ShopType } from './types'
 
 export const DOGS: Record<DogType, { name: string; trait: string }> = {
@@ -206,6 +206,58 @@ export function itemDef(id: string) {
   const found = ALL_ITEM_DEFS.find((item) => item.id === id)
   if (!found) throw new Error(`Unknown item def ${id}`)
   return found
+}
+
+function itemEffectVerb(type: ItemDef['effect']['type']) {
+  return type === 'HEAL' ? '恢复' : '造成'
+}
+
+function itemEffectUnit(type: ItemDef['effect']['type']) {
+  return type === 'HEAL' ? '点生命值' : '点伤害'
+}
+
+export function itemDescription(itemId: string, quality?: string | null) {
+  const def = itemDef(itemId)
+  const currentQuality = normalizeQuality(quality)
+  const amount = qualityAmount(def.effect.amount, currentQuality)
+  const one = qualityAmount(1, currentQuality)
+  const advanced = def.advancedEffect ?? 'NONE'
+  const baseEffect = def.effect.amount > 0
+    ? `${itemEffectVerb(def.effect.type)} ${amount} ${itemEffectUnit(def.effect.type)}。`
+    : ''
+
+  if (advanced === 'TARGET_WEAK_BONUS_DAMAGE') return `${baseEffect}若目标处于【虚弱】，额外造成 ${qualityAmount(4, currentQuality)} 点真实伤害。`
+  if (advanced === 'ADJACENT_DAMAGE_BONUS') return `${baseEffect}使【相邻】装备的下一次触发伤害 +${qualityAmount(4, currentQuality)}。`
+  if (advanced === 'GAIN_SHIELD') return `获得 ${amount} 点护盾。`
+  if (advanced === 'CLEANSE_ONE') return `恢复 ${amount} 点生命值，并使自身的一层【中毒】或者【虚弱】失效。`
+  if (advanced === 'APPLY_POISON') return `对敌人施加 ${amount} 层【中毒】。`
+  if (advanced === 'GAIN_SHIELD_THORNS') return `获得 ${amount} 点护盾，并获得 ${one} 层【荆棘】。`
+  if (advanced === 'APPLY_WEAK_ON_HIT') return `${baseEffect}并给敌人施加 ${one} 层【虚弱】。`
+  if (advanced === 'DOUBLE_SHIELD_DAMAGE') return `${baseEffect}如果敌方有护盾，该次伤害直接对护盾造成 2 倍伤害。`
+  if (advanced === 'HEAL_OR_MAX_HP') return `恢复 ${amount} 点生命值。如果你当前处于满血，则永久提升自身 ${one} 点最大生命值。`
+  if (advanced === 'LIFESTEAL') return `${baseEffect}并将造成伤害的 100% 转化为自身治疗。`
+  if (advanced === 'POISON_AND_DISABLE_RIGHTMOST') return `对敌方施加 ${amount} 层【中毒】，并使敌方最右侧的一个装备【失效】一次。`
+  if (advanced === 'SHIELD_IMMUNITY') return `获得 ${amount} 点护盾。只要你拥有护盾，你免疫所有【中毒】和【虚弱】的施加。`
+  if (advanced === 'POISON_ON_ROLL') return `${baseEffect}每次投掷都会对敌人叠加 ${qualityAmount(3, currentQuality)} 层【中毒】。`
+  if (advanced === 'GAIN_THORNS') return `${baseEffect}每次触发有 50% 概率获得 ${one} 层【荆棘】。`
+  if (advanced === 'APPLY_WEAK') return `${baseEffect}每次触发有 50% 概率给敌人施加 ${one} 层【虚弱】。`
+  if (advanced === 'MAX_HP_ON_EXTRA_ROLL') return `每当系统触发职业特性的“额外投掷”时，永久使你最大生命值 +${one}。`
+  if (advanced === 'SHIELD_ON_NON_LUCKY') return `非【天命数字】时获得 ${qualityAmount(5, currentQuality)} 点护盾。`
+  if (advanced === 'AVALANCHE') return `每当掷出【小点】时，积攒1层“雪崩”。5层雪崩时会清空层数同时对敌人造成 ${qualityAmount(50, currentQuality)} 点伤害。每次雪崩后下次雪崩伤害加倍。`
+  if (advanced === 'SHIBA_SPEED') return `${baseEffect}${def.description}`
+  if (advanced === 'TRIGGER_ADJACENT') return `${baseEffect}${def.description}`
+  if (advanced === 'EXTRA_ROLL_CHANCE') return `${baseEffect}${def.description}`
+  if (advanced === 'TRIGGER_MINUS_THREE') return `${baseEffect}${def.description}`
+  if (advanced === 'LARGE_TRIGGERS_NON_LARGE') return `${baseEffect}${def.description}`
+  if (advanced === 'DISABLE_ENEMY_LARGE') return `${baseEffect}${def.description}`
+  if (baseEffect) return baseEffect
+  if (def.description) return def.description
+  return def.description
+}
+
+export function itemDefForQuality(itemId: string, quality?: string | null): ItemDef {
+  const def = itemDef(itemId)
+  return { ...def, description: itemDescription(itemId, quality) }
 }
 
 export function relicDef(id: string) {

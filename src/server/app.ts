@@ -10,13 +10,13 @@ import { prisma } from './db'
 import { registerDogfightRoutes } from './dogfight'
 import { publicErrorMessage } from './errors'
 import { buildApexSeedEntries, resolveApexChallenge, type ApexOpponent } from './game/apex'
-import { itemDef, relicDef, relicDefForQuality } from './game/data'
+import { itemDef, itemDefForQuality, relicDef, relicDefForQuality } from './game/data'
 import { canPlace, findSlot } from './game/grid'
 import { canUpgradePair, nextQuality, normalizeQuality } from './game/quality'
 import { simulateBattle } from './game/battle'
 import { STARTING_GOLD, isTrainingMatchRound } from './game/matchmaking'
 import type { BattleResult, DogType, FighterSnapshot, GameItem, RelicInstance, ShopOffer, ShopType } from './game/types'
-import { applyRelicChoice, classRewardChoices, initialItems, makeChoices, makeRelicChoices, makeShop, parseJson, publicRun, relicsFromRun, seedGhost, snapshotFromRun, toGameItems } from './state'
+import { applyRelicChoice, classRewardChoices, createFinishedBattleRecord, initialItems, makeChoices, makeRelicChoices, makeShop, parseJson, postBattleLargeItemReward, publicRun, relicsFromRun, seedGhost, snapshotFromRun, toGameItems } from './state'
 
 declare module 'fastify' {
   interface FastifyRequest {
@@ -88,7 +88,7 @@ export function buildApp() {
     challengeWins: entry.challengeWins,
     isSeed: entry.isSeed,
     createdAt: entry.createdAt,
-    items: parseJson<GameItem[]>(entry.items, []).map((item) => ({ ...item, def: itemDef(item.defId) })),
+    items: parseJson<GameItem[]>(entry.items, []).map((item) => ({ ...item, def: itemDefForQuality(item.defId, item.quality) })),
     relics: parseJson<RelicInstance[]>(entry.relics, []).map((relic) => ({ ...relic, def: relicDefForQuality(relic.relicId, relic.quality) })),
   })
 
@@ -540,6 +540,7 @@ export function buildApp() {
     const playerWon = result.winner === 'player'
     const wins = run.wins + (playerWon ? 1 : 0)
     const losses = run.losses + (playerWon ? 0 : 1)
+    const battleRecord = createFinishedBattleRecord(result, wins, losses)
     const status = wins >= 12 || losses >= 3 ? 'COMPLETE' : 'ACTIVE'
     const nextRound = run.round + 1
     const nextClassRewards = classRewardChoices(run.dogType as DogType, nextRound)
@@ -558,7 +559,7 @@ export function buildApp() {
       gold: run.gold + roundIncome,
       status,
       phase,
-      lastBattle: JSON.stringify(result),
+      lastBattle: JSON.stringify(battleRecord),
       matchedGhost: null,
       refreshCost: 1,
       classRewardChoices: phase === 'CLASS_REWARD' ? JSON.stringify(nextClassRewards) : '[]',
@@ -568,6 +569,12 @@ export function buildApp() {
         : phase === 'CHOICE'
           ? { choices: JSON.stringify(makeChoices(`${run.id}-choices-${nextRound}`, nextRound)), shopItems: '[]' }
           : {}),
+    }
+    const postBattleReward = status === 'ACTIVE'
+      ? postBattleLargeItemReward(toGameItems(run.items), `${run.id}-post-battle-${nextRound}-${wins}-${losses}`)
+      : null
+    if (postBattleReward) {
+      Object.assign(updateData, { items: { create: postBattleReward } })
     }
     const updated = await prisma.run.update({ where: { id: run.id }, data: updateData, include: { items: true } })
     return { run: publicRun(updated) }
