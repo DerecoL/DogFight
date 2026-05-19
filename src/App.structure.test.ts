@@ -5,6 +5,42 @@ const app = readFileSync(new URL('./App.tsx', import.meta.url), 'utf8')
 const css = readFileSync(new URL('./App.css', import.meta.url), 'utf8')
 
 describe('selection screen structure', () => {
+  it('renders a mode lobby and opens the peak arena screen from the peak card', () => {
+    expect(app).toContain("type GameMode = 'CASUAL' | 'LADDER' | 'DOGFIGHT' | 'PEAK'")
+    expect(app).toContain("type AppScreen = 'LOBBY' | 'CASUAL' | 'PEAK'")
+    expect(app).toContain("const [appScreen, setAppScreen] = useState<AppScreen>('LOBBY')")
+    expect(app).toContain('function ModeLobby')
+    expect(app).toContain('休闲模式')
+    expect(app).toContain('天梯模式')
+    expect(app).toContain('斗狗模式')
+    expect(app).toContain('巅峰模式')
+    expect(app).toContain('onEnterPeak={() => setAppScreen(\'PEAK\')}')
+    expect(app).toContain('进入巅峰模式')
+  })
+
+  it('wires peak arena to apex APIs and keeps the lobby button in the top banner', () => {
+    expect(app).toContain('function ApexArena')
+    expect(app).toContain("api<ApexOverview>('/apex')")
+    expect(app).toContain("api<ApexSubmitResponse>('/apex/submit'")
+    expect(app).toContain('leaderboard: result.leaderboard')
+    expect(app).toContain('candidates: current?.candidates.filter((run) => run.id !== runId) ?? []')
+    expect(app).toContain('title="模式大厅"')
+    expect(app).toContain('aria-label="模式大厅"')
+    expect(app).toContain('setAppScreen(\'LOBBY\')')
+    expect(css).toContain('.apex-screen')
+    expect(css).toContain('.apex-layout')
+    expect(css).toContain('.apex-rank-row.player-entry')
+  })
+
+  it('adds responsive mode lobby styling hooks', () => {
+    expect(css).toContain('.mode-lobby-screen')
+    expect(css).toContain('.mode-grid')
+    expect(css).toContain('.mode-card.locked')
+    expect(css).toContain('.lock-chain')
+    expect(css).toContain('grid-template-columns: repeat(2, minmax(260px, 1fr))')
+    expect(css).toContain('grid-template-columns: 1fr')
+  })
+
   it('keeps dog selection as an eight-slot gallery with a detail panel', () => {
     expect(app).toContain('DOG_SELECTION_SLOT_COUNT = 8')
     expect(app).toContain('dog-card placeholder')
@@ -192,7 +228,7 @@ describe('selection screen structure', () => {
     expect(app).toContain('audio.play().then(() => setMusicBlocked(false)).catch(() => setMusicBlocked(true))')
     expect(app).toContain('musicEnabled={musicEnabled}')
     expect(app).toContain('onToggleMusic={toggleMusic}')
-    expect(app).toContain('function TopBar({ run, musicEnabled, musicBlocked, onToggleMusic, onLogout }')
+    expect(app).toContain('function TopBar({ run, musicEnabled, musicBlocked, onToggleMusic, onOpenLobby, onLogout }')
     expect(app).toContain('<Music size={18} />')
     expect(app).toContain('<VolumeX size={18} />')
     expect(css).toContain('.topbar-actions')

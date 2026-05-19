@@ -15,12 +15,18 @@ import {
   Backpack,
   BadgeDollarSign,
   Coins,
+  Crown,
   Dice5,
+  Gamepad2,
   Grid3X3,
   HeartPulse,
+  House,
+  Lock,
   LogOut,
+  Medal,
   Music,
   PackagePlus,
+  RadioTower,
   RefreshCcw,
   Shield,
   ShoppingBag,
@@ -35,6 +41,8 @@ type Phase = 'SHOP' | 'CHOICE' | 'CLASS_REWARD' | 'RELIC_CHOICE' | 'PREP' | 'MAT
 type Area = 'EQUIPMENT' | 'BAG'
 type ShopType = 'GENERAL' | 'LARGE' | 'MEDIUM' | 'SMALL' | 'SMALL_DICE' | 'BIG_DICE' | 'RELIC'
 type ItemQuality = 'BRONZE' | 'SILVER' | 'GOLD' | 'DIAMOND'
+type GameMode = 'CASUAL' | 'LADDER' | 'DOGFIGHT' | 'PEAK'
+type AppScreen = 'LOBBY' | 'CASUAL' | 'PEAK'
 
 type ItemDef = {
   id: string
@@ -110,6 +118,36 @@ type Run = {
 }
 type AuthUser = { id: string; email: string; nickname: string | null }
 type TipAnchor = { x: number; y: number }
+type ApexEntry = {
+  id: string
+  sourceRunId: string | null
+  name: string
+  dogType: DogType
+  luckyNumber?: number | null
+  wins: number
+  losses: number
+  round: number
+  rank: number
+  challengeWins: number
+  isSeed: boolean
+  createdAt: string
+}
+type ApexBattleSummary = {
+  opponentId: string
+  opponentRank: number
+  opponentName: string
+  winner: 'player' | 'opponent'
+  duration: number
+  playerHp: number
+  opponentHp: number
+}
+type ApexChallengeReport = {
+  placementRank: number
+  challengeWins: number
+  battles: ApexBattleSummary[]
+}
+type ApexOverview = { leaderboard: ApexEntry[]; candidates: Run[] }
+type ApexSubmitResponse = { entry: ApexEntry; report: ApexChallengeReport; leaderboard: ApexEntry[] }
 
 const dogNames: Record<DogType, string> = { SHIBA: '柴犬', SAMOYED: '萨摩耶', MUTT: '土狗', BULLY: '恶霸', EMPEROR: '狗皇帝' }
 const dogTraits: Record<DogType, string> = {
@@ -333,6 +371,7 @@ function RuleText({ text }: { text: string }) {
 export default function App() {
   const [email, setEmail] = useState('player@dogdice.test')
   const [password, setPassword] = useState('dogdice')
+  const [appScreen, setAppScreen] = useState<AppScreen>('LOBBY')
   const [user, setUser] = useState<AuthUser | null>(null)
   const [needsNicknameSetup, setNeedsNicknameSetup] = useState(false)
   const [run, setRun] = useState<Run | null>(null)
@@ -424,6 +463,7 @@ export default function App() {
       const data = await fn()
       if ('user' in data) {
         setUser(data.user)
+        setAppScreen('LOBBY')
         if (!data.user) {
           setRun(null)
         } else if ('activeRun' in data) {
@@ -556,16 +596,32 @@ export default function App() {
     )
   }
 
+  if (appScreen === 'LOBBY') {
+    return (
+      <Shell run={run ?? undefined} error={error} musicEnabled={musicEnabled} musicBlocked={musicBlocked} onToggleMusic={toggleMusic} onLogout={() => action(() => api('/auth/logout', { method: 'POST' }).then(() => ({ user: null })))}>
+        <ModeLobby run={run} onEnterCasual={() => setAppScreen('CASUAL')} onEnterPeak={() => setAppScreen('PEAK')} />
+      </Shell>
+    )
+  }
+
+  if (appScreen === 'PEAK') {
+    return (
+      <Shell run={run ?? undefined} error={error} musicEnabled={musicEnabled} musicBlocked={musicBlocked} onToggleMusic={toggleMusic} onOpenLobby={() => setAppScreen('LOBBY')} onLogout={() => action(() => api('/auth/logout', { method: 'POST' }).then(() => ({ user: null })))}>
+        <ApexArena />
+      </Shell>
+    )
+  }
+
   if (!run) {
     return (
-      <Shell error={error} musicEnabled={musicEnabled} musicBlocked={musicBlocked} onToggleMusic={toggleMusic} onLogout={() => action(() => api('/auth/logout', { method: 'POST' }).then(() => ({ user: null })))}>
+      <Shell error={error} musicEnabled={musicEnabled} musicBlocked={musicBlocked} onToggleMusic={toggleMusic} onOpenLobby={() => setAppScreen('LOBBY')} onLogout={() => action(() => api('/auth/logout', { method: 'POST' }).then(() => ({ user: null })))}>
         <DogSelect onPick={(choice) => action(() => api('/runs', { method: 'POST', body: JSON.stringify(choice) }))} />
       </Shell>
     )
   }
 
   return (
-    <Shell run={run} error={error} musicEnabled={musicEnabled} musicBlocked={musicBlocked} onToggleMusic={toggleMusic} onLogout={() => action(() => api('/auth/logout', { method: 'POST' }).then(() => ({ user: null })))}>
+    <Shell run={run} error={error} musicEnabled={musicEnabled} musicBlocked={musicBlocked} onToggleMusic={toggleMusic} onOpenLobby={() => setAppScreen('LOBBY')} onLogout={() => action(() => api('/auth/logout', { method: 'POST' }).then(() => ({ user: null })))}>
       {!battle && run.phase === 'CHOICE' && (
         <ShopChoiceSelect choices={run.choices} onPick={(shopType) => action(() => api(`/runs/${run.id}/choice/select`, { method: 'POST', body: JSON.stringify({ shopType }) }))} />
       )}
@@ -692,6 +748,207 @@ export default function App() {
   )
 }
 
+const modeCards: Array<{
+  id: GameMode
+  title: string
+  description: string
+  icon: React.ReactNode
+  locked: boolean
+}> = [
+  {
+    id: 'CASUAL',
+    title: '休闲模式',
+    description: '当前经典构筑、商店、匹配和自动战斗流程',
+    icon: <Gamepad2 size={38} />,
+    locked: false,
+  },
+  {
+    id: 'LADDER',
+    title: '天梯模式',
+    description: '累计排名、积分、赛季冲榜，未开放',
+    icon: <Medal size={38} />,
+    locked: true,
+  },
+  {
+    id: 'DOGFIGHT',
+    title: '斗狗模式',
+    description: '实时战斗，未开放',
+    icon: <RadioTower size={38} />,
+    locked: true,
+  },
+  {
+    id: 'PEAK',
+    title: '巅峰模式',
+    description: '12胜狗进入巅峰竞技场，自动挑战榜单冲击排名',
+    icon: <Crown size={38} />,
+    locked: false,
+  },
+]
+
+function ModeLobby({ run, onEnterCasual, onEnterPeak }: { run: Run | null; onEnterCasual: () => void; onEnterPeak: () => void }) {
+  const casualAction = run ? '继续休闲模式' : '开始休闲模式'
+  return (
+    <section className="mode-lobby-screen">
+      <div className="screen-heading centered">
+        <h2>模式大厅</h2>
+        <p>选择本次要进入的竞技方式。休闲模式产出的12胜狗可以送入巅峰竞技场。</p>
+      </div>
+      <div className="mode-grid">
+        {modeCards.map((mode) => (
+          <article key={mode.id} className={mode.locked ? 'mode-card locked' : 'mode-card available'}>
+            <span className="mode-icon">{mode.icon}</span>
+            {mode.locked && (
+              <span className="lock-chain" aria-label={`${mode.title}未解锁`}>
+                <Lock size={18} />
+                未解锁
+              </span>
+            )}
+            <div className="mode-copy">
+              <strong>{mode.title}</strong>
+              <p>{mode.description}</p>
+            </div>
+            {mode.id === 'CASUAL' ? (
+              <button className="primary action-button mode-action" onClick={onEnterCasual}>{casualAction}</button>
+            ) : mode.id === 'PEAK' ? (
+              <button className="primary action-button mode-action" onClick={onEnterPeak}>进入巅峰模式</button>
+            ) : (
+              <button className="secondary action-button mode-action" disabled>
+                <Lock size={18} /> 未解锁
+              </button>
+            )}
+          </article>
+        ))}
+      </div>
+    </section>
+  )
+}
+
+function ApexArena() {
+  const [overview, setOverview] = useState<ApexOverview | null>(null)
+  const [report, setReport] = useState<ApexChallengeReport | null>(null)
+  const [submittedEntry, setSubmittedEntry] = useState<ApexEntry | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [submittingRunId, setSubmittingRunId] = useState<string | null>(null)
+  const [error, setError] = useState('')
+
+  const loadApex = async () => {
+    setError('')
+    setLoading(true)
+    try {
+      setOverview(await api<ApexOverview>('/apex'))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '巅峰竞技场加载失败')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    let active = true
+    api<ApexOverview>('/apex')
+      .then((data) => {
+        if (active) setOverview(data)
+      })
+      .catch((err) => {
+        if (active) setError(err instanceof Error ? err.message : '巅峰竞技场加载失败')
+      })
+      .finally(() => {
+        if (active) setLoading(false)
+      })
+    return () => { active = false }
+  }, [])
+
+  const submitRun = async (runId: string) => {
+    setError('')
+    setSubmittingRunId(runId)
+    try {
+      const result = await api<ApexSubmitResponse>('/apex/submit', { method: 'POST', body: JSON.stringify({ runId }) })
+      setReport(result.report)
+      setSubmittedEntry(result.entry)
+      setOverview((current) => ({
+        leaderboard: result.leaderboard,
+        candidates: current?.candidates.filter((run) => run.id !== runId) ?? [],
+      }))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '提交巅峰竞技场失败')
+    } finally {
+      setSubmittingRunId(null)
+    }
+  }
+
+  const leaderboard = overview?.leaderboard ?? []
+  const candidates = overview?.candidates ?? []
+
+  return (
+    <section className="apex-screen">
+      <div className="screen-heading centered">
+        <h2>巅峰竞技场</h2>
+        <p>保存12胜狗的死数据，自动从榜尾向上挑战，失败后固定在当前名次。</p>
+      </div>
+      <div className="apex-toolbar">
+        <button className="secondary action-button" onClick={() => void loadApex()} disabled={loading}>
+          <RefreshCcw size={18} /> 刷新
+        </button>
+      </div>
+      {error && <p className="error">{error}</p>}
+      {report && submittedEntry && (
+        <div className="apex-report">
+          <Trophy size={30} />
+          <div>
+            <h3>{submittedEntry.name} 登记为第 {report.placementRank} 名</h3>
+            <p>连续击败 {report.challengeWins} 个对手，共进行了 {report.battles.length} 场挑战。</p>
+          </div>
+        </div>
+      )}
+      <div className="apex-layout">
+        <section className="apex-candidates">
+          <div className="panel-heading">
+            <h3>可投入的12胜狗</h3>
+            <p>{candidates.length > 0 ? '选择一只狗进入巅峰竞技场。每只完成局只能提交一次。' : '暂无可提交的12胜完成局。'}</p>
+          </div>
+          <div className="apex-candidate-list">
+            {loading ? (
+              <p className="apex-empty">正在读取巅峰数据...</p>
+            ) : candidates.length === 0 ? (
+              <p className="apex-empty">先在休闲模式打出12胜，再回来冲榜。</p>
+            ) : candidates.map((candidate) => (
+              <article className="apex-candidate-card" key={candidate.id}>
+                <img className="dog-avatar small" src={dogAssets[candidate.dogType]} alt="" />
+                <div>
+                  <strong>{dogNames[candidate.dogType]} · {candidate.wins}胜{candidate.losses}败</strong>
+                  <p>第 {candidate.round} 回合 · 遗物 {candidate.relics.length} · 装备 {candidate.items.length}</p>
+                </div>
+                <button className="primary action-button" disabled={Boolean(submittingRunId)} onClick={() => void submitRun(candidate.id)}>
+                  <Crown size={18} /> {submittingRunId === candidate.id ? '挑战中' : '投入巅峰'}
+                </button>
+              </article>
+            ))}
+          </div>
+        </section>
+        <section className="apex-leaderboard">
+          <div className="panel-heading">
+            <h3>巅峰榜</h3>
+            <p>初始50个种子数据会随着玩家提交逐步被挤下去。</p>
+          </div>
+          <div className="apex-rank-list">
+            {leaderboard.map((entry) => (
+              <article className={`apex-rank-row ${entry.isSeed ? 'seed' : 'player-entry'}`} key={entry.id}>
+                <b>#{entry.rank}</b>
+                <img className="dog-avatar small" src={dogAssets[entry.dogType]} alt="" />
+                <div>
+                  <strong>{entry.name}</strong>
+                  <p>{dogNames[entry.dogType]} · {entry.wins}胜{entry.losses}败 · 第 {entry.round} 回合</p>
+                </div>
+                <span>{entry.isSeed ? '种子' : `${entry.challengeWins}连胜`}</span>
+              </article>
+            ))}
+          </div>
+        </section>
+      </div>
+    </section>
+  )
+}
+
 function DogSelect({ onPick }: { onPick: (choice: { dogType: DogType; luckyNumber?: number }) => void }) {
   const [selectedDog, setSelectedDog] = useState<DogType>('SHIBA')
   const [luckyNumber, setLuckyNumber] = useState(1)
@@ -760,17 +1017,17 @@ function DogSelect({ onPick }: { onPick: (choice: { dogType: DogType; luckyNumbe
   )
 }
 
-function Shell({ children, run, error, musicEnabled, musicBlocked, onToggleMusic, onLogout }: { children: React.ReactNode; run?: Run; error?: string; musicEnabled: boolean; musicBlocked: boolean; onToggleMusic: () => void; onLogout: () => void }) {
+function Shell({ children, run, error, musicEnabled, musicBlocked, onToggleMusic, onOpenLobby, onLogout }: { children: React.ReactNode; run?: Run; error?: string; musicEnabled: boolean; musicBlocked: boolean; onToggleMusic: () => void; onOpenLobby?: () => void; onLogout: () => void }) {
   return (
     <main className="app-shell">
-      <TopBar run={run} musicEnabled={musicEnabled} musicBlocked={musicBlocked} onToggleMusic={onToggleMusic} onLogout={onLogout} />
+      <TopBar run={run} musicEnabled={musicEnabled} musicBlocked={musicBlocked} onToggleMusic={onToggleMusic} onOpenLobby={onOpenLobby} onLogout={onLogout} />
       {error && <p className="error">{error}</p>}
       <div className="screen-content">{children}</div>
     </main>
   )
 }
 
-function TopBar({ run, musicEnabled, musicBlocked, onToggleMusic, onLogout }: { run?: Run; musicEnabled: boolean; musicBlocked: boolean; onToggleMusic: () => void; onLogout: () => void }) {
+function TopBar({ run, musicEnabled, musicBlocked, onToggleMusic, onOpenLobby, onLogout }: { run?: Run; musicEnabled: boolean; musicBlocked: boolean; onToggleMusic: () => void; onOpenLobby?: () => void; onLogout: () => void }) {
   const musicTitle = musicEnabled ? (musicBlocked ? '音乐待播放，点击重试' : '关闭音乐') : '开启音乐'
   return (
     <header className="topbar">
@@ -789,6 +1046,11 @@ function TopBar({ run, musicEnabled, musicBlocked, onToggleMusic, onLogout }: { 
         </div>
       )}
       <div className="topbar-actions">
+        {onOpenLobby && (
+          <button className="icon-button" title="模式大厅" aria-label="模式大厅" onClick={onOpenLobby}>
+            <House size={18} />
+          </button>
+        )}
         <IconButton title={musicTitle} onClick={onToggleMusic}>
           {musicEnabled ? <Music size={18} /> : <VolumeX size={18} />}
         </IconButton>

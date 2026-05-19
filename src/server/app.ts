@@ -3,11 +3,12 @@ import cookie from '@fastify/cookie'
 import cors from '@fastify/cors'
 import jwt from '@fastify/jwt'
 import Fastify from 'fastify'
-import { Prisma } from '@prisma/client'
+import { Prisma, type ApexEntry } from '@prisma/client'
 import { z } from 'zod'
 import { cookieOptionsForEnv, resolveServerConfig } from './config'
 import { prisma } from './db'
 import { publicErrorMessage } from './errors'
+import { buildApexSeedEntries, resolveApexChallenge, type ApexOpponent } from './game/apex'
 import { itemDef, relicDef } from './game/data'
 import { canPlace, findSlot } from './game/grid'
 import { canUpgradePair, nextQuality, normalizeQuality } from './game/quality'
@@ -61,6 +62,58 @@ export function buildApp() {
     email: user.email,
     nickname: user.nickname,
   })
+
+  const apexEntryToFighter = (entry: ApexEntry): FighterSnapshot => ({
+    name: entry.name,
+    dogType: entry.dogType as DogType,
+    luckyNumber: entry.luckyNumber,
+    wins: entry.wins,
+    losses: entry.losses,
+    round: entry.round,
+    items: parseJson(entry.items, []),
+    relics: parseJson(entry.relics, []),
+  })
+
+  const publicApexEntry = (entry: ApexEntry) => ({
+    id: entry.id,
+    sourceRunId: entry.sourceRunId,
+    name: entry.name,
+    dogType: entry.dogType as DogType,
+    luckyNumber: entry.luckyNumber,
+    wins: entry.wins,
+    losses: entry.losses,
+    round: entry.round,
+    rank: entry.rank,
+    challengeWins: entry.challengeWins,
+    isSeed: entry.isSeed,
+    createdAt: entry.createdAt,
+  })
+
+  const ensureApexSeeds = async () => {
+    const count = await prisma.apexEntry.count()
+    if (count > 0) return
+
+    await prisma.apexEntry.createMany({
+      data: buildApexSeedEntries().map((entry) => ({
+        name: entry.fighter.name,
+        dogType: entry.fighter.dogType,
+        luckyNumber: entry.fighter.luckyNumber,
+        round: entry.fighter.round,
+        wins: entry.fighter.wins,
+        losses: entry.fighter.losses,
+        items: JSON.stringify(entry.fighter.items),
+        relics: JSON.stringify(entry.fighter.relics ?? []),
+        rank: entry.rank,
+        challengeWins: 0,
+        isSeed: true,
+      })),
+    })
+  }
+
+  const apexLeaderboard = async () => {
+    await ensureApexSeeds()
+    return prisma.apexEntry.findMany({ orderBy: { rank: 'asc' } })
+  }
 
   app.get('/api/health', async () => ({ ok: true }))
 
@@ -137,6 +190,86 @@ export function buildApp() {
       include: { items: true },
     })
     return { run: publicRun(run) }
+  })
+
+  app.get('/api/apex', async (request) => {
+    const userId = requireUser(request.userId)
+    const leaderboard = await apexLeaderboard()
+    const submitted = await prisma.apexEntry.findMany({
+      where: { userId, sourceRunId: { not: null } },
+      select: { sourceRunId: true },
+    })
+    const submittedRunIds = submitted
+      .map((entry) => entry.sourceRunId)
+      .filter((runId): runId is string => Boolean(runId))
+    const candidates = await prisma.run.findMany({
+      where: {
+        userId,
+        status: 'COMPLETE',
+        wins: { gte: 12 },
+        id: { notIn: submittedRunIds },
+      },
+      orderBy: { updatedAt: 'desc' },
+      include: { items: true },
+    })
+
+    return {
+      leaderboard: leaderboard.map(publicApexEntry),
+      candidates: candidates.map(publicRun),
+    }
+  })
+
+  app.post('/api/apex/submit', async (request, reply) => {
+    const userId = requireUser(request.userId)
+    const { runId } = z.object({ runId: z.string() }).parse(request.body)
+    const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } })
+    const run = await prisma.run.findFirst({ where: { id: runId, userId }, include: { items: true } })
+    if (!run) return reply.code(404).send({ error: 'Run not found' })
+    if (run.status !== 'COMPLETE' || run.wins < 12) return reply.code(400).send({ error: 'Only completed 12-win dogs can enter apex arena' })
+
+    const existing = await prisma.apexEntry.findUnique({ where: { sourceRunId: run.id } })
+    if (existing) return reply.code(409).send({ error: 'This dog has already entered apex arena' })
+
+    const leaderboard = await apexLeaderboard()
+    const challengerName = `${user.nickname ?? user.email.split('@')[0]}#${user.id.slice(0, 6)}`
+    const challenger = snapshotFromRun(run, challengerName)
+    const opponents: ApexOpponent[] = leaderboard.map((entry) => ({
+      id: entry.id,
+      rank: entry.rank,
+      fighter: apexEntryToFighter(entry),
+    }))
+    const report = resolveApexChallenge(challenger, opponents, `${run.id}-apex`)
+    const rankOffset = 1_000_000
+
+    const entry = await prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`UPDATE "ApexEntry" SET "rank" = "rank" + ${rankOffset} WHERE "rank" >= ${report.placementRank}`
+      const created = await tx.apexEntry.create({
+        data: {
+          userId,
+          sourceRunId: run.id,
+          name: challengerName,
+          dogType: run.dogType,
+          luckyNumber: run.luckyNumber,
+          round: run.round,
+          wins: run.wins,
+          losses: run.losses,
+          items: JSON.stringify(toGameItems(run.items)),
+          relics: JSON.stringify(relicsFromRun(run)),
+          rank: report.placementRank,
+          challengeWins: report.challengeWins,
+          isSeed: false,
+        },
+      })
+      await tx.$executeRaw`UPDATE "ApexEntry" SET "rank" = "rank" - ${rankOffset - 1} WHERE "rank" >= ${report.placementRank + rankOffset}`
+      return created
+    })
+    const updatedLeaderboard = await prisma.apexEntry.findMany({ orderBy: { rank: 'asc' } })
+
+    return {
+      entry: publicApexEntry(entry),
+      report,
+      leaderboard: updatedLeaderboard.map(publicApexEntry),
+    }
   })
 
   app.get('/api/runs/:runId', async (request) => {

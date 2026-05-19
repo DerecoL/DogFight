@@ -1391,6 +1391,246 @@ input {
   text-align: center;
 }
 
+.mode-lobby-screen,
+.apex-screen {
+  width: min(1120px, 100%);
+  display: grid;
+  gap: 18px;
+  margin: 0 auto;
+}
+
+.mode-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(260px, 1fr));
+  gap: 14px;
+}
+
+.mode-card {
+  position: relative;
+  min-height: 230px;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 14px;
+  align-content: stretch;
+  justify-items: start;
+  padding: 18px;
+  overflow: hidden;
+  background: var(--paper);
+  border: 3px solid var(--ink);
+  border-radius: 10px;
+  box-shadow: 6px 7px 0 rgba(61, 45, 37, .22);
+}
+
+.mode-card.available {
+  background:
+    radial-gradient(circle at 92% 14%, rgba(255, 216, 107, .48), transparent 22%),
+    var(--paper);
+}
+
+.mode-card.locked {
+  background:
+    repeating-linear-gradient(135deg, rgba(61, 45, 37, .04) 0 10px, transparent 10px 20px),
+    #f1e2cf;
+  color: rgba(61, 45, 37, .62);
+}
+
+.mode-card.locked::before,
+.mode-card.locked::after {
+  content: "";
+  position: absolute;
+  z-index: 0;
+  width: 180px;
+  height: 14px;
+  border: 3px solid rgba(61, 45, 37, .5);
+  border-radius: 999px;
+  background: rgba(255, 250, 241, .5);
+  transform: rotate(-28deg);
+}
+
+.mode-card.locked::before {
+  right: -42px;
+  top: 42px;
+}
+
+.mode-card.locked::after {
+  right: -28px;
+  top: 82px;
+}
+
+.mode-icon {
+  position: relative;
+  z-index: 1;
+  width: 62px;
+  height: 62px;
+  display: grid;
+  place-items: center;
+  border: 3px solid var(--ink);
+  border-radius: 10px;
+  background: #ffe08a;
+  box-shadow: 4px 5px 0 rgba(61, 45, 37, .18);
+  color: var(--ink);
+}
+
+.mode-card.locked .mode-icon {
+  background: #d8c8b5;
+}
+
+.lock-chain {
+  position: absolute;
+  right: 14px;
+  top: 14px;
+  z-index: 2;
+  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 9px;
+  border: 3px solid var(--ink);
+  border-radius: 999px;
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 950;
+  box-shadow: 3px 4px 0 rgba(61, 45, 37, .18);
+}
+
+.mode-copy {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.mode-copy strong {
+  color: var(--ink);
+  font-size: 22px;
+  font-weight: 950;
+}
+
+.mode-copy p {
+  max-width: 34em;
+  color: rgba(61, 45, 37, .78);
+  font-weight: 850;
+  line-height: 1.45;
+}
+
+.mode-card.locked .mode-copy p {
+  color: rgba(61, 45, 37, .6);
+}
+
+.mode-action {
+  position: relative;
+  z-index: 1;
+  justify-self: start;
+  width: auto;
+  min-width: 168px;
+}
+
+.apex-toolbar {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.apex-layout {
+  display: grid;
+  grid-template-columns: minmax(280px, 430px) minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.apex-candidates,
+.apex-leaderboard,
+.apex-report {
+  background: rgba(255, 250, 241, .94);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  box-shadow: 0 14px 34px rgba(112, 72, 30, .10);
+}
+
+.apex-candidates,
+.apex-leaderboard {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+}
+
+.panel-heading {
+  display: grid;
+  gap: 5px;
+}
+
+.apex-candidate-list,
+.apex-rank-list {
+  display: grid;
+  gap: 10px;
+}
+
+.apex-candidate-card,
+.apex-report {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+}
+
+.apex-rank-row {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+}
+
+.apex-candidate-card,
+.apex-rank-row {
+  min-height: 74px;
+  padding: 10px;
+  border: 1px solid rgba(61, 45, 37, .22);
+  border-radius: 12px;
+  background: #fff;
+}
+
+.apex-rank-row.player-entry {
+  background: #fff8d7;
+  border-color: rgba(245, 158, 11, .5);
+}
+
+.apex-rank-row > b {
+  width: 48px;
+  color: var(--ink);
+  font-size: 18px;
+}
+
+.apex-rank-row > span {
+  min-width: 58px;
+  padding: 5px 8px;
+  border-radius: 999px;
+  background: #e9f0ff;
+  color: #315fdd;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 950;
+}
+
+.apex-report {
+  padding: 14px 16px;
+  border-color: rgba(245, 158, 11, .52);
+  background: #fff8d7;
+}
+
+.apex-report svg {
+  color: #d79000;
+}
+
+.apex-empty {
+  padding: 18px;
+  border: 1px dashed rgba(61, 45, 37, .35);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, .58);
+  text-align: center;
+  font-weight: 850;
+}
+
 .dog-select-screen,
 .shop-choice-screen,
 .nickname-setup {
@@ -1915,6 +2155,25 @@ input {
   .ceremony-stage { min-height: 0; padding: 18px; }
   .ceremony-dog-avatar { width: 112px; height: 112px; }
   .ceremony-reward-preview { grid-template-columns: 1fr; }
+  .mode-grid,
+  .apex-layout {
+    grid-template-columns: 1fr;
+  }
+  .mode-card {
+    min-height: 210px;
+  }
+  .apex-candidate-card,
+  .apex-report {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+  .apex-rank-row {
+    grid-template-columns: auto auto minmax(0, 1fr);
+  }
+  .apex-candidate-card .action-button,
+  .apex-rank-row > span {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
 }
 
 @media (max-width: 900px) {
