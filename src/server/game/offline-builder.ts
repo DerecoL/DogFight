@@ -87,7 +87,7 @@ function scoreDef(def: ItemDef, profile: OfflineBuildProfile, rng: () => number)
   return classScore + tagScore + diceScore + def.size * 2 + rng()
 }
 
-function uniqueById(defs: ItemDef[]) {
+function uniqueById<T extends { id: string }>(defs: T[]) {
   const seen = new Set<string>()
   return defs.filter((def) => {
     if (seen.has(def.id)) return false
