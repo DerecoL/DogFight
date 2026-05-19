@@ -42,6 +42,10 @@ describe('production deployment assets', () => {
     const backup = read('deploy/backup-postgres.sh')
 
     expect(workflow).toContain('tar -czf "$RUNNER_TEMP/dogfight-source.tar.gz"')
+    expect(workflow).toContain("--exclude='node_modules'")
+    expect(workflow).toContain("--exclude='dist'")
+    expect(workflow).toContain("--exclude='dist-click'")
+    expect(workflow).toContain("--exclude='.pglite'")
     expect(workflow).toContain('"$RUNNER_TEMP/dogfight-source.tar.gz"')
     expect(workflow).not.toContain('tar -czf dogfight-source.tar.gz')
     expect(workflow).toContain('docker compose up -d --build')

@@ -14,7 +14,16 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Package source
-        run: tar -czf "$RUNNER_TEMP/dogfight-source.tar.gz" --exclude='.git' .
+        run: |
+          tar -czf "$RUNNER_TEMP/dogfight-source.tar.gz" \
+            --exclude='.git' \
+            --exclude='node_modules' \
+            --exclude='dist' \
+            --exclude='dist-click' \
+            --exclude='.pglite' \
+            --exclude='.worktrees' \
+            --exclude='.codex-*' \
+            .
 
       - name: Configure SSH
         run: |
