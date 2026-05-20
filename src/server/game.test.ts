@@ -247,6 +247,171 @@ describe('dog and item definitions', () => {
 })
 
 describe('battle simulation', () => {
+  const openingThornsRelic: RelicInstance = { id: 'opening-thorns', relicId: 'v3-fluffed-spike-collar', quality: 'GOLD', slot: 0 }
+
+  function reverseFurCombEvent(result: ReturnType<typeof simulateBattle>, itemId = 'comb') {
+    return result.events.find((event) =>
+      event.kind === 'ITEM'
+      && event.actor === 'player'
+      && event.itemId === itemId
+      && event.defId === 'v4-reverse-fur-comb'
+    )
+  }
+
+  it('reverse fur comb silver purges enemy thorns first and heals by removed layers', () => {
+    const player: FighterSnapshot = {
+      name: 'P',
+      dogType: 'MUTT',
+      wins: 0,
+      losses: 0,
+      round: 7,
+      items: [
+        { id: 'comb', defId: 'v4-reverse-fur-comb', quality: 'SILVER', area: 'EQUIPMENT', x: 0, y: 0 },
+      ],
+    }
+    const opponent: FighterSnapshot = {
+      name: 'O',
+      dogType: 'MUTT',
+      wins: 0,
+      losses: 0,
+      round: 7,
+      items: [
+        { id: 'hit', defId: 'starter-1', quality: 'DIAMOND', area: 'EQUIPMENT', x: 0, y: 0 },
+        { id: 'shield', defId: 'v3-wooden-shield', quality: 'DIAMOND', area: 'EQUIPMENT', x: 1, y: 0 },
+        { id: 'speed', defId: 'shiba-speed-katana', quality: 'GOLD', area: 'EQUIPMENT', x: 2, y: 0 },
+      ],
+      relics: [openingThornsRelic],
+    }
+
+    const result = simulateBattle(player, opponent, 'reverse-fur-comb-0')
+    const purge = reverseFurCombEvent(result)
+
+    expect(purge).toMatchObject({
+      effectType: 'HEAL',
+      amount: 3,
+      target: 'player',
+      sourceHpDelta: 15,
+      playerHp: 240,
+    })
+    expect(purge?.text).toContain('清除 3 层增益')
+    expect(purge?.text).toContain('恢复 15 点生命')
+    expect(purge?.opponentStatuses?.positive).toContainEqual(expect.objectContaining({ type: 'thorns', stacks: 2 }))
+    expect(purge?.opponentStatuses?.positive).toContainEqual(expect.objectContaining({ type: 'shield', amount: 27 }))
+  })
+
+  it('reverse fur comb converts every 8 enemy shield into one purged layer after thorns and speed', () => {
+    const player: FighterSnapshot = {
+      name: 'P',
+      dogType: 'MUTT',
+      wins: 0,
+      losses: 0,
+      round: 7,
+      items: [
+        { id: 'comb', defId: 'v4-reverse-fur-comb', quality: 'SILVER', area: 'EQUIPMENT', x: 0, y: 0 },
+      ],
+    }
+    const opponent: FighterSnapshot = {
+      name: 'O',
+      dogType: 'MUTT',
+      wins: 0,
+      losses: 0,
+      round: 7,
+      items: [
+        { id: 'hit', defId: 'starter-1', quality: 'DIAMOND', area: 'EQUIPMENT', x: 0, y: 0 },
+        { id: 'shield', defId: 'v3-wooden-shield', quality: 'DIAMOND', area: 'EQUIPMENT', x: 1, y: 0 },
+      ],
+    }
+
+    const result = simulateBattle(player, opponent, 'reverse-fur-comb-5')
+    const purge = reverseFurCombEvent(result)
+
+    expect(purge).toMatchObject({
+      effectType: 'HEAL',
+      amount: 3,
+      sourceHpDelta: 15,
+      playerHp: 251,
+    })
+    expect(purge?.text).toContain('清除 3 层增益')
+    expect(purge?.text).toContain('恢复 15 点生命')
+    expect(purge?.opponentStatuses?.positive).toContainEqual(expect.objectContaining({ type: 'shield', amount: 30 }))
+  })
+
+  it('reverse fur comb diamond purges seven layers and reports seventy-seven healing', () => {
+    const player: FighterSnapshot = {
+      name: 'P',
+      dogType: 'MUTT',
+      wins: 0,
+      losses: 0,
+      round: 7,
+      items: [
+        { id: 'comb', defId: 'v4-reverse-fur-comb', quality: 'DIAMOND', area: 'EQUIPMENT', x: 0, y: 0 },
+      ],
+    }
+    const opponent: FighterSnapshot = {
+      name: 'O',
+      dogType: 'MUTT',
+      wins: 0,
+      losses: 0,
+      round: 7,
+      items: [
+        { id: 'hit', defId: 'starter-1', quality: 'DIAMOND', area: 'EQUIPMENT', x: 0, y: 0 },
+        { id: 'shield', defId: 'v3-wooden-shield', quality: 'DIAMOND', area: 'EQUIPMENT', x: 1, y: 0 },
+        { id: 'speed', defId: 'shiba-speed-katana', quality: 'GOLD', area: 'EQUIPMENT', x: 2, y: 0 },
+      ],
+      relics: [openingThornsRelic],
+    }
+
+    const result = simulateBattle(player, opponent, 'reverse-fur-comb-0')
+    const purge = reverseFurCombEvent(result)
+
+    expect(purge).toMatchObject({
+      effectType: 'HEAL',
+      amount: 7,
+      target: 'player',
+    })
+    expect(purge?.text).toContain('清除 7 层增益')
+    expect(purge?.text).toContain('恢复 77 点生命')
+    expect(purge?.opponentStatuses?.positive).not.toContainEqual(expect.objectContaining({ type: 'thorns' }))
+    expect(purge?.opponentStatuses?.positive).not.toContainEqual(expect.objectContaining({ type: 'extraRoll' }))
+    expect(purge?.opponentStatuses?.positive).toContainEqual(expect.objectContaining({ type: 'shield', amount: 27 }))
+  })
+
+  it('reverse fur comb prioritizes thorns before shield when the purge limit is small', () => {
+    const player: FighterSnapshot = {
+      name: 'P',
+      dogType: 'MUTT',
+      wins: 0,
+      losses: 0,
+      round: 7,
+      items: [
+        { id: 'comb', defId: 'v4-reverse-fur-comb', quality: 'BRONZE', area: 'EQUIPMENT', x: 0, y: 0 },
+      ],
+    }
+    const opponent: FighterSnapshot = {
+      name: 'O',
+      dogType: 'MUTT',
+      wins: 0,
+      losses: 0,
+      round: 7,
+      items: [
+        { id: 'hit', defId: 'starter-1', quality: 'DIAMOND', area: 'EQUIPMENT', x: 0, y: 0 },
+        { id: 'shield', defId: 'v3-wooden-shield', quality: 'DIAMOND', area: 'EQUIPMENT', x: 1, y: 0 },
+      ],
+      relics: [openingThornsRelic],
+    }
+
+    const result = simulateBattle(player, opponent, 'reverse-fur-comb-1')
+    const purge = reverseFurCombEvent(result)
+
+    expect(purge).toMatchObject({
+      effectType: 'HEAL',
+      amount: 2,
+    })
+    expect(purge?.text).toContain('恢复 6 点生命')
+    expect(purge?.opponentStatuses?.positive).toContainEqual(expect.objectContaining({ type: 'thorns', stacks: 3 }))
+    expect(purge?.opponentStatuses?.positive).toContainEqual(expect.objectContaining({ type: 'shield', amount: 27 }))
+  })
+
   it('growing chew sword silver damage grows without a fixed cap', () => {
     const player: FighterSnapshot = {
       name: 'P',

@@ -366,6 +366,31 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
     return applied
   }
 
+  const purgePositiveBuffs = (target: Side, maxLayers: number) => {
+    let remaining = Math.max(0, maxLayers)
+    let removed = 0
+    const targetState = state[target]
+    const removeLayers = (available: number) => {
+      const layers = Math.min(available, remaining)
+      remaining -= layers
+      removed += layers
+      return layers
+    }
+
+    if (remaining > 0 && targetState.thorns > 0) {
+      targetState.thorns -= removeLayers(targetState.thorns)
+    }
+    if (remaining > 0 && targetState.shibaSpeedStacks > 0) {
+      targetState.shibaSpeedStacks -= removeLayers(targetState.shibaSpeedStacks)
+    }
+    if (remaining > 0 && targetState.shield >= 8) {
+      const shieldLayers = removeLayers(Math.floor(targetState.shield / 8))
+      targetState.shield -= shieldLayers * 8
+    }
+
+    return removed
+  }
+
   const playerOpeningThorns = relicWithEffect(player, 'OPENING_THORNS')
   const opponentOpeningThorns = relicWithEffect(opponent, 'OPENING_THORNS')
   if (playerOpeningThorns) state.player.thorns += relicOpeningThorns(playerOpeningThorns.relicId, playerOpeningThorns.quality)
@@ -672,6 +697,19 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
         actorState.freeze = 0
         targetState.weak += 2
         triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'UTILITY', amount: 2, target: targetSide, sourceHp: getHp(actorSide), targetHp: getHp(targetSide), sourceHpDelta: 0, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 冻结敌人 2 秒` })
+      }
+    }
+    if (!sacrificeReplacesSmallEffect && advanced === 'PURGE_ENEMY_BUFFS') {
+      const maxLayers = qualityAmountFrom(def.effect.amount, quality, def.effect.qualityBase)
+      const removed = purgePositiveBuffs(targetSide, maxLayers)
+      if (removed <= 0) {
+        triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'UTILITY', amount: 0, target: targetSide, sourceHp: getHp(actorSide), targetHp: getHp(targetSide), sourceHpDelta: 0, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 未清除任何敌方增益` })
+      } else if (recoveryBlocked) {
+        triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'UTILITY', amount: removed, target: targetSide, sourceHp: getHp(actorSide), targetHp: getHp(targetSide), sourceHpDelta: 0, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 清除 ${removed} 层增益` })
+      } else {
+        const healAmount = removed * qualityAmountFrom(5, quality, 'SILVER')
+        const healed = applyHeal(actorSide, healAmount)
+        triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'HEAL', amount: removed, target: actorSide, sourceHp: healed.after, targetHp: getHp(targetSide), sourceHpDelta: healed.delta, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 清除 ${removed} 层增益，恢复 ${healAmount} 点生命` })
       }
     }
     if (!sacrificeReplacesSmallEffect && !recoveryBlocked && advanced === 'SHIELD_ON_NON_LUCKY' && actor.luckyNumber !== roll) {
