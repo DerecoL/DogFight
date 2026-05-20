@@ -242,6 +242,96 @@ describe('dog and item definitions', () => {
 })
 
 describe('battle simulation', () => {
+  it('growing chew sword silver damage grows without a fixed cap', () => {
+    const player: FighterSnapshot = {
+      name: 'P',
+      dogType: 'MUTT',
+      wins: 0,
+      losses: 0,
+      round: 7,
+      items: [
+        { id: 'growing-silver', defId: 'v4-growing-chew-sword', quality: 'SILVER', area: 'EQUIPMENT', x: 0, y: 0 },
+      ],
+    }
+    const opponent: FighterSnapshot = { name: 'O', dogType: 'MUTT', wins: 0, losses: 0, round: 7, items: [] }
+    const result = simulateBattle(player, opponent, 'growing-chew-sword-silver')
+    const hits = result.events.filter((event) =>
+      event.kind === 'ITEM'
+      && event.actor === 'player'
+      && event.itemId === 'growing-silver'
+      && event.effectType === 'DAMAGE'
+    )
+    const growthEvents = result.events.filter((event) =>
+      event.kind === 'ITEM'
+      && event.actor === 'player'
+      && event.itemId === 'growing-silver'
+      && event.effectType === 'UTILITY'
+      && event.text.includes('后续伤害提高')
+    )
+
+    expect(hits.slice(0, 5).map((event) => event.amount)).toEqual([1, 4, 7, 10, 13])
+    expect(hits.some((event) => event.amount > 25)).toBe(true)
+    expect(growthEvents.slice(0, 3).map((event) => event.amount)).toEqual([3, 3, 3])
+  })
+
+  it('growing chew sword quality controls starting damage and growth step', () => {
+    const damageSequenceFor = (quality: GameItem['quality']) => {
+      const player: FighterSnapshot = {
+        name: 'P',
+        dogType: 'MUTT',
+        wins: 0,
+        losses: 0,
+        round: 7,
+        items: [
+          { id: `growing-${quality}`, defId: 'v4-growing-chew-sword', quality, area: 'EQUIPMENT', x: 0, y: 0 },
+        ],
+      }
+      const opponent: FighterSnapshot = { name: 'O', dogType: 'MUTT', wins: 0, losses: 0, round: 7, items: [] }
+      const result = simulateBattle(player, opponent, `growing-chew-sword-${quality}`)
+      return result.events
+        .filter((event) =>
+          event.kind === 'ITEM'
+          && event.actor === 'player'
+          && event.itemId === `growing-${quality}`
+          && event.effectType === 'DAMAGE'
+        )
+        .slice(0, 3)
+        .map((event) => event.amount)
+    }
+
+    expect(damageSequenceFor('GOLD')).toEqual([2, 7, 12])
+    expect(damageSequenceFor('DIAMOND')).toEqual([3, 10, 17])
+  })
+
+  it('growing chew sword keeps growth per item instance', () => {
+    const player: FighterSnapshot = {
+      name: 'P',
+      dogType: 'MUTT',
+      wins: 0,
+      losses: 0,
+      round: 7,
+      items: [
+        { id: 'left-growth', defId: 'v4-growing-chew-sword', quality: 'SILVER', area: 'EQUIPMENT', x: 0, y: 0 },
+        { id: 'right-growth', defId: 'v4-growing-chew-sword', quality: 'SILVER', area: 'EQUIPMENT', x: 2, y: 0 },
+      ],
+    }
+    const opponent: FighterSnapshot = { name: 'O', dogType: 'MUTT', wins: 0, losses: 0, round: 7, items: [] }
+    const result = simulateBattle(player, opponent, 'growing-chew-sword-instances')
+    const hits = result.events.filter((event) =>
+      event.kind === 'ITEM'
+      && event.actor === 'player'
+      && (event.itemId === 'left-growth' || event.itemId === 'right-growth')
+      && event.effectType === 'DAMAGE'
+    )
+
+    expect(hits.slice(0, 4).map((event) => [event.itemId, event.amount])).toEqual([
+      ['left-growth', 1],
+      ['right-growth', 1],
+      ['left-growth', 4],
+      ['right-growth', 4],
+    ])
+  })
+
   it('blood contract fang at gold grants lifesteal to left adjacent equipment only', () => {
     const player: FighterSnapshot = {
       name: 'P',

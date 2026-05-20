@@ -79,6 +79,7 @@ type BattleSideState = {
   disabledLarge: number
   disabledItemIds: string[]
   adjacentDamageBonus: Record<string, number>
+  growthDamageByItemId: Record<string, number>
   lifestealItemIds: string[]
   forcedItemDice: Record<string, number>
   shibaSpeedStacks: number
@@ -108,6 +109,7 @@ function createSideState(maxHp: number): BattleSideState {
     disabledLarge: 0,
     disabledItemIds: [],
     adjacentDamageBonus: {},
+    growthDamageByItemId: {},
     lifestealItemIds: [],
     forcedItemDice: {},
     shibaSpeedStacks: 0,
@@ -497,6 +499,14 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
     const multiplier = bullyQuad ? 4 : doubled ? 2 : 1
     const traitText = bullyQuad ? '（恶霸4倍翻倍）' : bullyDoubled ? '（恶霸翻倍）' : emperorDoubled ? '（狗皇帝幸运翻倍）' : ''
     let amount = roundScaled(qualityAmountFrom(def.effect.amount, quality, def.effect.qualityBase) * multiplier, scale * globalEffectScale(actor))
+    let growthCurrentDamage = 0
+    let growthDamageStep = 0
+    if (advanced === 'GROWTH_DAMAGE') {
+      const growthBaseDamage = quality === 'DIAMOND' ? 3 : qualityAmountFrom(def.effect.amount, quality, def.effect.qualityBase)
+      growthCurrentDamage = actorState.growthDamageByItemId[item.id] ?? growthBaseDamage
+      amount = growthCurrentDamage
+      growthDamageStep = qualityAmountFrom(3, quality, 'SILVER')
+    }
     const damageBonus = actorState.adjacentDamageBonus[item.id] ?? 0
     if (damageBonus > 0 && (def.effect.type === 'DAMAGE' || def.effect.type === 'DAMAGE_SELF_SHIELD')) {
       amount += damageBonus
@@ -575,6 +585,10 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
       if (!recoveryBlocked && (advanced === 'LIFESTEAL' || actorState.lifestealItemIds.includes(item.id)) && after < before) {
         const healed = applyHeal(actorSide, before - after)
         triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'HEAL', amount: before - after, target: actorSide, sourceHp: healed.after, targetHp: getHp(targetSide), sourceHpDelta: healed.delta, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 吸取 ${before - after} 点生命` })
+      }
+      if (advanced === 'GROWTH_DAMAGE') {
+        actorState.growthDamageByItemId[item.id] = growthCurrentDamage + growthDamageStep
+        triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'UTILITY', amount: growthDamageStep, target: actorSide, sourceHp: getHp(actorSide), targetHp: getHp(targetSide), sourceHpDelta: 0, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 后续伤害提高 ${growthDamageStep}` })
       }
     }
 
