@@ -316,6 +316,14 @@ describe('buildStandaloneIndex', () => {
       expect(html).toContain('shiba-speed-katana')
       expect(html).toContain('midas-left')
       expect(html).toContain('buildOfflineFighter')
+      expect(html).toContain('v4-blood-contract-fang')
+      expect(html).toContain('v4-boom-counter')
+      expect(html).toContain('v4-growing-chew-sword')
+      expect(html).toContain('v4-reverse-fur-comb')
+      expect(html).toContain('GRANT_LIFESTEAL_ADJACENT')
+      expect(html).toContain('BOOM_COUNTER')
+      expect(html).toContain('GROWTH_DAMAGE')
+      expect(html).toContain('PURGE_ENEMY_BUFFS')
 
       const { window, localStorage, storageKey } = evaluateMockScript(extractMockScript(html))
       await window.fetch('/api/auth/register', { method: 'POST', body: JSON.stringify({ email: 'a@dog.test', password: 'dogdice' }) })
@@ -476,6 +484,40 @@ describe('buildStandaloneIndex', () => {
       expect(poisonApply.opponentStatuses.negative).toContainEqual(expect.objectContaining({ type: 'poison', stacks: 6, tickDamage: 6 }))
       expect(poisonTick).toMatchObject({ amount: 6, target: 'opponent' })
       expect(poisonTick.opponentStatuses.negative).toContainEqual(expect.objectContaining({ type: 'poison', stacks: 6, tickDamage: 6 }))
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  test('standalone mock applies new common archetype growth damage during battle', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'dogfight-standalone-growth-damage-'))
+    try {
+      const distDir = await createMinimalDist(root)
+      const outputFile = path.join(root, 'click-index.html')
+      const launcherFile = path.join(root, 'DogFight-standalone.cmd')
+      await buildStandaloneIndex({ distDir, outputFile, launcherFile })
+
+      const html = await readFile(outputFile, 'utf8')
+      const { window, localStorage, storageKey } = evaluateMockScript(extractMockScript(html))
+      await window.fetch('/api/auth/register', { method: 'POST', body: JSON.stringify({ email: 'growth@dog.test', password: 'dogdice' }) })
+      const created = await readJson(await window.fetch('/api/runs', { method: 'POST', body: JSON.stringify({ dogType: 'SHIBA' }) }))
+      const runId = created.run.id
+      const state = JSON.parse(localStorage.getItem(storageKey))
+      state.run.round = 6
+      state.run.phase = 'MATCH'
+      state.run.items = [
+        { id: 'growth-sword', defId: 'v4-growing-chew-sword', quality: 'SILVER', area: 'EQUIPMENT', x: 0, y: 0 },
+      ]
+      state.run.matchedGhost = { name: 'O', dogType: 'MUTT', wins: 0, losses: 0, round: 6, items: [], relics: [] }
+      localStorage.setItem(storageKey, JSON.stringify(state))
+
+      const battled = await readJson(await window.fetch(`/api/runs/${runId}/battle/start`, { method: 'POST', body: '{}' }))
+      const growthEvents = battled.battle.events.filter((event) =>
+        event.kind === 'ITEM' && event.defId === 'v4-growing-chew-sword' && event.effectType === 'DAMAGE'
+      )
+
+      expect(growthEvents.map((event) => event.amount).slice(0, 3)).toEqual([1, 4, 7])
+      expect(growthEvents[0].text).toContain('后续伤害')
     } finally {
       await rm(root, { recursive: true, force: true })
     }

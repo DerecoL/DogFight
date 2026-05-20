@@ -2604,6 +2604,31 @@ input {
   justify-content: flex-end;
 }
 
+.apex-tabs {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, .66);
+}
+
+.apex-tabs button {
+  border: 0;
+  border-radius: 6px;
+  padding: 7px 12px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.apex-tabs button.active {
+  background: var(--ink);
+  color: #fffaf1;
+}
+
 .apex-layout {
   display: grid;
   grid-template-columns: minmax(280px, 430px) minmax(0, 1fr);

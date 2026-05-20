@@ -51,6 +51,10 @@ export type AdvancedEffect =
   | 'POISON_AND_DISABLE_RIGHTMOST'
   | 'SHIELD_IMMUNITY'
   | 'STEAL_ENEMY_BUFF'
+  | 'GRANT_LIFESTEAL_ADJACENT'
+  | 'BOOM_COUNTER'
+  | 'GROWTH_DAMAGE'
+  | 'PURGE_ENEMY_BUFFS'
 
 export type ItemDef = {
   id: string

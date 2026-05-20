@@ -62,6 +62,7 @@ type ItemDef = {
   tags: string[]
   description?: string
   defaultQuality?: ItemQuality
+  advancedEffect?: string
   effect: { type: string; amount: number; qualityBase?: ItemQuality }
 }
 type Item = { id: string; defId: string; quality: ItemQuality; area: Area; x: number; y: number; def: ItemDef }
@@ -197,6 +198,8 @@ type TipAnchor = { x: number; y: number }
 type ApexEntry = {
   id: string
   sourceRunId: string | null
+  boardType: 'OVERALL' | 'DAILY'
+  boardKey: string
   name: string
   dogType: DogType
   luckyNumber?: number | null
@@ -224,8 +227,12 @@ type ApexChallengeReport = {
   challengeWins: number
   battles: ApexBattleSummary[]
 }
-type ApexOverview = { leaderboard: ApexEntry[]; candidates: Run[] }
-type ApexSubmitResponse = { entry: ApexEntry; report: ApexChallengeReport; leaderboard: ApexEntry[] }
+type ApexBoardId = 'overall' | 'daily'
+type ApexLeaderboards = Record<ApexBoardId, ApexEntry[]>
+type ApexReports = Record<ApexBoardId, ApexChallengeReport>
+type ApexEntries = Record<ApexBoardId, ApexEntry>
+type ApexOverview = { leaderboards: ApexLeaderboards; candidates: Run[]; dailyBoardKey: string; dailyResetHour: number }
+type ApexSubmitResponse = { entries: ApexEntries; reports: ApexReports; leaderboards: ApexLeaderboards; dailyBoardKey: string; dailyResetHour: number }
 type DogfightRoomStatus = 'WAITING' | 'ACTIVE' | 'COMPLETE'
 type DogfightRoomPhase = 'LOBBY' | 'DOG_SELECT' | 'SHOP' | 'BATTLE' | 'COMPLETE'
 type DogfightMember = {
@@ -360,6 +367,10 @@ const itemIcons: Record<string, string> = {
   'v3-blood-mad-fang': '/assets/items/v3-blood-mad-fang.svg',
   'v3-fermented-trash-bin': '/assets/items/v3-fermented-trash-bin.svg',
   'v3-golden-kennel': '/assets/items/v3-golden-kennel.svg',
+  'v4-blood-contract-fang': '/assets/items/v4-blood-contract-fang.svg',
+  'v4-boom-counter': '/assets/items/v4-boom-counter.svg',
+  'v4-growing-chew-sword': '/assets/items/v4-growing-chew-sword.svg',
+  'v4-reverse-fur-comb': '/assets/items/v4-reverse-fur-comb.svg',
   'shiba-speed-katana': '/assets/items/shiba-speed-katana.svg',
   'shiba-great-katana': '/assets/items/shiba-great-katana.svg',
   'shiba-swallow-katana': '/assets/items/shiba-swallow-katana.svg',
@@ -580,6 +591,10 @@ function createBattleFxStyle(event: BattleEvent) {
 
 function effectText(def: ItemDef, quality: ItemQuality = 'BRONZE') {
   const amount = qualityAmountFrom(def.effect.amount, quality, def.effect.qualityBase)
+  if (def.advancedEffect === 'GRANT_LIFESTEAL_ADJACENT') return quality === 'DIAMOND' ? '左右相邻装备获得吸血' : '左侧相邻装备获得吸血'
+  if (def.advancedEffect === 'BOOM_COUNTER') return `爆鸣计数达到 30 后造成 ${amount} 伤害`
+  if (def.advancedEffect === 'GROWTH_DAMAGE') return `造成 ${amount} 伤害，后续伤害提升`
+  if (def.advancedEffect === 'PURGE_ENEMY_BUFFS') return '清除敌方增益并恢复生命'
   if (def.effect.type === 'HEAL') return `回复 ${amount} 生命`
   if (def.effect.type === 'DAMAGE' || def.effect.type === 'DAMAGE_SELF_SHIELD') return `造成 ${amount} 伤害`
   if (def.effect.type === 'UTILITY') {
@@ -640,6 +655,10 @@ function diceToneText(def: ItemDef) {
 }
 
 function effectToneText(def: ItemDef) {
+  if (def.advancedEffect === 'GRANT_LIFESTEAL_ADJACENT') return '吸血'
+  if (def.advancedEffect === 'BOOM_COUNTER') return '爆鸣计数'
+  if (def.advancedEffect === 'GROWTH_DAMAGE') return '后续伤害'
+  if (def.advancedEffect === 'PURGE_ENEMY_BUFFS') return '清除'
   if (def.effect.type === 'HEAL') return '回复'
   if (def.effect.type === 'UTILITY') {
     if (def.tags.includes('shield')) return '护盾'
@@ -1940,8 +1959,9 @@ function battleToRun(battle: Battle | null): Run | null {
 
 function ApexArena() {
   const [overview, setOverview] = useState<ApexOverview | null>(null)
-  const [report, setReport] = useState<ApexChallengeReport | null>(null)
-  const [submittedEntry, setSubmittedEntry] = useState<ApexEntry | null>(null)
+  const [reports, setReports] = useState<ApexReports | null>(null)
+  const [submittedEntries, setSubmittedEntries] = useState<ApexEntries | null>(null)
+  const [activeApexBoard, setActiveApexBoard] = useState<ApexBoardId>('overall')
   const [expandedEntryId, setExpandedEntryId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [submittingRunId, setSubmittingRunId] = useState<string | null>(null)
@@ -1979,10 +1999,12 @@ function ApexArena() {
     setSubmittingRunId(runId)
     try {
       const result = await api<ApexSubmitResponse>('/apex/submit', { method: 'POST', body: JSON.stringify({ runId }) })
-      setReport(result.report)
-      setSubmittedEntry(result.entry)
+      setReports(result.reports)
+      setSubmittedEntries(result.entries)
       setOverview((current) => ({
-        leaderboard: result.leaderboard,
+        leaderboards: result.leaderboards,
+        dailyBoardKey: result.dailyBoardKey,
+        dailyResetHour: result.dailyResetHour,
         candidates: current?.candidates.filter((run) => run.id !== runId) ?? [],
       }))
     } catch (err) {
@@ -1992,8 +2014,10 @@ function ApexArena() {
     }
   }
 
-  const leaderboard = overview?.leaderboard ?? []
+  const leaderboards = overview?.leaderboards ?? { overall: [], daily: [] }
+  const leaderboard = leaderboards[activeApexBoard]
   const candidates = overview?.candidates ?? []
+  const activeBoardLabel = activeApexBoard === 'overall' ? '总榜' : '当日榜'
 
   return (
     <section className="apex-screen">
@@ -2007,12 +2031,12 @@ function ApexArena() {
         </button>
       </div>
       {error && <p className="error">{error}</p>}
-      {report && submittedEntry && (
+      {reports && submittedEntries && (
         <div className="apex-report">
           <Trophy size={30} />
           <div>
-            <h3>{submittedEntry.name} 登记为第 {report.placementRank} 名</h3>
-            <p>连续击败 {report.challengeWins} 个对手，共进行了 {report.battles.length} 场挑战。</p>
+            <h3>{submittedEntries.overall.name} 已投入巅峰榜</h3>
+            <p>总榜第 {reports.overall.placementRank} 名，当日榜第 {reports.daily.placementRank} 名。总榜连胜 {reports.overall.challengeWins}，当日榜连胜 {reports.daily.challengeWins}。</p>
           </div>
         </div>
       )}
@@ -2043,8 +2067,12 @@ function ApexArena() {
         </section>
         <section className="apex-leaderboard">
           <div className="panel-heading">
-            <h3>巅峰榜</h3>
-            <p>初始50个种子数据会随着玩家提交逐步被挤下去。</p>
+            <h3>{activeBoardLabel}</h3>
+            <p>{activeApexBoard === 'daily' ? `每日 05:00 更新 · ${overview?.dailyBoardKey ?? ''}` : '初始50个种子数据会随着玩家提交逐步被挤下去。'}</p>
+            <div className="apex-tabs" role="tablist" aria-label="巅峰榜切换">
+              <button type="button" role="tab" aria-selected={activeApexBoard === 'overall'} className={activeApexBoard === 'overall' ? 'active' : ''} onClick={() => setActiveApexBoard('overall')}>总榜</button>
+              <button type="button" role="tab" aria-selected={activeApexBoard === 'daily'} className={activeApexBoard === 'daily' ? 'active' : ''} onClick={() => setActiveApexBoard('daily')}>当日榜</button>
+            </div>
           </div>
           <div className="apex-rank-list">
             {leaderboard.map((entry) => (

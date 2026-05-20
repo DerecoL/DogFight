@@ -745,7 +745,7 @@ async function currentMockApiScript(buildId) {
   }
 
   function defaultState() {
-    return { user: null, run: null, nextId: 1 };
+    return { user: null, run: null, nextId: 1, apexEntries: [] };
   }
 
   function id(state, prefix) {
@@ -790,6 +790,14 @@ async function currentMockApiScript(buildId) {
 
   function qualityMultiplier(quality) {
     return Math.pow(1.5, qualities.indexOf(normalizeQuality(quality)));
+  }
+
+  function growthDamageBase(quality) {
+    return normalizeQuality(quality) === 'DIAMOND' ? 3 : qualityAmountFrom(1, quality, 'SILVER');
+  }
+
+  function growthDamageStep(quality) {
+    return qualityAmountFrom(3, quality, 'SILVER');
   }
 
   function relicQualityRatio(def, quality) {
@@ -918,6 +926,114 @@ async function currentMockApiScript(buildId) {
       ladderSettlement: run.ladderSettlement || null,
       items: (run.items || []).map(publicItem),
     };
+  }
+
+  function dailyApexBoardKey(date = new Date()) {
+    const shifted = new Date(date.getTime() + 3 * 60 * 60 * 1000);
+    return shifted.getUTCFullYear() + '-' + String(shifted.getUTCMonth() + 1).padStart(2, '0') + '-' + String(shifted.getUTCDate()).padStart(2, '0');
+  }
+
+  function ensureApexEntries(state) {
+    if (!Array.isArray(state.apexEntries)) state.apexEntries = [];
+    return state.apexEntries;
+  }
+
+  function apexSeedFighter(state, rank, boardType, boardKey) {
+    const dogType = dogTypes[(rank - 1) % dogTypes.length];
+    return {
+      id: id(state, 'apex'),
+      sourceRunId: null,
+      boardType,
+      boardKey,
+      name: 'Apex Seed ' + rank,
+      dogType,
+      luckyNumber: dogType === 'EMPEROR' ? ((rank % 6) + 1) : null,
+      wins: Math.min(12, Math.max(0, Math.floor((50 - rank) / 4))),
+      losses: Math.max(0, 2 - Math.floor((50 - rank) / 18)),
+      round: Math.max(1, Math.ceil((51 - rank) / 4)),
+      rank,
+      challengeWins: 0,
+      isSeed: true,
+      createdAt: new Date().toISOString(),
+      items: initialItems(state),
+      relics: [],
+    };
+  }
+
+  function ensureApexBoard(state, boardType, boardKey) {
+    const entries = ensureApexEntries(state);
+    if (entries.some((entry) => entry.boardType === boardType && entry.boardKey === boardKey)) return;
+    for (let rank = 1; rank <= 50; rank += 1) entries.push(apexSeedFighter(state, rank, boardType, boardKey));
+  }
+
+  function publicApexEntry(entry) {
+    return {
+      ...entry,
+      items: (entry.items || []).map(publicItem),
+      relics: publicRelics(entry.relics || []),
+    };
+  }
+
+  function apexScore(entry) {
+    return entry.wins * 100 + entry.round * 4 - entry.losses * 25 + (entry.items || []).length;
+  }
+
+  function apexBoard(state, boardType, boardKey) {
+    ensureApexBoard(state, boardType, boardKey);
+    return ensureApexEntries(state)
+      .filter((entry) => entry.boardType === boardType && entry.boardKey === boardKey)
+      .sort((a, b) => a.rank - b.rank);
+  }
+
+  function resolveLocalApexChallenge(challenger, opponents) {
+    const score = apexScore(challenger);
+    const ordered = [...opponents].sort((a, b) => b.rank - a.rank);
+    const battles = [];
+    let challengeWins = 0;
+    for (const opponent of ordered) {
+      const won = score >= apexScore(opponent);
+      battles.push({
+        opponentId: opponent.id,
+        opponentRank: opponent.rank,
+        opponentName: opponent.name,
+        winner: won ? 'player' : 'opponent',
+        duration: 8 + battles.length,
+        playerHp: won ? 20 + Math.min(80, score % 80) : 0,
+        opponentHp: won ? 0 : 20 + Math.min(80, apexScore(opponent) % 80),
+      });
+      if (!won) return { placementRank: opponent.rank + 1, challengeWins, battles };
+      challengeWins += 1;
+    }
+    return { placementRank: 1, challengeWins, battles };
+  }
+
+  function submitApexBoard(state, boardType, boardKey, run, user) {
+    const board = apexBoard(state, boardType, boardKey);
+    const challenger = {
+      id: id(state, 'apex'),
+      sourceRunId: run.id,
+      boardType,
+      boardKey,
+      name: (user.nickname || user.account) + '#' + user.id.slice(0, 6),
+      dogType: run.dogType,
+      luckyNumber: run.luckyNumber || null,
+      wins: run.wins,
+      losses: run.losses,
+      round: run.round,
+      items: run.items || [],
+      relics: run.relics || [],
+      isSeed: false,
+      createdAt: new Date().toISOString(),
+    };
+    const report = resolveLocalApexChallenge(challenger, board);
+    const entries = ensureApexEntries(state);
+    for (const entry of entries) {
+      if (entry.boardType === boardType && entry.boardKey === boardKey && entry.rank >= report.placementRank) entry.rank += 1;
+    }
+    challenger.rank = report.placementRank;
+    challenger.challengeWins = report.challengeWins;
+    entries.push(challenger);
+    return { entry: challenger, report };
   }
 
   function shopPool(type) {
@@ -1230,8 +1346,8 @@ async function currentMockApiScript(buildId) {
     let playerHp = 100;
     let opponentHp = 100;
     const state = {
-      player: { shield: 0, poison: 0, weak: 0, thorns: 0, shibaSpeedStacks: 0, furyStacks: 0, disabledItemIds: [] },
-      opponent: { shield: 0, poison: 0, weak: 0, thorns: 0, shibaSpeedStacks: 0, furyStacks: 0, disabledItemIds: [] },
+      player: { shield: 0, poison: 0, weak: 0, thorns: 0, disabledItemIds: [], shibaSpeedStacks: 0, furyStacks: 0, lifestealItemIds: [], boomCounter: 0, growthDamageByItemId: {} },
+      opponent: { shield: 0, poison: 0, weak: 0, thorns: 0, disabledItemIds: [], shibaSpeedStacks: 0, furyStacks: 0, lifestealItemIds: [], boomCounter: 0, growthDamageByItemId: {} },
     };
     const events = [];
     let time = 0;
@@ -1243,6 +1359,19 @@ async function currentMockApiScript(buildId) {
     const opponentOf = (side) => side === 'player' ? 'opponent' : 'player';
     const fighterOf = (side) => side === 'player' ? run : opponent;
     const equippedOf = (fighter) => (fighter.items || []).filter((item) => item.area === 'EQUIPMENT').sort((a, b) => a.x - b.x);
+    const equippedWithEffect = (fighter, effect) => equippedOf(fighter).filter((item) => defs[item.defId]?.advancedEffect === effect);
+    const bloodContractAdjacentItems = (fighter, item, quality) => {
+      const itemLeft = item.x;
+      const itemRight = item.x + (defs[item.defId]?.width || 1);
+      return equippedOf(fighter).filter((candidate) => {
+        if (candidate.id === item.id) return false;
+        const candidateLeft = candidate.x;
+        const candidateRight = candidate.x + (defs[candidate.defId]?.width || 1);
+        const touchesLeft = candidateRight === itemLeft;
+        const touchesRight = candidateLeft === itemRight;
+        return normalizeQuality(quality) === 'DIAMOND' ? touchesLeft || touchesRight : touchesLeft;
+      });
+    };
     const relicWithEffect = (fighter, effect) => normalizeRelics(fighter.relics || []).find((relic) => relicDefsById[relic.relicId]?.effect === effect) || null;
     const hasRelicEffect = (fighter, effect) => Boolean(relicWithEffect(fighter, effect));
     const hasShieldImmunity = (side) => state[side].shield > 0 && equippedOf(fighterOf(side)).some((item) => defs[item.defId]?.advancedEffect === 'SHIELD_IMMUNITY');
@@ -1287,6 +1416,29 @@ async function currentMockApiScript(buildId) {
       const after = Math.max(0, before - amount);
       setHp(side, after);
       return { before, after, delta: after - before };
+    };
+    const applyHeal = (side, amount) => {
+      const before = hpOf(side);
+      const after = Math.min(100, before + amount);
+      setHp(side, after);
+      return { before, after, delta: after - before };
+    };
+    const purgePositiveBuffs = (side, maxLayers) => {
+      let remaining = Math.max(0, maxLayers);
+      let removed = 0;
+      const remove = (available) => {
+        const layers = Math.min(available, remaining);
+        remaining -= layers;
+        removed += layers;
+        return layers;
+      };
+      if (remaining > 0 && state[side].thorns > 0) state[side].thorns -= remove(state[side].thorns);
+      if (remaining > 0 && state[side].shibaSpeedStacks > 0) state[side].shibaSpeedStacks -= remove(state[side].shibaSpeedStacks);
+      if (remaining > 0 && state[side].shield >= 8) {
+        const shieldLayers = remove(Math.floor(state[side].shield / 8));
+        state[side].shield -= shieldLayers * 8;
+      }
+      return removed;
     };
     const addPoison = (side, amount) => {
       if (hasShieldImmunity(side)) return false;
@@ -1333,10 +1485,41 @@ async function currentMockApiScript(buildId) {
           }
           const target = opponentOf(side);
           const advanced = def.advancedEffect || 'NONE';
-          let amount = qualityAmountFrom(def.effect?.amount || 0, item.quality, def.effect?.qualityBase);
+          const quality = normalizeQuality(item.quality);
+          const sacrificeReplacesSmallEffect = def.size === 1 && equippedWithEffect(fighter, 'SMALL_TRIGGERS_LARGE').length > 0;
+          const boomCounterItem = equippedWithEffect(fighter, 'BOOM_COUNTER')[0];
+          if (!sacrificeReplacesSmallEffect && boomCounterItem) {
+            state[side].boomCounter += 1;
+            if (state[side].boomCounter >= 30) {
+              state[side].boomCounter = 0;
+              const boomDef = defs[boomCounterItem.defId];
+              const boomQuality = normalizeQuality(boomCounterItem.quality);
+              const boomDamage = qualityAmountFrom(boomDef.effect?.amount || 0, boomQuality, boomDef.effect?.qualityBase);
+              const boomResult = applyDirectHealthDamage(target, boomDamage);
+              push({ actor: side, kind: 'ITEM', itemId: boomCounterItem.id, defId: boomCounterItem.defId, effectType: 'DAMAGE', amount: Math.max(0, -boomResult.delta), target, text: boomDef.name + ' 爆鸣计数达到 30，造成 ' + Math.max(0, -boomResult.delta) + ' 点直接伤害。' });
+            }
+          }
+          let amount = qualityAmountFrom(def.effect?.amount || 0, quality, def.effect?.qualityBase);
+          if (advanced === 'GROWTH_DAMAGE') amount = state[side].growthDamageByItemId[item.id] ?? growthDamageBase(quality);
           if (state[side].furyStacks > 0 && def.effect?.type === 'DAMAGE') amount += state[side].furyStacks;
           time += 0.25;
-          if (def.effect?.type === 'HEAL') {
+          if (advanced === 'GRANT_LIFESTEAL_ADJACENT') {
+            const recipients = bloodContractAdjacentItems(fighter, item, quality);
+            for (const recipient of recipients) {
+              if (!state[side].lifestealItemIds.includes(recipient.id)) state[side].lifestealItemIds.push(recipient.id);
+            }
+            push({ actor: side, kind: 'ITEM', itemId: item.id, defId: item.defId, effectType: 'UTILITY', amount: recipients.length, target: side, text: def.name + ' 使' + recipients.length + '件相邻装备获得吸血。' });
+          } else if (advanced === 'PURGE_ENEMY_BUFFS') {
+            const removed = purgePositiveBuffs(target, amount);
+            const recoveryBlocked = time <= 10 && equippedWithEffect(fighter, 'DOUBLE_RATE_FIRST_TEN').length > 0;
+            if (removed > 0 && !recoveryBlocked) {
+              const healAmount = removed * qualityAmountFrom(5, quality, 'SILVER');
+              const healed = applyHeal(side, healAmount);
+              push({ actor: side, kind: 'ITEM', itemId: item.id, defId: item.defId, effectType: 'HEAL', amount: healAmount, target: side, text: def.name + ' 清除 ' + removed + ' 层增益，恢复 ' + Math.max(0, healed.delta) + ' 生命。' });
+            } else {
+              push({ actor: side, kind: 'ITEM', itemId: item.id, defId: item.defId, effectType: 'UTILITY', amount: removed, target, text: def.name + ' 清除 ' + removed + ' 层增益。' });
+            }
+          } else if (def.effect?.type === 'HEAL') {
             setHp(side, Math.min(100, hpOf(side) + amount));
             if (advanced === 'CLEANSE_ONE') {
               if (state[side].poison > 0) state[side].poison -= 1;
@@ -1367,14 +1550,17 @@ async function currentMockApiScript(buildId) {
             const result = applyDamage(target, amount, advanced === 'DOUBLE_SHIELD_DAMAGE' ? amount * 2 : amount);
             if (advanced === 'APPLY_WEAK_ON_HIT') addWeak(target, qualityAmount(1, item.quality));
             if (advanced === 'APPLY_WEAK_20_ON_HIT' && rng() < 0.2) addWeak(target, qualityAmount(1, item.quality));
-            if (advanced === 'LIFESTEAL') setHp(side, Math.min(100, hpOf(side) + Math.max(0, -result.delta)));
-            if (advanced === 'SHIBA_SPEED') state[side].shibaSpeedStacks = Math.min(5, state[side].shibaSpeedStacks + 1);
-            push({ actor: side, kind: 'ITEM', itemId: item.id, defId: item.defId, effectType: 'DAMAGE', amount: Math.max(0, -result.delta), target, text: def.name + ' 造成 ' + Math.max(0, -result.delta) + ' 点伤害。' });
             if (advanced === 'GAIN_FURY_ON_ATTACK' && rng() < 0.5) {
               state[side].furyStacks += 1;
               push({ actor: side, kind: 'ITEM', itemId: item.id, defId: item.defId, effectType: 'UTILITY', amount: state[side].furyStacks, target: side, text: def.name + ' 触发【激昂】，攻击伤害 +1。' });
             }
+            const actualHealthDamage = Math.max(0, -result.delta);
+            if (advanced === 'LIFESTEAL' || state[side].lifestealItemIds.includes(item.id)) applyHeal(side, actualHealthDamage);
+            if (advanced === 'GROWTH_DAMAGE') state[side].growthDamageByItemId[item.id] = amount + growthDamageStep(quality);
+            const growthText = advanced === 'GROWTH_DAMAGE' ? '，后续伤害 +' + growthDamageStep(quality) : '';
+            push({ actor: side, kind: 'ITEM', itemId: item.id, defId: item.defId, effectType: 'DAMAGE', amount: actualHealthDamage, target, text: def.name + ' 造成 ' + actualHealthDamage + ' 点伤害' + growthText + '。' });
           }
+          if (!sacrificeReplacesSmallEffect && advanced === 'SHIBA_SPEED') state[side].shibaSpeedStacks = Math.min(5, state[side].shibaSpeedStacks + 1);
           if (playerHp <= 0 || opponentHp <= 0) break;
         }
       }
@@ -1475,6 +1661,38 @@ async function currentMockApiScript(buildId) {
         : [];
       saveState(state);
       return json({ leaderboard, playerRank: profile.tier === 'DOG_KING' ? 1 : null, playerProfile: publicLadderProfile(profile) });
+    }
+    if (pathname === '/apex') {
+      const dailyBoardKey = dailyApexBoardKey();
+      const submittedRunIds = new Set(ensureApexEntries(state).filter((entry) => entry.boardType === 'OVERALL' && entry.sourceRunId).map((entry) => entry.sourceRunId));
+      const candidates = state.run && state.run.status === 'COMPLETE' && !submittedRunIds.has(state.run.id) ? [publicRun(state.run)] : [];
+      const leaderboards = {
+        overall: apexBoard(state, 'OVERALL', 'default').map(publicApexEntry),
+        daily: apexBoard(state, 'DAILY', dailyBoardKey).map(publicApexEntry),
+      };
+      saveState(state);
+      return json({ dailyBoardKey, dailyResetHour: 5, leaderboards, candidates });
+    }
+    if (pathname === '/apex/submit' && method === 'POST') {
+      const run = state.run && state.run.id === body.runId ? state.run : null;
+      if (!run) return error('Run not found', 404);
+      if (run.status !== 'COMPLETE') return error('Only completed dogs can enter apex arena');
+      if (ensureApexEntries(state).some((entry) => entry.boardType === 'OVERALL' && entry.sourceRunId === run.id)) return error('This dog has already entered apex arena', 409);
+      const dailyBoardKey = dailyApexBoardKey();
+      const overall = submitApexBoard(state, 'OVERALL', 'default', run, state.user);
+      const daily = submitApexBoard(state, 'DAILY', dailyBoardKey, run, state.user);
+      const leaderboards = {
+        overall: apexBoard(state, 'OVERALL', 'default').map(publicApexEntry),
+        daily: apexBoard(state, 'DAILY', dailyBoardKey).map(publicApexEntry),
+      };
+      saveState(state);
+      return json({
+        entries: { overall: publicApexEntry(overall.entry), daily: publicApexEntry(daily.entry) },
+        reports: { overall: overall.report, daily: daily.report },
+        dailyBoardKey,
+        dailyResetHour: 5,
+        leaderboards,
+      });
     }
     if (pathname === '/runs' && method === 'POST') {
       const dogType = dogTypes.includes(body.dogType) ? body.dogType : 'SHIBA';

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { resolveWinnerByHealthPercent, simulateBattle } from './game/battle'
-import { CLASS_REWARD_DEFS, DOGS, RELIC_DEFS, itemDef, shopPool } from './game/data'
+import { CLASS_REWARD_DEFS, DOGS, RELIC_DEFS, itemDef, itemDefForQuality, shopPool } from './game/data'
 import { canPlace, findSlot, triggerOrder } from './game/grid'
 import { createRng } from './game/rng'
 import { createShop, itemPurchaseValue, itemSellValue } from './game/shop'
@@ -179,9 +179,715 @@ describe('dog and item definitions', () => {
       'v3-husky-engine',
     ]))
   })
+
+  it('defines the new common archetype equipment with exact tuning', () => {
+    expect(itemDef('v4-blood-contract-fang')).toMatchObject({
+      size: 2,
+      price: 12,
+      dice: [1, 6],
+      tags: ['lifesteal', 'support', 'extreme'],
+      effect: { type: 'UTILITY', amount: 0 },
+      advancedEffect: 'GRANT_LIFESTEAL_ADJACENT',
+      defaultQuality: 'GOLD',
+    })
+    expect(itemDef('v4-boom-counter')).toMatchObject({
+      size: 2,
+      price: 14,
+      dice: [1, 2, 3, 4, 5, 6],
+      tags: ['counter', 'trigger', 'damage'],
+      effect: { type: 'UTILITY', amount: 300, qualityBase: 'GOLD' },
+      advancedEffect: 'BOOM_COUNTER',
+      defaultQuality: 'GOLD',
+    })
+    expect(itemDef('v4-growing-chew-sword')).toMatchObject({
+      size: 2,
+      price: 9,
+      dice: [2, 3, 4],
+      tags: ['growth', 'damage', 'stable'],
+      effect: { type: 'DAMAGE', amount: 1, qualityBase: 'SILVER' },
+      advancedEffect: 'GROWTH_DAMAGE',
+      defaultQuality: 'SILVER',
+    })
+    expect(itemDef('v4-reverse-fur-comb')).toMatchObject({
+      size: 1,
+      price: 8,
+      dice: [3, 4],
+      tags: ['cleanse', 'heal', 'counter'],
+      effect: { type: 'UTILITY', amount: 3, qualityBase: 'SILVER' },
+      advancedEffect: 'PURGE_ENEMY_BUFFS',
+      defaultQuality: 'SILVER',
+    })
+
+    expect(shopPool('GENERAL').map((item) => item.id)).toEqual(expect.arrayContaining([
+      'v4-blood-contract-fang',
+      'v4-boom-counter',
+      'v4-growing-chew-sword',
+      'v4-reverse-fur-comb',
+    ]))
+    expect(shopPool('MEDIUM').map((item) => item.id)).toEqual(expect.arrayContaining([
+      'v4-blood-contract-fang',
+      'v4-boom-counter',
+      'v4-growing-chew-sword',
+    ]))
+    expect(shopPool('SMALL').map((item) => item.id)).toContain('v4-reverse-fur-comb')
+  })
+
+  it('uses quality-scaled descriptions for base-quality archetype equipment', () => {
+    expect(itemDefForQuality('v4-growing-chew-sword', 'BRONZE').description).toContain('初始造成 1 点伤害')
+    expect(itemDefForQuality('v4-growing-chew-sword', 'BRONZE').description).toContain('后续伤害 +2')
+    expect(itemDefForQuality('v4-growing-chew-sword', 'SILVER').description).toContain('后续伤害 +3')
+    expect(itemDefForQuality('v4-reverse-fur-comb', 'BRONZE').description).toContain('每实际清除 1 层，自己恢复 3 点生命')
+    expect(itemDefForQuality('v4-reverse-fur-comb', 'SILVER').description).toContain('每实际清除 1 层，自己恢复 5 点生命')
+  })
+
+  it('growing chew sword diamond description matches growth base and step', () => {
+    expect(itemDefForQuality('v4-growing-chew-sword', 'DIAMOND').description).toContain('初始造成 3 点伤害')
+    expect(itemDefForQuality('v4-growing-chew-sword', 'DIAMOND').description).toContain('后续伤害 +7')
+  })
 })
 
 describe('battle simulation', () => {
+  const openingThornsRelic: RelicInstance = { id: 'opening-thorns', relicId: 'v3-fluffed-spike-collar', quality: 'GOLD', slot: 0 }
+
+  function reverseFurCombEvent(result: ReturnType<typeof simulateBattle>, itemId = 'comb') {
+    return result.events.find((event) =>
+      event.kind === 'ITEM'
+      && event.actor === 'player'
+      && event.itemId === itemId
+      && event.defId === 'v4-reverse-fur-comb'
+    )
+  }
+
+  it('reverse fur comb silver purges enemy thorns first and heals by removed layers', () => {
+    const player: FighterSnapshot = {
+      name: 'P',
+      dogType: 'MUTT',
+      wins: 0,
+      losses: 0,
+      round: 7,
+      items: [
+        { id: 'comb', defId: 'v4-reverse-fur-comb', quality: 'SILVER', area: 'EQUIPMENT', x: 0, y: 0 },
+      ],
+    }
+    const opponent: FighterSnapshot = {
+      name: 'O',
+      dogType: 'MUTT',
+      wins: 0,
+      losses: 0,
+      round: 7,
+      items: [
+        { id: 'hit', defId: 'starter-1', quality: 'DIAMOND', area: 'EQUIPMENT', x: 0, y: 0 },
+        { id: 'shield', defId: 'v3-wooden-shield', quality: 'DIAMOND', area: 'EQUIPMENT', x: 1, y: 0 },
+        { id: 'speed', defId: 'shiba-speed-katana', quality: 'GOLD', area: 'EQUIPMENT', x: 2, y: 0 },
+      ],
+      relics: [openingThornsRelic],
+    }
+
+    const result = simulateBattle(player, opponent, 'reverse-fur-comb-0')
+    const purge = reverseFurCombEvent(result)
+
+    expect(purge).toMatchObject({
+      effectType: 'HEAL',
+      amount: 15,
+      target: 'player',
+      sourceHpDelta: 15,
+      playerHp: 240,
+    })
+    expect(purge?.text).toContain('清除 3 层增益')
+    expect(purge?.text).toContain('恢复 15 点生命')
+    expect(purge?.opponentStatuses?.positive).toContainEqual(expect.objectContaining({ type: 'thorns', stacks: 2 }))
+    expect(purge?.opponentShield).toBe(27)
+  })
+
+  it('reverse fur comb converts every 8 enemy shield into one purged layer after thorns and speed', () => {
+    const player: FighterSnapshot = {
+      name: 'P',
+      dogType: 'MUTT',
+      wins: 0,
+      losses: 0,
+      round: 7,
+      items: [
+        { id: 'comb', defId: 'v4-reverse-fur-comb', quality: 'SILVER', area: 'EQUIPMENT', x: 0, y: 0 },
+      ],
+    }
+    const opponent: FighterSnapshot = {
+      name: 'O',
+      dogType: 'MUTT',
+      wins: 0,
+      losses: 0,
+      round: 7,
+      items: [
+        { id: 'hit', defId: 'starter-1', quality: 'DIAMOND', area: 'EQUIPMENT', x: 0, y: 0 },
+        { id: 'shield', defId: 'v3-wooden-shield', quality: 'DIAMOND', area: 'EQUIPMENT', x: 1, y: 0 },
+      ],
+    }
+
+    const result = simulateBattle(player, opponent, 'reverse-fur-comb-5')
+    const purge = reverseFurCombEvent(result)
+
+    expect(purge).toMatchObject({
+      effectType: 'HEAL',
+      amount: 15,
+      sourceHpDelta: 15,
+      playerHp: 251,
+    })
+    expect(purge?.text).toContain('清除 3 层增益')
+    expect(purge?.text).toContain('恢复 15 点生命')
+    expect(purge?.opponentShield).toBe(30)
+  })
+
+  it('reverse fur comb diamond purges seven layers and reports seventy-seven healing', () => {
+    const player: FighterSnapshot = {
+      name: 'P',
+      dogType: 'MUTT',
+      wins: 0,
+      losses: 0,
+      round: 7,
+      items: [
+        { id: 'comb', defId: 'v4-reverse-fur-comb', quality: 'DIAMOND', area: 'EQUIPMENT', x: 0, y: 0 },
+      ],
+    }
+    const opponent: FighterSnapshot = {
+      name: 'O',
+      dogType: 'MUTT',
+      wins: 0,
+      losses: 0,
+      round: 7,
+      items: [
+        { id: 'hit', defId: 'starter-1', quality: 'DIAMOND', area: 'EQUIPMENT', x: 0, y: 0 },
+        { id: 'shield', defId: 'v3-wooden-shield', quality: 'DIAMOND', area: 'EQUIPMENT', x: 1, y: 0 },
+        { id: 'speed', defId: 'shiba-speed-katana', quality: 'GOLD', area: 'EQUIPMENT', x: 2, y: 0 },
+      ],
+      relics: [openingThornsRelic],
+    }
+
+    const result = simulateBattle(player, opponent, 'reverse-fur-comb-0')
+    const purge = reverseFurCombEvent(result)
+
+    expect(purge).toMatchObject({
+      effectType: 'HEAL',
+      amount: 77,
+      target: 'player',
+    })
+    expect(purge?.text).toContain('清除 7 层增益')
+    expect(purge?.text).toContain('恢复 77 点生命')
+    expect(purge?.opponentStatuses?.positive).not.toContainEqual(expect.objectContaining({ type: 'thorns' }))
+    expect(purge?.opponentStatuses?.positive).not.toContainEqual(expect.objectContaining({ type: 'extraRoll' }))
+    expect(purge?.opponentShield).toBe(27)
+  })
+
+  it('reverse fur comb prioritizes thorns before shield when the purge limit is small', () => {
+    const player: FighterSnapshot = {
+      name: 'P',
+      dogType: 'MUTT',
+      wins: 0,
+      losses: 0,
+      round: 7,
+      items: [
+        { id: 'comb', defId: 'v4-reverse-fur-comb', quality: 'BRONZE', area: 'EQUIPMENT', x: 0, y: 0 },
+      ],
+    }
+    const opponent: FighterSnapshot = {
+      name: 'O',
+      dogType: 'MUTT',
+      wins: 0,
+      losses: 0,
+      round: 7,
+      items: [
+        { id: 'hit', defId: 'starter-1', quality: 'DIAMOND', area: 'EQUIPMENT', x: 0, y: 0 },
+        { id: 'shield', defId: 'v3-wooden-shield', quality: 'DIAMOND', area: 'EQUIPMENT', x: 1, y: 0 },
+      ],
+      relics: [openingThornsRelic],
+    }
+
+    const result = simulateBattle(player, opponent, 'reverse-fur-comb-1')
+    const purge = reverseFurCombEvent(result)
+
+    expect(purge).toMatchObject({
+      effectType: 'HEAL',
+      amount: 6,
+    })
+    expect(purge?.text).toContain('恢复 6 点生命')
+    expect(purge?.opponentStatuses?.positive).toContainEqual(expect.objectContaining({ type: 'thorns', stacks: 3 }))
+    expect(purge?.opponentShield).toBe(27)
+  })
+
+  it('reverse fur comb still purges buffs but does not heal while recovery is blocked', () => {
+    const player: FighterSnapshot = {
+      name: 'P',
+      dogType: 'MUTT',
+      wins: 0,
+      losses: 0,
+      round: 7,
+      items: [
+        { id: 'air', defId: 'mutt-eat-air', quality: 'DIAMOND', area: 'EQUIPMENT', x: 0, y: 0 },
+        { id: 'comb', defId: 'v4-reverse-fur-comb', quality: 'DIAMOND', area: 'EQUIPMENT', x: 4, y: 0 },
+      ],
+    }
+    const opponent: FighterSnapshot = {
+      name: 'O',
+      dogType: 'MUTT',
+      wins: 0,
+      losses: 0,
+      round: 7,
+      items: [
+        { id: 'hit', defId: 'starter-1', quality: 'DIAMOND', area: 'EQUIPMENT', x: 0, y: 0 },
+        { id: 'shield', defId: 'v3-wooden-shield', quality: 'DIAMOND', area: 'EQUIPMENT', x: 1, y: 0 },
+      ],
+      relics: [openingThornsRelic],
+    }
+
+    const result = simulateBattle(player, opponent, 'reverse-fur-comb-blocked-1')
+    const purge = reverseFurCombEvent(result)
+
+    expect(purge).toBeDefined()
+    expect(purge?.time).toBeLessThanOrEqual(10)
+    expect(purge?.effectType).not.toBe('HEAL')
+    expect(purge).toMatchObject({
+      effectType: 'UTILITY',
+      sourceHpDelta: 0,
+    })
+    expect(purge?.text).toContain('清除')
+    expect(purge?.text).not.toContain('恢复')
+    expect(purge?.opponentStatuses?.positive).not.toContainEqual(expect.objectContaining({ type: 'thorns' }))
+    expect(purge?.opponentShield).toBe(11)
+  })
+
+  it('growing chew sword silver damage grows without a fixed cap', () => {
+    const player: FighterSnapshot = {
+      name: 'P',
+      dogType: 'MUTT',
+      wins: 0,
+      losses: 0,
+      round: 7,
+      items: [
+        { id: 'growing-silver', defId: 'v4-growing-chew-sword', quality: 'SILVER', area: 'EQUIPMENT', x: 0, y: 0 },
+      ],
+    }
+    const opponent: FighterSnapshot = { name: 'O', dogType: 'MUTT', wins: 0, losses: 0, round: 7, items: [] }
+    const result = simulateBattle(player, opponent, 'growing-chew-sword-silver')
+    const hits = result.events.filter((event) =>
+      event.kind === 'ITEM'
+      && event.actor === 'player'
+      && event.itemId === 'growing-silver'
+      && event.effectType === 'DAMAGE'
+    )
+    const growthEvents = result.events.filter((event) =>
+      event.kind === 'ITEM'
+      && event.actor === 'player'
+      && event.itemId === 'growing-silver'
+      && event.effectType === 'UTILITY'
+      && event.text.includes('后续伤害提高')
+    )
+
+    expect(hits.slice(0, 5).map((event) => event.amount)).toEqual([1, 4, 7, 10, 13])
+    expect(hits.some((event) => (event.amount ?? 0) > 25)).toBe(true)
+    expect(growthEvents.slice(0, 3).map((event) => event.amount)).toEqual([3, 3, 3])
+  })
+
+  it('growing chew sword quality controls starting damage and growth step', () => {
+    const damageSequenceFor = (quality: GameItem['quality']) => {
+      const player: FighterSnapshot = {
+        name: 'P',
+        dogType: 'MUTT',
+        wins: 0,
+        losses: 0,
+        round: 7,
+        items: [
+          { id: `growing-${quality}`, defId: 'v4-growing-chew-sword', quality, area: 'EQUIPMENT', x: 0, y: 0 },
+        ],
+      }
+      const opponent: FighterSnapshot = { name: 'O', dogType: 'MUTT', wins: 0, losses: 0, round: 7, items: [] }
+      const result = simulateBattle(player, opponent, `growing-chew-sword-${quality}`)
+      return result.events
+        .filter((event) =>
+          event.kind === 'ITEM'
+          && event.actor === 'player'
+          && event.itemId === `growing-${quality}`
+          && event.effectType === 'DAMAGE'
+        )
+        .slice(0, 3)
+        .map((event) => event.amount)
+    }
+
+    expect(damageSequenceFor('GOLD')).toEqual([2, 7, 12])
+    expect(damageSequenceFor('DIAMOND')).toEqual([3, 10, 17])
+  })
+
+  it('growing chew sword applies emperor lucky doubling to current unscaled growth base', () => {
+    const player: FighterSnapshot = {
+      name: 'P',
+      dogType: 'EMPEROR',
+      luckyNumber: 2,
+      wins: 0,
+      losses: 0,
+      round: 7,
+      items: [
+        { id: 'growing-diamond', defId: 'v4-growing-chew-sword', quality: 'DIAMOND', area: 'EQUIPMENT', x: 0, y: 0 },
+      ],
+    }
+    const opponent: FighterSnapshot = { name: 'O', dogType: 'MUTT', wins: 0, losses: 0, round: 7, items: [] }
+    const result = simulateBattle(player, opponent, 'growing-chew-sword-emperor-5')
+    const firstPlayerRoll = result.events.find((event) => event.kind === 'ROLL' && event.actor === 'player')
+    const firstHit = result.events.find((event) =>
+      event.kind === 'ITEM'
+      && event.actor === 'player'
+      && event.itemId === 'growing-diamond'
+      && event.effectType === 'DAMAGE'
+    )
+    const firstGrowth = result.events.find((event) =>
+      event.kind === 'ITEM'
+      && event.actor === 'player'
+      && event.itemId === 'growing-diamond'
+      && event.effectType === 'UTILITY'
+      && event.text.includes('后续伤害提高')
+    )
+
+    expect(firstPlayerRoll?.roll).toBe(2)
+    expect(firstHit?.amount).toBe(6)
+    expect(firstGrowth?.amount).toBe(7)
+  })
+
+  it('growing chew sword keeps growth per item instance', () => {
+    const player: FighterSnapshot = {
+      name: 'P',
+      dogType: 'MUTT',
+      wins: 0,
+      losses: 0,
+      round: 7,
+      items: [
+        { id: 'left-growth', defId: 'v4-growing-chew-sword', quality: 'SILVER', area: 'EQUIPMENT', x: 0, y: 0 },
+        { id: 'right-growth', defId: 'v4-growing-chew-sword', quality: 'SILVER', area: 'EQUIPMENT', x: 2, y: 0 },
+      ],
+    }
+    const opponent: FighterSnapshot = { name: 'O', dogType: 'MUTT', wins: 0, losses: 0, round: 7, items: [] }
+    const result = simulateBattle(player, opponent, 'growing-chew-sword-instances')
+    const hits = result.events.filter((event) =>
+      event.kind === 'ITEM'
+      && event.actor === 'player'
+      && (event.itemId === 'left-growth' || event.itemId === 'right-growth')
+      && event.effectType === 'DAMAGE'
+    )
+
+    expect(hits.slice(0, 4).map((event) => [event.itemId, event.amount])).toEqual([
+      ['left-growth', 1],
+      ['right-growth', 1],
+      ['left-growth', 4],
+      ['right-growth', 4],
+    ])
+  })
+
+  it('blood contract fang at gold grants lifesteal to left adjacent equipment only', () => {
+    const player: FighterSnapshot = {
+      name: 'P',
+      dogType: 'SHIBA',
+      wins: 0,
+      losses: 0,
+      round: 6,
+      items: [
+        { id: 'left-bite', defId: 'starter-1', quality: 'BRONZE', area: 'EQUIPMENT', x: 0, y: 0 },
+        { id: 'fang', defId: 'v4-blood-contract-fang', quality: 'GOLD', area: 'EQUIPMENT', x: 1, y: 0 },
+        { id: 'right-bite', defId: 'starter-1', quality: 'BRONZE', area: 'EQUIPMENT', x: 3, y: 0 },
+      ],
+    }
+    const opponent: FighterSnapshot = {
+      name: 'O',
+      dogType: 'SHIBA',
+      wins: 0,
+      losses: 0,
+      round: 6,
+      items: [
+        { id: 'opener', defId: 'starter-1', quality: 'DIAMOND', area: 'EQUIPMENT', x: 0, y: 0 },
+      ],
+    }
+    const result = simulateBattle(player, opponent, 'blood-contract-gold')
+    const grantIndex = result.events.findIndex((event) =>
+      event.actor === 'player'
+      && event.itemId === 'fang'
+      && event.effectType === 'UTILITY'
+      && event.text.includes('左侧')
+      && event.text.includes('吸血')
+    )
+    const laterEvents = result.events.slice(grantIndex + 1)
+    const leftHeals = laterEvents.filter((event) => event.actor === 'player' && event.itemId === 'left-bite' && event.effectType === 'HEAL')
+    const rightHeals = laterEvents.filter((event) => event.actor === 'player' && event.itemId === 'right-bite' && event.effectType === 'HEAL')
+
+    expect(grantIndex).toBeGreaterThanOrEqual(0)
+    expect(leftHeals.length).toBeGreaterThan(0)
+    expect(leftHeals.every((event) => (event.sourceHpDelta ?? 0) > 0)).toBe(true)
+    expect(rightHeals).toEqual([])
+  })
+
+  it('blood contract fang grants lifesteal to wide left adjacent equipment touching edges', () => {
+    const player: FighterSnapshot = {
+      name: 'P',
+      dogType: 'SHIBA',
+      wins: 0,
+      losses: 0,
+      round: 6,
+      items: [
+        { id: 'large-left', defId: 'giant-bone', quality: 'BRONZE', area: 'EQUIPMENT', x: 0, y: 0 },
+        { id: 'fang', defId: 'v4-blood-contract-fang', quality: 'GOLD', area: 'EQUIPMENT', x: 4, y: 0 },
+      ],
+    }
+    const opponent: FighterSnapshot = {
+      name: 'O',
+      dogType: 'SHIBA',
+      wins: 0,
+      losses: 0,
+      round: 6,
+      items: [
+        { id: 'opener', defId: 'starter-1', quality: 'DIAMOND', area: 'EQUIPMENT', x: 0, y: 0 },
+      ],
+    }
+    const result = simulateBattle(player, opponent, 'wide-left-adjacent-blood-contract')
+    const grantIndex = result.events.findIndex((event) =>
+      event.actor === 'player'
+      && event.itemId === 'fang'
+      && event.effectType === 'UTILITY'
+      && event.text.includes('吸血')
+    )
+    const laterEvents = result.events.slice(grantIndex + 1)
+    const largeDamageIndex = laterEvents.findIndex((event) =>
+      event.actor === 'player'
+      && event.itemId === 'large-left'
+      && event.effectType === 'DAMAGE'
+      && (event.targetHpDelta ?? 0) < 0
+    )
+    const largeHeal = laterEvents.slice(largeDamageIndex + 1).find((event) =>
+      event.actor === 'player'
+      && event.itemId === 'large-left'
+      && event.effectType === 'HEAL'
+      && (event.sourceHpDelta ?? 0) > 0
+    )
+
+    expect(grantIndex).toBeGreaterThanOrEqual(0)
+    expect(largeDamageIndex).toBeGreaterThanOrEqual(0)
+    expect(largeHeal).toBeDefined()
+  })
+
+  it('blood contract fang at diamond grants lifesteal to both adjacent equipment', () => {
+    const player: FighterSnapshot = {
+      name: 'P',
+      dogType: 'SHIBA',
+      wins: 0,
+      losses: 0,
+      round: 6,
+      items: [
+        { id: 'left-bite', defId: 'starter-1', quality: 'BRONZE', area: 'EQUIPMENT', x: 0, y: 0 },
+        { id: 'fang', defId: 'v4-blood-contract-fang', quality: 'DIAMOND', area: 'EQUIPMENT', x: 1, y: 0 },
+        { id: 'right-bite', defId: 'starter-1', quality: 'BRONZE', area: 'EQUIPMENT', x: 3, y: 0 },
+      ],
+    }
+    const opponent: FighterSnapshot = {
+      name: 'O',
+      dogType: 'SHIBA',
+      wins: 0,
+      losses: 0,
+      round: 6,
+      items: [
+        { id: 'opener', defId: 'starter-1', quality: 'DIAMOND', area: 'EQUIPMENT', x: 0, y: 0 },
+      ],
+    }
+    const result = simulateBattle(player, opponent, 'blood-contract-diamond')
+    const grantIndex = result.events.findIndex((event) =>
+      event.actor === 'player'
+      && event.itemId === 'fang'
+      && event.effectType === 'UTILITY'
+      && event.text.includes('左右相邻')
+      && event.text.includes('吸血')
+    )
+    const laterEvents = result.events.slice(grantIndex + 1)
+    const leftHeals = laterEvents.filter((event) => event.actor === 'player' && event.itemId === 'left-bite' && event.effectType === 'HEAL')
+    const rightHeals = laterEvents.filter((event) => event.actor === 'player' && event.itemId === 'right-bite' && event.effectType === 'HEAL')
+
+    expect(grantIndex).toBeGreaterThanOrEqual(0)
+    expect(leftHeals.length).toBeGreaterThan(0)
+    expect(rightHeals.length).toBeGreaterThan(0)
+    expect([...leftHeals, ...rightHeals].every((event) => (event.sourceHpDelta ?? 0) > 0)).toBe(true)
+  })
+
+  it('blood contract lifesteal does not heal for shield-absorbed damage', () => {
+    const player: FighterSnapshot = {
+      name: 'P',
+      dogType: 'SHIBA',
+      wins: 0,
+      losses: 0,
+      round: 6,
+      items: [
+        { id: 'left-bite', defId: 'starter-1', quality: 'BRONZE', area: 'EQUIPMENT', x: 0, y: 0 },
+        { id: 'fang', defId: 'v4-blood-contract-fang', quality: 'GOLD', area: 'EQUIPMENT', x: 1, y: 0 },
+      ],
+    }
+    const opponent: FighterSnapshot = {
+      name: 'O',
+      dogType: 'SHIBA',
+      wins: 0,
+      losses: 0,
+      round: 6,
+      items: [
+        { id: 'shield-a', defId: 'v3-golden-kennel', quality: 'DIAMOND', area: 'EQUIPMENT', x: 0, y: 0 },
+        { id: 'shield-b', defId: 'v3-golden-kennel', quality: 'DIAMOND', area: 'EQUIPMENT', x: 4, y: 0 },
+        { id: 'opener', defId: 'starter-1', quality: 'DIAMOND', area: 'EQUIPMENT', x: 8, y: 0 },
+      ],
+    }
+    const result = simulateBattle(player, opponent, 'blood-contract-shield')
+    const grantIndex = result.events.findIndex((event) =>
+      event.actor === 'player'
+      && event.itemId === 'fang'
+      && event.effectType === 'UTILITY'
+      && event.text.includes('吸血')
+    )
+    const laterEvents = result.events.slice(grantIndex + 1)
+    const absorbedHit = laterEvents.find((event) =>
+      event.actor === 'player'
+      && event.itemId === 'left-bite'
+      && event.effectType === 'DAMAGE'
+      && event.targetHpDelta === 0
+    )
+    const absorbedIndex = laterEvents.findIndex((event) => event === absorbedHit)
+    const nextEvent = absorbedIndex >= 0 ? laterEvents[absorbedIndex + 1] : undefined
+
+    expect(grantIndex).toBeGreaterThanOrEqual(0)
+    expect(absorbedHit).toMatchObject({ amount: 0, targetHpDelta: 0 })
+    expect(nextEvent).not.toMatchObject({ actor: 'player', itemId: 'left-bite', effectType: 'HEAL' })
+  })
+
+  it('gold boom counter explodes for 300 damage after 30 successful equipment triggers', () => {
+    const player: FighterSnapshot = {
+      name: 'P',
+      dogType: 'SHIBA',
+      wins: 0,
+      losses: 0,
+      round: 10,
+      items: [
+        { id: 'counter', defId: 'v4-boom-counter', quality: 'GOLD', area: 'EQUIPMENT', x: 0, y: 0 },
+      ],
+    }
+    const opponent: FighterSnapshot = { name: 'O', dogType: 'SHIBA', wins: 0, losses: 0, round: 10, items: [] }
+    const result = simulateBattle(player, opponent, 'boom-counter-gold')
+    const explosion = result.events.find((event) =>
+      event.actor === 'player'
+      && event.itemId === 'counter'
+      && event.defId === 'v4-boom-counter'
+      && event.effectType === 'DAMAGE'
+      && event.text.includes('爆鸣计数达到 30')
+    )
+
+    expect(explosion).toMatchObject({
+      quality: 'GOLD',
+      amount: 300,
+      target: 'opponent',
+      targetHpDelta: -300,
+      time: 30,
+    })
+  })
+
+  it('diamond boom counter keeps threshold 30 and damage 450', () => {
+    const player: FighterSnapshot = {
+      name: 'P',
+      dogType: 'SHIBA',
+      wins: 0,
+      losses: 0,
+      round: 11,
+      items: [
+        { id: 'counter', defId: 'v4-boom-counter', quality: 'DIAMOND', area: 'EQUIPMENT', x: 0, y: 0 },
+      ],
+    }
+    const opponent: FighterSnapshot = { name: 'O', dogType: 'SHIBA', wins: 0, losses: 0, round: 11, items: [] }
+    const result = simulateBattle(player, opponent, 'boom-counter-diamond')
+    const explosion = result.events.find((event) =>
+      event.actor === 'player'
+      && event.itemId === 'counter'
+      && event.effectType === 'DAMAGE'
+      && event.text.includes('爆鸣计数达到 30')
+    )
+
+    expect(explosion).toMatchObject({
+      quality: 'DIAMOND',
+      amount: 450,
+      targetHpDelta: -450,
+      time: 30,
+    })
+  })
+
+  it('boom counter explosion does not trigger lifesteal when granted by diamond blood contract fang', () => {
+    const player: FighterSnapshot = {
+      name: 'P',
+      dogType: 'SHIBA',
+      wins: 0,
+      losses: 0,
+      round: 10,
+      items: [
+        { id: 'fang', defId: 'v4-blood-contract-fang', quality: 'DIAMOND', area: 'EQUIPMENT', x: 0, y: 0 },
+        { id: 'counter', defId: 'v4-boom-counter', quality: 'GOLD', area: 'EQUIPMENT', x: 2, y: 0 },
+      ],
+    }
+    const opponent: FighterSnapshot = { name: 'O', dogType: 'SHIBA', wins: 0, losses: 0, round: 10, items: [] }
+    const result = simulateBattle(player, opponent, 'boom-counter-lifesteal')
+    const grantIndex = result.events.findIndex((event) =>
+      event.actor === 'player'
+      && event.itemId === 'fang'
+      && event.effectType === 'UTILITY'
+      && event.text.includes('吸血')
+    )
+    const explosionIndex = result.events.findIndex((event) =>
+      event.actor === 'player'
+      && event.itemId === 'counter'
+      && event.effectType === 'DAMAGE'
+      && event.text.includes('爆鸣计数达到 30')
+    )
+    const nextPlayerEvent = result.events.slice(explosionIndex + 1).find((event) => event.actor === 'player')
+
+    expect(grantIndex).toBeGreaterThanOrEqual(0)
+    expect(explosionIndex).toBeGreaterThan(grantIndex)
+    expect(nextPlayerEvent).not.toMatchObject({ itemId: 'counter', effectType: 'HEAL' })
+  })
+
+  it('replaced small items do not count toward boom counter', () => {
+    const player: FighterSnapshot = {
+      name: 'P',
+      dogType: 'BULLY',
+      wins: 0,
+      losses: 0,
+      round: 10,
+      items: [
+        ...Array.from({ length: 30 }, (_, index) => ({
+          id: `small-${index}`,
+          defId: 'starter-1',
+          quality: 'BRONZE' as const,
+          area: 'EQUIPMENT' as const,
+          x: index,
+          y: 0,
+        })),
+        { id: 'counter', defId: 'v4-boom-counter', quality: 'GOLD', area: 'EQUIPMENT', x: 30, y: 0 },
+        { id: 'sacrifice', defId: 'bully-sacrifice', quality: 'DIAMOND', area: 'EQUIPMENT', x: 32, y: 0 },
+        { id: 'large', defId: 'giant-bone', quality: 'BRONZE', area: 'EQUIPMENT', x: 36, y: 0 },
+      ],
+    }
+    const opponent: FighterSnapshot = { name: 'O', dogType: 'SHIBA', wins: 0, losses: 0, round: 10, items: [] }
+    const result = simulateBattle(player, opponent, 'sacrifice-boom-4')
+    const firstPlayerRollIndex = result.events.findIndex((event) => event.kind === 'ROLL' && event.actor === 'player')
+    const firstPlayerRoll = result.events[firstPlayerRollIndex]
+    const firstLargeReplacementIndex = result.events.findIndex((event) =>
+      event.time === firstPlayerRoll?.time
+      && event.actor === 'player'
+      && event.itemId === 'large'
+      && event.effectType === 'DAMAGE'
+    )
+    const boomBeforeLargeReplacement = result.events.slice(firstPlayerRollIndex + 1, firstLargeReplacementIndex).find((event) =>
+      event.actor === 'player'
+      && event.itemId === 'counter'
+      && event.defId === 'v4-boom-counter'
+      && event.effectType === 'DAMAGE'
+    )
+
+    expect(firstPlayerRollIndex).toBeGreaterThanOrEqual(0)
+    expect(firstPlayerRoll?.roll).toBe(1)
+    expect(firstLargeReplacementIndex).toBeGreaterThan(firstPlayerRollIndex)
+    expect(boomBeforeLargeReplacement).toBeUndefined()
+  })
+
   it('resolves deterministic battle logs with poison or victory', () => {
     const player: FighterSnapshot = { name: 'P', dogType: 'MUTT', wins: 0, losses: 0, round: 0, items: baseItems() }
     const opponent: FighterSnapshot = { name: 'O', dogType: 'SHIBA', wins: 0, losses: 0, round: 0, items: baseItems() }

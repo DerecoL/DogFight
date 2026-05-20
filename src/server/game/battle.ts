@@ -10,6 +10,8 @@ import {
   relicPoisonTickBonus,
   relicRollBiasChance,
   SHIBA_POISON_ON_ROLL_AMOUNT,
+  growthDamageBase,
+  growthDamageStep,
   itemDefForQuality,
 } from './data'
 import { triggerOrder } from './grid'
@@ -80,9 +82,12 @@ type BattleSideState = {
   disabledLarge: number
   disabledItemIds: string[]
   adjacentDamageBonus: Record<string, number>
+  growthDamageByItemId: Record<string, number>
+  lifestealItemIds: string[]
   forcedItemDice: Record<string, number>
   shibaSpeedStacks: number
   furyStacks: number
+  boomCounter: number
 }
 
 function maxHealthForRound(round: number) {
@@ -109,9 +114,12 @@ function createSideState(maxHp: number): BattleSideState {
     disabledLarge: 0,
     disabledItemIds: [],
     adjacentDamageBonus: {},
+    growthDamageByItemId: {},
+    lifestealItemIds: [],
     forcedItemDice: {},
     shibaSpeedStacks: 0,
     furyStacks: 0,
+    boomCounter: 0,
   }
 }
 
@@ -232,6 +240,19 @@ function globalEffectScale(actor: FighterSnapshot) {
 function adjacentItems(actor: FighterSnapshot, item: GameItem) {
   const ordered = triggerOrder(actor.items)
   return ordered.filter((candidate) => candidate.id !== item.id && Math.abs(candidate.x - item.x) <= itemDef(item.defId).width)
+}
+
+function bloodContractAdjacentItems(actor: FighterSnapshot, item: GameItem, quality: ItemQuality) {
+  const itemLeft = item.x
+  const itemRight = item.x + itemDef(item.defId).width
+  return triggerOrder(actor.items).filter((candidate) => {
+    if (candidate.id === item.id) return false
+    const candidateLeft = candidate.x
+    const candidateRight = candidate.x + itemDef(candidate.defId).width
+    const touchesLeft = candidateRight === itemLeft
+    const touchesRight = candidateLeft === itemRight
+    return quality === 'DIAMOND' ? touchesLeft || touchesRight : touchesLeft
+  })
 }
 
 function queueItems(queue: TriggerQueueEntry[], items: GameItem[], allowExtraRollFanout = true) {
@@ -364,6 +385,31 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
     return null
   }
 
+  const purgePositiveBuffs = (target: Side, maxLayers: number) => {
+    let remaining = Math.max(0, maxLayers)
+    let removed = 0
+    const targetState = state[target]
+    const removeLayers = (available: number) => {
+      const layers = Math.min(available, remaining)
+      remaining -= layers
+      removed += layers
+      return layers
+    }
+
+    if (remaining > 0 && targetState.thorns > 0) {
+      targetState.thorns -= removeLayers(targetState.thorns)
+    }
+    if (remaining > 0 && targetState.shibaSpeedStacks > 0) {
+      targetState.shibaSpeedStacks -= removeLayers(targetState.shibaSpeedStacks)
+    }
+    if (remaining > 0 && targetState.shield >= 8) {
+      const shieldLayers = removeLayers(Math.floor(targetState.shield / 8))
+      targetState.shield -= shieldLayers * 8
+    }
+
+    return removed
+  }
+
   const playerOpeningThorns = relicWithEffect(player, 'OPENING_THORNS')
   const opponentOpeningThorns = relicWithEffect(opponent, 'OPENING_THORNS')
   if (playerOpeningThorns) state.player.thorns += relicOpeningThorns(playerOpeningThorns.relicId, playerOpeningThorns.quality)
@@ -443,6 +489,53 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
       return triggers
     }
 
+    const boomCounterItem = equippedItemsWithEffect(actor, 'BOOM_COUNTER')[0]
+    if (!sacrificeReplacesSmallEffect && boomCounterItem) {
+      actorState.boomCounter += 1
+      if (actorState.boomCounter >= 30) {
+        actorState.boomCounter = 0
+        const boomQuality = normalizeQuality(boomCounterItem.quality)
+        const boomDef = itemDef(boomCounterItem.defId)
+        const damage = qualityAmountFrom(boomDef.effect.amount, boomQuality, boomDef.effect.qualityBase)
+        const result = applyDirectHealthDamage(targetSide, damage)
+        triggers.push({
+          itemId: boomCounterItem.id,
+          defId: boomCounterItem.defId,
+          quality: boomQuality,
+          effectType: 'DAMAGE',
+          amount: result.before - result.after,
+          target: targetSide,
+          sourceHp: getHp(actorSide),
+          targetHp: result.after,
+          sourceHpDelta: 0,
+          targetHpDelta: result.delta,
+          roll,
+          text: `${itemName(boomDef, boomQuality)} 爆鸣计数达到 30，造成 ${result.before - result.after} 点直接伤害`,
+        })
+      }
+    }
+
+    if (!sacrificeReplacesSmallEffect && advanced === 'GRANT_LIFESTEAL_ADJACENT') {
+      const recipients = bloodContractAdjacentItems(actor, item, quality)
+      for (const recipient of recipients) {
+        if (!actorState.lifestealItemIds.includes(recipient.id)) actorState.lifestealItemIds.push(recipient.id)
+      }
+      triggers.push({
+        itemId: item.id,
+        defId: item.defId,
+        quality,
+        effectType: 'UTILITY',
+        amount: recipients.length,
+        target: actorSide,
+        sourceHp: getHp(actorSide),
+        targetHp: getHp(targetSide),
+        sourceHpDelta: 0,
+        targetHpDelta: 0,
+        roll,
+        text: `${itemName(def, quality)} 使${quality === 'DIAMOND' ? '左右相邻' : '左侧'}装备获得【吸血】`,
+      })
+    }
+
     const bullyDoubled = actor.dogType === 'BULLY' && isLarge(def, actor) && rng() < BULLY_LARGE_EFFECT_CHANCE
     const bullyQuad = bullyDoubled && triggerOrder(actor.items).some((entry) => itemDef(entry.defId).advancedEffect === 'BULLY_QUADRUPLE_CHANCE') && rng() < 0.2
     const emperorTraitDisabled = hasEquippedEffect(actor, 'ADJACENT_USES_LUCKY') || hasEquippedEffect(actor, 'ONLY_LUCKY_DOUBLE')
@@ -454,7 +547,13 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
     const multiplier = bullyQuad ? 4 : doubled ? 2 : 1
     const traitText = bullyQuad ? '（恶霸4倍翻倍）' : bullyDoubled ? '（恶霸翻倍）' : emperorDoubled ? '（狗皇帝幸运翻倍）' : ''
     const extraRollDamageScale = extra && hasEquippedEffect(actor, 'EXTRA_ROLL_RECURSE') ? 1 + extraDepth * 0.1 : 1
-    const baseAmount = qualityAmountFrom(def.effect.amount, quality, def.effect.qualityBase) * multiplier
+    let growthCurrentDamage = 0
+    let growthStep = 0
+    if (advanced === 'GROWTH_DAMAGE') {
+      growthCurrentDamage = actorState.growthDamageByItemId[item.id] ?? growthDamageBase(quality)
+      growthStep = growthDamageStep(quality)
+    }
+    const baseAmount = (advanced === 'GROWTH_DAMAGE' ? growthCurrentDamage : qualityAmountFrom(def.effect.amount, quality, def.effect.qualityBase)) * multiplier
     const scaledBaseAmount = (def.effect.type === 'DAMAGE' || def.effect.type === 'DAMAGE_SELF_SHIELD')
       ? baseAmount * extraRollDamageScale
       : baseAmount
@@ -562,9 +661,13 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
           triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'UTILITY', amount: targetState.weak, target: targetSide, sourceHp: getHp(actorSide), targetHp: getHp(targetSide), sourceHpDelta: 0, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 施加 ${appliedWeak} 层【虚弱】` })
         }
       }
-      if (!recoveryBlocked && advanced === 'LIFESTEAL' && after < before) {
+      if (!recoveryBlocked && (advanced === 'LIFESTEAL' || actorState.lifestealItemIds.includes(item.id)) && after < before) {
         const healed = applyHeal(actorSide, before - after)
         triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'HEAL', amount: before - after, target: actorSide, sourceHp: healed.after, targetHp: getHp(targetSide), sourceHpDelta: healed.delta, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 吸取 ${before - after} 点生命` })
+      }
+      if (advanced === 'GROWTH_DAMAGE') {
+        actorState.growthDamageByItemId[item.id] = growthCurrentDamage + growthStep
+        triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'UTILITY', amount: growthStep, target: actorSide, sourceHp: getHp(actorSide), targetHp: getHp(targetSide), sourceHpDelta: 0, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 后续伤害提高 ${growthStep}` })
       }
     }
 
@@ -667,6 +770,19 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
         actorState.freezeStacks = 0
         targetState.frozenUntil = Math.max(targetState.frozenUntil, time + 2)
         triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'UTILITY', amount: 2, target: targetSide, sourceHp: getHp(actorSide), targetHp: getHp(targetSide), sourceHpDelta: 0, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 冻结敌人 2 秒` })
+      }
+    }
+    if (!sacrificeReplacesSmallEffect && advanced === 'PURGE_ENEMY_BUFFS') {
+      const maxLayers = qualityAmountFrom(def.effect.amount, quality, def.effect.qualityBase)
+      const removed = purgePositiveBuffs(targetSide, maxLayers)
+      if (removed <= 0) {
+        triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'UTILITY', amount: 0, target: targetSide, sourceHp: getHp(actorSide), targetHp: getHp(targetSide), sourceHpDelta: 0, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 未清除任何敌方增益` })
+      } else if (recoveryBlocked) {
+        triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'UTILITY', amount: removed, target: targetSide, sourceHp: getHp(actorSide), targetHp: getHp(targetSide), sourceHpDelta: 0, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 清除 ${removed} 层增益` })
+      } else {
+        const healAmount = removed * qualityAmountFrom(5, quality, 'SILVER')
+        const healed = applyHeal(actorSide, healAmount)
+        triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'HEAL', amount: healAmount, target: actorSide, sourceHp: healed.after, targetHp: getHp(targetSide), sourceHpDelta: healed.delta, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 清除 ${removed} 层增益，恢复 ${healAmount} 点生命` })
       }
     }
     if (!sacrificeReplacesSmallEffect && !recoveryBlocked && advanced === 'SHIELD_ON_NON_LUCKY' && actor.luckyNumber !== roll) {
