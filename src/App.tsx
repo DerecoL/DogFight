@@ -607,6 +607,24 @@ function effectText(def: ItemDef, quality: ItemQuality = 'BRONZE') {
   return '特殊效果'
 }
 
+function growthDamageTextForBattleItem(item: Item, owner: 'player' | 'opponent', events: BattleEvent[], displayIndex: number) {
+  if (item.def.advancedEffect !== 'GROWTH_DAMAGE') return null
+  const baseDamage = qualityAmountFrom(item.def.effect.amount, item.quality, item.def.effect.qualityBase)
+  const growth = events.slice(0, displayIndex + 1).reduce((total, event) => {
+    if (
+      event.actor === owner
+      && event.kind === 'ITEM'
+      && event.itemId === item.id
+      && event.defId === item.defId
+      && event.effectType === 'UTILITY'
+    ) {
+      return total + (event.amount ?? 0)
+    }
+    return total
+  }, 0)
+  return `当前伤害 ${baseDamage + growth}；每次成功触发后，本局内后续伤害继续提升。`
+}
+
 function purchaseValueForItem(def: ItemDef, quality: ItemQuality = normalizeQuality(def.defaultQuality)) {
   const currentQuality = normalizeQuality(quality)
   return Math.floor(def.price * qualityPriceMultiplier[currentQuality])
@@ -1249,7 +1267,7 @@ function ModeLobby({ run, runHistory, onOpen, onEnterCasual, onEnterLadder, onEn
     <section className="mode-lobby-screen" data-history-count={runHistory.totalRuns} data-history-action={onOpen.name}>
       <div className="screen-heading centered">
         <h2>模式大厅</h2>
-        <p>选择本次要进入的竞技方式。休闲模式结束后的狗可以送入巅峰竞技场。</p>
+        <p>选择本次要进入的竞技方式。休闲或天梯完成后的狗可以送入巅峰竞技场。</p>
       </div>
       <div className="mode-grid">
         {modeCards.map((mode) => (
@@ -2852,7 +2870,7 @@ function DraggingItemOverlay({ item }: { item: Item | null }) {
   )
 }
 
-function FloatingTip({ run, item, offer, anchor, onClose, onBuy, onSell, onUpgrade }: { run: Run; item: Item | null; offer: ShopOffer | null; anchor: TipAnchor | null; onClose: () => void; onBuy: (() => void) | null; onSell: (() => void) | null; onUpgrade: (() => void) | null }) {
+function FloatingTip({ run, item, offer, anchor, descriptionOverride, onClose, onBuy, onSell, onUpgrade }: { run: Run; item: Item | null; offer: ShopOffer | null; anchor: TipAnchor | null; descriptionOverride?: string | null; onClose: () => void; onBuy: (() => void) | null; onSell: (() => void) | null; onUpgrade: (() => void) | null }) {
   const def = item?.def ?? offer?.def
   useOutsideTipDismiss(Boolean(def), onClose)
   if (!def) return null
@@ -2885,7 +2903,7 @@ function FloatingTip({ run, item, offer, anchor, onClose, onBuy, onSell, onUpgra
         <Dice5 size={22} />
         {def.dice.map((face) => <span key={face}>{face}</span>)}
       </div>
-      <p className="tip-description"><RuleText text={def.description ?? effectText(def, quality)} /></p>
+      <p className="tip-description"><RuleText text={descriptionOverride ?? def.description ?? effectText(def, quality)} /></p>
       {isOffer && (
         <div className="tip-price">
           <Coins size={16} />
@@ -2935,7 +2953,7 @@ function ForfeitRunAction({ run, onForfeit }: { run: Run; onForfeit: () => void 
 
 function BattleView({ run, battle, currentEvent, eventIndex, speed, score, onSpeed, onContinue, onRestart }: { run: Run; battle: Battle | null; currentEvent?: BattleEvent; eventIndex: number; speed: number; score: number; onSpeed: (speed: number) => void; onContinue: () => void; onRestart: () => void }) {
   const [logOpen, setLogOpen] = useState(false)
-  const [battleTip, setBattleTip] = useState<{ item: Item; anchor: TipAnchor } | null>(null)
+  const [battleTip, setBattleTip] = useState<{ item: Item; owner: 'player' | 'opponent'; anchor: TipAnchor } | null>(null)
   const playback = battle ?? run.lastBattle
   const events = playback?.events ?? []
   const displayIndex = battle ? eventIndex : Math.max(0, events.length - 1)
@@ -2973,7 +2991,7 @@ function BattleView({ run, battle, currentEvent, eventIndex, speed, score, onSpe
         </div>
       </div>
 
-      <BattleEquipmentRow owner="opponent" snapshot={opponentSnapshot} activeEvent={event} onInspect={(item, element) => setBattleTip({ item, anchor: getFloatingTipPosition(element) })} />
+      <BattleEquipmentRow owner="opponent" snapshot={opponentSnapshot} events={events} displayIndex={displayIndex} activeEvent={event} onInspect={(item, element) => setBattleTip({ item, owner: 'opponent', anchor: getFloatingTipPosition(element) })} />
       <BattleStage
         player={playerSnapshot}
         opponent={opponentSnapshot}
@@ -2983,13 +3001,14 @@ function BattleView({ run, battle, currentEvent, eventIndex, speed, score, onSpe
         finished={isFinished}
         winner={playback?.winner}
       />
-      <BattleEquipmentRow owner="player" snapshot={playerSnapshot} activeEvent={event} onInspect={(item, element) => setBattleTip({ item, anchor: getFloatingTipPosition(element) })} />
+      <BattleEquipmentRow owner="player" snapshot={playerSnapshot} events={events} displayIndex={displayIndex} activeEvent={event} onInspect={(item, element) => setBattleTip({ item, owner: 'player', anchor: getFloatingTipPosition(element) })} />
       {battleTip && (
         <FloatingTip
           run={run}
           item={battleTip.item}
           offer={null}
           anchor={battleTip.anchor}
+          descriptionOverride={growthDamageTextForBattleItem(battleTip.item, battleTip.owner, events, displayIndex)}
           onClose={() => setBattleTip(null)}
           onBuy={null}
           onSell={null}
@@ -3034,7 +3053,7 @@ function LadderSettlementSummary({ settlement }: { settlement: LadderSettlement 
   )
 }
 
-function BattleEquipmentRow({ owner, snapshot, activeEvent, onInspect }: { owner: 'player' | 'opponent'; snapshot: BattleSnapshot; activeEvent?: BattleEvent; onInspect: (item: Item, element: HTMLElement) => void }) {
+function BattleEquipmentRow({ owner, snapshot, events, displayIndex, activeEvent, onInspect }: { owner: 'player' | 'opponent'; snapshot: BattleSnapshot; events: BattleEvent[]; displayIndex: number; activeEvent?: BattleEvent; onInspect: (item: Item, element: HTMLElement) => void }) {
   const items = snapshot.items.filter((item) => item.area === 'EQUIPMENT')
   const activeItemId = activeEvent?.actor === owner && activeEvent.kind === 'ITEM' ? activeEvent.itemId : null
   const activeVfxKind = battleVfxKind(activeEvent)
@@ -3047,7 +3066,9 @@ function BattleEquipmentRow({ owner, snapshot, activeEvent, onInspect }: { owner
       </div>
       <div className="battle-slot-grid" style={{ gridTemplateColumns: `repeat(${slots}, minmax(0, 1fr))` }}>
         {Array.from({ length: slots }).map((_, x) => <i key={x} className="battle-slot" style={{ gridColumn: x + 1, gridRow: 1 }} />)}
-        {items.map((item) => (
+        {items.map((item) => {
+          const growthText = growthDamageTextForBattleItem(item, owner, events, displayIndex)
+          return (
           <button
             type="button"
             key={item.id}
@@ -3057,15 +3078,17 @@ function BattleEquipmentRow({ owner, snapshot, activeEvent, onInspect }: { owner
               gridColumn: `${item.x + 1} / span ${item.def.width}`,
               gridRow: 1,
             }}
-            title={`${qualityLabel[normalizeQuality(item.quality)]} ${item.def.name} · ${effectText(item.def, normalizeQuality(item.quality))}`}
+            title={`${qualityLabel[normalizeQuality(item.quality)]} ${item.def.name} · ${growthText ?? effectText(item.def, normalizeQuality(item.quality))}`}
             onClick={(event) => onInspect(item, event.currentTarget)}
           >
             <img className="item-icon" src={itemIcon(item.def)} alt="" />
             <span className="quality-chip">{qualityLabel[normalizeQuality(item.quality)]}</span>
             <span>{item.def.name}</span>
             <small><Dice5 size={12} /> {item.def.dice.join('/')}</small>
+            <small className="item-effect">{growthText ?? effectText(item.def, normalizeQuality(item.quality))}</small>
           </button>
-        ))}
+          )
+        })}
       </div>
     </div>
   )

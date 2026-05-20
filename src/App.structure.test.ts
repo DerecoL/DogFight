@@ -270,6 +270,7 @@ describe('selection screen structure', () => {
     expect(app).toContain('斗狗模式')
     expect(app).toContain('巅峰模式')
     expect(app).toContain('天梯模式')
+    expect(app).toContain('休闲或天梯完成后的狗可以送入巅峰竞技场')
     expect(app).toContain('查看装备')
     expect(css).toContain('.player-history-panel')
     expect(css).toContain('.history-ladder-slot')

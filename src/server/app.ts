@@ -486,7 +486,6 @@ export function buildApp() {
     const candidates = await prisma.run.findMany({
       where: {
         userId,
-        mode: 'CASUAL',
         status: 'COMPLETE',
         id: { notIn: submittedRunIds },
       },

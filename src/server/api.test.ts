@@ -942,6 +942,36 @@ describeWithDatabase('run API', () => {
     await agent.post('/api/apex/submit').send({ runId }).expect(409)
   })
 
+  it('lists completed ladder runs as apex candidates and removes them after submission', async () => {
+    const agent = request.agent(app.server)
+    await app.ready()
+
+    await agent.post('/api/auth/register').send({ account: `apex-ladder-${Date.now()}`, password: 'dogdice' }).expect(200)
+    const casual = await agent.post('/api/runs').send({ dogType: 'SHIBA' }).expect(200)
+    const ladder = await agent.post('/api/runs').send({ dogType: 'MUTT', mode: 'LADDER' }).expect(200)
+    const casualRunId = casual.body.run.id
+    const ladderRunId = ladder.body.run.id
+
+    await prisma.run.updateMany({
+      where: { id: { in: [casualRunId, ladderRunId] } },
+      data: { wins: 6, losses: 2, round: 8, phase: 'COMPLETE', status: 'COMPLETE' },
+    })
+
+    const overview = await agent.get('/api/apex').expect(200)
+    const candidateIds = overview.body.candidates.map((run: { id: string }) => run.id)
+    expect(candidateIds).toContain(casualRunId)
+    expect(candidateIds).toContain(ladderRunId)
+    expect(overview.body.candidates.find((run: { id: string }) => run.id === ladderRunId)).toMatchObject({
+      mode: 'LADDER',
+      status: 'COMPLETE',
+    })
+
+    await agent.post('/api/apex/submit').send({ runId: ladderRunId }).expect(200)
+
+    const afterSubmit = await agent.get('/api/apex').expect(200)
+    expect(afterSubmit.body.candidates.map((run: { id: string }) => run.id)).not.toContain(ladderRunId)
+  })
+
   it('creates dogfight rooms as empty seats without abandoning the casual run', async () => {
     const agent = request.agent(app.server)
     await app.ready()

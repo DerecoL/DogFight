@@ -21,4 +21,12 @@ describe('item card effect text', () => {
     expect(app).toContain('后续伤害')
     expect(app).toContain('清除')
   })
+
+  it('shows the current growth damage value during battle playback', () => {
+    expect(app).toContain('function growthDamageTextForBattleItem')
+    expect(app).toContain('events.slice(0, displayIndex + 1)')
+    expect(app).toContain('当前伤害')
+    expect(app).toContain('const growthText = growthDamageTextForBattleItem')
+    expect(app).toContain('descriptionOverride={growthDamageTextForBattleItem')
+  })
 })
