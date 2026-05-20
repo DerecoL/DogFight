@@ -887,52 +887,59 @@ describeWithDatabase('run API', () => {
     await agent.post('/api/apex/submit').send({ runId }).expect(409)
   })
 
-  it('creates dogfight rooms with independent room runs without abandoning the casual run', async () => {
+  it('creates dogfight rooms as empty seats without abandoning the casual run', async () => {
     const agent = request.agent(app.server)
     await app.ready()
 
     await agent.post('/api/auth/register').send({ email: `dogfight-host${Date.now()}@dog.test`, password: 'dogdice' }).expect(200)
     const casual = await agent.post('/api/runs').send({ dogType: 'SHIBA' }).expect(200)
 
-    const created = await agent.post('/api/dogfight/rooms').send({ dogType: 'MUTT' }).expect(200)
+    const created = await agent.post('/api/dogfight/rooms').send({}).expect(200)
     expect(created.body.room).toMatchObject({
       status: 'WAITING',
+      phase: 'LOBBY',
       currentRound: 0,
       maxPlayers: 8,
+      targetPlayerCount: 8,
       isHost: true,
       spectator: false,
     })
     expect(created.body.room.members).toHaveLength(1)
-    expect(created.body.room.currentRun.id).not.toBe(casual.body.run.id)
+    expect(created.body.room.members[0]).toMatchObject({ kind: 'PLAYER', runId: null, dogType: null })
+    expect(created.body.room.currentRun).toBeNull()
 
     const me = await agent.get('/api/me').expect(200)
     expect(me.body.activeRun.id).toBe(casual.body.run.id)
   })
 
-  it('lets players join waiting dogfight rooms, blocks late joins, and allows spectators to read active rooms', async () => {
+  it('starts dogfight rooms by filling bots to eight and entering synchronized dog selection', async () => {
     const host = request.agent(app.server)
     const guest = request.agent(app.server)
     const spectator = request.agent(app.server)
     await app.ready()
 
     await host.post('/api/auth/register').send({ email: `dogfight-room-host${Date.now()}@dog.test`, password: 'dogdice' }).expect(200)
-    const created = await host.post('/api/dogfight/rooms').send({ dogType: 'SHIBA' }).expect(200)
+    const created = await host.post('/api/dogfight/rooms').send({}).expect(200)
     const roomId = created.body.room.id
 
     await guest.post('/api/auth/register').send({ email: `dogfight-room-guest${Date.now()}@dog.test`, password: 'dogdice' }).expect(200)
-    const joined = await guest.post(`/api/dogfight/rooms/${roomId}/join`).send({ dogType: 'SAMOYED' }).expect(200)
+    const joined = await guest.post(`/api/dogfight/rooms/${roomId}/join`).send({}).expect(200)
     expect(joined.body.room.members).toHaveLength(2)
 
     const nonHostStart = await guest.post(`/api/dogfight/rooms/${roomId}/start`).send({}).expect(403)
     expect(nonHostStart.body.error).toBeTruthy()
 
     const started = await host.post(`/api/dogfight/rooms/${roomId}/start`).send({}).expect(200)
-    expect(started.body.room.status).toBe('ACTIVE')
+    expect(started.body.room).toMatchObject({ status: 'ACTIVE', phase: 'DOG_SELECT', targetPlayerCount: 8 })
+    expect(started.body.room.members).toHaveLength(8)
+    expect(started.body.room.members.filter((member: { kind: string }) => member.kind === 'BOT')).toHaveLength(6)
+    expect(started.body.room.members.filter((member: { kind: string; runId: string | null }) => member.kind === 'PLAYER' && member.runId === null)).toHaveLength(2)
+    expect(Date.parse(started.body.room.phaseDeadline)).toBeGreaterThan(Date.now())
 
     await spectator.post('/api/auth/register').send({ email: `dogfight-spectator${Date.now()}@dog.test`, password: 'dogdice' }).expect(200)
-    await spectator.post(`/api/dogfight/rooms/${roomId}/join`).send({ dogType: 'MUTT' }).expect(400)
+    await spectator.post(`/api/dogfight/rooms/${roomId}/join`).send({}).expect(400)
     const watched = await spectator.get(`/api/dogfight/rooms/${roomId}`).expect(200)
-    expect(watched.body.room).toMatchObject({ status: 'ACTIVE', spectator: true })
+    expect(watched.body.room).toMatchObject({ status: 'ACTIVE', phase: 'DOG_SELECT', spectator: true })
     expect(watched.body.room.currentRun).toBeNull()
   })
 
@@ -943,22 +950,22 @@ describeWithDatabase('run API', () => {
     await app.ready()
 
     await first.post('/api/auth/register').send({ email: `dogfight-random-a${Date.now()}@dog.test`, password: 'dogdice' }).expect(200)
-    const created = await first.post('/api/dogfight/match').send({ dogType: 'SHIBA' }).expect(200)
+    const created = await first.post('/api/dogfight/match').send({}).expect(200)
 
     await second.post('/api/auth/register').send({ email: `dogfight-random-b${Date.now()}@dog.test`, password: 'dogdice' }).expect(200)
-    const joined = await second.post('/api/dogfight/match').send({ dogType: 'BULLY' }).expect(200)
+    const joined = await second.post('/api/dogfight/match').send({}).expect(200)
     expect(joined.body.room.id).toBe(created.body.room.id)
     expect(joined.body.room.members).toHaveLength(2)
 
     await first.post(`/api/dogfight/rooms/${created.body.room.id}/start`).send({}).expect(200)
 
     await third.post('/api/auth/register').send({ email: `dogfight-random-c${Date.now()}@dog.test`, password: 'dogdice' }).expect(200)
-    const nextRoom = await third.post('/api/dogfight/match').send({ dogType: 'MUTT' }).expect(200)
+    const nextRoom = await third.post('/api/dogfight/match').send({}).expect(200)
     expect(nextRoom.body.room.id).not.toBe(created.body.room.id)
     expect(nextRoom.body.room.status).toBe('WAITING')
   })
 
-  it('settles dogfight rounds with offline training, player pairings, loss compensation, elimination, and final survivor', async () => {
+  it('advances synchronized dogfight phases with dog choices, shop ready, battle viewing, and player-ranked members', async () => {
     const agents = [request.agent(app.server), request.agent(app.server), request.agent(app.server)]
     await app.ready()
 
@@ -966,33 +973,41 @@ describeWithDatabase('run API', () => {
       await agent.post('/api/auth/register').send({ email: `dogfight-settle-${index}-${Date.now()}@dog.test`, password: 'dogdice' }).expect(200)
     }
 
-    const created = await agents[0].post('/api/dogfight/rooms').send({ dogType: 'SHIBA' }).expect(200)
+    const created = await agents[0].post('/api/dogfight/rooms').send({}).expect(200)
     const roomId = created.body.room.id
-    await agents[1].post(`/api/dogfight/rooms/${roomId}/join`).send({ dogType: 'SAMOYED' }).expect(200)
-    await agents[2].post(`/api/dogfight/rooms/${roomId}/join`).send({ dogType: 'MUTT' }).expect(200)
+    await agents[1].post(`/api/dogfight/rooms/${roomId}/join`).send({}).expect(200)
+    await agents[2].post(`/api/dogfight/rooms/${roomId}/join`).send({}).expect(200)
     await agents[0].post(`/api/dogfight/rooms/${roomId}/start`).send({}).expect(200)
 
-    const openingRoom = await prisma.dogfightRoom.findUniqueOrThrow({ where: { id: roomId }, include: { participants: true } })
-    await prisma.itemInstance.deleteMany({ where: { runId: openingRoom.participants[0].runId } })
+    await agents[0].post(`/api/dogfight/rooms/${roomId}/dog-choice`).send({ dogType: 'SHIBA' }).expect(200)
+    await agents[1].post(`/api/dogfight/rooms/${roomId}/dog-choice`).send({ dogType: 'SAMOYED' }).expect(200)
+    const selected = await agents[2].post(`/api/dogfight/rooms/${roomId}/dog-choice`).send({ dogType: 'EMPEROR', luckyNumber: 5 }).expect(200)
+    expect(selected.body.room.phase).toBe('SHOP')
+    expect(selected.body.room.members).toHaveLength(8)
+    expect(selected.body.room.members.every((member: { runId: string | null; dogType: string | null }) => member.runId && member.dogType)).toBe(true)
+    expect(selected.body.room.currentRun.dogType).toBe('EMPEROR')
 
     await agents[0].post(`/api/dogfight/rooms/${roomId}/ready`).send({}).expect(200)
     await agents[1].post(`/api/dogfight/rooms/${roomId}/ready`).send({}).expect(200)
-    const trainingRound = await agents[2].post(`/api/dogfight/rooms/${roomId}/ready`).send({}).expect(200)
-    expect(trainingRound.body.room.currentRound).toBe(1)
-    expect(trainingRound.body.room.battles.filter((battle: { round: number; opponentKind: string }) => battle.round === 0 && battle.opponentKind === 'OFFLINE')).toHaveLength(3)
-    const compensated = trainingRound.body.room.members.find((member: { runId: string }) => member.runId === openingRoom.participants[0].runId)
-    expect(compensated).toMatchObject({ losses: 1, gold: 22 })
+    const battleRound = await agents[2].post(`/api/dogfight/rooms/${roomId}/ready`).send({}).expect(200)
+    expect(battleRound.body.room).toMatchObject({ phase: 'BATTLE', currentRound: 0 })
+    expect(battleRound.body.room.battles.filter((battle: { round: number; opponentKind: string }) => battle.round === 0 && battle.opponentKind === 'OFFLINE')).toHaveLength(8)
+    expect(battleRound.body.room.members.map((member: { losses: number }) => 5 - member.losses)).toEqual([...battleRound.body.room.members.map((member: { losses: number }) => 5 - member.losses)].sort((a, b) => b - a))
+    expect(battleRound.body.room.members.find((member: { kind: string; currentBattleId: string | null }) => member.kind === 'BOT' && member.currentBattleId)).toBeTruthy()
 
-    const room = await prisma.dogfightRoom.findUniqueOrThrow({ where: { id: roomId }, include: { participants: true } })
-    await prisma.dogfightRoom.update({ where: { id: roomId }, data: { currentRound: 3, readyDeadline: new Date(Date.now() - 1_000) } })
+    const ownBattleId = battleRound.body.room.currentRunMember.currentBattleId
+    const ownBattle = await agents[2].get(`/api/dogfight/battles/${ownBattleId}`).expect(200)
+    expect(ownBattle.body.battle.result.playerSnapshot.dogType).toBe('EMPEROR')
+
+    await prisma.dogfightRoom.update({ where: { id: roomId }, data: { phaseDeadline: new Date(Date.now() - 1_000) } })
+    const nextShop = await agents[0].get(`/api/dogfight/rooms/${roomId}`).expect(200)
+    expect(nextShop.body.room).toMatchObject({ phase: 'SHOP', currentRound: 1 })
+
+    await prisma.dogfightRoom.update({ where: { id: roomId }, data: { currentRound: 3, phase: 'SHOP', phaseDeadline: new Date(Date.now() - 1_000) } })
     await prisma.dogfightParticipant.updateMany({ where: { roomId }, data: { ready: false, eliminated: false, eliminatedRound: null } })
-    await prisma.run.updateMany({ where: { id: { in: room.participants.map((participant) => participant.runId) } }, data: { round: 3, phase: 'SHOP', losses: 4 } })
-    await prisma.dogfightParticipant.update({ where: { id: room.participants[0].id }, data: { eliminated: true, eliminatedRound: 3 } })
-
-    const settled = await agents[0].get(`/api/dogfight/rooms/${roomId}`).expect(200)
-    expect(settled.body.room.status).toBe('COMPLETE')
-    expect(settled.body.room.currentRound).toBe(4)
-    expect(settled.body.room.winnerParticipantId).toBeTruthy()
-    expect(settled.body.room.battles.some((battle: { round: number; opponentKind: string }) => battle.round === 3 && battle.opponentKind === 'PLAYER')).toBe(true)
+    await prisma.run.updateMany({ where: { dogfightParticipant: { roomId } }, data: { round: 3, phase: 'SHOP' } })
+    const playerRound = await agents[0].get(`/api/dogfight/rooms/${roomId}`).expect(200)
+    expect(playerRound.body.room.phase).toBe('BATTLE')
+    expect(playerRound.body.room.battles.some((battle: { round: number; opponentKind: string }) => battle.round === 3 && battle.opponentKind === 'PLAYER')).toBe(true)
   })
 })

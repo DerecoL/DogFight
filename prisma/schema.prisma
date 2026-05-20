@@ -170,9 +170,12 @@ model DogfightRoom {
   id                  String   @id @default(cuid())
   hostUserId          String
   status              String   @default("WAITING")
+  phase               String   @default("LOBBY")
   currentRound        Int      @default(0)
   maxPlayers          Int      @default(8)
+  targetPlayerCount   Int      @default(8)
   readyDeadline       DateTime?
+  phaseDeadline       DateTime?
   winnerParticipantId String?
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
@@ -187,9 +190,10 @@ model DogfightRoom {
 model DogfightParticipant {
   id              String   @id @default(cuid())
   roomId          String
-  userId          String
-  runId           String   @unique
+  userId          String?
+  runId           String?  @unique
   nickname        String
+  kind            String   @default("PLAYER")
   isHost          Boolean  @default(false)
   ready           Boolean  @default(false)
   eliminated      Boolean  @default(false)
@@ -199,7 +203,7 @@ model DogfightParticipant {
   updatedAt       DateTime @updatedAt
 
   room DogfightRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
-  run  Run          @relation(fields: [runId], references: [id], onDelete: Cascade)
+  run  Run?         @relation(fields: [runId], references: [id], onDelete: Cascade)
 
   @@unique([roomId, userId])
   @@index([roomId])

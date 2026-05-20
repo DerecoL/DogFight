@@ -1,0 +1,7 @@
+ALTER TABLE "DogfightRoom" ADD COLUMN "phase" TEXT NOT NULL DEFAULT 'LOBBY';
+ALTER TABLE "DogfightRoom" ADD COLUMN "targetPlayerCount" INTEGER NOT NULL DEFAULT 8;
+ALTER TABLE "DogfightRoom" ADD COLUMN "phaseDeadline" TIMESTAMP(3);
+
+ALTER TABLE "DogfightParticipant" ADD COLUMN "kind" TEXT NOT NULL DEFAULT 'PLAYER';
+ALTER TABLE "DogfightParticipant" ALTER COLUMN "userId" DROP NOT NULL;
+ALTER TABLE "DogfightParticipant" ALTER COLUMN "runId" DROP NOT NULL;
