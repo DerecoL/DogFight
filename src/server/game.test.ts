@@ -288,7 +288,7 @@ describe('battle simulation', () => {
 
     expect(purge).toMatchObject({
       effectType: 'HEAL',
-      amount: 3,
+      amount: 15,
       target: 'player',
       sourceHpDelta: 15,
       playerHp: 240,
@@ -327,7 +327,7 @@ describe('battle simulation', () => {
 
     expect(purge).toMatchObject({
       effectType: 'HEAL',
-      amount: 3,
+      amount: 15,
       sourceHpDelta: 15,
       playerHp: 251,
     })
@@ -366,7 +366,7 @@ describe('battle simulation', () => {
 
     expect(purge).toMatchObject({
       effectType: 'HEAL',
-      amount: 7,
+      amount: 77,
       target: 'player',
     })
     expect(purge?.text).toContain('清除 7 层增益')
@@ -405,11 +405,52 @@ describe('battle simulation', () => {
 
     expect(purge).toMatchObject({
       effectType: 'HEAL',
-      amount: 2,
+      amount: 6,
     })
     expect(purge?.text).toContain('恢复 6 点生命')
     expect(purge?.opponentStatuses?.positive).toContainEqual(expect.objectContaining({ type: 'thorns', stacks: 3 }))
     expect(purge?.opponentStatuses?.positive).toContainEqual(expect.objectContaining({ type: 'shield', amount: 27 }))
+  })
+
+  it('reverse fur comb still purges buffs but does not heal while recovery is blocked', () => {
+    const player: FighterSnapshot = {
+      name: 'P',
+      dogType: 'MUTT',
+      wins: 0,
+      losses: 0,
+      round: 7,
+      items: [
+        { id: 'air', defId: 'mutt-eat-air', quality: 'DIAMOND', area: 'EQUIPMENT', x: 0, y: 0 },
+        { id: 'comb', defId: 'v4-reverse-fur-comb', quality: 'DIAMOND', area: 'EQUIPMENT', x: 4, y: 0 },
+      ],
+    }
+    const opponent: FighterSnapshot = {
+      name: 'O',
+      dogType: 'MUTT',
+      wins: 0,
+      losses: 0,
+      round: 7,
+      items: [
+        { id: 'hit', defId: 'starter-1', quality: 'DIAMOND', area: 'EQUIPMENT', x: 0, y: 0 },
+        { id: 'shield', defId: 'v3-wooden-shield', quality: 'DIAMOND', area: 'EQUIPMENT', x: 1, y: 0 },
+      ],
+      relics: [openingThornsRelic],
+    }
+
+    const result = simulateBattle(player, opponent, 'reverse-fur-comb-blocked-1')
+    const purge = reverseFurCombEvent(result)
+
+    expect(purge).toBeDefined()
+    expect(purge?.time).toBeLessThanOrEqual(10)
+    expect(purge?.effectType).not.toBe('HEAL')
+    expect(purge).toMatchObject({
+      effectType: 'UTILITY',
+      sourceHpDelta: 0,
+    })
+    expect(purge?.text).toContain('清除')
+    expect(purge?.text).not.toContain('恢复')
+    expect(purge?.opponentStatuses?.positive).not.toContainEqual(expect.objectContaining({ type: 'thorns' }))
+    expect(purge?.opponentStatuses?.positive).toContainEqual(expect.objectContaining({ type: 'shield', amount: 11 }))
   })
 
   it('growing chew sword silver damage grows without a fixed cap', () => {

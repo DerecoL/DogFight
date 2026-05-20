@@ -709,7 +709,7 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
       } else {
         const healAmount = removed * qualityAmountFrom(5, quality, 'SILVER')
         const healed = applyHeal(actorSide, healAmount)
-        triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'HEAL', amount: removed, target: actorSide, sourceHp: healed.after, targetHp: getHp(targetSide), sourceHpDelta: healed.delta, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 清除 ${removed} 层增益，恢复 ${healAmount} 点生命` })
+        triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'HEAL', amount: healAmount, target: actorSide, sourceHp: healed.after, targetHp: getHp(targetSide), sourceHpDelta: healed.delta, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 清除 ${removed} 层增益，恢复 ${healAmount} 点生命` })
       }
     }
     if (!sacrificeReplacesSmallEffect && !recoveryBlocked && advanced === 'SHIELD_ON_NON_LUCKY' && actor.luckyNumber !== roll) {
