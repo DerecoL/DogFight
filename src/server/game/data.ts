@@ -51,15 +51,24 @@ export const ITEM_DEFS: ItemDef[] = [
   ...[1, 2, 3, 4, 5, 6].map((n) =>
     slotItem(`starter-${n}`, `${n}点牙咬`, 1, 2, [n], ['starter'], { type: 'DAMAGE', amount: 5 }),
   ),
-  slotItem('small-bite', '小型咬击', 1, 3, [1, 2, 3], ['small'], { type: 'DAMAGE', amount: 4 }),
+  slotItem('small-bite', '小型咬击', 1, 3, [1, 2, 3], ['small', 'weak'], { type: 'DAMAGE', amount: 4 }, {
+    description: '造成 4 点伤害。命中后有 20% 概率给敌人施加 1 层【虚弱】。',
+    advancedEffect: 'APPLY_WEAK_20_ON_HIT',
+  }),
   slotItem('lucky-paw', '幸运爪垫', 1, 4, [6], ['big'], { type: 'DAMAGE', amount: 12 }),
   slotItem('milk-bone', '牛奶骨头', 1, 4, [2, 4], ['heal'], { type: 'HEAL', amount: 6 }),
   slotItem('rubber-ball', '橡胶球', 2, 6, [3, 5], ['medium'], { type: 'DAMAGE', amount: 9 }),
   slotItem('spiked-collar', '尖刺项圈', 2, 7, [4, 5, 6], ['big', 'medium'], { type: 'DAMAGE', amount: 8 }),
   slotItem('training-disc', '训练飞盘', 2, 6, [1, 6], ['medium'], { type: 'DAMAGE', amount: 10 }),
   slotItem('guard-vest', '护卫背心', 3, 8, [1, 3, 5], ['medium', 'heal'], { type: 'HEAL', amount: 8 }),
-  slotItem('giant-bone', '巨型骨棒', 4, 10, [5, 6], ['large', 'big'], { type: 'DAMAGE', amount: 16 }),
-  slotItem('dog-house', '小狗窝', 4, 9, [1, 2], ['large', 'small'], { type: 'HEAL', amount: 12 }),
+  slotItem('giant-bone', '巨型骨棒', 4, 10, [5, 6], ['large', 'big', 'fury'], { type: 'DAMAGE', amount: 16 }, {
+    description: '造成 16 点伤害。攻击时有 50% 概率触发【激昂】；【激昂】使所有攻击伤害 +1，可叠加。',
+    advancedEffect: 'GAIN_FURY_ON_ATTACK',
+  }),
+  slotItem('dog-house', '小狗窝', 4, 9, [1, 2], ['large', 'small'], { type: 'HEAL', amount: 12 }, {
+    description: '恢复 12 点生命值，并偷取敌方 1 层增益（优先【荆棘】，其次【加速】；护盾不算增益）。',
+    advancedEffect: 'STEAL_ENEMY_BUFF',
+  }),
   slotItem('v3-broken-canine', '断裂的犬齿', 1, 3, [1, 2], ['small', 'weak'], { type: 'DAMAGE', amount: 3 }, {
     description: '造成 3 点伤害。若目标处于【虚弱】，额外造成 4 点真实伤害。',
     advancedEffect: 'TARGET_WEAK_BONUS_DAMAGE',
@@ -141,7 +150,7 @@ export const CLASS_REWARD_DEFS: ItemDef[] = [
   classItem('SHIBA', 3, 'shiba-great-katana', '大太刀', 2, [1, 2, 3], ['trigger', 'small'], '会额外触发该道具【相邻】的装备1次', 'TRIGGER_ADJACENT', 'GOLD', { type: 'DAMAGE', amount: 8 }),
   classItem('SHIBA', 3, 'shiba-swallow-katana', '燕回太刀', 1, [1, 2, 3], ['extra-roll', 'small'], '20%概率会额外投掷一次（可叠加，最多3次）', 'EXTRA_ROLL_CHANCE', 'GOLD', { type: 'DAMAGE', amount: 5 }),
   classItem('SHIBA', 6, 'shiba-shadow-clone', '忍法·影分身', 1, [1, 2, 3], ['small'], '每次投掷会投掷两次，选取更接近1~3的那次', 'ROLL_TWO_PICK_SMALL', 'DIAMOND'),
-  classItem('SHIBA', 6, 'shiba-break', '忍法·破', 1, [1, 2, 3], ['small'], '装备将不按照点数触发，按照其容量触发', 'TRIGGER_BY_SIZE', 'DIAMOND'),
+  classItem('SHIBA', 6, 'shiba-break', '忍法·破', 1, [1, 2, 3], ['small'], '装备将不按照点数触发，按照其容量触发；按容量触发时有 50% 概率额外触发 1 次', 'TRIGGER_BY_SIZE', 'DIAMOND'),
   classItem('SHIBA', 6, 'shiba-poison', '忍法·剧毒', 1, [1, 2, 3, 4, 5, 6], ['poison'], `每次投掷都会对敌人叠加${SHIBA_POISON_ON_ROLL_AMOUNT}层【中毒】（不随品质提升）`, 'POISON_ON_ROLL', 'DIAMOND'),
 
   classItem('SAMOYED', 3, 'samoyed-soft-fur', '松软毛皮', 2, [4, 5, 6], ['big', 'heal'], '每次触发恢复8的血量', 'NONE', 'GOLD', { type: 'HEAL', amount: 8 }),
@@ -193,6 +202,7 @@ export const TERM_DEFS = [
   { term: '大点', description: '投掷出4~6点', note: '无' },
   { term: '极值', description: '投掷出1和6点', note: '无' },
   { term: '荆棘', description: '每次受到攻击对敌方玩家造成3点伤害（可叠加）', note: '无' },
+  { term: '激昂', description: '自身所有攻击伤害 +1（可叠加）', note: '由巨型骨棒等效果获得' },
   { term: '中毒', description: '造成2秒持续伤害，每秒结算1次（可叠加，叠加刷新持续时间）', note: '无' },
   { term: '虚弱', description: '玩家的下次攻击造成的伤害减少50%（可叠加层数，不叠加效果）', note: '无' },
   { term: '大型物品', description: '容量为4的物品', note: '恶霸袖标可让3格物品也按大型物品处理' },
@@ -235,11 +245,14 @@ export function itemDescription(itemId: string, quality?: string | null) {
   if (advanced === 'APPLY_POISON') return `对敌人施加 ${amount} 层【中毒】。`
   if (advanced === 'GAIN_SHIELD_THORNS') return `获得 ${amount} 点护盾，并获得 ${one} 层【荆棘】。`
   if (advanced === 'APPLY_WEAK_ON_HIT') return `${baseEffect}并给敌人施加 ${one} 层【虚弱】。`
+  if (advanced === 'APPLY_WEAK_20_ON_HIT') return `${baseEffect}命中后有 20% 概率给敌人施加 ${one} 层【虚弱】。`
+  if (advanced === 'GAIN_FURY_ON_ATTACK') return `${baseEffect}攻击时有 50% 概率触发【激昂】；【激昂】使所有攻击伤害 +1，可叠加。`
   if (advanced === 'DOUBLE_SHIELD_DAMAGE') return `${baseEffect}如果敌方有护盾，该次伤害直接对护盾造成 2 倍伤害。`
   if (advanced === 'HEAL_OR_MAX_HP') return `恢复 ${amount} 点生命值。如果你当前处于满血，则永久提升自身 ${one} 点最大生命值。`
   if (advanced === 'LIFESTEAL') return `${baseEffect}并将造成伤害的 100% 转化为自身治疗。`
   if (advanced === 'POISON_AND_DISABLE_RIGHTMOST') return `对敌方施加 ${amount} 层【中毒】，并使敌方最右侧的一个装备【失效】一次。`
   if (advanced === 'SHIELD_IMMUNITY') return `获得 ${amount} 点护盾。只要你拥有护盾，你受到的【中毒】和【虚弱】层数减半（向上取整）。`
+  if (advanced === 'STEAL_ENEMY_BUFF') return `恢复 ${amount} 点生命值，并偷取敌方 1 层增益（优先【荆棘】，其次【加速】；护盾不算增益）。`
   if (advanced === 'POISON_ON_ROLL') return `${baseEffect}每次投掷都会对敌人叠加 ${SHIBA_POISON_ON_ROLL_AMOUNT} 层【中毒】（不随品质提升）。`
   if (advanced === 'GAIN_THORNS') return `${baseEffect}每次触发有 50% 概率获得 ${one} 层【荆棘】。`
   if (advanced === 'APPLY_WEAK') return `${baseEffect}每次触发有 50% 概率给敌人施加 ${one} 层【虚弱】。`

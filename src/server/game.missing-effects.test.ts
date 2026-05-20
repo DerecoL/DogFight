@@ -169,11 +169,15 @@ describe('missing equipment effect regressions', () => {
       ],
     }
     const result = simulateBattle(player, opponent, 'plain-10')
-    const alliedFollowup = result.events.find(
-      (event) => event.kind === 'ITEM' && event.actor === 'player' && event.itemId === 'large' && event.time === 3,
-    )
     const enemyFollowup = result.events.find(
       (event) => event.kind === 'ITEM' && event.actor === 'opponent' && event.itemId === 'opp-large',
+    )
+    const alliedFollowup = result.events.find(
+      (event) => event.kind === 'ITEM'
+        && event.actor === 'player'
+        && event.itemId === 'large'
+        && event.effectType === 'DAMAGE'
+        && event.time > (enemyFollowup?.time ?? 0),
     )
 
     expect(alliedFollowup?.amount).toBeGreaterThan(0)

@@ -128,8 +128,8 @@ async function defaultMockApiScript(buildId = new Date().toISOString().replace(/
     itemDef('spiked-collar', '尖刺项圈', 2, 7, [4, 5, 6], ['big', 'medium'], 'DAMAGE', 8),
     itemDef('training-disc', '训练飞盘', 2, 6, [1, 6], ['medium'], 'DAMAGE', 10),
     itemDef('guard-vest', '护卫背心', 3, 8, [1, 3, 5], ['medium', 'heal'], 'HEAL', 8),
-    itemDef('giant-bone', '巨型骨棒', 4, 10, [5, 6], ['large', 'big'], 'DAMAGE', 16),
-    itemDef('dog-house', '小狗窝', 4, 9, [1, 2], ['large', 'small'], 'HEAL', 12),
+    itemDef('giant-bone', '巨型骨棒', 4, 10, [5, 6], ['large', 'big', 'fury'], 'DAMAGE', 16, 'GAIN_FURY_ON_ATTACK'),
+    itemDef('dog-house', '小狗窝', 4, 9, [1, 2], ['large', 'small'], 'HEAL', 12, 'STEAL_ENEMY_BUFF'),
   ];
   const defs = Object.fromEntries(itemDefs.map((def) => [def.id, def]));
   const shopTypes = ['GENERAL', 'LARGE', 'MEDIUM', 'SMALL', 'SMALL_DICE', 'BIG_DICE'];
@@ -137,7 +137,7 @@ async function defaultMockApiScript(buildId = new Date().toISOString().replace(/
   const dogNames = { SHIBA: '柴犬', SAMOYED: '萨摩耶', MUTT: '土狗', BULLY: '恶霸', EMPEROR: '狗皇帝' };
   const originalFetch = window.fetch.bind(window);
 
-  function itemDef(id, name, size, price, dice, tags, effectType, amount) {
+  function itemDef(id, name, size, price, dice, tags, effectType, amount, advancedEffect = 'NONE') {
     return {
       id,
       name,
@@ -147,8 +147,13 @@ async function defaultMockApiScript(buildId = new Date().toISOString().replace(/
       price,
       dice,
       tags,
+      advancedEffect,
       effect: { type: effectType, amount },
-      description: diceText(dice) + '时' + (effectType === 'HEAL' ? '回复' : '造成') + amount + (effectType === 'HEAL' ? '生命' : '伤害'),
+      description: id === 'dog-house'
+        ? diceText(dice) + '时回复' + amount + '生命，并偷取敌方1层增益（护盾不算增益）'
+        : id === 'giant-bone'
+          ? diceText(dice) + '时造成' + amount + '伤害，攻击时50%概率触发【激昂】（所有攻击伤害+1，可叠加）'
+        : diceText(dice) + '时' + (effectType === 'HEAL' ? '回复' : '造成') + amount + (effectType === 'HEAL' ? '生命' : '伤害'),
     };
   }
 
@@ -1225,8 +1230,8 @@ async function currentMockApiScript(buildId) {
     let playerHp = 100;
     let opponentHp = 100;
     const state = {
-      player: { shield: 0, poison: 0, weak: 0, thorns: 0, disabledItemIds: [] },
-      opponent: { shield: 0, poison: 0, weak: 0, thorns: 0, disabledItemIds: [] },
+      player: { shield: 0, poison: 0, weak: 0, thorns: 0, shibaSpeedStacks: 0, furyStacks: 0, disabledItemIds: [] },
+      opponent: { shield: 0, poison: 0, weak: 0, thorns: 0, shibaSpeedStacks: 0, furyStacks: 0, disabledItemIds: [] },
     };
     const events = [];
     let time = 0;
@@ -1249,8 +1254,9 @@ async function currentMockApiScript(buildId) {
     };
     const statusRows = (side) => ({
       positive: [
-        ...(state[side].shield > 0 ? [{ type: 'shield', label: '护盾', tone: 'positive', amount: Math.round(state[side].shield) }] : []),
         ...(state[side].thorns > 0 ? [{ type: 'thorns', label: '荆棘', tone: 'positive', stacks: state[side].thorns }] : []),
+        ...(state[side].shibaSpeedStacks > 0 ? [{ type: 'extraRoll', label: '加速', tone: 'positive', stacks: state[side].shibaSpeedStacks }] : []),
+        ...(state[side].furyStacks > 0 ? [{ type: 'fury', label: '激昂', tone: 'positive', stacks: state[side].furyStacks }] : []),
       ],
       negative: [
         ...(state[side].poison > 0 ? [{ type: 'poison', label: '中毒', tone: 'negative', stacks: state[side].poison, nextTickIn: 1, tickDamage: poisonTickDamage(side) }] : []),
@@ -1292,6 +1298,19 @@ async function currentMockApiScript(buildId) {
       state[side].weak += amount;
       return true;
     };
+    const stealPositiveBuff = (actor, target) => {
+      if (state[target].thorns > 0) {
+        state[target].thorns -= 1;
+        state[actor].thorns += 1;
+        return '荆棘';
+      }
+      if (state[target].shibaSpeedStacks > 0) {
+        state[target].shibaSpeedStacks -= 1;
+        state[actor].shibaSpeedStacks += 1;
+        return '加速';
+      }
+      return null;
+    };
     const playerOpeningThorns = relicWithEffect(run, 'OPENING_THORNS');
     const opponentOpeningThorns = relicWithEffect(opponent, 'OPENING_THORNS');
     if (playerOpeningThorns) state.player.thorns += relicOpeningThorns(playerOpeningThorns.relicId, playerOpeningThorns.quality);
@@ -1314,7 +1333,8 @@ async function currentMockApiScript(buildId) {
           }
           const target = opponentOf(side);
           const advanced = def.advancedEffect || 'NONE';
-          const amount = qualityAmountFrom(def.effect?.amount || 0, item.quality, def.effect?.qualityBase);
+          let amount = qualityAmountFrom(def.effect?.amount || 0, item.quality, def.effect?.qualityBase);
+          if (state[side].furyStacks > 0 && def.effect?.type === 'DAMAGE') amount += state[side].furyStacks;
           time += 0.25;
           if (def.effect?.type === 'HEAL') {
             setHp(side, Math.min(100, hpOf(side) + amount));
@@ -1323,6 +1343,10 @@ async function currentMockApiScript(buildId) {
               else if (state[side].weak > 0) state[side].weak -= 1;
             }
             push({ actor: side, kind: 'ITEM', itemId: item.id, defId: item.defId, effectType: 'HEAL', amount, target: side, text: def.name + ' 回复 ' + amount + ' 生命。' });
+            if (advanced === 'STEAL_ENEMY_BUFF') {
+              const stolen = stealPositiveBuff(side, target);
+              if (stolen) push({ actor: side, kind: 'ITEM', itemId: item.id, defId: item.defId, effectType: 'UTILITY', amount: 1, target: 'both', text: def.name + ' 偷取 1 层【' + stolen + '】。' });
+            }
           } else if (advanced === 'GAIN_SHIELD' || advanced === 'SHIELD_IMMUNITY') {
             state[side].shield += amount;
             push({ actor: side, kind: 'ITEM', itemId: item.id, defId: item.defId, effectType: 'UTILITY', amount, target: side, text: def.name + ' 获得 ' + amount + ' 点护盾。' });
@@ -1342,8 +1366,14 @@ async function currentMockApiScript(buildId) {
           } else {
             const result = applyDamage(target, amount, advanced === 'DOUBLE_SHIELD_DAMAGE' ? amount * 2 : amount);
             if (advanced === 'APPLY_WEAK_ON_HIT') addWeak(target, qualityAmount(1, item.quality));
+            if (advanced === 'APPLY_WEAK_20_ON_HIT' && rng() < 0.2) addWeak(target, qualityAmount(1, item.quality));
             if (advanced === 'LIFESTEAL') setHp(side, Math.min(100, hpOf(side) + Math.max(0, -result.delta)));
+            if (advanced === 'SHIBA_SPEED') state[side].shibaSpeedStacks = Math.min(5, state[side].shibaSpeedStacks + 1);
             push({ actor: side, kind: 'ITEM', itemId: item.id, defId: item.defId, effectType: 'DAMAGE', amount: Math.max(0, -result.delta), target, text: def.name + ' 造成 ' + Math.max(0, -result.delta) + ' 点伤害。' });
+            if (advanced === 'GAIN_FURY_ON_ATTACK' && rng() < 0.5) {
+              state[side].furyStacks += 1;
+              push({ actor: side, kind: 'ITEM', itemId: item.id, defId: item.defId, effectType: 'UTILITY', amount: state[side].furyStacks, target: side, text: def.name + ' 触发【激昂】，攻击伤害 +1。' });
+            }
           }
           if (playerHp <= 0 || opponentHp <= 0) break;
         }

@@ -23,6 +23,28 @@ describe('quality-adjusted item descriptions', () => {
     expect(numbers('shiba-poison', 'DIAMOND')).not.toContain('20')
   })
 
+  it('describes shiba break size triggers and its repeat chance', () => {
+    const description = itemDefForQuality('shiba-break', 'DIAMOND').description
+
+    expect(description).toContain('按照其容量触发')
+    expect(description).toContain('50% 概率额外触发 1 次')
+  })
+
+  it('describes dog house stealing real buffs while excluding shield', () => {
+    const description = itemDefForQuality('dog-house', 'BRONZE').description
+
+    expect(description).toContain('偷取敌方 1 层增益')
+    expect(description).toContain('护盾不算增益')
+  })
+
+  it('describes giant bone fury as a stacking attack damage buff', () => {
+    const description = itemDefForQuality('giant-bone', 'BRONZE').description
+
+    expect(description).toContain('50% 概率触发【激昂】')
+    expect(description).toContain('所有攻击伤害 +1')
+    expect(description).toContain('可叠加')
+  })
+
   it('shows upgraded base effects for described equipment and class rewards', () => {
     expect(numbers('v3-large-bone-sword', 'DIAMOND')).toContain('27')
     expect(numbers('v3-auto-waterer', 'DIAMOND')).toContain('27')

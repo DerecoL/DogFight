@@ -14,6 +14,8 @@ export type AdvancedEffect =
   | 'POISON_ON_ROLL'
   | 'GAIN_THORNS'
   | 'APPLY_WEAK'
+  | 'APPLY_WEAK_20_ON_HIT'
+  | 'GAIN_FURY_ON_ATTACK'
   | 'AVALANCHE'
   | 'FREEZE_STACK'
   | 'TRIGGER_MINUS_THREE'
@@ -48,6 +50,7 @@ export type AdvancedEffect =
   | 'LIFESTEAL'
   | 'POISON_AND_DISABLE_RIGHTMOST'
   | 'SHIELD_IMMUNITY'
+  | 'STEAL_ENEMY_BUFF'
 
 export type ItemDef = {
   id: string
@@ -138,7 +141,7 @@ export type BattleFighterSnapshot = Omit<FighterSnapshot, 'items'> & {
   relics?: BattleRelicSnapshot[]
 }
 
-export type BattleStatusType = 'shield' | 'thorns' | 'extraRoll' | 'poison' | 'weak' | 'freeze' | 'disabled'
+export type BattleStatusType = 'thorns' | 'extraRoll' | 'fury' | 'poison' | 'weak' | 'freeze' | 'disabled'
 
 export type BattleStatusEntry = {
   type: BattleStatusType

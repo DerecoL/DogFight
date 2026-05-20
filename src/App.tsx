@@ -74,7 +74,7 @@ type BattleActor = 'player' | 'opponent' | 'system'
 type BattleTarget = 'player' | 'opponent' | 'both' | 'none'
 type BattleSnapshot = { name: string; dogType: DogType; luckyNumber?: number | null; wins: number; losses: number; round: number; items: Item[]; relics?: Relic[] }
 type BattleStatusEntry = {
-  type: 'shield' | 'thorns' | 'extraRoll' | 'poison' | 'weak' | 'freeze' | 'disabled' | string
+  type: 'shield' | 'thorns' | 'extraRoll' | 'fury' | 'poison' | 'weak' | 'freeze' | 'disabled' | string
   label: string
   tone: 'positive' | 'negative'
   amount?: number

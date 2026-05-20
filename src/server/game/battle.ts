@@ -50,7 +50,7 @@ type ItemTrigger = {
   quality: ItemQuality
   effectType: ItemDef['effect']['type'] | 'POISON' | 'ROLL'
   amount: number
-  target: Side | 'none'
+  target: Side | 'both' | 'none'
   sourceHp: number
   targetHp: number
   sourceHpDelta: number
@@ -82,6 +82,7 @@ type BattleSideState = {
   adjacentDamageBonus: Record<string, number>
   forcedItemDice: Record<string, number>
   shibaSpeedStacks: number
+  furyStacks: number
 }
 
 function maxHealthForRound(round: number) {
@@ -110,6 +111,7 @@ function createSideState(maxHp: number): BattleSideState {
     adjacentDamageBonus: {},
     forcedItemDice: {},
     shibaSpeedStacks: 0,
+    furyStacks: 0,
   }
 }
 
@@ -183,26 +185,26 @@ function isAdjacentToEffect(actor: FighterSnapshot, item: GameItem, effect: stri
 function matchingContext(actor: FighterSnapshot, item: GameItem, roll: number, forcedItemDice: Record<string, number> = {}) {
   const def = itemDef(item.defId)
   const forcedDie = forcedItemDice[item.id]
-  if (forcedDie != null) return { matches: roll === forcedDie, scale: 1, note: roll === forcedDie ? '（圣旨改点）' : '' }
+  if (forcedDie != null) return { matches: roll === forcedDie, scale: 1, note: roll === forcedDie ? '（圣旨改点）' : '', triggeredBySize: false }
 
   if (actor.dogType === 'EMPEROR' && actor.luckyNumber && isAdjacentToEffect(actor, item, 'ADJACENT_USES_LUCKY')) {
-    return { matches: roll === actor.luckyNumber, scale: 1, note: roll === actor.luckyNumber ? '（垂帘听政）' : '' }
+    return { matches: roll === actor.luckyNumber, scale: 1, note: roll === actor.luckyNumber ? '（垂帘听政）' : '', triggeredBySize: false }
   }
 
-  if (def.dice.includes(roll)) return { matches: true, scale: 1, note: '' }
+  if (def.dice.includes(roll)) return { matches: true, scale: 1, note: '', triggeredBySize: false }
 
   const bigToSmall = relicWithEffect(actor, 'MIRROR_BIG_TO_SMALL')
   if (bigToSmall && roll <= 3 && def.dice.includes(roll + 3)) {
-    return { matches: true, scale: relicEffectScale(bigToSmall.relicId, bigToSmall.quality), note: '（点金手·左映射）' }
+    return { matches: true, scale: relicEffectScale(bigToSmall.relicId, bigToSmall.quality), note: '（点金手·左映射）', triggeredBySize: false }
   }
   const smallToBig = relicWithEffect(actor, 'MIRROR_SMALL_TO_BIG')
   if (smallToBig && roll >= 4 && def.dice.includes(roll - 3)) {
-    return { matches: true, scale: relicEffectScale(smallToBig.relicId, smallToBig.quality), note: '（点金手·右映射）' }
+    return { matches: true, scale: relicEffectScale(smallToBig.relicId, smallToBig.quality), note: '（点金手·右映射）', triggeredBySize: false }
   }
   if (triggerOrder(actor.items).some((item) => itemDef(item.defId).advancedEffect === 'TRIGGER_BY_SIZE') && def.size === roll) {
-    return { matches: true, scale: 1, note: '（按容量触发）' }
+    return { matches: true, scale: 1, note: '（按容量触发）', triggeredBySize: true }
   }
-  return { matches: false, scale: 1, note: '' }
+  return { matches: false, scale: 1, note: '', triggeredBySize: false }
 }
 
 function restrictRollByRelic(fighter: FighterSnapshot, roll: number) {
@@ -267,9 +269,9 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
     const frozenRemaining = Math.max(0, state[side].frozenUntil - time)
     return {
       positive: [
-        ...(state[side].shield > 0 ? [{ type: 'shield' as const, label: '护盾', tone: 'positive' as const, amount: Math.round(state[side].shield) }] : []),
         ...(state[side].thorns > 0 ? [{ type: 'thorns' as const, label: '荆棘', tone: 'positive' as const, stacks: state[side].thorns }] : []),
         ...(state[side].shibaSpeedStacks > 0 ? [{ type: 'extraRoll' as const, label: '加速', tone: 'positive' as const, stacks: state[side].shibaSpeedStacks }] : []),
+        ...(state[side].furyStacks > 0 ? [{ type: 'fury' as const, label: '激昂', tone: 'positive' as const, stacks: state[side].furyStacks }] : []),
       ],
       negative: [
         ...(state[side].poison > 0 ? [{ type: 'poison' as const, label: '中毒', tone: 'negative' as const, stacks: state[side].poison, nextTickIn: 1, tickDamage: poisonTickDamage(side) }] : []),
@@ -346,6 +348,20 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
     if (applied <= 0) return 0
     state[target].weak += applied
     return applied
+  }
+
+  const stealPositiveBuff = (actorSide: Side, targetSide: Side) => {
+    if (state[targetSide].thorns > 0) {
+      state[targetSide].thorns -= 1
+      state[actorSide].thorns += 1
+      return '荆棘'
+    }
+    if (state[targetSide].shibaSpeedStacks > 0) {
+      state[targetSide].shibaSpeedStacks -= 1
+      state[actorSide].shibaSpeedStacks += 1
+      return '加速'
+    }
+    return null
   }
 
   const playerOpeningThorns = relicWithEffect(player, 'OPENING_THORNS')
@@ -448,6 +464,9 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
       amount += damageBonus
       delete actorState.adjacentDamageBonus[item.id]
     }
+    if (actorState.furyStacks > 0 && (def.effect.type === 'DAMAGE' || def.effect.type === 'DAMAGE_SELF_SHIELD')) {
+      amount += actorState.furyStacks
+    }
 
     if (!sacrificeReplacesSmallEffect && (def.effect.type === 'DAMAGE' || def.effect.type === 'DAMAGE_SELF_SHIELD')) {
       const before = getHp(targetSide)
@@ -473,6 +492,23 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
         roll,
         text: `${itemName(def, quality)}${traitText}${note} 造成 ${Math.abs(after - before)} 点伤害`,
       })
+      if (advanced === 'GAIN_FURY_ON_ATTACK' && rng() < 0.5) {
+        actorState.furyStacks += 1
+        triggers.push({
+          itemId: item.id,
+          defId: item.defId,
+          quality,
+          effectType: 'UTILITY',
+          amount: actorState.furyStacks,
+          target: actorSide,
+          sourceHp: getHp(actorSide),
+          targetHp: getHp(targetSide),
+          sourceHpDelta: 0,
+          targetHpDelta: 0,
+          roll,
+          text: `${itemName(def, quality)} 触发【激昂】，攻击伤害 +1`,
+        })
+      }
       if (targetState.thorns > 0) {
         const thorn = targetState.thorns * 3
         const thornResult = applyDamage(actorSide, thorn)
@@ -520,6 +556,12 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
           triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'UTILITY', amount: targetState.weak, target: targetSide, sourceHp: getHp(actorSide), targetHp: getHp(targetSide), sourceHpDelta: 0, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 施加 ${appliedWeak} 层【虚弱】` })
         }
       }
+      if (advanced === 'APPLY_WEAK_20_ON_HIT' && rng() < 0.2) {
+        const appliedWeak = addWeak(targetSide, targetFighter, qualityAmount(1, quality))
+        if (appliedWeak > 0) {
+          triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'UTILITY', amount: targetState.weak, target: targetSide, sourceHp: getHp(actorSide), targetHp: getHp(targetSide), sourceHpDelta: 0, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 施加 ${appliedWeak} 层【虚弱】` })
+        }
+      }
       if (!recoveryBlocked && advanced === 'LIFESTEAL' && after < before) {
         const healed = applyHeal(actorSide, before - after)
         triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'HEAL', amount: before - after, target: actorSide, sourceHp: healed.after, targetHp: getHp(targetSide), sourceHpDelta: healed.delta, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 吸取 ${before - after} 点生命` })
@@ -553,6 +595,26 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
         actorState.maxHp += gain
         setHp(actorSide, getHp(actorSide) + gain)
         triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'HEAL', amount: gain, target: actorSide, sourceHp: getHp(actorSide), targetHp: getHp(targetSide), sourceHpDelta: gain, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 使最大生命值 +${gain}` })
+      }
+    }
+
+    if (!sacrificeReplacesSmallEffect && advanced === 'STEAL_ENEMY_BUFF') {
+      const stolen = stealPositiveBuff(actorSide, targetSide)
+      if (stolen) {
+        triggers.push({
+          itemId: item.id,
+          defId: item.defId,
+          quality,
+          effectType: 'UTILITY',
+          amount: 1,
+          target: 'both',
+          sourceHp: getHp(actorSide),
+          targetHp: getHp(targetSide),
+          sourceHpDelta: 0,
+          targetHpDelta: 0,
+          roll,
+          text: `${itemName(def, quality)} 偷取 1 层【${stolen}】`,
+        })
       }
     }
 
@@ -711,8 +773,12 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
       text: `${fighter.name}${extra ? ' 额外' : ''}掷出 ${roll} 点（${DOGS[fighter.dogType].name}）`,
     })
 
-    const initialQueue = triggerOrder(fighter.items).filter((item) => matchingContext(fighter, item, roll, fighterState.forcedItemDice).matches)
-    if (hasEquippedEffect(fighter, 'ONLY_LUCKY_DOUBLE') && fighter.luckyNumber !== roll) initialQueue.length = 0
+    const initialMatches = triggerOrder(fighter.items)
+      .map((item) => ({ item, context: matchingContext(fighter, item, roll, fighterState.forcedItemDice) }))
+      .filter(({ context }) => context.matches)
+    const initialQueue = hasEquippedEffect(fighter, 'ONLY_LUCKY_DOUBLE') && fighter.luckyNumber !== roll
+      ? []
+      : initialMatches.flatMap(({ item, context }) => context.triggeredBySize && rng() < 0.5 ? [item, item] : [item])
     const emptyRollSafety = relicWithEffect(fighter, 'EMPTY_ROLL_LARGE_SAFETY')
     const missedBeforeRoll = fighterState.emptyRolls
     if (initialQueue.length === 0 && emptyRollSafety && missedBeforeRoll >= relicEmptyRollMisses(emptyRollSafety.relicId, emptyRollSafety.quality)) {

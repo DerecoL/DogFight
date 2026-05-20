@@ -1208,6 +1208,7 @@ input {
 .status-chip.shield,
 .status-chip.extraRoll { background: #dbeafe; color: #1d4ed8; }
 .status-chip.thorns { background: #fef3c7; color: #92400e; }
+.status-chip.fury { background: #ffedd5; color: #c2410c; }
 .status-chip.poison { background: #dcfce7; color: #15803d; }
 .status-chip.weak { background: #ede9fe; color: #6d28d9; }
 .status-chip.freeze { background: #e0f2fe; color: #0369a1; }

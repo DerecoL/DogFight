@@ -251,6 +251,52 @@ describe('battle simulation', () => {
     expect(result.opponentSnapshot.items).toEqual([])
   })
 
+  it('lets small bite sometimes inflict weak after dealing damage', () => {
+    const player: FighterSnapshot = {
+      name: 'P',
+      dogType: 'MUTT',
+      wins: 0,
+      losses: 0,
+      round: 0,
+      items: [
+        { id: 'small-copy', defId: 'small-bite', quality: 'BRONZE', area: 'EQUIPMENT', x: 0, y: 0 },
+      ],
+    }
+    const opponent: FighterSnapshot = { name: 'O', dogType: 'MUTT', wins: 0, losses: 0, round: 0, items: [] }
+    const result = simulateBattle(player, opponent, 'small-bite-weak-2')
+    const damageEvent = result.events.find((event) => event.kind === 'ITEM' && event.actor === 'player' && event.itemId === 'small-copy' && event.effectType === 'DAMAGE')
+    const weakEvent = result.events.find((event) => event.kind === 'ITEM' && event.actor === 'player' && event.itemId === 'small-copy' && event.effectType === 'UTILITY')
+
+    expect(damageEvent).toMatchObject({ amount: 4, target: 'opponent', targetHpDelta: -4 })
+    expect(weakEvent).toMatchObject({ amount: 1, target: 'opponent', targetHpDelta: 0 })
+    expect(weakEvent?.opponentStatuses?.negative).toContainEqual(expect.objectContaining({ type: 'weak', stacks: 1 }))
+  })
+
+  it('lets giant bone stack fury that increases later attack damage', () => {
+    const player: FighterSnapshot = {
+      name: 'P',
+      dogType: 'EMPEROR',
+      wins: 0,
+      losses: 0,
+      round: 0,
+      items: [
+        { id: 'bone', defId: 'giant-bone', quality: 'BRONZE', area: 'EQUIPMENT', x: 0, y: 0 },
+        { id: 'bite-6', defId: 'starter-6', quality: 'BRONZE', area: 'EQUIPMENT', x: 4, y: 0 },
+      ],
+    }
+    const opponent: FighterSnapshot = { name: 'O', dogType: 'EMPEROR', wins: 0, losses: 0, round: 0, items: [] }
+    const result = simulateBattle(player, opponent, 'giant-fury-same-0')
+    const firstRollTime = result.events.find((event) => event.kind === 'ROLL' && event.actor === 'player')?.time
+    const firstRollEvents = result.events.filter((event) => event.kind === 'ITEM' && event.actor === 'player' && event.time === firstRollTime)
+
+    expect(firstRollEvents.map((event) => [event.itemId, event.effectType, event.amount])).toEqual([
+      ['bone', 'DAMAGE', 16],
+      ['bone', 'UTILITY', 1],
+      ['bite-6', 'DAMAGE', 6],
+    ])
+    expect(firstRollEvents[1].playerStatuses?.positive).toContainEqual(expect.objectContaining({ type: 'fury', stacks: 1 }))
+  })
+
   it('resolves every matching item immediately from left to right on a roll', () => {
     const player: FighterSnapshot = {
       name: 'P',
@@ -277,6 +323,117 @@ describe('battle simulation', () => {
     expect(itemEvents.map((event) => event.itemId)).toEqual(['starter', 'paw', 'collar', 'disc', 'bone'])
     expect(itemEvents.map((event) => event.targetHpDelta)).toEqual([-5, -12, -8, -10, -16])
     expect(itemEvents.map((event) => event.opponentHp)).toEqual([95, 83, 75, 65, 49])
+  })
+
+  it('lets shiba break repeat size-based triggers half the time', () => {
+    const player: FighterSnapshot = {
+      name: 'P',
+      dogType: 'BULLY',
+      wins: 0,
+      losses: 0,
+      round: 6,
+      items: [
+        { id: 'break', defId: 'shiba-break', quality: 'DIAMOND', area: 'EQUIPMENT', x: 0, y: 0 },
+        { id: 'ball-a', defId: 'rubber-ball', quality: 'BRONZE', area: 'EQUIPMENT', x: 1, y: 0 },
+      ],
+    }
+    const opponent: FighterSnapshot = { name: 'O', dogType: 'SHIBA', wins: 0, losses: 0, round: 6, items: [] }
+    const result = simulateBattle(player, opponent, 'shiba-break-size-repeat-85')
+    const firstPlayerRoll = result.events.find((event) => event.kind === 'ROLL' && event.actor === 'player')
+    const ballEvents = result.events.filter(
+      (event) => event.time === firstPlayerRoll?.time && event.itemId === 'ball-a' && event.kind === 'ITEM',
+    )
+
+    expect(firstPlayerRoll?.roll).toBe(2)
+    expect(ballEvents).toHaveLength(2)
+    expect(ballEvents.map((event) => event.amount)).toEqual([9, 9])
+  })
+
+  it('lets dog house steal one thorn buff from the opponent after healing', () => {
+    const player: FighterSnapshot = {
+      name: 'P',
+      dogType: 'SHIBA',
+      wins: 0,
+      losses: 0,
+      round: 0,
+      items: [
+        { id: 'house', defId: 'dog-house', quality: 'BRONZE', area: 'EQUIPMENT', x: 0, y: 0 },
+      ],
+    }
+    const opponent: FighterSnapshot = {
+      name: 'O',
+      dogType: 'SAMOYED',
+      wins: 0,
+      losses: 0,
+      round: 0,
+      items: [],
+      relics: [{ id: 'opening-thorns', relicId: 'v3-fluffed-spike-collar', quality: 'GOLD', slot: 0 }],
+    }
+
+    const result = simulateBattle(player, opponent, 'dog-house-seed-0')
+    const steal = result.events.find((event) => event.itemId === 'house' && event.text.includes('偷取 1 层【荆棘】'))
+
+    expect(steal?.playerStatuses?.positive).toContainEqual(expect.objectContaining({ type: 'thorns', stacks: 1 }))
+    expect(steal?.opponentStatuses?.positive).toContainEqual(expect.objectContaining({ type: 'thorns', stacks: 4 }))
+  })
+
+  it('lets dog house steal one speed buff when the opponent has no thorns', () => {
+    const player: FighterSnapshot = {
+      name: 'P',
+      dogType: 'SHIBA',
+      wins: 0,
+      losses: 0,
+      round: 0,
+      items: [
+        { id: 'house', defId: 'dog-house', quality: 'BRONZE', area: 'EQUIPMENT', x: 0, y: 0 },
+      ],
+    }
+    const opponent: FighterSnapshot = {
+      name: 'O',
+      dogType: 'SHIBA',
+      wins: 0,
+      losses: 0,
+      round: 0,
+      items: [
+        { id: 'speed', defId: 'shiba-speed-katana', quality: 'GOLD', area: 'EQUIPMENT', x: 0, y: 0 },
+      ],
+    }
+
+    const result = simulateBattle(player, opponent, 'dog-house-speed-0')
+    const steal = result.events.find((event) => event.itemId === 'house' && event.text.includes('偷取 1 层【加速】'))
+
+    expect(steal?.playerStatuses?.positive).toContainEqual(expect.objectContaining({ type: 'extraRoll', stacks: 1 }))
+    expect(steal?.opponentStatuses?.positive ?? []).not.toContainEqual(expect.objectContaining({ type: 'extraRoll' }))
+  })
+
+  it('does not let dog house steal shield because shield is special health', () => {
+    const player: FighterSnapshot = {
+      name: 'P',
+      dogType: 'SHIBA',
+      wins: 0,
+      losses: 0,
+      round: 0,
+      items: [
+        { id: 'house', defId: 'dog-house', quality: 'BRONZE', area: 'EQUIPMENT', x: 0, y: 0 },
+      ],
+    }
+    const opponent: FighterSnapshot = {
+      name: 'O',
+      dogType: 'SHIBA',
+      wins: 0,
+      losses: 0,
+      round: 0,
+      items: [
+        { id: 'shield', defId: 'v3-cone-collar', quality: 'BRONZE', area: 'EQUIPMENT', x: 0, y: 0 },
+      ],
+    }
+
+    const result = simulateBattle(player, opponent, 'dog-house-shield-2')
+    const shieldEvent = result.events.find((event) => event.itemId === 'shield')
+    const houseEvents = result.events.filter((event) => event.itemId === 'house')
+
+    expect(shieldEvent?.opponentShield).toBe(3)
+    expect(houseEvents.some((event) => event.text.includes('偷取'))).toBe(false)
   })
 
   it('scales item effects by quality with rounded 1.5x steps', () => {
@@ -702,7 +859,8 @@ describe('battle simulation', () => {
 
     expect(poisonApply?.opponentStatuses?.negative).toContainEqual(expect.objectContaining({ type: 'poison', stacks: 6, nextTickIn: 1, tickDamage: 6 }))
     expect(poisonTick?.opponentStatuses?.negative).toContainEqual(expect.objectContaining({ type: 'poison', stacks: 6, tickDamage: 6 }))
-    expect(shieldEvent?.playerStatuses?.positive).toContainEqual(expect.objectContaining({ type: 'shield', amount: 3 }))
+    expect(shieldEvent?.playerShield).toBe(3)
+    expect(shieldEvent?.playerStatuses?.positive ?? []).not.toContainEqual(expect.objectContaining({ type: 'shield' }))
   })
 
   it('lets golden kennel halve poison instead of fully blocking it', () => {
