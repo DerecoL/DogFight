@@ -283,6 +283,54 @@ describe('battle simulation', () => {
     expect(rightHeals).toEqual([])
   })
 
+  it('blood contract fang grants lifesteal to wide left adjacent equipment touching edges', () => {
+    const player: FighterSnapshot = {
+      name: 'P',
+      dogType: 'SHIBA',
+      wins: 0,
+      losses: 0,
+      round: 6,
+      items: [
+        { id: 'large-left', defId: 'giant-bone', quality: 'BRONZE', area: 'EQUIPMENT', x: 0, y: 0 },
+        { id: 'fang', defId: 'v4-blood-contract-fang', quality: 'GOLD', area: 'EQUIPMENT', x: 4, y: 0 },
+      ],
+    }
+    const opponent: FighterSnapshot = {
+      name: 'O',
+      dogType: 'SHIBA',
+      wins: 0,
+      losses: 0,
+      round: 6,
+      items: [
+        { id: 'opener', defId: 'starter-1', quality: 'DIAMOND', area: 'EQUIPMENT', x: 0, y: 0 },
+      ],
+    }
+    const result = simulateBattle(player, opponent, 'wide-left-adjacent-blood-contract')
+    const grantIndex = result.events.findIndex((event) =>
+      event.actor === 'player'
+      && event.itemId === 'fang'
+      && event.effectType === 'UTILITY'
+      && event.text.includes('吸血')
+    )
+    const laterEvents = result.events.slice(grantIndex + 1)
+    const largeDamageIndex = laterEvents.findIndex((event) =>
+      event.actor === 'player'
+      && event.itemId === 'large-left'
+      && event.effectType === 'DAMAGE'
+      && (event.targetHpDelta ?? 0) < 0
+    )
+    const largeHeal = laterEvents.slice(largeDamageIndex + 1).find((event) =>
+      event.actor === 'player'
+      && event.itemId === 'large-left'
+      && event.effectType === 'HEAL'
+      && (event.sourceHpDelta ?? 0) > 0
+    )
+
+    expect(grantIndex).toBeGreaterThanOrEqual(0)
+    expect(largeDamageIndex).toBeGreaterThanOrEqual(0)
+    expect(largeHeal).toBeDefined()
+  })
+
   it('blood contract fang at diamond grants lifesteal to both adjacent equipment', () => {
     const player: FighterSnapshot = {
       name: 'P',

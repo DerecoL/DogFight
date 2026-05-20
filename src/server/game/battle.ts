@@ -232,6 +232,19 @@ function adjacentItems(actor: FighterSnapshot, item: GameItem) {
   return ordered.filter((candidate) => candidate.id !== item.id && Math.abs(candidate.x - item.x) <= itemDef(item.defId).width)
 }
 
+function bloodContractAdjacentItems(actor: FighterSnapshot, item: GameItem, quality: ItemQuality) {
+  const itemLeft = item.x
+  const itemRight = item.x + itemDef(item.defId).width
+  return triggerOrder(actor.items).filter((candidate) => {
+    if (candidate.id === item.id) return false
+    const candidateLeft = candidate.x
+    const candidateRight = candidate.x + itemDef(candidate.defId).width
+    const touchesLeft = candidateRight === itemLeft
+    const touchesRight = candidateLeft === itemRight
+    return quality === 'DIAMOND' ? touchesLeft || touchesRight : touchesLeft
+  })
+}
+
 function queueItems(queue: TriggerQueueEntry[], items: GameItem[], allowExtraRollFanout = true) {
   queue.push(...items.map((item) => ({ item, allowExtraRollFanout })))
 }
@@ -425,7 +438,7 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
     }
 
     if (!sacrificeReplacesSmallEffect && advanced === 'GRANT_LIFESTEAL_ADJACENT') {
-      const recipients = adjacentItems(actor, item).filter((entry) => quality === 'DIAMOND' || entry.x < item.x)
+      const recipients = bloodContractAdjacentItems(actor, item, quality)
       for (const recipient of recipients) {
         if (!actorState.lifestealItemIds.includes(recipient.id)) actorState.lifestealItemIds.push(recipient.id)
       }
