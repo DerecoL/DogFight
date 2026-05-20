@@ -787,6 +787,14 @@ async function currentMockApiScript(buildId) {
     return Math.pow(1.5, qualities.indexOf(normalizeQuality(quality)));
   }
 
+  function growthDamageBase(quality) {
+    return normalizeQuality(quality) === 'DIAMOND' ? 3 : qualityAmountFrom(1, quality, 'SILVER');
+  }
+
+  function growthDamageStep(quality) {
+    return qualityAmountFrom(3, quality, 'SILVER');
+  }
+
   function relicQualityRatio(def, quality) {
     return qualityMultiplier(quality) / qualityMultiplier(def.defaultQuality);
   }
@@ -1225,8 +1233,8 @@ async function currentMockApiScript(buildId) {
     let playerHp = 100;
     let opponentHp = 100;
     const state = {
-      player: { shield: 0, poison: 0, weak: 0, thorns: 0, disabledItemIds: [] },
-      opponent: { shield: 0, poison: 0, weak: 0, thorns: 0, disabledItemIds: [] },
+      player: { shield: 0, poison: 0, weak: 0, thorns: 0, disabledItemIds: [], shibaSpeedStacks: 0, lifestealItemIds: [], boomCounter: 0, growthDamageByItemId: {} },
+      opponent: { shield: 0, poison: 0, weak: 0, thorns: 0, disabledItemIds: [], shibaSpeedStacks: 0, lifestealItemIds: [], boomCounter: 0, growthDamageByItemId: {} },
     };
     const events = [];
     let time = 0;
@@ -1238,6 +1246,19 @@ async function currentMockApiScript(buildId) {
     const opponentOf = (side) => side === 'player' ? 'opponent' : 'player';
     const fighterOf = (side) => side === 'player' ? run : opponent;
     const equippedOf = (fighter) => (fighter.items || []).filter((item) => item.area === 'EQUIPMENT').sort((a, b) => a.x - b.x);
+    const equippedWithEffect = (fighter, effect) => equippedOf(fighter).filter((item) => defs[item.defId]?.advancedEffect === effect);
+    const bloodContractAdjacentItems = (fighter, item, quality) => {
+      const itemLeft = item.x;
+      const itemRight = item.x + (defs[item.defId]?.width || 1);
+      return equippedOf(fighter).filter((candidate) => {
+        if (candidate.id === item.id) return false;
+        const candidateLeft = candidate.x;
+        const candidateRight = candidate.x + (defs[candidate.defId]?.width || 1);
+        const touchesLeft = candidateRight === itemLeft;
+        const touchesRight = candidateLeft === itemRight;
+        return normalizeQuality(quality) === 'DIAMOND' ? touchesLeft || touchesRight : touchesLeft;
+      });
+    };
     const relicWithEffect = (fighter, effect) => normalizeRelics(fighter.relics || []).find((relic) => relicDefsById[relic.relicId]?.effect === effect) || null;
     const hasRelicEffect = (fighter, effect) => Boolean(relicWithEffect(fighter, effect));
     const hasShieldImmunity = (side) => state[side].shield > 0 && equippedOf(fighterOf(side)).some((item) => defs[item.defId]?.advancedEffect === 'SHIELD_IMMUNITY');
@@ -1249,6 +1270,7 @@ async function currentMockApiScript(buildId) {
     };
     const statusRows = (side) => ({
       positive: [
+        ...(state[side].shibaSpeedStacks > 0 ? [{ type: 'extraRoll', label: '加速', tone: 'positive', stacks: state[side].shibaSpeedStacks }] : []),
         ...(state[side].shield > 0 ? [{ type: 'shield', label: '护盾', tone: 'positive', amount: Math.round(state[side].shield) }] : []),
         ...(state[side].thorns > 0 ? [{ type: 'thorns', label: '荆棘', tone: 'positive', stacks: state[side].thorns }] : []),
       ],
@@ -1282,6 +1304,29 @@ async function currentMockApiScript(buildId) {
       setHp(side, after);
       return { before, after, delta: after - before };
     };
+    const applyHeal = (side, amount) => {
+      const before = hpOf(side);
+      const after = Math.min(100, before + amount);
+      setHp(side, after);
+      return { before, after, delta: after - before };
+    };
+    const purgePositiveBuffs = (side, maxLayers) => {
+      let remaining = Math.max(0, maxLayers);
+      let removed = 0;
+      const remove = (available) => {
+        const layers = Math.min(available, remaining);
+        remaining -= layers;
+        removed += layers;
+        return layers;
+      };
+      if (remaining > 0 && state[side].thorns > 0) state[side].thorns -= remove(state[side].thorns);
+      if (remaining > 0 && state[side].shibaSpeedStacks > 0) state[side].shibaSpeedStacks -= remove(state[side].shibaSpeedStacks);
+      if (remaining > 0 && state[side].shield >= 8) {
+        const shieldLayers = remove(Math.floor(state[side].shield / 8));
+        state[side].shield -= shieldLayers * 8;
+      }
+      return removed;
+    };
     const addPoison = (side, amount) => {
       if (hasShieldImmunity(side)) return false;
       state[side].poison += amount;
@@ -1314,9 +1359,40 @@ async function currentMockApiScript(buildId) {
           }
           const target = opponentOf(side);
           const advanced = def.advancedEffect || 'NONE';
-          const amount = qualityAmountFrom(def.effect?.amount || 0, item.quality, def.effect?.qualityBase);
+          const quality = normalizeQuality(item.quality);
+          const sacrificeReplacesSmallEffect = def.size === 1 && equippedWithEffect(fighter, 'SMALL_TRIGGERS_LARGE').length > 0;
+          const boomCounterItem = equippedWithEffect(fighter, 'BOOM_COUNTER')[0];
+          if (!sacrificeReplacesSmallEffect && boomCounterItem) {
+            state[side].boomCounter += 1;
+            if (state[side].boomCounter >= 30) {
+              state[side].boomCounter = 0;
+              const boomDef = defs[boomCounterItem.defId];
+              const boomQuality = normalizeQuality(boomCounterItem.quality);
+              const boomDamage = qualityAmountFrom(boomDef.effect?.amount || 0, boomQuality, boomDef.effect?.qualityBase);
+              const boomResult = applyDirectHealthDamage(target, boomDamage);
+              push({ actor: side, kind: 'ITEM', itemId: boomCounterItem.id, defId: boomCounterItem.defId, effectType: 'DAMAGE', amount: Math.max(0, -boomResult.delta), target, text: boomDef.name + ' 爆鸣计数达到 30，造成 ' + Math.max(0, -boomResult.delta) + ' 点直接伤害。' });
+            }
+          }
+          let amount = qualityAmountFrom(def.effect?.amount || 0, quality, def.effect?.qualityBase);
+          if (advanced === 'GROWTH_DAMAGE') amount = state[side].growthDamageByItemId[item.id] ?? growthDamageBase(quality);
           time += 0.25;
-          if (def.effect?.type === 'HEAL') {
+          if (advanced === 'GRANT_LIFESTEAL_ADJACENT') {
+            const recipients = bloodContractAdjacentItems(fighter, item, quality);
+            for (const recipient of recipients) {
+              if (!state[side].lifestealItemIds.includes(recipient.id)) state[side].lifestealItemIds.push(recipient.id);
+            }
+            push({ actor: side, kind: 'ITEM', itemId: item.id, defId: item.defId, effectType: 'UTILITY', amount: recipients.length, target: side, text: def.name + ' 使' + recipients.length + '件相邻装备获得吸血。' });
+          } else if (advanced === 'PURGE_ENEMY_BUFFS') {
+            const removed = purgePositiveBuffs(target, amount);
+            const recoveryBlocked = time <= 10 && equippedWithEffect(fighter, 'DOUBLE_RATE_FIRST_TEN').length > 0;
+            if (removed > 0 && !recoveryBlocked) {
+              const healAmount = removed * qualityAmountFrom(5, quality, 'SILVER');
+              const healed = applyHeal(side, healAmount);
+              push({ actor: side, kind: 'ITEM', itemId: item.id, defId: item.defId, effectType: 'HEAL', amount: healAmount, target: side, text: def.name + ' 清除 ' + removed + ' 层增益，恢复 ' + Math.max(0, healed.delta) + ' 生命。' });
+            } else {
+              push({ actor: side, kind: 'ITEM', itemId: item.id, defId: item.defId, effectType: 'UTILITY', amount: removed, target, text: def.name + ' 清除 ' + removed + ' 层增益。' });
+            }
+          } else if (def.effect?.type === 'HEAL') {
             setHp(side, Math.min(100, hpOf(side) + amount));
             if (advanced === 'CLEANSE_ONE') {
               if (state[side].poison > 0) state[side].poison -= 1;
@@ -1342,9 +1418,13 @@ async function currentMockApiScript(buildId) {
           } else {
             const result = applyDamage(target, amount, advanced === 'DOUBLE_SHIELD_DAMAGE' ? amount * 2 : amount);
             if (advanced === 'APPLY_WEAK_ON_HIT') addWeak(target, qualityAmount(1, item.quality));
-            if (advanced === 'LIFESTEAL') setHp(side, Math.min(100, hpOf(side) + Math.max(0, -result.delta)));
-            push({ actor: side, kind: 'ITEM', itemId: item.id, defId: item.defId, effectType: 'DAMAGE', amount: Math.max(0, -result.delta), target, text: def.name + ' 造成 ' + Math.max(0, -result.delta) + ' 点伤害。' });
+            const actualHealthDamage = Math.max(0, -result.delta);
+            if (advanced === 'LIFESTEAL' || state[side].lifestealItemIds.includes(item.id)) applyHeal(side, actualHealthDamage);
+            if (advanced === 'GROWTH_DAMAGE') state[side].growthDamageByItemId[item.id] = amount + growthDamageStep(quality);
+            const growthText = advanced === 'GROWTH_DAMAGE' ? '，后续伤害 +' + growthDamageStep(quality) : '';
+            push({ actor: side, kind: 'ITEM', itemId: item.id, defId: item.defId, effectType: 'DAMAGE', amount: actualHealthDamage, target, text: def.name + ' 造成 ' + actualHealthDamage + ' 点伤害' + growthText + '。' });
           }
+          if (!sacrificeReplacesSmallEffect && advanced === 'SHIBA_SPEED') state[side].shibaSpeedStacks = Math.min(5, state[side].shibaSpeedStacks + 1);
           if (playerHp <= 0 || opponentHp <= 0) break;
         }
       }

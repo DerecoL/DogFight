@@ -62,6 +62,7 @@ type ItemDef = {
   tags: string[]
   description?: string
   defaultQuality?: ItemQuality
+  advancedEffect?: string
   effect: { type: string; amount: number; qualityBase?: ItemQuality }
 }
 type Item = { id: string; defId: string; quality: ItemQuality; area: Area; x: number; y: number; def: ItemDef }
@@ -580,6 +581,10 @@ function createBattleFxStyle(event: BattleEvent) {
 
 function effectText(def: ItemDef, quality: ItemQuality = 'BRONZE') {
   const amount = qualityAmountFrom(def.effect.amount, quality, def.effect.qualityBase)
+  if (def.advancedEffect === 'GRANT_LIFESTEAL_ADJACENT') return quality === 'DIAMOND' ? '左右相邻装备获得吸血' : '左侧相邻装备获得吸血'
+  if (def.advancedEffect === 'BOOM_COUNTER') return `爆鸣计数达到 30 后造成 ${amount} 伤害`
+  if (def.advancedEffect === 'GROWTH_DAMAGE') return `造成 ${amount} 伤害，后续伤害提升`
+  if (def.advancedEffect === 'PURGE_ENEMY_BUFFS') return '清除敌方增益并恢复生命'
   if (def.effect.type === 'HEAL') return `回复 ${amount} 生命`
   if (def.effect.type === 'DAMAGE' || def.effect.type === 'DAMAGE_SELF_SHIELD') return `造成 ${amount} 伤害`
   if (def.effect.type === 'UTILITY') {
@@ -640,6 +645,10 @@ function diceToneText(def: ItemDef) {
 }
 
 function effectToneText(def: ItemDef) {
+  if (def.advancedEffect === 'GRANT_LIFESTEAL_ADJACENT') return '吸血'
+  if (def.advancedEffect === 'BOOM_COUNTER') return '爆鸣计数'
+  if (def.advancedEffect === 'GROWTH_DAMAGE') return '后续伤害'
+  if (def.advancedEffect === 'PURGE_ENEMY_BUFFS') return '清除'
   if (def.effect.type === 'HEAL') return '回复'
   if (def.effect.type === 'UTILITY') {
     if (def.tags.includes('shield')) return '护盾'
