@@ -238,6 +238,16 @@ function itemEffectUnit(type: ItemDef['effect']['type']) {
   return type === 'HEAL' ? '点生命值' : '点伤害'
 }
 
+export function growthDamageBase(quality?: string | null) {
+  const currentQuality = normalizeQuality(quality)
+  if (currentQuality === 'DIAMOND') return 3
+  return qualityAmountFrom(1, currentQuality, 'SILVER')
+}
+
+export function growthDamageStep(quality?: string | null) {
+  return qualityAmountFrom(3, quality, 'SILVER')
+}
+
 export function itemDescription(itemId: string, quality?: string | null) {
   const def = itemDef(itemId)
   const currentQuality = normalizeQuality(quality)
@@ -265,8 +275,8 @@ export function itemDescription(itemId: string, quality?: string | null) {
     : '触发时，使左边 1 个相邻装备获得【吸血】直到战斗结束。被赋予吸血的装备按实际造成的生命伤害 100% 治疗自己。'
   if (advanced === 'BOOM_COUNTER') return `己方装备每成功触发 1 次，获得 1 点爆鸣计数。达到 30 点后清零，对敌方造成 ${amount} 点直接伤害。`
   if (advanced === 'GROWTH_DAMAGE') {
-    const growth = qualityAmountFrom(3, currentQuality, 'SILVER')
-    return `初始造成 ${amount} 点伤害。每次该装备成功触发后，本局内后续伤害 +${growth}，无成长次数上限。`
+    const growth = growthDamageStep(currentQuality)
+    return `初始造成 ${growthDamageBase(currentQuality)} 点伤害。每次该装备成功触发后，本局内后续伤害 +${growth}，无成长次数上限。`
   }
   if (advanced === 'PURGE_ENEMY_BUFFS') {
     const purgeLimit = amount

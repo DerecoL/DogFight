@@ -239,6 +239,11 @@ describe('dog and item definitions', () => {
     expect(itemDefForQuality('v4-reverse-fur-comb', 'BRONZE').description).toContain('每实际清除 1 层，自己恢复 3 点生命')
     expect(itemDefForQuality('v4-reverse-fur-comb', 'SILVER').description).toContain('每实际清除 1 层，自己恢复 5 点生命')
   })
+
+  it('growing chew sword diamond description matches growth base and step', () => {
+    expect(itemDefForQuality('v4-growing-chew-sword', 'DIAMOND').description).toContain('初始造成 3 点伤害')
+    expect(itemDefForQuality('v4-growing-chew-sword', 'DIAMOND').description).toContain('后续伤害 +7')
+  })
 })
 
 describe('battle simulation', () => {
@@ -301,6 +306,40 @@ describe('battle simulation', () => {
 
     expect(damageSequenceFor('GOLD')).toEqual([2, 7, 12])
     expect(damageSequenceFor('DIAMOND')).toEqual([3, 10, 17])
+  })
+
+  it('growing chew sword applies emperor lucky doubling to current unscaled growth base', () => {
+    const player: FighterSnapshot = {
+      name: 'P',
+      dogType: 'EMPEROR',
+      luckyNumber: 2,
+      wins: 0,
+      losses: 0,
+      round: 7,
+      items: [
+        { id: 'growing-diamond', defId: 'v4-growing-chew-sword', quality: 'DIAMOND', area: 'EQUIPMENT', x: 0, y: 0 },
+      ],
+    }
+    const opponent: FighterSnapshot = { name: 'O', dogType: 'MUTT', wins: 0, losses: 0, round: 7, items: [] }
+    const result = simulateBattle(player, opponent, 'growing-chew-sword-emperor-5')
+    const firstPlayerRoll = result.events.find((event) => event.kind === 'ROLL' && event.actor === 'player')
+    const firstHit = result.events.find((event) =>
+      event.kind === 'ITEM'
+      && event.actor === 'player'
+      && event.itemId === 'growing-diamond'
+      && event.effectType === 'DAMAGE'
+    )
+    const firstGrowth = result.events.find((event) =>
+      event.kind === 'ITEM'
+      && event.actor === 'player'
+      && event.itemId === 'growing-diamond'
+      && event.effectType === 'UTILITY'
+      && event.text.includes('后续伤害提高')
+    )
+
+    expect(firstPlayerRoll?.roll).toBe(2)
+    expect(firstHit?.amount).toBe(6)
+    expect(firstGrowth?.amount).toBe(7)
   })
 
   it('growing chew sword keeps growth per item instance', () => {

@@ -10,6 +10,8 @@ import {
   relicPoisonTickBonus,
   relicRollBiasChance,
   SHIBA_POISON_ON_ROLL_AMOUNT,
+  growthDamageBase,
+  growthDamageStep,
   itemDefForQuality,
 } from './data'
 import { triggerOrder } from './grid'
@@ -500,12 +502,11 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
     const traitText = bullyQuad ? '（恶霸4倍翻倍）' : bullyDoubled ? '（恶霸翻倍）' : emperorDoubled ? '（狗皇帝幸运翻倍）' : ''
     let amount = roundScaled(qualityAmountFrom(def.effect.amount, quality, def.effect.qualityBase) * multiplier, scale * globalEffectScale(actor))
     let growthCurrentDamage = 0
-    let growthDamageStep = 0
+    let growthStep = 0
     if (advanced === 'GROWTH_DAMAGE') {
-      const growthBaseDamage = quality === 'DIAMOND' ? 3 : qualityAmountFrom(def.effect.amount, quality, def.effect.qualityBase)
-      growthCurrentDamage = actorState.growthDamageByItemId[item.id] ?? growthBaseDamage
-      amount = growthCurrentDamage
-      growthDamageStep = qualityAmountFrom(3, quality, 'SILVER')
+      growthCurrentDamage = actorState.growthDamageByItemId[item.id] ?? growthDamageBase(quality)
+      amount = roundScaled(growthCurrentDamage * multiplier, scale * globalEffectScale(actor))
+      growthStep = growthDamageStep(quality)
     }
     const damageBonus = actorState.adjacentDamageBonus[item.id] ?? 0
     if (damageBonus > 0 && (def.effect.type === 'DAMAGE' || def.effect.type === 'DAMAGE_SELF_SHIELD')) {
@@ -587,8 +588,8 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
         triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'HEAL', amount: before - after, target: actorSide, sourceHp: healed.after, targetHp: getHp(targetSide), sourceHpDelta: healed.delta, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 吸取 ${before - after} 点生命` })
       }
       if (advanced === 'GROWTH_DAMAGE') {
-        actorState.growthDamageByItemId[item.id] = growthCurrentDamage + growthDamageStep
-        triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'UTILITY', amount: growthDamageStep, target: actorSide, sourceHp: getHp(actorSide), targetHp: getHp(targetSide), sourceHpDelta: 0, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 后续伤害提高 ${growthDamageStep}` })
+        actorState.growthDamageByItemId[item.id] = growthCurrentDamage + growthStep
+        triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'UTILITY', amount: growthStep, target: actorSide, sourceHp: getHp(actorSide), targetHp: getHp(targetSide), sourceHpDelta: 0, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 后续伤害提高 ${growthStep}` })
       }
     }
 
