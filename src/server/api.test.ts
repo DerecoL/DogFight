@@ -339,6 +339,14 @@ describeWithDatabase('run API', () => {
       ladderSettlement: {
         beforeTier: 'BRONZE',
         beforeScore: 0,
+        afterTier: 'BRONZE',
+        afterScore: 6,
+        delta: 6,
+        rawDelta: 6,
+        baseScore: 8,
+        tierTax: 0,
+        lossPenalty: 2,
+        perfectBonus: 0,
         wins: 7,
         losses: 2,
       },
@@ -346,11 +354,21 @@ describeWithDatabase('run API', () => {
 
     const ladder = await agent.get('/api/ladder/me').expect(200)
     expect(ladder.body.profile).toMatchObject({
+      tier: 'BRONZE',
+      score: 6,
       gamesPlayed: 1,
       totalWins: 7,
       totalLosses: 2,
     })
     expect(ladder.body.recentSettlements[0]).toMatchObject({
+      afterTier: 'BRONZE',
+      afterScore: 6,
+      delta: 6,
+      rawDelta: 6,
+      baseScore: 8,
+      tierTax: 0,
+      lossPenalty: 2,
+      perfectBonus: 0,
       wins: 7,
       losses: 2,
     })
