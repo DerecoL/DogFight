@@ -293,6 +293,64 @@ const itemIcons: Record<string, string> = {
   'guard-vest': '/assets/items/guard-vest.svg',
   'giant-bone': '/assets/items/giant-bone.svg',
   'dog-house': '/assets/items/dog-house.svg',
+  'v3-broken-canine': '/assets/items/v3-broken-canine.svg',
+  'v3-chew-scratch-post': '/assets/items/v3-chew-scratch-post.svg',
+  'v3-cone-collar': '/assets/items/v3-cone-collar.svg',
+  'v3-dog-catnip': '/assets/items/v3-dog-catnip.svg',
+  'v3-flea-disc': '/assets/items/v3-flea-disc.svg',
+  'v3-large-bone-sword': '/assets/items/v3-large-bone-sword.svg',
+  'v3-wooden-shield': '/assets/items/v3-wooden-shield.svg',
+  'v3-spiked-vest': '/assets/items/v3-spiked-vest.svg',
+  'v3-hydrant-axe': '/assets/items/v3-hydrant-axe.svg',
+  'v3-dinosaur-leg-bone': '/assets/items/v3-dinosaur-leg-bone.svg',
+  'v3-auto-waterer': '/assets/items/v3-auto-waterer.svg',
+  'v3-night-patrol-light': '/assets/items/v3-night-patrol-light.svg',
+  'v3-blood-mad-fang': '/assets/items/v3-blood-mad-fang.svg',
+  'v3-fermented-trash-bin': '/assets/items/v3-fermented-trash-bin.svg',
+  'v3-golden-kennel': '/assets/items/v3-golden-kennel.svg',
+  'shiba-speed-katana': '/assets/items/shiba-speed-katana.svg',
+  'shiba-great-katana': '/assets/items/shiba-great-katana.svg',
+  'shiba-swallow-katana': '/assets/items/shiba-swallow-katana.svg',
+  'shiba-shadow-clone': '/assets/items/shiba-shadow-clone.svg',
+  'shiba-break': '/assets/items/shiba-break.svg',
+  'shiba-poison': '/assets/items/shiba-poison.svg',
+  'samoyed-soft-fur': '/assets/items/samoyed-soft-fur.svg',
+  'samoyed-thorn-fur': '/assets/items/samoyed-thorn-fur.svg',
+  'samoyed-frost-fur': '/assets/items/samoyed-frost-fur.svg',
+  'samoyed-avalanche-core': '/assets/items/samoyed-avalanche-core.svg',
+  'samoyed-absolute-zero': '/assets/items/samoyed-absolute-zero.svg',
+  'samoyed-cold-proof': '/assets/items/samoyed-cold-proof.svg',
+  'mutt-old-collar': '/assets/items/mutt-old-collar.svg',
+  'mutt-counting-collar': '/assets/items/mutt-counting-collar.svg',
+  'mutt-charged-collar': '/assets/items/mutt-charged-collar.svg',
+  'mutt-chase-tail': '/assets/items/mutt-chase-tail.svg',
+  'mutt-chase-car': '/assets/items/mutt-chase-car.svg',
+  'mutt-eat-air': '/assets/items/mutt-eat-air.svg',
+  'bully-vault': '/assets/items/bully-vault.svg',
+  'bully-gym': '/assets/items/bully-gym.svg',
+  'bully-armband': '/assets/items/bully-armband.svg',
+  'bully-sacrifice': '/assets/items/bully-sacrifice.svg',
+  'bully-colossus': '/assets/items/bully-colossus.svg',
+  'bully-demolish': '/assets/items/bully-demolish.svg',
+  'emperor-dice-cup': '/assets/items/emperor-dice-cup.svg',
+  'emperor-minister': '/assets/items/emperor-minister.svg',
+  'emperor-robe': '/assets/items/emperor-robe.svg',
+  'emperor-curtain': '/assets/items/emperor-curtain.svg',
+  'emperor-edict': '/assets/items/emperor-edict.svg',
+  'emperor-fallen': '/assets/items/emperor-fallen.svg',
+}
+const relicIcons: Record<string, string> = {
+  'midas-left': '/assets/relics/midas-left.svg',
+  'midas-right': '/assets/relics/midas-right.svg',
+  'half-die-left': '/assets/relics/half-die-left.svg',
+  'half-die-right': '/assets/relics/half-die-right.svg',
+  'v3-two-sided-gold-tag': '/assets/relics/v3-two-sided-gold-tag.svg',
+  'v3-balanced-food-bowl': '/assets/relics/v3-balanced-food-bowl.svg',
+  'v3-lucky-foxtail': '/assets/relics/v3-lucky-foxtail.svg',
+  'v3-bad-dog-manual': '/assets/relics/v3-bad-dog-manual.svg',
+  'v3-fluffed-spike-collar': '/assets/relics/v3-fluffed-spike-collar.svg',
+  'v3-husky-engine': '/assets/relics/v3-husky-engine.svg',
+  'v3-fourth-dimensional-kennel': '/assets/relics/v3-fourth-dimensional-kennel.svg',
 }
 const qualityOrder: ItemQuality[] = ['BRONZE', 'SILVER', 'GOLD', 'DIAMOND']
 const qualityLabel: Record<ItemQuality, string> = {
@@ -384,6 +442,10 @@ function itemTone(def: ItemDef) {
 
 function itemIcon(def: ItemDef) {
   return itemIcons[def.id] ?? '/assets/items/bite.svg'
+}
+
+function relicIcon(def: RelicDef) {
+  return relicIcons[def.id] ?? '/assets/relics/v3-two-sided-gold-tag.svg'
 }
 
 function normalizeQuality(quality?: string): ItemQuality {
@@ -2064,7 +2126,7 @@ function RelicChoiceSelect({ choices, onPick }: { choices: RelicChoice[]; onPick
       <div className="choice-grid relic-choice-grid">
         {choices.map((choice) => (
           <div key={choice.relicId} role="button" tabIndex={0} className={`choice relic-choice ${selected === choice.relicId ? 'selected' : ''}`} onClick={() => setSelected(choice.relicId)} onKeyDown={(event) => handleChoiceCardKeyDown(event, () => setSelected(choice.relicId))}>
-            <Trophy size={36} />
+            <RelicGlyph relic={choice} size={44} />
             <strong>{choice.def.name}</strong>
             <span className={`tip-tag ${qualityClass(choice.quality)}`}>{qualityLabel[choice.quality]}</span>
             <span><RuleText text={choice.def.description} /></span>
@@ -2195,13 +2257,8 @@ function RelicRail({ relics }: { relics: Relic[] }) {
   )
 }
 
-function RelicGlyph({ relic, size }: { relic: Relic; size: number }) {
-  const effect = relic.def.effect
-  if (effect.includes('MIRROR') || effect.includes('GOLD')) return <BadgeDollarSign size={size} aria-hidden="true" />
-  if (effect.includes('ROLL') || effect.includes('DIE') || effect.includes('BIAS') || effect.includes('ONLY_')) return <Dice5 size={size} aria-hidden="true" />
-  if (effect.includes('SAFETY') || effect.includes('THORNS')) return <Shield size={size} aria-hidden="true" />
-  if (effect.includes('EQUIPMENT')) return <Backpack size={size} aria-hidden="true" />
-  return <Trophy size={size} aria-hidden="true" />
+function RelicGlyph({ relic, size }: { relic: Relic | RelicChoice; size: number }) {
+  return <img className="relic-glyph" src={relicIcon(relic.def)} alt="" style={{ width: size, height: size }} />
 }
 
 function RelicFloatingTip({ relic, anchor, onClose }: { relic: Relic | null; anchor: TipAnchor | null; onClose: () => void }) {

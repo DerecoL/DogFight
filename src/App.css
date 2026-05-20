@@ -530,6 +530,11 @@ input {
   outline: 3px solid rgba(90, 132, 246, .5);
   outline-offset: 2px;
 }
+.relic-glyph {
+  display: block;
+  object-fit: contain;
+  filter: drop-shadow(0 4px 6px rgba(37, 48, 71, .18));
+}
 .relic-quality-dot {
   position: absolute;
   right: 6px;

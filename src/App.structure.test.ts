@@ -1,8 +1,30 @@
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
 const app = readFileSync(new URL('./App.tsx', import.meta.url), 'utf8')
 const css = readFileSync(new URL('./App.css', import.meta.url), 'utf8')
+const data = readFileSync(new URL('./server/game/data.ts', import.meta.url), 'utf8')
+
+function mappedAssetIds(recordName: string) {
+  const start = app.indexOf(`const ${recordName}: Record<string, string> = {`)
+  const end = app.indexOf('\n}', start)
+  const record = app.slice(start, end)
+  return [...record.matchAll(/['`]([^'`]+)['`]:\s*['`]([^'`]+)['`]/g)].map(([, id, path]) => ({ id, path }))
+}
+
+function itemDefIds() {
+  const slotIds = [...data.matchAll(/slotItem\(\s*['`]([^'`]+)['`]/g)]
+    .map((match) => match[1])
+    .filter((id) => id !== 'starter-${n}')
+  const classIds = [...data.matchAll(/classItem\(\s*['`][^'`]+['`]\s*,\s*\d+\s*,\s*['`]([^'`]+)['`]/g)]
+    .map((match) => match[1])
+  return [...new Set(['starter-1', 'starter-2', 'starter-3', 'starter-4', 'starter-5', 'starter-6', ...slotIds, ...classIds])]
+}
+
+function relicDefIds() {
+  const relicBlock = data.slice(data.indexOf('export const RELIC_DEFS'), data.indexOf('export const TERM_DEFS'))
+  return [...relicBlock.matchAll(/\{\s*id:\s*['`]([^'`]+)['`]/g)].map((match) => match[1])
+}
 
 describe('selection screen structure', () => {
   it('renders a mode lobby and opens the peak arena screen from the peak card', () => {
@@ -237,6 +259,18 @@ describe('selection screen structure', () => {
     expect(app).toContain('RuleText')
     expect(app).toContain('rule-term')
     expect(app).toContain('rule-tip')
+  })
+
+  it('maps every item and relic definition to a dedicated SVG icon asset', () => {
+    const itemIconEntries = mappedAssetIds('itemIcons')
+    const relicIconEntries = mappedAssetIds('relicIcons')
+    const itemIconIds = itemIconEntries.map((entry) => entry.id)
+    const relicIconIds = relicIconEntries.map((entry) => entry.id)
+
+    expect(itemDefIds().filter((id) => !itemIconIds.includes(id))).toEqual([])
+    expect(relicDefIds().filter((id) => !relicIconIds.includes(id))).toEqual([])
+    expect(itemIconEntries.filter((entry) => !existsSync(new URL(`../public${entry.path}`, import.meta.url)))).toEqual([])
+    expect(relicIconEntries.filter((entry) => !existsSync(new URL(`../public${entry.path}`, import.meta.url)))).toEqual([])
   })
 
   it('places the relic rail to the left of the bag grid', () => {
