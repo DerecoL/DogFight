@@ -349,6 +349,13 @@ describe('selection screen structure', () => {
     expect(relicRailMarkup).not.toContain('<small><RuleText text={relic.def.description} /></small>')
   })
 
+  it('lets inspected backpack relics be sold for zero gold', () => {
+    expect(app).toContain('onSellRelic')
+    expect(app).toContain('/relic/sell')
+    expect(app).toContain('body: JSON.stringify({ relicId })')
+    expect(app).toContain('出售 +0')
+  })
+
   it('gates class reward selection behind a dismissible awakening ceremony', () => {
     expect(app).toContain('classRewardCeremonyKey')
     expect(app).toContain('ceremonyDismissedRounds')

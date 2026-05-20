@@ -879,6 +879,11 @@ export default function App() {
     void action(() => api(`/runs/${run.id}/items/upgrade`, { method: 'POST', body: JSON.stringify({ itemId, targetItemId }) }))
   }
 
+  const sellRelic = (relicId: string) => {
+    if (!run) return
+    void action(() => api(`/runs/${run.id}/relic/sell`, { method: 'POST', body: JSON.stringify({ relicId }) }))
+  }
+
   const finishBattle = async () => {
     if (!run) return
     setError('')
@@ -1072,6 +1077,7 @@ export default function App() {
               run={run}
               selectedItemId={selectedItemId}
               draggingItemId={draggingItemId}
+              onSellRelic={sellRelic}
               onSelectItem={onInspectItem}
               onSlotClick={(area, x, y) => selectedItemId && moveItem(selectedItemId, area, x, y)}
             />
@@ -1102,6 +1108,7 @@ export default function App() {
               run={run}
               selectedItemId={selectedItemId}
               draggingItemId={draggingItemId}
+              onSellRelic={sellRelic}
               onSelectItem={onInspectItem}
               onSlotClick={(area, x, y) => selectedItemId && moveItem(selectedItemId, area, x, y)}
             />
@@ -1137,7 +1144,7 @@ export default function App() {
                 <p>整理装备与遗物后再匹配对手。</p>
               </>
             )}
-            <InventoryBoard run={run} selectedItemId={selectedItemId} draggingItemId={draggingItemId} onSelectItem={onInspectItem} onSlotClick={(area, x, y) => selectedItemId && moveItem(selectedItemId, area, x, y)} />
+            <InventoryBoard run={run} selectedItemId={selectedItemId} draggingItemId={draggingItemId} onSellRelic={sellRelic} onSelectItem={onInspectItem} onSlotClick={(area, x, y) => selectedItemId && moveItem(selectedItemId, area, x, y)} />
             <FloatingTip
               run={run}
               item={selectedItem}
@@ -1683,6 +1690,11 @@ function DogfightRoomView({ room, onRoomChange, onLeave }: { room: DogfightRoom;
     void runAction(() => api<{ run: Run }>(`/runs/${run.id}/items/upgrade`, { method: 'POST', body: JSON.stringify({ itemId, targetItemId }) }))
   }
 
+  const sellRelic = (relicId: string) => {
+    if (!run || currentMember?.ready) return
+    void runAction(() => api<{ run: Run }>(`/runs/${run.id}/relic/sell`, { method: 'POST', body: JSON.stringify({ relicId }) }))
+  }
+
   const onInspectOffer = (offerId: string, element: HTMLElement) => {
     setSelectedOfferId(offerId)
     setSelectedItemId(null)
@@ -1803,6 +1815,7 @@ function DogfightRoomView({ room, onRoomChange, onLeave }: { room: DogfightRoom;
                 onReroll={() => !currentMember?.ready && runAction(() => api<{ run: Run }>(`/runs/${run.id}/shop/reroll`, { method: 'POST' }))}
                 onBuy={() => selectedOffer && !currentMember?.ready && runAction(() => api<{ run: Run }>(`/runs/${run.id}/shop/buy`, { method: 'POST', body: JSON.stringify({ offerId: selectedOffer.offerId, area: 'BAG' }) }))}
                 onSell={() => selectedItem && !currentMember?.ready && runAction(() => api<{ run: Run }>(`/runs/${run.id}/shop/sell`, { method: 'POST', body: JSON.stringify({ itemId: selectedItem.id }) }))}
+                onSellRelic={sellRelic}
                 onUpgrade={selectedItem && canUpgradeItem(selectedItem, run.items) && !currentMember?.ready ? () => upgradeItem(selectedItem.id) : null}
                 onChoice={(shopType) => !currentMember?.ready && runAction(() => api<{ run: Run }>(`/runs/${run.id}/choice/select`, { method: 'POST', body: JSON.stringify({ shopType }) }))}
                 onClassReward={(defId) => !currentMember?.ready && runAction(() => api<{ run: Run }>(`/runs/${run.id}/class-reward/select`, { method: 'POST', body: JSON.stringify({ defId }) }))}
@@ -1834,7 +1847,7 @@ function DogfightRoomView({ room, onRoomChange, onLeave }: { room: DogfightRoom;
   )
 }
 
-function DogfightRunWorkbench({ run, selectedItemId, selectedOfferId, draggingItemId, selectedItem, selectedOffer, tipAnchor, onInspectOffer, onInspectItem, onMoveItem, onReroll, onBuy, onSell, onUpgrade, onChoice, onClassReward, onRelic, onCloseTip }: {
+function DogfightRunWorkbench({ run, selectedItemId, selectedOfferId, draggingItemId, selectedItem, selectedOffer, tipAnchor, onInspectOffer, onInspectItem, onMoveItem, onReroll, onBuy, onSell, onSellRelic, onUpgrade, onChoice, onClassReward, onRelic, onCloseTip }: {
   run: Run
   selectedItemId: string | null
   selectedOfferId: string | null
@@ -1848,6 +1861,7 @@ function DogfightRunWorkbench({ run, selectedItemId, selectedOfferId, draggingIt
   onReroll: () => void
   onBuy: () => void
   onSell: () => void
+  onSellRelic: (relicId: string) => void
   onUpgrade: (() => void) | null
   onChoice: (shopType: ShopType) => void
   onClassReward: (defId: string) => void
@@ -1859,7 +1873,7 @@ function DogfightRunWorkbench({ run, selectedItemId, selectedOfferId, draggingIt
     return (
       <section className="reward-workbench">
         <ClassRewardSelect choices={run.classRewardChoices} onPick={onClassReward} />
-        <InventoryBoard run={run} selectedItemId={selectedItemId} draggingItemId={draggingItemId} onSelectItem={onInspectItem} onSlotClick={(area, x, y) => selectedItemId && onMoveItem(selectedItemId, area, x, y)} />
+        <InventoryBoard run={run} selectedItemId={selectedItemId} draggingItemId={draggingItemId} onSellRelic={onSellRelic} onSelectItem={onInspectItem} onSlotClick={(area, x, y) => selectedItemId && onMoveItem(selectedItemId, area, x, y)} />
         <FloatingTip run={run} item={selectedItem} offer={null} anchor={tipAnchor} onClose={onCloseTip} onBuy={null} onSell={null} onUpgrade={onUpgrade} />
       </section>
     )
@@ -1868,7 +1882,7 @@ function DogfightRunWorkbench({ run, selectedItemId, selectedOfferId, draggingIt
   return (
     <section className="shop-workbench dogfight-workbench">
       {run.phase === 'SHOP' && <ShopShelf run={run} selectedOfferId={selectedOfferId} draggingItemId={draggingItemId} onInspectOffer={onInspectOffer} onReroll={onReroll} onMatch={() => undefined} />}
-      <InventoryBoard run={run} selectedItemId={selectedItemId} draggingItemId={draggingItemId} onSelectItem={onInspectItem} onSlotClick={(area, x, y) => selectedItemId && onMoveItem(selectedItemId, area, x, y)} />
+      <InventoryBoard run={run} selectedItemId={selectedItemId} draggingItemId={draggingItemId} onSellRelic={onSellRelic} onSelectItem={onInspectItem} onSlotClick={(area, x, y) => selectedItemId && onMoveItem(selectedItemId, area, x, y)} />
       <FloatingTip run={run} item={selectedItem} offer={selectedOffer} anchor={tipAnchor} onClose={onCloseTip} onBuy={selectedOffer ? onBuy : null} onSell={selectedItem ? onSell : null} onUpgrade={onUpgrade} />
     </section>
   )
@@ -2602,23 +2616,27 @@ function SizePreview({ size }: { size: number }) {
   )
 }
 
-function InventoryBoard({ run, selectedItemId, draggingItemId, onSelectItem, onSlotClick }: { run: Run; selectedItemId: string | null; draggingItemId: string | null; onSelectItem: (itemId: string, element: HTMLElement) => void; onSlotClick: (area: Area, x: number, y: number) => void }) {
+function InventoryBoard({ run, selectedItemId, draggingItemId, onSellRelic, onSelectItem, onSlotClick }: { run: Run; selectedItemId: string | null; draggingItemId: string | null; onSellRelic?: ((relicId: string) => void) | null; onSelectItem: (itemId: string, element: HTMLElement) => void; onSlotClick: (area: Area, x: number, y: number) => void }) {
   const equipmentSlots = equipmentSlotCount(run.relics)
   return (
     <section className="inventory-board expanded paper-inventory">
       <GridPanel title="装备栏" subtitle={`${equipmentSlots} 格单行，从左向右触发`} icon={<Grid3X3 size={18} />} area="EQUIPMENT" w={equipmentSlots} h={1} items={run.items} selectedItemId={selectedItemId} draggingItemId={draggingItemId} onSelectItem={onSelectItem} onSlotClick={onSlotClick} />
       <div className="bag-relic-row">
-        <RelicRail relics={run.relics ?? []} />
+        <RelicRail relics={run.relics ?? []} onSellRelic={onSellRelic ?? null} />
         <GridPanel title="背包" subtitle={`${BASE_EQUIPMENT_SLOT_COUNT} 格单行，战斗中默认不生效`} icon={<Backpack size={18} />} area="BAG" w={BASE_EQUIPMENT_SLOT_COUNT} h={1} items={run.items} selectedItemId={selectedItemId} draggingItemId={draggingItemId} onSelectItem={onSelectItem} onSlotClick={onSlotClick} />
       </div>
     </section>
   )
 }
 
-function RelicRail({ relics }: { relics: Relic[] }) {
+function RelicRail({ relics, onSellRelic }: { relics: Relic[]; onSellRelic?: ((relicId: string) => void) | null }) {
   const [selectedRelicId, setSelectedRelicId] = useState<string | null>(null)
   const [relicTipAnchor, setRelicTipAnchor] = useState<TipAnchor | null>(null)
   const selectedRelic = relics.find((relic) => relic.id === selectedRelicId) ?? null
+  const closeRelicTip = () => {
+    setSelectedRelicId(null)
+    setRelicTipAnchor(null)
+  }
   return (
     <aside className="relic-rail">
       <div className="grid-heading">
@@ -2651,7 +2669,7 @@ function RelicRail({ relics }: { relics: Relic[] }) {
           )
         })}
       </div>
-      <RelicFloatingTip relic={selectedRelic} anchor={relicTipAnchor} onClose={() => { setSelectedRelicId(null); setRelicTipAnchor(null) }} />
+      <RelicFloatingTip relic={selectedRelic} anchor={relicTipAnchor} onClose={closeRelicTip} onSell={onSellRelic ? (relicId) => { onSellRelic(relicId); closeRelicTip() } : null} />
     </aside>
   )
 }
@@ -2660,7 +2678,7 @@ function RelicGlyph({ relic, size }: { relic: Relic | RelicChoice; size: number 
   return <img className="relic-glyph" src={relicIcon(relic.def)} alt="" style={{ width: size, height: size }} />
 }
 
-function RelicFloatingTip({ relic, anchor, onClose }: { relic: Relic | null; anchor: TipAnchor | null; onClose: () => void }) {
+function RelicFloatingTip({ relic, anchor, onClose, onSell }: { relic: Relic | null; anchor: TipAnchor | null; onClose: () => void; onSell?: ((relicId: string) => void) | null }) {
   useOutsideTipDismiss(Boolean(relic), onClose)
   if (!relic) return null
   const style = anchor ? { '--tip-x': `${anchor.x}px`, '--tip-y': `${anchor.y}px` } as React.CSSProperties : undefined
@@ -2677,6 +2695,13 @@ function RelicFloatingTip({ relic, anchor, onClose }: { relic: Relic | null; anc
         <h3>{relic.def.name}</h3>
       </div>
       <p className="tip-description"><RuleText text={relic.def.description} /></p>
+      {onSell && (
+        <div className="tip-actions">
+          <button className="danger-button wide" onClick={() => onSell(relic.id)}>
+            <BadgeDollarSign size={18} /> 出售 +0
+          </button>
+        </div>
+      )}
     </aside>
   )
 }

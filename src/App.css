@@ -946,16 +946,20 @@ input {
   top: var(--tip-y);
   z-index: 20;
   width: min(380px, calc(100vw - 28px));
+  max-height: min(440px, calc(100dvh - 28px));
   display: grid;
   gap: 12px;
   padding: 16px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
   background: rgba(255, 250, 241, .98);
   border: 1px solid var(--line);
   border-radius: 18px;
   box-shadow: 0 24px 70px rgba(37, 48, 71, .24);
 }
 .floating-tip.paper-card {
-  overflow: visible;
+  overflow: auto;
   border: 3px solid var(--ink);
   border-radius: 12px;
   box-shadow: 8px 10px 0 rgba(61, 45, 37, .18), 0 24px 70px rgba(37, 48, 71, .18);
@@ -1112,8 +1116,12 @@ input {
   font-weight: 950;
 }
 .tip-actions {
+  position: sticky;
+  bottom: 0;
   display: grid;
   gap: 8px;
+  padding-top: 6px;
+  background: rgba(255, 250, 241, .98);
 }
 .disabled-reason { color: #b4233d; }
 

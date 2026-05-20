@@ -773,6 +773,27 @@ describeWithDatabase('run API', () => {
     expect(moved.body.run.items.find((item: { id: string }) => item.id === right.id)).toMatchObject({ area: 'BAG', x: 1, y: 0 })
   })
 
+  it('upgrades matching items when a move lands on an identical item', async () => {
+    const agent = request.agent(app.server)
+    await app.ready()
+
+    await agent.post('/api/auth/register').send({ email: `move-upgrade${Date.now()}@dog.test`, password: 'dogdice' }).expect(200)
+    const created = await agent.post('/api/runs').send({ dogType: 'SHIBA' }).expect(200)
+    const runId = created.body.run.id
+    const target = await prisma.itemInstance.create({
+      data: { runId, defId: 'small-bite', quality: 'BRONZE', area: 'EQUIPMENT', x: 6, y: 0 },
+    })
+    const moving = await prisma.itemInstance.create({
+      data: { runId, defId: 'small-bite', quality: 'BRONZE', area: 'BAG', x: 0, y: 0 },
+    })
+
+    const moved = await agent.post(`/api/runs/${runId}/items/move`).send({ itemId: moving.id, area: 'EQUIPMENT', x: 6, y: 0 }).expect(200)
+
+    expect(moved.body.run.items.find((item: { id: string }) => item.id === target.id)).toMatchObject({ quality: 'SILVER', area: 'EQUIPMENT', x: 6, y: 0 })
+    expect(moved.body.run.items.some((item: { id: string }) => item.id === moving.id)).toBe(false)
+    expect(moved.body.run.items.filter((item: { defId: string }) => item.defId === 'small-bite')).toHaveLength(1)
+  })
+
   it('rejects upgrades for mismatched, max-quality, or cross-user items', async () => {
     const agent = request.agent(app.server)
     await app.ready()
@@ -850,6 +871,33 @@ describeWithDatabase('run API', () => {
     await prisma.run.update({ where: { id: runId }, data: { phase: 'RELIC_CHOICE', relicChoices: JSON.stringify([firstRelic]) } })
     const upgraded = await agent.post(`/api/runs/${runId}/relic/select`).send({ relicId: firstRelic }).expect(200)
     expect(upgraded.body.run.relics).toContainEqual(expect.objectContaining({ relicId: firstRelic, quality: nextQuality(firstRelicChoice.quality) }))
+  })
+
+  it('sells owned relics for zero gold and compacts the remaining relic slots', async () => {
+    const agent = request.agent(app.server)
+    await app.ready()
+
+    await agent.post('/api/auth/register').send({ account: `sell-relic-${Date.now()}`, password: 'dogdice' }).expect(200)
+    const created = await agent.post('/api/runs').send({ dogType: 'MUTT' }).expect(200)
+    const runId = created.body.run.id
+    await prisma.run.update({
+      where: { id: runId },
+      data: {
+        gold: 7,
+        phase: 'PREP',
+        relics: JSON.stringify([
+          { id: 'keep-left', relicId: 'midas-left', quality: 'BRONZE', slot: 0 },
+          { id: 'sell-middle', relicId: 'half-die-left', quality: 'SILVER', slot: 1 },
+          { id: 'keep-right', relicId: 'midas-right', quality: 'GOLD', slot: 2 },
+        ]),
+      },
+    })
+
+    const sold = await agent.post(`/api/runs/${runId}/relic/sell`).send({ relicId: 'sell-middle' }).expect(200)
+
+    expect(sold.body.run.gold).toBe(7)
+    expect(sold.body.run.relics.map((relic: { id: string }) => relic.id)).toEqual(['keep-left', 'keep-right'])
+    expect(sold.body.run.relics.map((relic: { slot: number }) => relic.slot)).toEqual([0, 1])
   })
 
   it('lists apex seeds and submits any completed run once', async () => {

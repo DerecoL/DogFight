@@ -226,6 +226,14 @@ export function applyRelicChoice(currentRelics: RelicInstance[], relicId: string
   return [...relics, { id: randomUUID(), relicId, quality: relicDefn.defaultQuality, slot: relics.length }]
 }
 
+export function removeRelicByInstanceId(currentRelics: RelicInstance[], relicInstanceId: string) {
+  const relics = normalizeRelics(currentRelics)
+  if (!relics.some((relic) => relic.id === relicInstanceId)) return null
+  return relics
+    .filter((relic) => relic.id !== relicInstanceId)
+    .map((relic, index) => ({ ...relic, slot: index }))
+}
+
 export function makeShop(type: ShopType, seed: string, round = 0) {
   return createShop(type, createRng(seed), round)
 }

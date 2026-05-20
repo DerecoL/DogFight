@@ -18,7 +18,7 @@ import { simulateBattle } from './game/battle'
 import { calculateLadderResult, ladderTierForScore, ladderTierLabels, ladderTiers, LADDER_SEASON_ID, type LadderTier } from './game/ladder'
 import { STARTING_GOLD, isTrainingMatchRound, selectCasualGhostSnapshot, selectLadderGhostSnapshot, targetLadderOpponentWinsRange, targetOpponentWins } from './game/matchmaking'
 import type { BattleResult, DogType, FighterSnapshot, GameItem, RelicInstance, ShopOffer, ShopType } from './game/types'
-import { applyRelicChoice, classRewardChoices, createFinishedBattleRecord, initialItems, makeChoices, makeRelicChoices, makeShop, parseJson, postBattleLargeItemReward, publicLadderSettlement, publicRun, publicRunHistory, relicsFromRun, seedGhost, snapshotFromRun, toGameItems } from './state'
+import { applyRelicChoice, classRewardChoices, createFinishedBattleRecord, initialItems, makeChoices, makeRelicChoices, makeShop, parseJson, postBattleLargeItemReward, publicLadderSettlement, publicRun, publicRunHistory, relicsFromRun, removeRelicByInstanceId, seedGhost, snapshotFromRun, toGameItems } from './state'
 
 type PrismaTransaction = Prisma.TransactionClient
 
@@ -595,6 +595,17 @@ export function buildApp() {
     const gameItems = toGameItems(run.items)
     const moving = { id: item.id, defId: item.defId, quality: normalizeQuality(item.quality), area: body.area, x: body.x, y: body.y }
     const placementOptions = placementOptionsForRun(run)
+    const coveredForUpgrade = overlappingItems(gameItems, moving, body.area, body.x, body.y)
+    const upgradeTarget = coveredForUpgrade.length === 1 ? coveredForUpgrade[0] : null
+    const upgradedQuality = upgradeTarget && canUpgradePair(moving, upgradeTarget) ? nextQuality(upgradeTarget.quality) : null
+    if (upgradeTarget && upgradedQuality) {
+      await prisma.$transaction([
+        prisma.itemInstance.update({ where: { id: upgradeTarget.id }, data: { quality: upgradedQuality } }),
+        prisma.itemInstance.delete({ where: { id: item.id } }),
+      ])
+      const updated = await prisma.run.findUniqueOrThrow({ where: { id: run.id }, include: { items: true } })
+      return { run: publicRun(updated) }
+    }
     if (!canPlace(gameItems, moving, body.area, body.x, body.y, placementOptions)) {
       const covered = body.area === 'EQUIPMENT' ? overlappingItems(gameItems, moving, body.area, body.x, body.y) : []
       const remainingItems = gameItems.filter((entry) => !covered.some((coveredItem) => coveredItem.id === entry.id))
@@ -716,6 +727,23 @@ export function buildApp() {
     const updated = await prisma.run.update({
       where: { id: run.id },
       data: { phase: 'PREP', relicChoices: '[]', relics: JSON.stringify(applyRelicChoice(relicsFromRun(run), body.relicId)) },
+      include: { items: true },
+    })
+    return { run: publicRun(updated) }
+  })
+
+  app.post('/api/runs/:runId/relic/sell', async (request, reply) => {
+    const userId = requireUser(request.userId)
+    const { runId } = z.object({ runId: z.string() }).parse(request.params)
+    const body = z.object({ relicId: z.string() }).parse(request.body)
+    const run = await prisma.run.findFirstOrThrow({ where: { id: runId, userId }, include: { items: true } })
+    if (await isReadyDogfightRunLocked(run.id)) return reply.code(400).send({ error: 'Round is already ready and locked' })
+    if (!['SHOP', 'MATCH', 'CLASS_REWARD', 'PREP'].includes(run.phase)) return reply.code(400).send({ error: 'Cannot sell relics in the current phase' })
+    const remainingRelics = removeRelicByInstanceId(relicsFromRun(run), body.relicId)
+    if (!remainingRelics) return reply.code(404).send({ error: 'Relic not found' })
+    const updated = await prisma.run.update({
+      where: { id: run.id },
+      data: { relics: JSON.stringify(remainingRelics) },
       include: { items: true },
     })
     return { run: publicRun(updated) }

@@ -272,6 +272,38 @@ describe('buildStandaloneIndex', () => {
     }
   })
 
+  test('standalone mock upgrades matching items when a move lands on an identical item', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'dogfight-standalone-move-upgrade-'))
+    try {
+      const distDir = await createMinimalDist(root)
+      const outputFile = path.join(root, 'click-index.html')
+      const launcherFile = path.join(root, 'DogFight-standalone.cmd')
+      await buildStandaloneIndex({ distDir, outputFile, launcherFile })
+
+      const html = await readFile(outputFile, 'utf8')
+      const { window, localStorage, storageKey } = evaluateMockScript(extractMockScript(html))
+      await window.fetch('/api/auth/register', { method: 'POST', body: JSON.stringify({ email: 'move-upgrade@dog.test', password: 'dogdice' }) })
+      const created = await readJson(await window.fetch('/api/runs', { method: 'POST', body: JSON.stringify({ dogType: 'SHIBA' }) }))
+      const state = JSON.parse(localStorage.getItem(storageKey))
+      state.run.items = [
+        ...state.run.items,
+        { id: 'target-small-bite', defId: 'small-bite', quality: 'BRONZE', area: 'EQUIPMENT', x: 6, y: 0 },
+        { id: 'moving-small-bite', defId: 'small-bite', quality: 'BRONZE', area: 'BAG', x: 0, y: 0 },
+      ]
+      localStorage.setItem(storageKey, JSON.stringify(state))
+
+      const movedResponse = await window.fetch(`/api/runs/${created.run.id}/items/move`, { method: 'POST', body: JSON.stringify({ itemId: 'moving-small-bite', area: 'EQUIPMENT', x: 6, y: 0 }) })
+      const moved = await readJson(movedResponse)
+
+      expect(movedResponse.status).toBe(200)
+      expect(moved.run.items.find((item) => item.id === 'target-small-bite')).toMatchObject({ quality: 'SILVER', area: 'EQUIPMENT', x: 6, y: 0 })
+      expect(moved.run.items.some((item) => item.id === 'moving-small-bite')).toBe(false)
+      expect(moved.run.items.filter((item) => item.defId === 'small-bite')).toHaveLength(1)
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   test('default standalone mock includes current class rewards, relics, and offline ghost builder flow', async () => {
     const root = await mkdtemp(path.join(tmpdir(), 'dogfight-standalone-current-data-'))
     try {
@@ -376,6 +408,39 @@ describe('buildStandaloneIndex', () => {
       expect(offer.def.description).toContain('27')
       expect(offer.def.description).not.toContain('8')
       expect(created.run.items[0].def.description).toContain('5')
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  test('standalone mock prices direct diamond shop offers at exact quality value without purchase markup', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'dogfight-standalone-diamond-price-'))
+    try {
+      const distDir = await createMinimalDist(root)
+      const outputFile = path.join(root, 'click-index.html')
+      const launcherFile = path.join(root, 'DogFight-standalone.cmd')
+      await buildStandaloneIndex({ distDir, outputFile, launcherFile })
+
+      const html = await readFile(outputFile, 'utf8')
+      const { window, localStorage, storageKey } = evaluateMockScript(extractMockScript(html))
+      await window.fetch('/api/auth/register', { method: 'POST', body: JSON.stringify({ email: 'diamond-price@dog.test', password: 'dogdice' }) })
+      await readJson(await window.fetch('/api/runs', { method: 'POST', body: JSON.stringify({ dogType: 'SHIBA' }) }))
+      let goldenKennelOffer = null
+
+      for (let index = 0; index < 80 && !goldenKennelOffer; index += 1) {
+        const state = JSON.parse(localStorage.getItem(storageKey))
+        state.run.id = `diamond-price-seed-${index}`
+        state.run.round = 6
+        state.run.phase = 'CHOICE'
+        state.run.choices = ['LARGE']
+        localStorage.setItem(storageKey, JSON.stringify(state))
+
+        const selected = await readJson(await window.fetch(`/api/runs/${state.run.id}/choice/select`, { method: 'POST', body: JSON.stringify({ shopType: 'LARGE' }) }))
+        goldenKennelOffer = selected.run.shopItems.find((offer) => offer.defId === 'v3-golden-kennel') ?? null
+      }
+
+      expect(goldenKennelOffer).toMatchObject({ quality: 'DIAMOND' })
+      expect(goldenKennelOffer.price).toBe(Math.max(1, Math.floor(144 * goldenKennelOffer.discount)))
     } finally {
       await rm(root, { recursive: true, force: true })
     }

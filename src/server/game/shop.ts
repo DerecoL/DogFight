@@ -10,10 +10,9 @@ const QUALITY_VALUE_MULTIPLIER: Record<ItemQuality, number> = {
   GOLD: 4,
   DIAMOND: 8,
 }
-const DIRECT_PURCHASE_MARKUP = 1.2
 
 function shopPrice(def: ItemDef, discount: number) {
-  return Math.max(1, Math.ceil(itemPurchaseValue(def) * DIRECT_PURCHASE_MARKUP * discount))
+  return Math.max(1, Math.floor(itemPurchaseValue(def) * discount))
 }
 
 export function itemPurchaseValue(def: ItemDef, quality: ItemQuality = normalizeQuality(def.defaultQuality)) {

@@ -90,12 +90,12 @@ describe('shop generation', () => {
     expect(offers.every((offer) => offer.quality !== 'DIAMOND')).toBe(true)
   })
 
-  it('prices direct diamond equipment as a late-game premium purchase', () => {
+  it('prices direct diamond equipment at its exact quality value without purchase markup', () => {
     const [offer] = createShop('LARGE', () => 0.99, 6)
 
     expect(offer.defId).toBe('v3-golden-kennel')
     expect(offer.quality).toBe('DIAMOND')
-    expect(offer.price).toBe(173)
+    expect(offer.price).toBe(144)
   })
 
   it('values upgraded equipment by each item price doubled per quality before selling at half', () => {

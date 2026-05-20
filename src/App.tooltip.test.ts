@@ -20,6 +20,15 @@ describe('item detail tooltip interactions', () => {
     expect(app).toContain('Math.min(Math.max(edge, centeredY), Math.max(edge, window.innerHeight - tipHeight - edge))')
   })
 
+  it('keeps tall bottom-bar item tips fully usable within the viewport', () => {
+    expect(cssRule('.floating-tip')).toContain('max-height: min(440px, calc(100dvh - 28px))')
+    expect(cssRule('.floating-tip')).toContain('overflow-y: auto')
+    expect(cssRule('.floating-tip.paper-card')).toContain('overflow: auto')
+    expect(cssRule('.floating-tip.paper-card')).not.toContain('overflow: visible')
+    expect(cssRule('.tip-actions')).toContain('position: sticky')
+    expect(cssRule('.tip-actions')).toContain('bottom: 0')
+  })
+
   it('lets both battle equipment rows open the same detail tip surface', () => {
     expect(app).toContain('battleTip')
     expect(app).toContain('onInspect={(item, element)')
@@ -48,3 +57,9 @@ describe('item detail tooltip interactions', () => {
     expect(app).toContain('出售 +{sellValue}')
   })
 })
+
+function cssRule(selector: string) {
+  const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const match = css.match(new RegExp(`${escaped}\\s*\\{([^}]*)\\}`))
+  return match?.[1] ?? ''
+}

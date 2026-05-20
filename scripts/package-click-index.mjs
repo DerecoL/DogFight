@@ -574,6 +574,19 @@ async function defaultMockApiScript(buildId = new Date().toISOString().replace(/
       const item = run.items.find((entry) => entry.id === body.itemId);
       if (!item) return error('道具不存在', 404);
       const candidate = { ...item, area: body.area, x: Number(body.x), y: Number(body.y) };
+      const coveredForUpgrade = coveredItems(run.items, candidate);
+      const upgradeTarget = coveredForUpgrade.length === 1 ? coveredForUpgrade[0] : null;
+      const upgradedQuality = upgradeTarget
+        && upgradeTarget.defId === candidate.defId
+        && normalizeQuality(upgradeTarget.quality) === normalizeQuality(candidate.quality)
+        ? nextQuality(upgradeTarget.quality)
+        : null;
+      if (upgradeTarget && upgradedQuality) {
+        upgradeTarget.quality = upgradedQuality;
+        run.items = run.items.filter((entry) => entry.id !== item.id);
+        saveState(state);
+        return json({ run: publicRun(run) });
+      }
       if (!canPlace(run.items, candidate, candidate.area, candidate.x, candidate.y, typeof equipmentWidthForRun === 'function' ? equipmentWidthForRun(run) : 12)) {
         const equipmentWidth = typeof equipmentWidthForRun === 'function' ? equipmentWidthForRun(run) : 12;
         const covered = candidate.area === 'EQUIPMENT' ? coveredItems(run.items, candidate) : [];
@@ -913,17 +926,28 @@ async function currentMockApiScript(buildId) {
     });
   }
 
+  const qualityValueMultiplier = { BRONZE: 1, SILVER: 2, GOLD: 4, DIAMOND: 8 };
+
+  function itemPurchaseValue(def, quality) {
+    return Math.floor(def.price * qualityValueMultiplier[normalizeQuality(quality || def.defaultQuality)]);
+  }
+
+  function shopPrice(def, discount) {
+    return Math.max(1, Math.floor(itemPurchaseValue(def) * discount));
+  }
+
   function createShop(state, type = 'GENERAL', seed = '') {
     const rng = createRng(seed || (state.nextId + '-' + type));
     const pool = shopPool(type);
     const offers = Array.from({ length: 5 }, () => {
       const def = pick(rng, pool);
       const discount = rng() < 0.2 ? pick(rng, [0.5, 0.6, 0.7, 0.8]) : 1;
-      return { offerId: id(state, 'offer'), defId: def.id, price: Math.max(1, Math.floor(def.price * discount)), discount, quality: 'BRONZE' };
+      const quality = normalizeQuality(def.defaultQuality);
+      return { offerId: id(state, 'offer'), defId: def.id, price: shopPrice(def, discount), discount, quality };
     });
     if (type === 'GENERAL' && offers.every((offer) => offer.price > 5)) {
-      const affordable = [...pool].sort((a, b) => a.price - b.price)[0];
-      offers[0] = { offerId: id(state, 'offer'), defId: affordable.id, price: affordable.price, discount: 1, quality: 'BRONZE' };
+      const affordable = [...pool].sort((a, b) => shopPrice(a, 1) - shopPrice(b, 1))[0];
+      offers[0] = { offerId: id(state, 'offer'), defId: affordable.id, price: shopPrice(affordable, 1), discount: 1, quality: normalizeQuality(affordable.defaultQuality) };
     }
     return offers;
   }
