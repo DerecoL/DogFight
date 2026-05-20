@@ -3471,6 +3471,8 @@ input {
 .dogfight-room-list,
 .dogfight-member-list,
 .dogfight-battle-list,
+.dogfight-survivor-board,
+.dogfight-battle-dock,
 .dogfight-room-status {
   background: rgba(255, 250, 241, .94);
   border: 3px solid var(--ink);
@@ -3481,7 +3483,9 @@ input {
 .dogfight-actions,
 .dogfight-room-list,
 .dogfight-member-list,
-.dogfight-battle-list {
+.dogfight-battle-list,
+.dogfight-survivor-board,
+.dogfight-battle-dock {
   padding: 14px;
   display: grid;
   gap: 12px;
@@ -3586,11 +3590,85 @@ input {
   margin: 0;
 }
 
+.dogfight-phase-track {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(92px, 1fr));
+  gap: 6px;
+  min-width: min(360px, 100%);
+}
+
+.dogfight-phase-track span {
+  padding: 7px 10px;
+  text-align: center;
+  border: 2px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  font-weight: 900;
+  color: var(--muted);
+}
+
+.dogfight-phase-track span.active {
+  border-color: var(--blue);
+  color: var(--ink);
+  background: #eef4ff;
+}
+
 .dogfight-room-columns {
   display: grid;
-  grid-template-columns: 300px minmax(0, 1fr);
+  grid-template-columns: 280px minmax(0, 1fr) 280px;
   gap: 18px;
   align-items: start;
+}
+
+.dogfight-survivor-board {
+  display: grid;
+  align-content: start;
+}
+
+.dogfight-player-frame {
+  width: 100%;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  background: #fff;
+  border: 2px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  text-align: left;
+}
+
+.dogfight-player-frame.bot {
+  border-style: dashed;
+  background: #fbfbf8;
+}
+
+.dogfight-player-frame.selected {
+  outline: 3px solid rgba(65, 127, 255, .32);
+  border-color: var(--blue);
+}
+
+.dogfight-player-frame.eliminated {
+  opacity: .58;
+  filter: grayscale(.35);
+}
+
+.dogfight-player-frame p {
+  margin: 2px 0 0;
+  color: var(--muted);
+  font-weight: 800;
+  font-size: 12px;
+}
+
+.dogfight-player-frame b {
+  display: inline-grid;
+  place-items: center;
+  min-width: 32px;
+  min-height: 32px;
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  background: #fff5d2;
 }
 
 .dogfight-member-list article {
@@ -3624,6 +3702,19 @@ input {
 
 .dogfight-workbench {
   align-items: start;
+}
+
+.dogfight-dog-select {
+  padding: 14px;
+}
+
+.dogfight-dog-select .dog-select-screen {
+  padding: 0;
+}
+
+.dogfight-battle-dock {
+  display: grid;
+  align-content: start;
 }
 
 .dogfight-battle-row {

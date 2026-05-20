@@ -987,7 +987,8 @@ describeWithDatabase('run API', () => {
     expect(selected.body.room.members.every((member: { runId: string | null; dogType: string | null }) => member.runId && member.dogType)).toBe(true)
     expect(selected.body.room.currentRun.dogType).toBe('EMPEROR')
 
-    await agents[0].post(`/api/dogfight/rooms/${roomId}/ready`).send({}).expect(200)
+    const hostReady = await agents[0].post(`/api/dogfight/rooms/${roomId}/ready`).send({}).expect(200)
+    await agents[0].post(`/api/runs/${hostReady.body.room.currentRun.id}/shop/reroll`).send({}).expect(400)
     await agents[1].post(`/api/dogfight/rooms/${roomId}/ready`).send({}).expect(200)
     const battleRound = await agents[2].post(`/api/dogfight/rooms/${roomId}/ready`).send({}).expect(200)
     expect(battleRound.body.room).toMatchObject({ phase: 'BATTLE', currentRound: 0 })

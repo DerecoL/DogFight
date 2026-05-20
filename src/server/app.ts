@@ -210,6 +210,11 @@ export function buildApp() {
     return hasExtraEquipment ? { equipmentWidth: 13 } : {}
   }
 
+  const isReadyDogfightRunLocked = async (runId: string) => {
+    const participant = await prisma.dogfightParticipant.findUnique({ where: { runId }, include: { room: true } })
+    return Boolean(participant?.ready && participant.room.status === 'ACTIVE' && participant.room.phase === 'SHOP')
+  }
+
   const overlappingItems = (items: GameItem[], moving: GameItem, area: GameItem['area'], x: number, y: number) => {
     const movingDef = itemDef(moving.defId)
     return items
@@ -505,6 +510,7 @@ export function buildApp() {
     const userId = requireUser(request.userId)
     const { runId } = z.object({ runId: z.string() }).parse(request.params)
     const run = await prisma.run.findFirstOrThrow({ where: { id: runId, userId }, include: { items: true } })
+    if (await isReadyDogfightRunLocked(run.id)) return reply.code(400).send({ error: '本回合已完成，等待其他玩家' })
     if (run.phase !== 'SHOP' || run.shopType === 'RELIC') return reply.code(400).send({ error: '当前不在普通商店' })
     if (run.gold < run.refreshCost) return reply.code(400).send({ error: '金币不足' })
     const shopItems = makeShop(run.shopType as ShopType, `${run.id}-${Date.now()}-${run.refreshCost}`, run.round)
@@ -521,6 +527,7 @@ export function buildApp() {
     const { runId } = z.object({ runId: z.string() }).parse(request.params)
     const body = z.object({ offerId: z.string(), area: z.enum(['EQUIPMENT', 'BAG']).default('BAG') }).parse(request.body)
     const run = await prisma.run.findFirstOrThrow({ where: { id: runId, userId }, include: { items: true } })
+    if (await isReadyDogfightRunLocked(run.id)) return reply.code(400).send({ error: '本回合已完成，等待其他玩家' })
     if (run.phase !== 'SHOP' || run.shopType === 'RELIC') return reply.code(400).send({ error: '当前不在普通商店' })
     const offers = parseJson<ShopOffer[]>(run.shopItems, [])
     const offer = offers.find((entry) => entry.offerId === body.offerId)
@@ -566,6 +573,7 @@ export function buildApp() {
     const { runId } = z.object({ runId: z.string() }).parse(request.params)
     const body = z.object({ itemId: z.string() }).parse(request.body)
     const run = await prisma.run.findFirstOrThrow({ where: { id: runId, userId }, include: { items: true } })
+    if (await isReadyDogfightRunLocked(run.id)) return reply.code(400).send({ error: '本回合已完成，等待其他玩家' })
     const item = run.items.find((entry) => entry.id === body.itemId)
     if (!item) return reply.code(404).send({ error: '道具不存在' })
     const def = itemDef(item.defId)
@@ -580,6 +588,7 @@ export function buildApp() {
     const { runId } = z.object({ runId: z.string() }).parse(request.params)
     const body = z.object({ itemId: z.string(), area: z.enum(['EQUIPMENT', 'BAG']), x: z.number().int(), y: z.number().int() }).parse(request.body)
     const run = await prisma.run.findFirstOrThrow({ where: { id: runId, userId }, include: { items: true } })
+    if (await isReadyDogfightRunLocked(run.id)) return reply.code(400).send({ error: '本回合已完成，等待其他玩家' })
     if (!['SHOP', 'MATCH', 'CLASS_REWARD', 'PREP'].includes(run.phase)) return reply.code(400).send({ error: '当前不能调整装备' })
     const item = run.items.find((entry) => entry.id === body.itemId)
     if (!item) return reply.code(404).send({ error: '道具不存在' })
@@ -616,6 +625,7 @@ export function buildApp() {
     const body = z.object({ itemId: z.string(), targetItemId: z.string().optional() }).parse(request.body)
     const run = await prisma.run.findFirst({ where: { id: runId, userId }, include: { items: true } })
     if (!run) return reply.code(404).send({ error: '跑局不存在' })
+    if (await isReadyDogfightRunLocked(run.id)) return reply.code(400).send({ error: '本回合已完成，等待其他玩家' })
     if (!['SHOP', 'MATCH', 'CLASS_REWARD', 'PREP'].includes(run.phase)) return reply.code(400).send({ error: '当前不能升级道具' })
 
     const gameItems = toGameItems(run.items)
@@ -646,6 +656,7 @@ export function buildApp() {
     const { runId } = z.object({ runId: z.string() }).parse(request.params)
     const body = z.object({ shopType: z.enum(['GENERAL', 'LARGE', 'MEDIUM', 'SMALL', 'SMALL_DICE', 'BIG_DICE', 'RELIC']) }).parse(request.body)
     const run = await prisma.run.findFirstOrThrow({ where: { id: runId, userId }, include: { items: true } })
+    if (await isReadyDogfightRunLocked(run.id)) return reply.code(400).send({ error: '本回合已完成，等待其他玩家' })
     if (run.phase !== 'CHOICE') return reply.code(400).send({ error: '当前不在三选一' })
     const choices = parseJson<ShopType[]>(run.choices, [])
     if (!choices.includes(body.shopType)) return reply.code(400).send({ error: '无效选择' })
@@ -672,6 +683,7 @@ export function buildApp() {
     const { runId } = z.object({ runId: z.string() }).parse(request.params)
     const body = z.object({ defId: z.string() }).parse(request.body)
     const run = await prisma.run.findFirstOrThrow({ where: { id: runId, userId }, include: { items: true } })
+    if (await isReadyDogfightRunLocked(run.id)) return reply.code(400).send({ error: '本回合已完成，等待其他玩家' })
     if (run.phase !== 'CLASS_REWARD') return reply.code(400).send({ error: '当前不在职业奖励' })
     const choices = parseJson<string[]>(run.classRewardChoices, [])
     if (!choices.includes(body.defId)) return reply.code(400).send({ error: '无效职业装备' })
@@ -696,6 +708,7 @@ export function buildApp() {
     const { runId } = z.object({ runId: z.string() }).parse(request.params)
     const body = z.object({ relicId: z.string() }).parse(request.body)
     const run = await prisma.run.findFirstOrThrow({ where: { id: runId, userId }, include: { items: true } })
+    if (await isReadyDogfightRunLocked(run.id)) return reply.code(400).send({ error: '本回合已完成，等待其他玩家' })
     if (run.phase !== 'RELIC_CHOICE') return reply.code(400).send({ error: '当前不在遗物选择' })
     const choices = parseJson<string[]>(run.relicChoices, [])
     if (!choices.includes(body.relicId)) return reply.code(400).send({ error: '无效遗物' })

@@ -226,12 +226,14 @@ describe('equipment layout scale', () => {
     expect(cssRule('.ceremony-skip-hint')).toContain('letter-spacing: 0')
   })
 
-  it('keeps dogfight dog selection constrained inside the room action panel', () => {
-    expect(css).not.toContain('.dogfight-picker .dog-select-layout')
-    expect(cssRule('.dogfight-picker .dog-select')).toContain('grid-template-columns: 1fr')
-    expect(cssRule('.dogfight-picker .dog-card-grid')).toContain('grid-template-columns: repeat(2, minmax(0, 1fr))')
-    expect(cssRule('.dogfight-picker .dog-detail-panel')).toContain('box-shadow: none')
-    expect(cssRule('.dogfight-picker .dog-detail-art')).toContain('display: none')
+  it('lays out dogfight as an autochess room with ranked player frames and phase controls', () => {
+    expect(cssRule('.dogfight-phase-track')).toContain('grid-template-columns')
+    expect(cssRule('.dogfight-survivor-board')).toContain('display: grid')
+    expect(cssRule('.dogfight-player-frame')).toContain('grid-template-columns')
+    expect(cssRule('.dogfight-player-frame.selected')).toContain('outline')
+    expect(cssRule('.dogfight-player-frame.bot')).toContain('border-style: dashed')
+    expect(cssRule('.dogfight-battle-dock')).toContain('display: grid')
+    expect(cssRule('.dogfight-room-columns')).toContain('grid-template-columns')
   })
 
   it('stacks dogfight room columns on narrow screens', () => {

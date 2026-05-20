@@ -227,17 +227,20 @@ type ApexChallengeReport = {
 type ApexOverview = { leaderboard: ApexEntry[]; candidates: Run[] }
 type ApexSubmitResponse = { entry: ApexEntry; report: ApexChallengeReport; leaderboard: ApexEntry[] }
 type DogfightRoomStatus = 'WAITING' | 'ACTIVE' | 'COMPLETE'
+type DogfightRoomPhase = 'LOBBY' | 'DOG_SELECT' | 'SHOP' | 'BATTLE' | 'COMPLETE'
 type DogfightMember = {
   id: string
-  userId: string
-  runId: string
+  userId: string | null
+  runId: string | null
+  kind: 'PLAYER' | 'BOT'
   nickname: string
   isHost: boolean
   ready: boolean
   eliminated: boolean
   eliminatedRound?: number | null
   placement?: number | null
-  dogType: DogType
+  currentBattleId?: string | null
+  dogType: DogType | null
   wins: number
   losses: number
   round: number
@@ -259,24 +262,31 @@ type DogfightRoom = {
   id: string
   hostUserId: string
   status: DogfightRoomStatus
+  phase: DogfightRoomPhase
   currentRound: number
   maxPlayers: number
+  targetPlayerCount: number
   readyDeadline: string | null
+  phaseDeadline: string | null
   winnerParticipantId?: string | null
   isHost: boolean
   spectator: boolean
   members: DogfightMember[]
+  currentRunMember: DogfightMember | null
   currentRun: Run | null
   battles: DogfightBattleSummary[]
 }
 type DogfightRoomSummary = {
   id: string
   status: DogfightRoomStatus
+  phase: DogfightRoomPhase
   currentRound: number
   maxPlayers: number
+  targetPlayerCount: number
   memberCount: number
   aliveCount: number
   readyDeadline: string | null
+  phaseDeadline: string | null
   winnerParticipantId?: string | null
   isMember: boolean
   isHost: boolean
@@ -595,6 +605,29 @@ function maxHealthForRound(round: number) {
   const earlyRounds = Math.min(completedRounds, EARLY_HP_GROWTH_ROUNDS)
   const lateRounds = Math.max(0, completedRounds - EARLY_HP_GROWTH_ROUNDS)
   return BASE_MAX_HP + earlyRounds * EARLY_ROUND_HP_GROWTH + lateRounds * LATE_ROUND_HP_GROWTH
+}
+
+function dogfightPhaseLabel(phase: DogfightRoomPhase) {
+  if (phase === 'LOBBY') return '等待开局'
+  if (phase === 'DOG_SELECT') return '选狗阶段'
+  if (phase === 'SHOP') return '商店阶段'
+  if (phase === 'BATTLE') return '战斗阶段'
+  return '房间结束'
+}
+
+function dogfightLives(member: DogfightMember) {
+  return member.eliminated ? 0 : Math.max(0, 5 - member.losses)
+}
+
+function sortedDogfightMembers(members: DogfightMember[]) {
+  return members.slice().sort((left, right) => {
+    const leftLives = dogfightLives(left)
+    const rightLives = dogfightLives(right)
+    return rightLives - leftLives
+      || right.wins - left.wins
+      || (left.kind === right.kind ? 0 : left.kind === 'PLAYER' ? -1 : 1)
+      || left.nickname.localeCompare(right.nickname)
+  })
 }
 
 function diceToneText(def: ItemDef) {
@@ -1441,7 +1474,6 @@ function DogfightLobby() {
   const [rooms, setRooms] = useState<DogfightRoomSummary[]>([])
   const [room, setRoom] = useState<DogfightRoom | null>(null)
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null)
-  const [pendingAction, setPendingAction] = useState<'CREATE' | 'JOIN' | 'MATCH' | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const roomId = room?.id ?? null
@@ -1463,7 +1495,6 @@ function DogfightLobby() {
     try {
       const data = await api<DogfightRoomResponse>('/dogfight/rooms/' + roomId)
       setRoom(data.room)
-      setPendingAction(null)
     } catch (err) {
       setError(err instanceof Error ? err.message : '斗狗房间进入失败')
     }
@@ -1495,21 +1526,20 @@ function DogfightLobby() {
     return () => window.clearInterval(timer)
   }, [roomId])
 
-  const enterWithDog = async (choice: { dogType: DogType; luckyNumber?: number }) => {
+  const enterRoom = async (actionType: 'CREATE' | 'JOIN' | 'MATCH', joinRoomId = selectedRoomId) => {
     setError('')
     try {
       let data: DogfightRoomResponse
-      if (pendingAction === 'CREATE') {
-        data = await api<DogfightRoomResponse>('/dogfight/rooms', { method: 'POST', body: JSON.stringify(choice) })
-      } else if (pendingAction === 'MATCH') {
-        data = await api<DogfightRoomResponse>('/dogfight/match', { method: 'POST', body: JSON.stringify(choice) })
+      if (actionType === 'CREATE') {
+        data = await api<DogfightRoomResponse>('/dogfight/rooms', { method: 'POST' })
+      } else if (actionType === 'MATCH') {
+        data = await api<DogfightRoomResponse>('/dogfight/match', { method: 'POST' })
       } else {
-        const roomId = selectedRoomId
+        const roomId = joinRoomId
         if (!roomId) throw new Error('请先选择一个未开始的房间')
-        data = await api<DogfightRoomResponse>(`/dogfight/rooms/${roomId}/join`, { method: 'POST', body: JSON.stringify(choice) })
+        data = await api<DogfightRoomResponse>(`/dogfight/rooms/${roomId}/join`, { method: 'POST' })
       }
       setRoom(data.room)
-      setPendingAction(null)
       void loadRooms()
     } catch (err) {
       setError(err instanceof Error ? err.message : '斗狗房间操作失败')
@@ -1529,15 +1559,10 @@ function DogfightLobby() {
       {error && <p className="error">{error}</p>}
       <div className="dogfight-layout">
         <aside className="dogfight-actions">
-          <button className="primary action-button" onClick={() => setPendingAction('CREATE')}><House size={18} /> 创建房间</button>
-          <button className="secondary action-button" disabled={!selectedRoomId} onClick={() => setPendingAction('JOIN')}><Swords size={18} /> 加入房间</button>
-          <button className="primary action-button" onClick={() => setPendingAction('MATCH')}><RadioTower size={18} /> 随机匹配</button>
-          {pendingAction && (
-            <div className="dogfight-picker">
-              <h3>{pendingAction === 'CREATE' ? '创建房间' : pendingAction === 'MATCH' ? '随机匹配' : '加入房间'}</h3>
-              <DogSelect onPick={enterWithDog} />
-            </div>
-          )}
+          <button className="primary action-button" onClick={() => void enterRoom('CREATE')}><House size={18} /> 创建房间</button>
+          <button className="secondary action-button" disabled={!selectedRoomId} onClick={() => void enterRoom('JOIN')}><Swords size={18} /> 加入房间</button>
+          <button className="primary action-button" onClick={() => void enterRoom('MATCH')}><RadioTower size={18} /> 随机匹配</button>
+          <p className="muted-note">玩家席位先进入房间，开局后统一 15 秒选择斗狗；不足 8 人由机器人补齐。</p>
         </aside>
         <section className="dogfight-room-list">
           <div className="panel-heading">
@@ -1550,14 +1575,14 @@ function DogfightLobby() {
             <article key={room.id} className={`dogfight-room-card ${selectedRoomId === room.id ? 'selected' : ''}`}>
               <div>
                 <strong>{room.hostName} 的房间</strong>
-                <p>{room.status === 'WAITING' ? '等待中' : room.status === 'ACTIVE' ? `第 ${room.currentRound} 回合` : '已结束'} · {room.memberCount}/{room.maxPlayers} 人 · 存活 {room.aliveCount}</p>
+                <p>{room.status === 'WAITING' ? '等待中' : room.status === 'ACTIVE' ? `${dogfightPhaseLabel(room.phase)} · 第 ${room.currentRound} 回合` : '已结束'} · 真人 {room.memberCount}/{room.maxPlayers} · 存活 {room.aliveCount}/{room.targetPlayerCount}</p>
               </div>
               <button
                 className="primary action-button"
                 onClick={() => {
                   if (room.status === 'WAITING') {
                     setSelectedRoomId(room.id)
-                    setPendingAction('JOIN')
+                    void enterRoom('JOIN', room.id)
                   } else {
                     void loadRoom(room.id)
                   }
@@ -1576,6 +1601,7 @@ function DogfightLobby() {
 function DogfightRoomView({ room, onRoomChange, onLeave }: { room: DogfightRoom; onRoomChange: (room: DogfightRoom) => void; onLeave: () => void }) {
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
   const [selectedOfferId, setSelectedOfferId] = useState<string | null>(null)
+  const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null)
   const [tipAnchor, setTipAnchor] = useState<TipAnchor | null>(null)
   const [draggingItemId, setDraggingItemId] = useState<string | null>(null)
   const [battle, setBattle] = useState<Battle | null>(null)
@@ -1585,10 +1611,12 @@ function DogfightRoomView({ room, onRoomChange, onLeave }: { room: DogfightRoom;
   const [now, setNow] = useState(() => Date.now())
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
   const run = room.currentRun
+  const currentMember = room.currentRunMember ?? (run ? room.members.find((member) => member.runId === run.id) ?? null : null)
   const selectedItem = run?.items.find((item) => item.id === selectedItemId) || null
   const selectedOffer = run?.shopItems.find((offer) => offer.offerId === selectedOfferId) || null
   const draggingItem = run?.items.find((item) => item.id === draggingItemId) || null
-  const currentMember = run ? room.members.find((member) => member.runId === run.id) : null
+  const deadline = room.phaseDeadline ? Math.max(0, Math.ceil((new Date(room.phaseDeadline).getTime() - now) / 1000)) : 0
+  const selectedBattleMemberId = selectedMemberId ?? currentMember?.id ?? sortedDogfightMembers(room.members)[0]?.id ?? null
 
   useEffect(() => {
     if (!battle) return
@@ -1624,6 +1652,7 @@ function DogfightRoomView({ room, onRoomChange, onLeave }: { room: DogfightRoom;
 
   const startRoom = () => runAction(() => api<DogfightRoomResponse>(`/dogfight/rooms/${room.id}/start`, { method: 'POST' }))
   const readyRoom = () => runAction(() => api<DogfightRoomResponse>(`/dogfight/rooms/${room.id}/ready`, { method: 'POST' }))
+  const chooseDog = (choice: { dogType: DogType; luckyNumber?: number }) => runAction(() => api<DogfightRoomResponse>(`/dogfight/rooms/${room.id}/dog-choice`, { method: 'POST', body: JSON.stringify(choice) }))
 
   const loadBattle = async (battleId: string) => {
     setError('')
@@ -1636,14 +1665,20 @@ function DogfightRoomView({ room, onRoomChange, onLeave }: { room: DogfightRoom;
     }
   }
 
+  useEffect(() => {
+    if (battle || room.phase !== 'BATTLE') return
+    const battleId = currentMember?.currentBattleId ?? sortedDogfightMembers(room.members).find((member) => member.currentBattleId)?.currentBattleId
+    if (battleId) void loadBattle(battleId)
+  }, [battle, currentMember?.currentBattleId, room.phase, room.members])
+
   const moveItem = (itemId: string, area: Area, x: number, y: number) => {
-    if (!run) return
+    if (!run || currentMember?.ready) return
     const placement = resolveRunSlotPlacement(run, itemId, area, x, y)
     void runAction(() => api<{ run: Run }>(`/runs/${run.id}/items/move`, { method: 'POST', body: JSON.stringify({ itemId, area: placement?.area ?? area, x: placement?.x ?? x, y: placement?.y ?? y }) }))
   }
 
   const upgradeItem = (itemId: string, targetItemId?: string) => {
-    if (!run) return
+    if (!run || currentMember?.ready) return
     setTipAnchor(null)
     void runAction(() => api<{ run: Run }>(`/runs/${run.id}/items/upgrade`, { method: 'POST', body: JSON.stringify({ itemId, targetItemId }) }))
   }
@@ -1673,7 +1708,7 @@ function DogfightRoomView({ room, onRoomChange, onLeave }: { room: DogfightRoom;
 
   const onDragEnd = (event: DragEndEvent) => {
     setDraggingItemId(null)
-    if (!run) return
+    if (!run || currentMember?.ready) return
     const itemId = String(event.active.id)
     const overId = event.over ? String(event.over.id) : ''
     if (overId.startsWith('UPGRADE_ITEM:')) {
@@ -1697,8 +1732,7 @@ function DogfightRoomView({ room, onRoomChange, onLeave }: { room: DogfightRoom;
     if (slot) moveItem(itemId, slot.area, slot.x, slot.y)
   }
 
-  const battleRun = run ?? battleToRun(battle)
-  const deadline = room.readyDeadline ? Math.max(0, Math.ceil((new Date(room.readyDeadline).getTime() - now) / 1000)) : 0
+  const battleRun = battleToRun(battle) ?? run
 
   return (
     <section className="dogfight-room-view">
@@ -1709,32 +1743,54 @@ function DogfightRoomView({ room, onRoomChange, onLeave }: { room: DogfightRoom;
       {error && <p className="error">{error}</p>}
       <div className="dogfight-room-status">
         <div>
-          <h2>{room.status === 'WAITING' ? '等待开局' : room.status === 'ACTIVE' ? `第 ${room.currentRound} 回合` : '房间结束'}</h2>
-          <p>{room.status === 'ACTIVE' ? `整备倒计时 ${deadline}s` : `玩家 ${room.members.length}/${room.maxPlayers}`}</p>
+          <h2>{dogfightPhaseLabel(room.phase)} · 第 {room.currentRound} 回合</h2>
+          <p>{room.phase === 'LOBBY' ? `玩家席位 ${room.members.filter((member) => member.kind === 'PLAYER').length}/${room.maxPlayers}` : `阶段倒计时 ${deadline}s`}</p>
         </div>
-        {room.currentRun && <span className="resource-pill safe"><Shield size={16} /> 失败容错 {`${5 - room.currentRun.losses}`}</span>}
+        <div className="dogfight-phase-track">
+          {(['DOG_SELECT', 'SHOP', 'BATTLE'] as DogfightRoomPhase[]).map((phase) => <span key={phase} className={room.phase === phase ? 'active' : ''}>{dogfightPhaseLabel(phase)}</span>)}
+        </div>
+        {currentMember && <span className="resource-pill safe"><Shield size={16} /> 剩余存活 {dogfightLives(currentMember)}</span>}
         {room.isHost && room.status === 'WAITING' && <button className="primary action-button" onClick={startRoom}>开始房间</button>}
-        {run && room.status === 'ACTIVE' && !currentMember?.ready && !currentMember?.eliminated && <button className="primary action-button" onClick={readyRoom}>准备本回合</button>}
+        {run && room.phase === 'SHOP' && !currentMember?.ready && !currentMember?.eliminated && <button className="primary action-button" onClick={readyRoom}>完成本回合</button>}
       </div>
 
       <div className="dogfight-room-columns">
-        <aside className="dogfight-member-list">
+        <aside className="dogfight-survivor-board">
           <h3>房间玩家</h3>
-          {room.members.map((member) => (
-            <article key={member.id} className={member.eliminated ? 'eliminated' : ''}>
-              <img className="dog-avatar small" src={dogAssets[member.dogType]} alt="" />
+          {sortedDogfightMembers(room.members).map((member) => (
+            <button
+              key={member.id}
+              className={`dogfight-player-frame ${member.kind.toLowerCase()} ${member.eliminated ? 'eliminated' : ''} ${selectedBattleMemberId === member.id ? 'selected' : ''}`}
+              onClick={() => {
+                setSelectedMemberId(member.id)
+                if (member.currentBattleId) void loadBattle(member.currentBattleId)
+              }}
+            >
+              {member.dogType ? <img className="dog-avatar small" src={dogAssets[member.dogType]} alt="" /> : <PawPrint size={28} />}
               <div>
                 <strong>{member.nickname}{member.isHost ? ' · 房主' : ''}</strong>
-                <p>{dogNames[member.dogType]} · {member.wins}胜 {member.losses}败 · {member.ready ? '已准备' : member.eliminated ? '已淘汰' : '整备中'}</p>
+                <p>{member.dogType ? dogNames[member.dogType] : '等待选狗'} · {member.kind === 'BOT' ? '机器人' : '玩家'} · {member.wins}胜 {member.losses}败</p>
               </div>
-            </article>
+              <b>{dogfightLives(member)}</b>
+            </button>
           ))}
         </aside>
 
         <main className="dogfight-play-area">
           {battle && battleRun ? (
             <BattleView run={battleRun} battle={battle} currentEvent={battle.events[eventIndex]} eventIndex={eventIndex} speed={speed} score={0} onSpeed={setSpeed} onContinue={() => setBattle(null)} onRestart={() => setBattle(null)} />
-          ) : run ? (
+          ) : room.phase === 'DOG_SELECT' && !run ? (
+            <section className="dogfight-dog-select sketch-panel">
+              <div className="section-title">
+                <PawPrint size={22} />
+                <div>
+                  <h2>选择斗狗</h2>
+                  <p>15 秒内锁定狗狗；超时会自动随机。</p>
+                </div>
+              </div>
+              <DogSelect onPick={chooseDog} />
+            </section>
+          ) : run && room.phase === 'SHOP' ? (
             <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd}>
               <DogfightRunWorkbench
                 run={run}
@@ -1744,13 +1800,13 @@ function DogfightRoomView({ room, onRoomChange, onLeave }: { room: DogfightRoom;
                 onInspectOffer={onInspectOffer}
                 onInspectItem={onInspectItem}
                 onMoveItem={moveItem}
-                onReroll={() => runAction(() => api<{ run: Run }>(`/runs/${run.id}/shop/reroll`, { method: 'POST' }))}
-                onBuy={() => selectedOffer && runAction(() => api<{ run: Run }>(`/runs/${run.id}/shop/buy`, { method: 'POST', body: JSON.stringify({ offerId: selectedOffer.offerId, area: 'BAG' }) }))}
-                onSell={() => selectedItem && runAction(() => api<{ run: Run }>(`/runs/${run.id}/shop/sell`, { method: 'POST', body: JSON.stringify({ itemId: selectedItem.id }) }))}
-                onUpgrade={selectedItem && canUpgradeItem(selectedItem, run.items) ? () => upgradeItem(selectedItem.id) : null}
-                onChoice={(shopType) => runAction(() => api<{ run: Run }>(`/runs/${run.id}/choice/select`, { method: 'POST', body: JSON.stringify({ shopType }) }))}
-                onClassReward={(defId) => runAction(() => api<{ run: Run }>(`/runs/${run.id}/class-reward/select`, { method: 'POST', body: JSON.stringify({ defId }) }))}
-                onRelic={(relicId) => runAction(() => api<{ run: Run }>(`/runs/${run.id}/relic/select`, { method: 'POST', body: JSON.stringify({ relicId }) }))}
+                onReroll={() => !currentMember?.ready && runAction(() => api<{ run: Run }>(`/runs/${run.id}/shop/reroll`, { method: 'POST' }))}
+                onBuy={() => selectedOffer && !currentMember?.ready && runAction(() => api<{ run: Run }>(`/runs/${run.id}/shop/buy`, { method: 'POST', body: JSON.stringify({ offerId: selectedOffer.offerId, area: 'BAG' }) }))}
+                onSell={() => selectedItem && !currentMember?.ready && runAction(() => api<{ run: Run }>(`/runs/${run.id}/shop/sell`, { method: 'POST', body: JSON.stringify({ itemId: selectedItem.id }) }))}
+                onUpgrade={selectedItem && canUpgradeItem(selectedItem, run.items) && !currentMember?.ready ? () => upgradeItem(selectedItem.id) : null}
+                onChoice={(shopType) => !currentMember?.ready && runAction(() => api<{ run: Run }>(`/runs/${run.id}/choice/select`, { method: 'POST', body: JSON.stringify({ shopType }) }))}
+                onClassReward={(defId) => !currentMember?.ready && runAction(() => api<{ run: Run }>(`/runs/${run.id}/class-reward/select`, { method: 'POST', body: JSON.stringify({ defId }) }))}
+                onRelic={(relicId) => !currentMember?.ready && runAction(() => api<{ run: Run }>(`/runs/${run.id}/relic/select`, { method: 'POST', body: JSON.stringify({ relicId }) }))}
                 selectedItem={selectedItem}
                 selectedOffer={selectedOffer}
                 tipAnchor={tipAnchor}
@@ -1761,18 +1817,18 @@ function DogfightRoomView({ room, onRoomChange, onLeave }: { room: DogfightRoom;
               </DragOverlay>
             </DndContext>
           ) : (
-            <p className="apex-empty">你正在观战这个房间。可以查看房间战况和历史战报。</p>
+            <p className="apex-empty">{room.phase === 'BATTLE' ? '战斗生成中，可以点击左侧玩家框或右侧场次切换观战。' : '你正在观战这个房间。可以查看房间战况和历史战报。'}</p>
           )}
-
-          <section className="dogfight-battle-list">
-            <h3>战报</h3>
-            {room.battles.length === 0 ? <p className="apex-empty">暂无战报</p> : room.battles.slice().reverse().map((entry) => (
-              <button key={entry.id} className="dogfight-battle-row" onClick={() => void loadBattle(entry.id)}>
-                第 {entry.round} 回合 · {entry.opponentKind === 'PLAYER' ? '玩家对战' : '离线训练'} · 回放
-              </button>
-            ))}
-          </section>
         </main>
+
+        <section className="dogfight-battle-dock">
+          <h3>本轮场次</h3>
+          {room.battles.length === 0 ? <p className="apex-empty">暂无战报</p> : room.battles.slice().reverse().map((entry) => (
+            <button key={entry.id} className="dogfight-battle-row" onClick={() => void loadBattle(entry.id)}>
+              第 {entry.round} 回合 · {entry.opponentKind === 'PLAYER' ? '玩家对战' : '离线训练'} · 回放
+            </button>
+          ))}
+        </section>
       </div>
     </section>
   )
