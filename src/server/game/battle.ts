@@ -79,6 +79,7 @@ type BattleSideState = {
   disabledLarge: number
   disabledItemIds: string[]
   adjacentDamageBonus: Record<string, number>
+  lifestealItemIds: string[]
   forcedItemDice: Record<string, number>
   shibaSpeedStacks: number
 }
@@ -106,6 +107,7 @@ function createSideState(maxHp: number): BattleSideState {
     disabledLarge: 0,
     disabledItemIds: [],
     adjacentDamageBonus: {},
+    lifestealItemIds: [],
     forcedItemDice: {},
     shibaSpeedStacks: 0,
   }
@@ -422,6 +424,27 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
       return triggers
     }
 
+    if (!sacrificeReplacesSmallEffect && advanced === 'GRANT_LIFESTEAL_ADJACENT') {
+      const recipients = adjacentItems(actor, item).filter((entry) => quality === 'DIAMOND' || entry.x < item.x)
+      for (const recipient of recipients) {
+        if (!actorState.lifestealItemIds.includes(recipient.id)) actorState.lifestealItemIds.push(recipient.id)
+      }
+      triggers.push({
+        itemId: item.id,
+        defId: item.defId,
+        quality,
+        effectType: 'UTILITY',
+        amount: recipients.length,
+        target: actorSide,
+        sourceHp: getHp(actorSide),
+        targetHp: getHp(targetSide),
+        sourceHpDelta: 0,
+        targetHpDelta: 0,
+        roll,
+        text: `${itemName(def, quality)} 使${quality === 'DIAMOND' ? '左右相邻' : '左侧'}装备获得【吸血】`,
+      })
+    }
+
     const bullyDoubled = actor.dogType === 'BULLY' && isLarge(def, actor) && rng() < BULLY_LARGE_EFFECT_CHANCE
     const bullyQuad = bullyDoubled && triggerOrder(actor.items).some((entry) => itemDef(entry.defId).advancedEffect === 'BULLY_QUADRUPLE_CHANCE') && rng() < 0.2
     const emperorTraitDisabled = hasEquippedEffect(actor, 'ADJACENT_USES_LUCKY') || hasEquippedEffect(actor, 'ONLY_LUCKY_DOUBLE')
@@ -508,7 +531,7 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
           triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'UTILITY', amount: targetState.weak, target: targetSide, sourceHp: getHp(actorSide), targetHp: getHp(targetSide), sourceHpDelta: 0, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 施加 ${appliedWeak} 层【虚弱】` })
         }
       }
-      if (!recoveryBlocked && advanced === 'LIFESTEAL' && after < before) {
+      if (!recoveryBlocked && (advanced === 'LIFESTEAL' || actorState.lifestealItemIds.includes(item.id)) && after < before) {
         const healed = applyHeal(actorSide, before - after)
         triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'HEAL', amount: before - after, target: actorSide, sourceHp: healed.after, targetHp: getHp(targetSide), sourceHpDelta: healed.delta, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 吸取 ${before - after} 点生命` })
       }

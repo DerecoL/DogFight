@@ -242,6 +242,134 @@ describe('dog and item definitions', () => {
 })
 
 describe('battle simulation', () => {
+  it('blood contract fang at gold grants lifesteal to left adjacent equipment only', () => {
+    const player: FighterSnapshot = {
+      name: 'P',
+      dogType: 'SHIBA',
+      wins: 0,
+      losses: 0,
+      round: 6,
+      items: [
+        { id: 'left-bite', defId: 'starter-1', quality: 'BRONZE', area: 'EQUIPMENT', x: 0, y: 0 },
+        { id: 'fang', defId: 'v4-blood-contract-fang', quality: 'GOLD', area: 'EQUIPMENT', x: 1, y: 0 },
+        { id: 'right-bite', defId: 'starter-1', quality: 'BRONZE', area: 'EQUIPMENT', x: 3, y: 0 },
+      ],
+    }
+    const opponent: FighterSnapshot = {
+      name: 'O',
+      dogType: 'SHIBA',
+      wins: 0,
+      losses: 0,
+      round: 6,
+      items: [
+        { id: 'opener', defId: 'starter-1', quality: 'DIAMOND', area: 'EQUIPMENT', x: 0, y: 0 },
+      ],
+    }
+    const result = simulateBattle(player, opponent, 'blood-contract-gold')
+    const grantIndex = result.events.findIndex((event) =>
+      event.actor === 'player'
+      && event.itemId === 'fang'
+      && event.effectType === 'UTILITY'
+      && event.text.includes('左侧')
+      && event.text.includes('吸血')
+    )
+    const laterEvents = result.events.slice(grantIndex + 1)
+    const leftHeals = laterEvents.filter((event) => event.actor === 'player' && event.itemId === 'left-bite' && event.effectType === 'HEAL')
+    const rightHeals = laterEvents.filter((event) => event.actor === 'player' && event.itemId === 'right-bite' && event.effectType === 'HEAL')
+
+    expect(grantIndex).toBeGreaterThanOrEqual(0)
+    expect(leftHeals.length).toBeGreaterThan(0)
+    expect(leftHeals.every((event) => (event.sourceHpDelta ?? 0) > 0)).toBe(true)
+    expect(rightHeals).toEqual([])
+  })
+
+  it('blood contract fang at diamond grants lifesteal to both adjacent equipment', () => {
+    const player: FighterSnapshot = {
+      name: 'P',
+      dogType: 'SHIBA',
+      wins: 0,
+      losses: 0,
+      round: 6,
+      items: [
+        { id: 'left-bite', defId: 'starter-1', quality: 'BRONZE', area: 'EQUIPMENT', x: 0, y: 0 },
+        { id: 'fang', defId: 'v4-blood-contract-fang', quality: 'DIAMOND', area: 'EQUIPMENT', x: 1, y: 0 },
+        { id: 'right-bite', defId: 'starter-1', quality: 'BRONZE', area: 'EQUIPMENT', x: 3, y: 0 },
+      ],
+    }
+    const opponent: FighterSnapshot = {
+      name: 'O',
+      dogType: 'SHIBA',
+      wins: 0,
+      losses: 0,
+      round: 6,
+      items: [
+        { id: 'opener', defId: 'starter-1', quality: 'DIAMOND', area: 'EQUIPMENT', x: 0, y: 0 },
+      ],
+    }
+    const result = simulateBattle(player, opponent, 'blood-contract-diamond')
+    const grantIndex = result.events.findIndex((event) =>
+      event.actor === 'player'
+      && event.itemId === 'fang'
+      && event.effectType === 'UTILITY'
+      && event.text.includes('左右相邻')
+      && event.text.includes('吸血')
+    )
+    const laterEvents = result.events.slice(grantIndex + 1)
+    const leftHeals = laterEvents.filter((event) => event.actor === 'player' && event.itemId === 'left-bite' && event.effectType === 'HEAL')
+    const rightHeals = laterEvents.filter((event) => event.actor === 'player' && event.itemId === 'right-bite' && event.effectType === 'HEAL')
+
+    expect(grantIndex).toBeGreaterThanOrEqual(0)
+    expect(leftHeals.length).toBeGreaterThan(0)
+    expect(rightHeals.length).toBeGreaterThan(0)
+    expect([...leftHeals, ...rightHeals].every((event) => (event.sourceHpDelta ?? 0) > 0)).toBe(true)
+  })
+
+  it('blood contract lifesteal does not heal for shield-absorbed damage', () => {
+    const player: FighterSnapshot = {
+      name: 'P',
+      dogType: 'SHIBA',
+      wins: 0,
+      losses: 0,
+      round: 6,
+      items: [
+        { id: 'left-bite', defId: 'starter-1', quality: 'BRONZE', area: 'EQUIPMENT', x: 0, y: 0 },
+        { id: 'fang', defId: 'v4-blood-contract-fang', quality: 'GOLD', area: 'EQUIPMENT', x: 1, y: 0 },
+      ],
+    }
+    const opponent: FighterSnapshot = {
+      name: 'O',
+      dogType: 'SHIBA',
+      wins: 0,
+      losses: 0,
+      round: 6,
+      items: [
+        { id: 'shield-a', defId: 'v3-golden-kennel', quality: 'DIAMOND', area: 'EQUIPMENT', x: 0, y: 0 },
+        { id: 'shield-b', defId: 'v3-golden-kennel', quality: 'DIAMOND', area: 'EQUIPMENT', x: 4, y: 0 },
+        { id: 'opener', defId: 'starter-1', quality: 'DIAMOND', area: 'EQUIPMENT', x: 8, y: 0 },
+      ],
+    }
+    const result = simulateBattle(player, opponent, 'blood-contract-shield')
+    const grantIndex = result.events.findIndex((event) =>
+      event.actor === 'player'
+      && event.itemId === 'fang'
+      && event.effectType === 'UTILITY'
+      && event.text.includes('吸血')
+    )
+    const laterEvents = result.events.slice(grantIndex + 1)
+    const absorbedHit = laterEvents.find((event) =>
+      event.actor === 'player'
+      && event.itemId === 'left-bite'
+      && event.effectType === 'DAMAGE'
+      && event.targetHpDelta === 0
+    )
+    const absorbedIndex = laterEvents.findIndex((event) => event === absorbedHit)
+    const nextEvent = absorbedIndex >= 0 ? laterEvents[absorbedIndex + 1] : undefined
+
+    expect(grantIndex).toBeGreaterThanOrEqual(0)
+    expect(absorbedHit).toMatchObject({ amount: 0, targetHpDelta: 0 })
+    expect(nextEvent).not.toMatchObject({ actor: 'player', itemId: 'left-bite', effectType: 'HEAL' })
+  })
+
   it('resolves deterministic battle logs with poison or victory', () => {
     const player: FighterSnapshot = { name: 'P', dogType: 'MUTT', wins: 0, losses: 0, round: 0, items: baseItems() }
     const opponent: FighterSnapshot = { name: 'O', dogType: 'SHIBA', wins: 0, losses: 0, round: 0, items: baseItems() }
