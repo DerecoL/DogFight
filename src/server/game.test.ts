@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { resolveWinnerByHealthPercent, simulateBattle } from './game/battle'
-import { CLASS_REWARD_DEFS, DOGS, RELIC_DEFS, itemDef, shopPool } from './game/data'
+import { CLASS_REWARD_DEFS, DOGS, RELIC_DEFS, itemDef, itemDefForQuality, shopPool } from './game/data'
 import { canPlace, findSlot, triggerOrder } from './game/grid'
 import { createRng } from './game/rng'
 import { createShop, itemPurchaseValue, itemSellValue } from './game/shop'
@@ -230,6 +230,14 @@ describe('dog and item definitions', () => {
       'v4-growing-chew-sword',
     ]))
     expect(shopPool('SMALL').map((item) => item.id)).toContain('v4-reverse-fur-comb')
+  })
+
+  it('uses quality-scaled descriptions for base-quality archetype equipment', () => {
+    expect(itemDefForQuality('v4-growing-chew-sword', 'BRONZE').description).toContain('初始造成 1 点伤害')
+    expect(itemDefForQuality('v4-growing-chew-sword', 'BRONZE').description).toContain('后续伤害 +2')
+    expect(itemDefForQuality('v4-growing-chew-sword', 'SILVER').description).toContain('后续伤害 +3')
+    expect(itemDefForQuality('v4-reverse-fur-comb', 'BRONZE').description).toContain('每实际清除 1 层，自己恢复 3 点生命')
+    expect(itemDefForQuality('v4-reverse-fur-comb', 'SILVER').description).toContain('每实际清除 1 层，自己恢复 5 点生命')
   })
 })
 
