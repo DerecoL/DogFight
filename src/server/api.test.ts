@@ -374,6 +374,47 @@ describeWithDatabase('run API', () => {
     })
   })
 
+  it('rolls back ladder forfeit completion when settlement creation fails', async () => {
+    const agent = request.agent(app.server)
+    await app.ready()
+
+    const registered = await agent.post('/api/auth/register').send({ account: `forfeit-rollback-${Date.now()}`, password: 'dogdice' }).expect(200)
+    const created = await agent.post('/api/runs').send({ dogType: 'SHIBA', mode: 'LADDER' }).expect(200)
+    const runId = created.body.run.id
+    const profile = await prisma.ladderProfile.findUniqueOrThrow({
+      where: { userId_seasonId: { userId: registered.body.user.id, seasonId: 'season-1' } },
+    })
+    await prisma.ladderSettlement.create({
+      data: {
+        userId: registered.body.user.id,
+        profileId: profile.id,
+        runId,
+        seasonId: 'season-1',
+        beforeTier: 'BRONZE',
+        beforeScore: 0,
+        afterTier: 'BRONZE',
+        afterScore: 0,
+        delta: 0,
+        rawDelta: 0,
+        baseScore: 0,
+        tierTax: 0,
+        lossPenalty: 0,
+        perfectBonus: 0,
+        newbieProtection: 0,
+        wins: 0,
+        losses: 0,
+      },
+    })
+
+    await agent.post(`/api/runs/${runId}/settle`).send({}).expect(500)
+
+    const run = await prisma.run.findUniqueOrThrow({ where: { id: runId } })
+    expect(run).toMatchObject({
+      status: 'ACTIVE',
+      phase: 'SHOP',
+    })
+  })
+
   it('rejects settling a run that is already complete', async () => {
     const agent = request.agent(app.server)
     await app.ready()

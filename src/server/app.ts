@@ -20,6 +20,8 @@ import { STARTING_GOLD, isTrainingMatchRound, selectCasualGhostSnapshot, selectL
 import type { BattleResult, DogType, FighterSnapshot, GameItem, RelicInstance, ShopOffer, ShopType } from './game/types'
 import { applyRelicChoice, classRewardChoices, createFinishedBattleRecord, initialItems, makeChoices, makeRelicChoices, makeShop, parseJson, postBattleLargeItemReward, publicLadderSettlement, publicRun, publicRunHistory, relicsFromRun, seedGhost, snapshotFromRun, toGameItems } from './state'
 
+type PrismaTransaction = Prisma.TransactionClient
+
 declare module 'fastify' {
   interface FastifyRequest {
     userId?: string
@@ -151,7 +153,7 @@ export function buildApp() {
     create: { userId, seasonId: LADDER_SEASON_ID },
   })
 
-  const settleLadderRun = async (userId: string, runId: string, wins: number, losses: number) => prisma.$transaction(async (tx) => {
+  const createLadderSettlement = async (tx: PrismaTransaction, userId: string, runId: string, wins: number, losses: number) => {
     const profile = await tx.ladderProfile.upsert({
       where: { userId_seasonId: { userId, seasonId: LADDER_SEASON_ID } },
       update: {},
@@ -199,7 +201,9 @@ export function buildApp() {
         losses,
       },
     })
-  })
+  }
+
+  const settleLadderRun = async (userId: string, runId: string, wins: number, losses: number) => prisma.$transaction(async (tx) => createLadderSettlement(tx, userId, runId, wins, losses))
 
   const placementOptionsForRun = (run: { relics: string }): PlacementOptions => {
     const hasExtraEquipment = relicsFromRun(run).some((relic) => relicDef(relic.relicId).effect === 'EXTRA_EQUIPMENT_REDUCED_EFFECT')
@@ -843,28 +847,31 @@ export function buildApp() {
   app.post('/api/runs/:runId/settle', async (request, reply) => {
     const userId = requireUser(request.userId)
     const { runId } = z.object({ runId: z.string() }).parse(request.params)
-    const run = await prisma.run.findFirstOrThrow({ where: { id: runId, userId }, include: { items: true, ladderSettlement: true } })
-    if (run.status !== 'ACTIVE') {
+    const settledRun = await prisma.$transaction(async (tx) => {
+      const run = await tx.run.findFirstOrThrow({ where: { id: runId, userId }, include: { items: true, ladderSettlement: true } })
+      if (run.status !== 'ACTIVE') return null
+
+      const transition = await tx.run.updateMany({
+        where: { id: run.id, userId, status: 'ACTIVE' },
+        data: {
+          status: 'COMPLETE',
+          phase: 'COMPLETE',
+          matchedGhost: null,
+        },
+      })
+      if (transition.count === 0) return null
+
+      if (run.mode === 'LADDER') {
+        await createLadderSettlement(tx, userId, run.id, run.wins, run.losses)
+      }
+
+      return tx.run.findUniqueOrThrow({ where: { id: run.id }, include: { items: true, ladderSettlement: true } })
+    })
+    if (!settledRun) {
       return reply.code(400).send({ error: '当前跑局已经结算或不可放弃' })
     }
 
-    const updated = await prisma.run.update({
-      where: { id: run.id },
-      data: {
-        status: 'COMPLETE',
-        phase: 'COMPLETE',
-        matchedGhost: null,
-      },
-      include: { items: true, ladderSettlement: true },
-    })
-
-    if (run.mode === 'LADDER') {
-      await settleLadderRun(userId, run.id, run.wins, run.losses)
-      const settledRun = await prisma.run.findUniqueOrThrow({ where: { id: run.id }, include: { items: true, ladderSettlement: true } })
-      return { run: publicRun(settledRun) }
-    }
-
-    return { run: publicRun(updated) }
+    return { run: publicRun(settledRun) }
   })
 
   return app
