@@ -174,7 +174,73 @@ async function defaultMockApiScript(buildId = new Date().toISOString().replace(/
   }
 
   function defaultState() {
-    return { user: null, run: null, nextId: 1 };
+    return { user: null, run: null, nextId: 1, ladderProfile: null, ladderSettlements: [] };
+  }
+
+  const ladderLabels = { BRONZE: '青铜', SILVER: '白银', GOLD: '黄金', PLATINUM: '白金', DIAMOND: '钻石', MASTER: '大师', DOG_KING: '犬王' };
+  const ladderOrder = ['BRONZE', 'SILVER', 'GOLD', 'PLATINUM', 'DIAMOND', 'MASTER', 'DOG_KING'];
+
+  function ensureLadderProfile(state) {
+    if (!state.ladderProfile) {
+      state.ladderProfile = { seasonId: 'season-1', tier: 'BRONZE', score: 0, highestTier: 'BRONZE', gamesPlayed: 0, totalWins: 0, totalLosses: 0, updatedAt: new Date().toISOString() };
+    }
+    return state.ladderProfile;
+  }
+
+  function ladderTierForScore(tier, score) {
+    if (tier === 'MASTER' || tier === 'DOG_KING') return score >= 500 ? 'DOG_KING' : 'MASTER';
+    return ladderOrder.includes(tier) ? tier : 'BRONZE';
+  }
+
+  function publicLadderProfile(profile) {
+    const tier = ladderTierForScore(profile.tier, profile.score);
+    return { ...profile, tier, tierLabel: ladderLabels[tier], highestTierLabel: ladderLabels[profile.highestTier] || '青铜' };
+  }
+
+  function ladderBaseScore(wins) {
+    if (wins <= 2) return -18;
+    if (wins <= 5) return -8;
+    if (wins === 6) return 0;
+    if (wins === 7) return 8;
+    if (wins === 8) return 16;
+    if (wins === 9) return 26;
+    if (wins === 10) return 38;
+    if (wins === 11) return 50;
+    return 65;
+  }
+
+  function ladderTierTax(tier) {
+    return { BRONZE: 0, SILVER: 0, GOLD: 8, PLATINUM: 16, DIAMOND: 26, MASTER: 30, DOG_KING: 38 }[tier] || 0;
+  }
+
+  function settleLadderRun(state, run) {
+    const profile = ensureLadderProfile(state);
+    const beforeTier = ladderTierForScore(profile.tier, profile.score);
+    const beforeScore = profile.score;
+    const baseScore = ladderBaseScore(run.wins);
+    const tierTax = ladderTierTax(beforeTier);
+    const lossPenalty = Math.max(0, run.losses - 1) * 2;
+    const perfectBonus = run.wins >= 12 && run.losses <= 0 ? 8 : 0;
+    const rawDelta = baseScore - tierTax - lossPenalty + perfectBonus;
+    const delta = profile.gamesPlayed < 5 && (beforeTier === 'BRONZE' || beforeTier === 'SILVER') && rawDelta < 0 ? 0 : rawDelta;
+    let afterTier = beforeTier;
+    let afterScore = Math.max(0, beforeScore + delta);
+    const fixedIndex = ladderOrder.indexOf(beforeTier);
+    if (fixedIndex >= 0 && fixedIndex <= ladderOrder.indexOf('DIAMOND') && afterScore >= 100) {
+      afterTier = ladderOrder[fixedIndex + 1] || 'MASTER';
+      afterScore = 20;
+    } else if (beforeTier === 'MASTER' || beforeTier === 'DOG_KING') {
+      afterTier = ladderTierForScore(beforeTier, afterScore);
+    }
+    profile.tier = afterTier;
+    profile.score = afterScore;
+    profile.highestTier = ladderOrder.indexOf(afterTier) > ladderOrder.indexOf(profile.highestTier) ? afterTier : profile.highestTier;
+    profile.gamesPlayed += 1;
+    profile.totalWins += run.wins;
+    profile.totalLosses += run.losses;
+    profile.updatedAt = new Date().toISOString();
+    run.ladderSettlement = { id: id(state, 'ladder'), beforeTier, beforeScore, afterTier, afterScore, delta, rawDelta, baseScore, tierTax, lossPenalty, perfectBonus, newbieProtection: delta - rawDelta, wins: run.wins, losses: run.losses, createdAt: profile.updatedAt };
+    state.ladderSettlements = [run.ladderSettlement, ...(state.ladderSettlements || [])].slice(0, 10);
   }
 
   function id(state, prefix) {
@@ -396,7 +462,7 @@ async function defaultMockApiScript(buildId = new Date().toISOString().replace(/
     run.gold += 5 + run.round * 2;
     run.matchedGhost = null;
     run.lastBattle = battle;
-    run.status = run.wins >= 12 || run.losses >= 3 ? 'COMPLETE' : 'ACTIVE';
+    run.status = run.wins >= 12 || run.losses >= 5 ? 'COMPLETE' : 'ACTIVE';
     run.phase = run.status === 'COMPLETE' ? 'COMPLETE' : run.round <= 2 ? 'SHOP' : 'CHOICE';
     run.refreshCost = 1;
     run.shopType = 'GENERAL';
@@ -813,6 +879,7 @@ async function currentMockApiScript(buildId) {
     if (!run) return null;
     return {
       ...run,
+      mode: run.mode || 'CASUAL',
       shopItems: (run.shopItems || []).map((offer) => {
         const quality = normalizeQuality(offer.quality);
         return { ...offer, quality, def: itemDefForQuality(offer.defId, quality) };
@@ -828,6 +895,7 @@ async function currentMockApiScript(buildId) {
       relics: publicRelics(run.relics || []),
       matchedGhost: run.matchedGhost ? publicSnapshot(run.matchedGhost) : null,
       lastBattle: publicBattle(run.lastBattle),
+      ladderSettlement: run.ladderSettlement || null,
       items: (run.items || []).map(publicItem),
     };
   }
@@ -1295,6 +1363,7 @@ async function currentMockApiScript(buildId) {
       run.shopItems = [];
       run.choices = [];
     }
+    if (run.status === 'COMPLETE' && run.mode === 'LADDER' && !run.ladderSettlement) settleLadderRun(state, run);
   }
 
   async function parseBody(options) {
@@ -1338,9 +1407,24 @@ async function currentMockApiScript(buildId) {
       saveState(state);
       return json({ user: state.user });
     }
+    if (pathname === '/ladder/me') {
+      const profile = ensureLadderProfile(state);
+      saveState(state);
+      return json({ profile: publicLadderProfile(profile), recentSettlements: state.ladderSettlements || [] });
+    }
+    if (pathname === '/ladder/leaderboard') {
+      const profile = ensureLadderProfile(state);
+      const leaderboard = profile.tier === 'DOG_KING'
+        ? [{ rank: 1, title: '犬王第 1 名', name: state.user.nickname || state.user.account, profile: publicLadderProfile(profile) }]
+        : [];
+      saveState(state);
+      return json({ leaderboard, playerRank: profile.tier === 'DOG_KING' ? 1 : null, playerProfile: publicLadderProfile(profile) });
+    }
     if (pathname === '/runs' && method === 'POST') {
       const dogType = dogTypes.includes(body.dogType) ? body.dogType : 'SHIBA';
-      state.run = { id: id(state, 'run'), dogType, luckyNumber: dogType === 'EMPEROR' ? Number(body.luckyNumber || 1) : null, wins: 0, losses: 0, round: 0, gold: 10, phase: 'SHOP', status: 'ACTIVE', shopType: 'GENERAL', shopItems: [], choices: [], classRewardChoices: [], relicChoices: [], relics: [], refreshCost: 1, matchedGhost: null, lastBattle: null, items: initialItems(state) };
+      const mode = body.mode === 'LADDER' ? 'LADDER' : 'CASUAL';
+      if (mode === 'LADDER') ensureLadderProfile(state);
+      state.run = { id: id(state, 'run'), mode, dogType, luckyNumber: dogType === 'EMPEROR' ? Number(body.luckyNumber || 1) : null, wins: 0, losses: 0, round: 0, gold: 10, phase: 'SHOP', status: 'ACTIVE', shopType: 'GENERAL', shopItems: [], choices: [], classRewardChoices: [], relicChoices: [], relics: [], refreshCost: 1, matchedGhost: null, lastBattle: null, ladderSettlement: null, items: initialItems(state) };
       state.run.shopItems = createShop(state, 'GENERAL', state.run.id + '-new-shop');
       saveState(state);
       return json({ run: publicRun(state.run) });

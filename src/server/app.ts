@@ -15,9 +15,10 @@ import { canPlace, findSlot, type PlacementOptions } from './game/grid'
 import { canUpgradePair, nextQuality, normalizeQuality } from './game/quality'
 import { itemSellValue } from './game/shop'
 import { simulateBattle } from './game/battle'
-import { STARTING_GOLD, isTrainingMatchRound, selectCasualGhostSnapshot, targetOpponentWins } from './game/matchmaking'
+import { calculateLadderResult, ladderTierForScore, ladderTierLabels, ladderTiers, LADDER_SEASON_ID, type LadderTier } from './game/ladder'
+import { STARTING_GOLD, isTrainingMatchRound, selectCasualGhostSnapshot, selectLadderGhostSnapshot, targetLadderOpponentWinsRange, targetOpponentWins } from './game/matchmaking'
 import type { BattleResult, DogType, FighterSnapshot, GameItem, RelicInstance, ShopOffer, ShopType } from './game/types'
-import { applyRelicChoice, classRewardChoices, createFinishedBattleRecord, initialItems, makeChoices, makeRelicChoices, makeShop, parseJson, postBattleLargeItemReward, publicRun, publicRunHistory, relicsFromRun, seedGhost, snapshotFromRun, toGameItems } from './state'
+import { applyRelicChoice, classRewardChoices, createFinishedBattleRecord, initialItems, makeChoices, makeRelicChoices, makeShop, parseJson, postBattleLargeItemReward, publicLadderSettlement, publicRun, publicRunHistory, relicsFromRun, seedGhost, snapshotFromRun, toGameItems } from './state'
 
 declare module 'fastify' {
   interface FastifyRequest {
@@ -112,6 +113,92 @@ export function buildApp() {
     createdAt: entry.createdAt,
     items: parseJson<GameItem[]>(entry.items, []).map((item) => ({ ...item, def: itemDefForQuality(item.defId, item.quality) })),
     relics: parseJson<RelicInstance[]>(entry.relics, []).map((relic) => ({ ...relic, def: relicDefForQuality(relic.relicId, relic.quality) })),
+  })
+
+  const sanitizeLadderTier = (tier: string): LadderTier => ladderTiers.includes(tier as LadderTier) ? tier as LadderTier : 'BRONZE'
+  const normalizeLadderTier = (tier: string, score: number): LadderTier => {
+    return ladderTierForScore(sanitizeLadderTier(tier), score)
+  }
+
+  const publicLadderProfile = (profile: {
+    tier: string
+    score: number
+    highestTier: string
+    gamesPlayed: number
+    totalWins: number
+    totalLosses: number
+    updatedAt: Date
+  }) => {
+    const tier = normalizeLadderTier(profile.tier, profile.score)
+    const highestTier = sanitizeLadderTier(profile.highestTier)
+    return {
+      seasonId: LADDER_SEASON_ID,
+      tier,
+      tierLabel: ladderTierLabels[tier],
+      score: profile.score,
+      highestTier,
+      highestTierLabel: ladderTierLabels[highestTier],
+      gamesPlayed: profile.gamesPlayed,
+      totalWins: profile.totalWins,
+      totalLosses: profile.totalLosses,
+      updatedAt: profile.updatedAt.toISOString(),
+    }
+  }
+
+  const ensureLadderProfile = async (userId: string) => prisma.ladderProfile.upsert({
+    where: { userId_seasonId: { userId, seasonId: LADDER_SEASON_ID } },
+    update: {},
+    create: { userId, seasonId: LADDER_SEASON_ID },
+  })
+
+  const settleLadderRun = async (userId: string, runId: string, wins: number, losses: number) => prisma.$transaction(async (tx) => {
+    const profile = await tx.ladderProfile.upsert({
+      where: { userId_seasonId: { userId, seasonId: LADDER_SEASON_ID } },
+      update: {},
+      create: { userId, seasonId: LADDER_SEASON_ID },
+    })
+    const calculation = calculateLadderResult({
+      tier: normalizeLadderTier(profile.tier, profile.score),
+      score: profile.score,
+      gamesPlayed: profile.gamesPlayed,
+    }, { wins, losses })
+    const highestTier = ladderTiers.indexOf(calculation.after.tier) > ladderTiers.indexOf(sanitizeLadderTier(profile.highestTier))
+      ? calculation.after.tier
+      : sanitizeLadderTier(profile.highestTier)
+
+    await tx.ladderProfile.update({
+      where: { id: profile.id },
+      data: {
+        tier: calculation.after.tier,
+        score: calculation.after.score,
+        highestTier,
+        gamesPlayed: { increment: 1 },
+        totalWins: { increment: wins },
+        totalLosses: { increment: losses },
+      },
+    })
+
+    return tx.ladderSettlement.create({
+      data: {
+        userId,
+        profileId: profile.id,
+        runId,
+        seasonId: LADDER_SEASON_ID,
+        beforeTier: calculation.before.tier,
+        beforeScore: calculation.before.score,
+        afterTier: calculation.after.tier,
+        afterScore: calculation.after.score,
+        delta: calculation.delta,
+        rawDelta: calculation.rawDelta,
+        baseScore: calculation.breakdown.baseScore,
+        tierTax: calculation.breakdown.tierTax,
+        lossPenalty: calculation.breakdown.lossPenalty,
+        perfectBonus: calculation.breakdown.perfectBonus,
+        newbieProtection: calculation.breakdown.newbieProtection,
+        wins,
+        losses,
+      },
+    })
   })
 
   const placementOptionsForRun = (run: { relics: string }): PlacementOptions => {
@@ -216,8 +303,56 @@ export function buildApp() {
   app.get('/api/me', async (request) => {
     const userId = requireUser(request.userId)
     const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } })
-    const activeRun = await prisma.run.findFirst({ where: { userId, status: 'ACTIVE' }, orderBy: { createdAt: 'desc' }, include: { items: true } })
+    const activeRun = await prisma.run.findFirst({ where: { userId, status: 'ACTIVE' }, orderBy: { createdAt: 'desc' }, include: { items: true, ladderSettlement: true } })
     return { user: publicUser(user), activeRun: activeRun ? publicRun(activeRun) : null }
+  })
+
+  app.get('/api/ladder/me', async (request) => {
+    const userId = requireUser(request.userId)
+    const profile = await ensureLadderProfile(userId)
+    const recentSettlements = await prisma.ladderSettlement.findMany({
+      where: { userId, seasonId: LADDER_SEASON_ID },
+      orderBy: { createdAt: 'desc' },
+      take: 5,
+    })
+    return {
+      profile: publicLadderProfile(profile),
+      recentSettlements: recentSettlements.map(publicLadderSettlement),
+    }
+  })
+
+  app.get('/api/ladder/leaderboard', async (request) => {
+    const userId = requireUser(request.userId)
+    const topDogKings = await prisma.ladderProfile.findMany({
+      where: { seasonId: LADDER_SEASON_ID, tier: 'DOG_KING' },
+      orderBy: [{ score: 'desc' }, { updatedAt: 'asc' }],
+      take: 50,
+      include: { user: true },
+    })
+    const playerProfile = await ensureLadderProfile(userId)
+    const betterPlayers = playerProfile.tier === 'DOG_KING'
+      ? await prisma.ladderProfile.count({
+        where: {
+          seasonId: LADDER_SEASON_ID,
+          tier: 'DOG_KING',
+          OR: [
+            { score: { gt: playerProfile.score } },
+            { score: playerProfile.score, updatedAt: { lt: playerProfile.updatedAt } },
+          ],
+        },
+      })
+      : null
+
+    return {
+      leaderboard: topDogKings.map((entry, index) => ({
+        rank: index + 1,
+        title: `犬王第 ${index + 1} 名`,
+        name: entry.user.nickname ?? entry.user.account,
+        profile: publicLadderProfile(entry),
+      })),
+      playerRank: betterPlayers == null ? null : betterPlayers + 1,
+      playerProfile: publicLadderProfile(playerProfile),
+    }
   })
 
   app.get('/api/runs/history', async (request) => {
@@ -227,6 +362,7 @@ export function buildApp() {
       orderBy: { updatedAt: 'desc' },
       select: {
         id: true,
+        mode: true,
         dogType: true,
         luckyNumber: true,
         wins: true,
@@ -248,17 +384,21 @@ export function buildApp() {
     const parsed = z.object({
       dogType: z.enum(['SHIBA', 'SAMOYED', 'MUTT', 'BULLY', 'EMPEROR']),
       luckyNumber: z.number().int().min(1).max(6).optional(),
+      mode: z.enum(['CASUAL', 'LADDER']).optional(),
     }).safeParse(request.body)
     if (!parsed.success) return reply.code(400).send({ error: '无效狗狗选择' })
     const body = parsed.data
+    const mode = body.mode ?? 'CASUAL'
     if (body.dogType === 'EMPEROR' && body.luckyNumber == null) {
       return reply.code(400).send({ error: '狗皇帝需要选择 1-6 的幸运数字' })
     }
+    if (mode === 'LADDER') await ensureLadderProfile(userId)
     await prisma.run.updateMany({ where: { userId, status: 'ACTIVE' }, data: { status: 'ABANDONED' } })
     const shopItems = makeShop('GENERAL', `${userId}-new-shop`, 0)
     const run = await prisma.run.create({
       data: {
         userId,
+        mode,
         dogType: body.dogType,
         luckyNumber: body.dogType === 'EMPEROR' ? body.luckyNumber : null,
         gold: STARTING_GOLD,
@@ -283,6 +423,7 @@ export function buildApp() {
     const candidates = await prisma.run.findMany({
       where: {
         userId,
+        mode: 'CASUAL',
         status: 'COMPLETE',
         id: { notIn: submittedRunIds },
       },
@@ -573,6 +714,7 @@ export function buildApp() {
       data: {
         runId: run.id,
         userId,
+        mode: run.mode,
         name: playerName,
         dogType: run.dogType,
         luckyNumber: run.luckyNumber,
@@ -585,21 +727,33 @@ export function buildApp() {
         seed: `${run.id}-${run.round}-${run.wins}-${run.losses}`,
       },
     })
-    const opponentWins = targetOpponentWins(run.wins)
+    const runMode = run.mode === 'LADDER' ? 'LADDER' : 'CASUAL'
+    const ladderProfile = runMode === 'LADDER' ? await ensureLadderProfile(userId) : null
+    const ladderRange = ladderProfile
+      ? targetLadderOpponentWinsRange({
+        tier: normalizeLadderTier(ladderProfile.tier, ladderProfile.score),
+        wins: run.wins,
+        round: run.round,
+      })
+      : null
+    const opponentWins = ladderRange?.preferred ?? targetOpponentWins(run.wins)
     const ghostCandidates = isTrainingMatchRound(run.round)
       ? null
       : await prisma.ghostSnapshot.findMany({
         where: {
+          mode: runMode,
           round: run.round,
           NOT: [{ runId: run.id }, { userId }],
-          wins: { gte: opponentWins, lte: run.wins },
+          wins: ladderRange ? { gte: ladderRange.min, lte: ladderRange.max } : { gte: opponentWins, lte: run.wins },
           losses: { gte: Math.max(0, run.losses - 1), lte: run.losses + 1 },
         },
         orderBy: { createdAt: 'desc' },
         take: 50,
       })
     const ghost = ghostCandidates
-      ? selectCasualGhostSnapshot(ghostCandidates, { wins: run.wins, seed: `${run.id}-${run.round}-${run.wins}-${run.losses}` })
+      ? runMode === 'LADDER'
+        ? selectLadderGhostSnapshot(ghostCandidates, { preferredWins: opponentWins, seed: `${run.id}-${run.round}-${run.wins}-${run.losses}` })
+        : selectCasualGhostSnapshot(ghostCandidates, { wins: run.wins, seed: `${run.id}-${run.round}-${run.wins}-${run.losses}` })
       : null
     const opponent = ghost
       ? { name: ghost.name, dogType: ghost.dogType as DogType, luckyNumber: ghost.luckyNumber, wins: ghost.wins, losses: ghost.losses, round: ghost.round, items: parseJson(ghost.items, []), relics: parseJson(ghost.relics, []) }
@@ -677,7 +831,12 @@ export function buildApp() {
     if (postBattleReward) {
       Object.assign(updateData, { items: { create: postBattleReward } })
     }
-    const updated = await prisma.run.update({ where: { id: run.id }, data: updateData, include: { items: true } })
+    const updated = await prisma.run.update({ where: { id: run.id }, data: updateData, include: { items: true, ladderSettlement: true } })
+    if (status === 'COMPLETE' && run.mode === 'LADDER') {
+      await settleLadderRun(userId, run.id, wins, losses)
+      const settledRun = await prisma.run.findUniqueOrThrow({ where: { id: run.id }, include: { items: true, ladderSettlement: true } })
+      return { run: publicRun(settledRun) }
+    }
     return { run: publicRun(updated) }
   })
 

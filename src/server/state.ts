@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import type { ItemInstance, Run } from '@prisma/client'
+import type { ItemInstance, LadderSettlement, Run } from '@prisma/client'
 import { CLASS_REWARD_DEFS, RELIC_DEFS, itemDef, itemDefForQuality, relicDef, relicDefForQuality, shopPool } from './game/data'
 import { buildOfflineFighter } from './game/offline-builder'
 import { findSlot } from './game/grid'
@@ -7,6 +7,8 @@ import { nextQuality, normalizeQuality } from './game/quality'
 import { createRng } from './game/rng'
 import { createChoices, createShop } from './game/shop'
 import type { BattleResult, DogType, FighterSnapshot, GameItem, ItemQuality, Phase, RelicInstance, ShopOffer, ShopType } from './game/types'
+
+type RunMode = 'CASUAL' | 'LADDER'
 
 export function parseJson<T>(value: string, fallback: T): T {
   try {
@@ -45,9 +47,31 @@ function relicChoiceQuality(relics: RelicInstance[], relicId: string) {
   return existing ? nextQuality(existing.quality) ?? existing.quality : relicDef(relicId).defaultQuality
 }
 
-export function publicRun(run: Run & { items: ItemInstance[] }) {
+export function publicLadderSettlement(settlement: LadderSettlement | null | undefined) {
+  if (!settlement) return null
+  return {
+    id: settlement.id,
+    beforeTier: settlement.beforeTier,
+    beforeScore: settlement.beforeScore,
+    afterTier: settlement.afterTier,
+    afterScore: settlement.afterScore,
+    delta: settlement.delta,
+    rawDelta: settlement.rawDelta,
+    baseScore: settlement.baseScore,
+    tierTax: settlement.tierTax,
+    lossPenalty: settlement.lossPenalty,
+    perfectBonus: settlement.perfectBonus,
+    newbieProtection: settlement.newbieProtection,
+    wins: settlement.wins,
+    losses: settlement.losses,
+    createdAt: settlement.createdAt.toISOString(),
+  }
+}
+
+export function publicRun(run: Run & { items: ItemInstance[]; ladderSettlement?: LadderSettlement | null }) {
   return {
     id: run.id,
+    mode: (run.mode === 'LADDER' ? 'LADDER' : 'CASUAL') as RunMode,
     dogType: run.dogType as DogType,
     luckyNumber: run.luckyNumber,
     wins: run.wins,
@@ -74,19 +98,20 @@ export function publicRun(run: Run & { items: ItemInstance[] }) {
     refreshCost: run.refreshCost,
     matchedGhost: run.matchedGhost ? parseJson(run.matchedGhost, null) : null,
     lastBattle: run.lastBattle ? parseJson(run.lastBattle, null) : null,
+    ladderSettlement: publicLadderSettlement(run.ladderSettlement),
     items: toGameItems(run.items).map((item) => ({ ...item, def: itemDefForQuality(item.defId, item.quality) })),
   }
 }
 
 type RunHistoryItemSource = Pick<ItemInstance, 'id' | 'runId' | 'defId' | 'quality' | 'area' | 'x' | 'y'>
-type RunHistorySource = Pick<Run, 'id' | 'dogType' | 'luckyNumber' | 'wins' | 'losses' | 'round' | 'status' | 'phase' | 'createdAt' | 'updatedAt'> & {
+type RunHistorySource = Pick<Run, 'id' | 'mode' | 'dogType' | 'luckyNumber' | 'wins' | 'losses' | 'round' | 'status' | 'phase' | 'createdAt' | 'updatedAt'> & {
   relics?: string
   items?: RunHistoryItemSource[]
 }
 
 export type PublicRunHistoryEntry = {
   id: string
-  mode: 'CASUAL'
+  mode: RunMode
   dogType: DogType
   luckyNumber: number | null
   wins: number
@@ -114,7 +139,7 @@ export type PublicRunHistory = {
 function toHistoryEntry(run: RunHistorySource): PublicRunHistoryEntry {
   return {
     id: run.id,
-    mode: 'CASUAL',
+    mode: run.mode === 'LADDER' ? 'LADDER' : 'CASUAL',
     dogType: run.dogType as DogType,
     luckyNumber: run.luckyNumber,
     wins: run.wins,

@@ -12,6 +12,8 @@ beforeEach(async () => {
   await prisma.dogfightBattle.deleteMany()
   await prisma.dogfightParticipant.deleteMany()
   await prisma.dogfightRoom.deleteMany()
+  await prisma.ladderSettlement.deleteMany()
+  await prisma.ladderProfile.deleteMany()
   await prisma.apexEntry.deleteMany()
   await prisma.battleLog.deleteMany()
   await prisma.ghostSnapshot.deleteMany()
@@ -258,6 +260,78 @@ describeWithDatabase('run API', () => {
 
     const fifthLoss = await agent.post(`/api/runs/${runId}/battle/finish`).send({}).expect(200)
     expect(fifthLoss.body.run).toMatchObject({ losses: 5, status: 'COMPLETE', phase: 'COMPLETE' })
+  })
+
+  it('creates ladder runs and settles ladder score when the run completes', async () => {
+    const agent = request.agent(app.server)
+    await app.ready()
+
+    await agent.post('/api/auth/register').send({ account: `ladder-${Date.now()}`, password: 'dogdice' }).expect(200)
+    const created = await agent.post('/api/runs').send({ dogType: 'SHIBA', mode: 'LADDER' }).expect(200)
+    expect(created.body.run.mode).toBe('LADDER')
+
+    const winningBattle = {
+      winner: 'player',
+      duration: 1,
+      playerHp: 10,
+      opponentHp: 0,
+      playerMaxHp: 10,
+      opponentMaxHp: 10,
+      events: [],
+      playerSnapshot: { name: 'P', dogType: 'SHIBA', wins: 11, losses: 0, round: 11, items: [] },
+      opponentSnapshot: { name: 'O', dogType: 'MUTT', wins: 11, losses: 0, round: 11, items: [] },
+    }
+
+    await prisma.run.update({
+      where: { id: created.body.run.id },
+      data: { wins: 11, losses: 0, round: 11, phase: 'BATTLE', lastBattle: JSON.stringify(winningBattle) },
+    })
+
+    const finished = await agent.post(`/api/runs/${created.body.run.id}/battle/finish`).send({}).expect(200)
+
+    expect(finished.body.run).toMatchObject({
+      mode: 'LADDER',
+      status: 'COMPLETE',
+      ladderSettlement: {
+        beforeTier: 'BRONZE',
+        beforeScore: 0,
+        afterTier: 'SILVER',
+        afterScore: 20,
+        delta: 73,
+        baseScore: 65,
+        perfectBonus: 8,
+      },
+    })
+
+    const ladder = await agent.get('/api/ladder/me').expect(200)
+    expect(ladder.body.profile).toMatchObject({
+      tier: 'SILVER',
+      score: 20,
+      gamesPlayed: 1,
+      totalWins: 12,
+      totalLosses: 0,
+    })
+  })
+
+  it('keeps ladder matchmaking separate from casual ghosts', async () => {
+    const casual = request.agent(app.server)
+    const ladder = request.agent(app.server)
+    await app.ready()
+
+    await casual.post('/api/auth/register').send({ account: `casual-ghost-${Date.now()}`, password: 'dogdice' }).expect(200)
+    const casualRun = await casual.post('/api/runs').send({ dogType: 'SAMOYED' }).expect(200)
+    await prisma.run.update({ where: { id: casualRun.body.run.id }, data: { round: 4, wins: 3, mode: 'CASUAL' } })
+    await casual.post(`/api/runs/${casualRun.body.run.id}/battle/match`).send({}).expect(200)
+
+    await ladder.post('/api/auth/register').send({ account: `ladder-match-${Date.now()}`, password: 'dogdice' }).expect(200)
+    const ladderRun = await ladder.post('/api/runs').send({ dogType: 'MUTT', mode: 'LADDER' }).expect(200)
+    await prisma.run.update({ where: { id: ladderRun.body.run.id }, data: { round: 4, wins: 3, mode: 'LADDER' } })
+
+    const matched = await ladder.post(`/api/runs/${ladderRun.body.run.id}/battle/match`).send({}).expect(200)
+
+    expect(matched.body.run.mode).toBe('LADDER')
+    expect(matched.body.run.matchedGhost.ghostId).toBeNull()
+    expect(matched.body.run.matchedGhost.name).not.toBe('玩家')
   })
 
   it('returns the current player history across multiple runs', async () => {
