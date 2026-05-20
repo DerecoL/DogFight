@@ -847,31 +847,35 @@ export function buildApp() {
   app.post('/api/runs/:runId/settle', async (request, reply) => {
     const userId = requireUser(request.userId)
     const { runId } = z.object({ runId: z.string() }).parse(request.params)
-    const settledRun = await prisma.$transaction(async (tx) => {
+    const settlement = await prisma.$transaction(async (tx) => {
       const run = await tx.run.findFirstOrThrow({ where: { id: runId, userId }, include: { items: true, ladderSettlement: true } })
-      if (run.status !== 'ACTIVE') return null
+      if (run.status !== 'ACTIVE') return { type: 'invalid' as const }
+      if (run.phase === 'BATTLE') return { type: 'battle' as const }
 
       const transition = await tx.run.updateMany({
-        where: { id: run.id, userId, status: 'ACTIVE' },
+        where: { id: run.id, userId, status: 'ACTIVE', phase: { not: 'BATTLE' } },
         data: {
           status: 'COMPLETE',
           phase: 'COMPLETE',
           matchedGhost: null,
         },
       })
-      if (transition.count === 0) return null
+      if (transition.count === 0) return { type: 'invalid' as const }
 
       if (run.mode === 'LADDER') {
         await createLadderSettlement(tx, userId, run.id, run.wins, run.losses)
       }
 
-      return tx.run.findUniqueOrThrow({ where: { id: run.id }, include: { items: true, ladderSettlement: true } })
+      return { type: 'settled' as const, run: await tx.run.findUniqueOrThrow({ where: { id: run.id }, include: { items: true, ladderSettlement: true } }) }
     })
-    if (!settledRun) {
+    if (settlement.type === 'battle') {
+      return reply.code(400).send({ error: '当前战斗已经生成结果，请先继续完成战斗结算' })
+    }
+    if (settlement.type === 'invalid') {
       return reply.code(400).send({ error: '当前跑局已经结算或不可放弃' })
     }
 
-    return { run: publicRun(settledRun) }
+    return { run: publicRun(settlement.run) }
   })
 
   return app

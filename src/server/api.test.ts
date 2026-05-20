@@ -374,6 +374,37 @@ describeWithDatabase('run API', () => {
     })
   })
 
+  it('rejects settling a run while battle playback is waiting to finish', async () => {
+    const agent = request.agent(app.server)
+    await app.ready()
+
+    await agent.post('/api/auth/register').send({ account: `forfeit-battle-${Date.now()}`, password: 'dogdice' }).expect(200)
+    const created = await agent.post('/api/runs').send({ dogType: 'SHIBA' }).expect(200)
+    const runId = created.body.run.id
+    const battle = {
+      winner: 'opponent',
+      duration: 1,
+      playerHp: 0,
+      opponentHp: 1,
+      playerMaxHp: 10,
+      opponentMaxHp: 10,
+      events: [],
+      playerSnapshot: { name: 'P', dogType: 'SHIBA', wins: 2, losses: 1, round: 3, items: [] },
+      opponentSnapshot: { name: 'O', dogType: 'MUTT', wins: 2, losses: 1, round: 3, items: [] },
+    }
+
+    await prisma.run.update({
+      where: { id: runId },
+      data: { wins: 2, losses: 1, round: 3, phase: 'BATTLE', status: 'ACTIVE', lastBattle: JSON.stringify(battle) },
+    })
+
+    const rejected = await agent.post(`/api/runs/${runId}/settle`).send({}).expect(400)
+    expect(rejected.body.error).toContain('当前战斗已经生成结果，请先继续完成战斗结算')
+
+    const run = await prisma.run.findUniqueOrThrow({ where: { id: runId } })
+    expect(run).toMatchObject({ status: 'ACTIVE', phase: 'BATTLE', wins: 2, losses: 1, round: 3 })
+  })
+
   it('rolls back ladder forfeit completion when settlement creation fails', async () => {
     const agent = request.agent(app.server)
     await app.ready()
