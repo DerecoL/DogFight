@@ -9,6 +9,8 @@ export const DOGS: Record<DogType, { name: string; trait: string }> = {
   EMPEROR: { name: '狗皇帝', trait: '指定幸运数字，命中时 50% 概率使触发效果翻倍' },
 }
 
+export const SHIBA_POISON_ON_ROLL_AMOUNT = 6
+
 function slotItem(
   id: string,
   name: string,
@@ -140,7 +142,7 @@ export const CLASS_REWARD_DEFS: ItemDef[] = [
   classItem('SHIBA', 3, 'shiba-swallow-katana', '燕回太刀', 1, [1, 2, 3], ['extra-roll', 'small'], '20%概率会额外投掷一次（可叠加，最多3次）', 'EXTRA_ROLL_CHANCE', 'GOLD', { type: 'DAMAGE', amount: 5 }),
   classItem('SHIBA', 6, 'shiba-shadow-clone', '忍法·影分身', 1, [1, 2, 3], ['small'], '每次投掷会投掷两次，选取更接近1~3的那次', 'ROLL_TWO_PICK_SMALL', 'DIAMOND'),
   classItem('SHIBA', 6, 'shiba-break', '忍法·破', 1, [1, 2, 3], ['small'], '装备将不按照点数触发，按照其容量触发', 'TRIGGER_BY_SIZE', 'DIAMOND'),
-  classItem('SHIBA', 6, 'shiba-poison', '忍法·剧毒', 1, [1, 2, 3, 4, 5, 6], ['poison'], '每次投掷都会对敌人叠加3层【中毒】（不随品质提升）', 'POISON_ON_ROLL', 'DIAMOND'),
+  classItem('SHIBA', 6, 'shiba-poison', '忍法·剧毒', 1, [1, 2, 3, 4, 5, 6], ['poison'], `每次投掷都会对敌人叠加${SHIBA_POISON_ON_ROLL_AMOUNT}层【中毒】（不随品质提升）`, 'POISON_ON_ROLL', 'DIAMOND'),
 
   classItem('SAMOYED', 3, 'samoyed-soft-fur', '松软毛皮', 2, [4, 5, 6], ['big', 'heal'], '每次触发恢复8的血量', 'NONE', 'GOLD', { type: 'HEAL', amount: 8 }),
   classItem('SAMOYED', 3, 'samoyed-thorn-fur', '荆棘毛发', 2, [4, 5, 6], ['big', 'thorn'], '每次触发有 50% 概率获得1层【荆棘】', 'GAIN_THORNS', 'GOLD'),
@@ -238,7 +240,7 @@ export function itemDescription(itemId: string, quality?: string | null) {
   if (advanced === 'LIFESTEAL') return `${baseEffect}并将造成伤害的 100% 转化为自身治疗。`
   if (advanced === 'POISON_AND_DISABLE_RIGHTMOST') return `对敌方施加 ${amount} 层【中毒】，并使敌方最右侧的一个装备【失效】一次。`
   if (advanced === 'SHIELD_IMMUNITY') return `获得 ${amount} 点护盾。只要你拥有护盾，你受到的【中毒】和【虚弱】层数减半（向上取整）。`
-  if (advanced === 'POISON_ON_ROLL') return `${baseEffect}每次投掷都会对敌人叠加 3 层【中毒】（不随品质提升）。`
+  if (advanced === 'POISON_ON_ROLL') return `${baseEffect}每次投掷都会对敌人叠加 ${SHIBA_POISON_ON_ROLL_AMOUNT} 层【中毒】（不随品质提升）。`
   if (advanced === 'GAIN_THORNS') return `${baseEffect}每次触发有 50% 概率获得 ${one} 层【荆棘】。`
   if (advanced === 'APPLY_WEAK') return `${baseEffect}每次触发有 50% 概率给敌人施加 ${one} 层【虚弱】。`
   if (advanced === 'MAX_HP_ON_EXTRA_ROLL') return `每当系统触发职业特性的“额外投掷”时，永久使你最大生命值 +${one}。`

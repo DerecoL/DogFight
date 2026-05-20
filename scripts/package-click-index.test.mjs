@@ -472,10 +472,10 @@ describe('buildStandaloneIndex', () => {
       const poisonApply = battled.battle.events.find((event) => event.kind === 'ITEM' && event.defId === 'shiba-poison' && event.effectType === 'POISON')
       const poisonTick = battled.battle.events.find((event) => event.kind === 'POISON' && event.target === 'opponent')
 
-      expect(poisonApply).toMatchObject({ amount: 10, target: 'opponent' })
-      expect(poisonApply.opponentStatuses.negative).toContainEqual(expect.objectContaining({ type: 'poison', stacks: 10, tickDamage: 10 }))
-      expect(poisonTick).toMatchObject({ amount: 10, target: 'opponent' })
-      expect(poisonTick.opponentStatuses.negative).toContainEqual(expect.objectContaining({ type: 'poison', stacks: 10, tickDamage: 10 }))
+      expect(poisonApply).toMatchObject({ amount: 6, target: 'opponent' })
+      expect(poisonApply.opponentStatuses.negative).toContainEqual(expect.objectContaining({ type: 'poison', stacks: 6, tickDamage: 6 }))
+      expect(poisonTick).toMatchObject({ amount: 6, target: 'opponent' })
+      expect(poisonTick.opponentStatuses.negative).toContainEqual(expect.objectContaining({ type: 'poison', stacks: 6, tickDamage: 6 }))
     } finally {
       await rm(root, { recursive: true, force: true })
     }

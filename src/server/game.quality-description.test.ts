@@ -19,8 +19,8 @@ describe('quality-adjusted item descriptions', () => {
   })
 
   it('keeps shiba poison fixed instead of scaling by quality', () => {
-    expect(numbers('shiba-poison', 'DIAMOND')).toContain('3')
-    expect(numbers('shiba-poison', 'DIAMOND')).not.toContain('10')
+    expect(numbers('shiba-poison', 'DIAMOND')).toContain('6')
+    expect(numbers('shiba-poison', 'DIAMOND')).not.toContain('20')
   })
 
   it('shows upgraded base effects for described equipment and class rewards', () => {

@@ -9,6 +9,7 @@ import {
   relicOpeningThorns,
   relicPoisonTickBonus,
   relicRollBiasChance,
+  SHIBA_POISON_ON_ROLL_AMOUNT,
   itemDefForQuality,
 } from './data'
 import { triggerOrder } from './grid'
@@ -544,7 +545,7 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
     }
 
     if (!sacrificeReplacesSmallEffect && advanced === 'POISON_ON_ROLL') {
-      const appliedPoison = addPoison(targetSide, targetFighter, 3)
+      const appliedPoison = addPoison(targetSide, targetFighter, SHIBA_POISON_ON_ROLL_AMOUNT)
       if (appliedPoison > 0) {
         triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'POISON', amount: targetState.poison, target: targetSide, sourceHp: getHp(actorSide), targetHp: getHp(targetSide), sourceHpDelta: 0, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 叠加 ${appliedPoison} 层【中毒】` })
       }

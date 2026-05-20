@@ -700,8 +700,8 @@ describe('battle simulation', () => {
     const poisonTick = result.events.find((event) => event.kind === 'POISON' && event.target === 'opponent')
     const shieldEvent = result.events.find((event) => event.defId === 'v3-cone-collar')
 
-    expect(poisonApply?.opponentStatuses?.negative).toContainEqual(expect.objectContaining({ type: 'poison', stacks: 3, nextTickIn: 1, tickDamage: 3 }))
-    expect(poisonTick?.opponentStatuses?.negative).toContainEqual(expect.objectContaining({ type: 'poison', stacks: 3, tickDamage: 3 }))
+    expect(poisonApply?.opponentStatuses?.negative).toContainEqual(expect.objectContaining({ type: 'poison', stacks: 6, nextTickIn: 1, tickDamage: 6 }))
+    expect(poisonTick?.opponentStatuses?.negative).toContainEqual(expect.objectContaining({ type: 'poison', stacks: 6, tickDamage: 6 }))
     expect(shieldEvent?.playerStatuses?.positive).toContainEqual(expect.objectContaining({ type: 'shield', amount: 3 }))
   })
 
@@ -730,9 +730,9 @@ describe('battle simulation', () => {
     const poisonApply = result.events.find((event) => event.defId === 'shiba-poison' && event.effectType === 'POISON')
     const poisonTick = result.events.find((event) => event.kind === 'POISON' && event.target === 'player')
 
-    expect(poisonApply?.amount).toBe(2)
-    expect(poisonApply?.playerStatuses?.negative).toContainEqual(expect.objectContaining({ type: 'poison', stacks: 2 }))
-    expect(poisonTick).toMatchObject({ amount: 2, target: 'player' })
+    expect(poisonApply?.amount).toBe(3)
+    expect(poisonApply?.playerStatuses?.negative).toContainEqual(expect.objectContaining({ type: 'poison', stacks: 3 }))
+    expect(poisonTick).toMatchObject({ amount: 3, target: 'player' })
   })
 
   it('lets spiked vest grant one shield while keeping its thorns', () => {

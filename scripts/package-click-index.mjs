@@ -685,6 +685,7 @@ async function loadStandaloneGameData() {
     classRewardDefs: dataModule.CLASS_REWARD_DEFS,
     relicDefs: dataModule.RELIC_DEFS,
     itemDescriptions,
+    shibaPoisonOnRollAmount: dataModule.SHIBA_POISON_ON_ROLL_AMOUNT,
   }
 }
 
@@ -704,6 +705,7 @@ async function currentMockApiScript(buildId) {
   const itemDefs = gameData.itemDefs;
   const classRewardDefs = gameData.classRewardDefs;
   const relicDefs = gameData.relicDefs;
+  const shibaPoisonOnRollAmount = gameData.shibaPoisonOnRollAmount;
   const allItemDefs = [...itemDefs, ...classRewardDefs];
   const defs = Object.fromEntries(allItemDefs.map((def) => [def.id, def]));
   const relicDefsById = Object.fromEntries(relicDefs.map((def) => [def.id, def]));
@@ -1329,7 +1331,7 @@ async function currentMockApiScript(buildId) {
             state[side].thorns += qualityAmount(1, item.quality);
             push({ actor: side, kind: 'ITEM', itemId: item.id, defId: item.defId, effectType: 'UTILITY', amount, target: side, text: def.name + ' 获得护盾与荆棘。' });
           } else if (advanced === 'POISON_ON_ROLL') {
-            const poisonAmount = qualityAmount(3, item.quality);
+            const poisonAmount = shibaPoisonOnRollAmount;
             if (addPoison(target, poisonAmount)) push({ actor: side, kind: 'ITEM', itemId: item.id, defId: item.defId, effectType: 'POISON', amount: poisonAmount, target, text: def.name + ' 叠加 ' + poisonAmount + ' 层【中毒】。' });
           } else if (advanced === 'APPLY_POISON' || advanced === 'POISON_AND_DISABLE_RIGHTMOST') {
             if (addPoison(target, amount)) push({ actor: side, kind: 'ITEM', itemId: item.id, defId: item.defId, effectType: 'POISON', amount, target, text: def.name + ' 叠加 ' + amount + ' 层【中毒】。' });
