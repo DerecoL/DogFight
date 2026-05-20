@@ -48,6 +48,10 @@ export type AdvancedEffect =
   | 'LIFESTEAL'
   | 'POISON_AND_DISABLE_RIGHTMOST'
   | 'SHIELD_IMMUNITY'
+  | 'GRANT_LIFESTEAL_ADJACENT'
+  | 'BOOM_COUNTER'
+  | 'GROWTH_DAMAGE'
+  | 'PURGE_ENEMY_BUFFS'
 
 export type ItemDef = {
   id: string

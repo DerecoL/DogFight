@@ -134,6 +134,26 @@ export const ITEM_DEFS: ItemDef[] = [
     advancedEffect: 'SHIELD_IMMUNITY',
     defaultQuality: 'DIAMOND',
   }),
+  slotItem('v4-blood-contract-fang', '血契犬牙', 2, 12, [1, 6], ['lifesteal', 'support', 'extreme'], { type: 'UTILITY', amount: 0 }, {
+    description: '触发时，使左边 1 个相邻装备获得【吸血】直到战斗结束。钻石品质改为使左右相邻装备都获得【吸血】。',
+    advancedEffect: 'GRANT_LIFESTEAL_ADJACENT',
+    defaultQuality: 'GOLD',
+  }),
+  slotItem('v4-boom-counter', '爆鸣计数器', 2, 14, [1, 2, 3, 4, 5, 6], ['counter', 'trigger', 'damage'], { type: 'UTILITY', amount: 300, qualityBase: 'GOLD' }, {
+    description: '己方装备每成功触发 1 次，获得 1 点爆鸣计数。达到 30 点后清零，对敌方造成 300 点直接伤害。升级只提高伤害。',
+    advancedEffect: 'BOOM_COUNTER',
+    defaultQuality: 'GOLD',
+  }),
+  slotItem('v4-growing-chew-sword', '磨牙成长剑', 2, 9, [2, 3, 4], ['growth', 'damage', 'stable'], { type: 'DAMAGE', amount: 1, qualityBase: 'SILVER' }, {
+    description: '初始造成 1 点伤害。每次该装备成功触发后，本局内后续伤害 +3，无成长次数上限。',
+    advancedEffect: 'GROWTH_DAMAGE',
+    defaultQuality: 'SILVER',
+  }),
+  slotItem('v4-reverse-fur-comb', '逆毛净化梳', 1, 8, [3, 4], ['cleanse', 'heal', 'counter'], { type: 'UTILITY', amount: 3, qualityBase: 'SILVER' }, {
+    description: '清除敌方最多 3 层正面增益；每实际清除 1 层，自己恢复 5 点生命。优先清除荆棘，再清除加速层数，最后每 8 点护盾折算 1 层。',
+    advancedEffect: 'PURGE_ENEMY_BUFFS',
+    defaultQuality: 'SILVER',
+  }),
 ]
 
 export const CLASS_REWARD_DEFS: ItemDef[] = [
@@ -240,6 +260,19 @@ export function itemDescription(itemId: string, quality?: string | null) {
   if (advanced === 'LIFESTEAL') return `${baseEffect}并将造成伤害的 100% 转化为自身治疗。`
   if (advanced === 'POISON_AND_DISABLE_RIGHTMOST') return `对敌方施加 ${amount} 层【中毒】，并使敌方最右侧的一个装备【失效】一次。`
   if (advanced === 'SHIELD_IMMUNITY') return `获得 ${amount} 点护盾。只要你拥有护盾，你受到的【中毒】和【虚弱】层数减半（向上取整）。`
+  if (advanced === 'GRANT_LIFESTEAL_ADJACENT') return currentQuality === 'DIAMOND'
+    ? '触发时，使左右相邻装备都获得【吸血】直到战斗结束。被赋予吸血的装备按实际造成的生命伤害 100% 治疗自己。'
+    : '触发时，使左边 1 个相邻装备获得【吸血】直到战斗结束。被赋予吸血的装备按实际造成的生命伤害 100% 治疗自己。'
+  if (advanced === 'BOOM_COUNTER') return `己方装备每成功触发 1 次，获得 1 点爆鸣计数。达到 30 点后清零，对敌方造成 ${amount} 点直接伤害。`
+  if (advanced === 'GROWTH_DAMAGE') {
+    const growth = currentQuality === 'DIAMOND' ? 7 : currentQuality === 'GOLD' ? 5 : 3
+    return `初始造成 ${amount} 点伤害。每次该装备成功触发后，本局内后续伤害 +${growth}，无成长次数上限。`
+  }
+  if (advanced === 'PURGE_ENEMY_BUFFS') {
+    const purgeLimit = amount
+    const healPerLayer = currentQuality === 'DIAMOND' ? 11 : currentQuality === 'GOLD' ? 8 : 5
+    return `清除敌方最多 ${purgeLimit} 层正面增益；每实际清除 1 层，自己恢复 ${healPerLayer} 点生命。优先清除荆棘、加速层数，再按每 8 点护盾折算 1 层。`
+  }
   if (advanced === 'POISON_ON_ROLL') return `${baseEffect}每次投掷都会对敌人叠加 ${SHIBA_POISON_ON_ROLL_AMOUNT} 层【中毒】（不随品质提升）。`
   if (advanced === 'GAIN_THORNS') return `${baseEffect}每次触发有 50% 概率获得 ${one} 层【荆棘】。`
   if (advanced === 'APPLY_WEAK') return `${baseEffect}每次触发有 50% 概率给敌人施加 ${one} 层【虚弱】。`

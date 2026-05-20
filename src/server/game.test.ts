@@ -179,6 +179,58 @@ describe('dog and item definitions', () => {
       'v3-husky-engine',
     ]))
   })
+
+  it('defines the new common archetype equipment with exact tuning', () => {
+    expect(itemDef('v4-blood-contract-fang')).toMatchObject({
+      size: 2,
+      price: 12,
+      dice: [1, 6],
+      tags: ['lifesteal', 'support', 'extreme'],
+      effect: { type: 'UTILITY', amount: 0 },
+      advancedEffect: 'GRANT_LIFESTEAL_ADJACENT',
+      defaultQuality: 'GOLD',
+    })
+    expect(itemDef('v4-boom-counter')).toMatchObject({
+      size: 2,
+      price: 14,
+      dice: [1, 2, 3, 4, 5, 6],
+      tags: ['counter', 'trigger', 'damage'],
+      effect: { type: 'UTILITY', amount: 300, qualityBase: 'GOLD' },
+      advancedEffect: 'BOOM_COUNTER',
+      defaultQuality: 'GOLD',
+    })
+    expect(itemDef('v4-growing-chew-sword')).toMatchObject({
+      size: 2,
+      price: 9,
+      dice: [2, 3, 4],
+      tags: ['growth', 'damage', 'stable'],
+      effect: { type: 'DAMAGE', amount: 1, qualityBase: 'SILVER' },
+      advancedEffect: 'GROWTH_DAMAGE',
+      defaultQuality: 'SILVER',
+    })
+    expect(itemDef('v4-reverse-fur-comb')).toMatchObject({
+      size: 1,
+      price: 8,
+      dice: [3, 4],
+      tags: ['cleanse', 'heal', 'counter'],
+      effect: { type: 'UTILITY', amount: 3, qualityBase: 'SILVER' },
+      advancedEffect: 'PURGE_ENEMY_BUFFS',
+      defaultQuality: 'SILVER',
+    })
+
+    expect(shopPool('GENERAL').map((item) => item.id)).toEqual(expect.arrayContaining([
+      'v4-blood-contract-fang',
+      'v4-boom-counter',
+      'v4-growing-chew-sword',
+      'v4-reverse-fur-comb',
+    ]))
+    expect(shopPool('MEDIUM').map((item) => item.id)).toEqual(expect.arrayContaining([
+      'v4-blood-contract-fang',
+      'v4-boom-counter',
+      'v4-growing-chew-sword',
+    ]))
+    expect(shopPool('SMALL').map((item) => item.id)).toContain('v4-reverse-fur-comb')
+  })
 })
 
 describe('battle simulation', () => {
