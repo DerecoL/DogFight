@@ -840,5 +840,32 @@ export function buildApp() {
     return { run: publicRun(updated) }
   })
 
+  app.post('/api/runs/:runId/settle', async (request, reply) => {
+    const userId = requireUser(request.userId)
+    const { runId } = z.object({ runId: z.string() }).parse(request.params)
+    const run = await prisma.run.findFirstOrThrow({ where: { id: runId, userId }, include: { items: true, ladderSettlement: true } })
+    if (run.status !== 'ACTIVE') {
+      return reply.code(400).send({ error: '当前跑局已经结算或不可放弃' })
+    }
+
+    const updated = await prisma.run.update({
+      where: { id: run.id },
+      data: {
+        status: 'COMPLETE',
+        phase: 'COMPLETE',
+        matchedGhost: null,
+      },
+      include: { items: true, ladderSettlement: true },
+    })
+
+    if (run.mode === 'LADDER') {
+      await settleLadderRun(userId, run.id, run.wins, run.losses)
+      const settledRun = await prisma.run.findUniqueOrThrow({ where: { id: run.id }, include: { items: true, ladderSettlement: true } })
+      return { run: publicRun(settledRun) }
+    }
+
+    return { run: publicRun(updated) }
+  })
+
   return app
 }
