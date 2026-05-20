@@ -15,12 +15,35 @@ export type CasualGhostSelectionInput = {
   seed: string
 }
 
+export type LadderGhostSelectionInput = {
+  preferredWins: number
+  seed: string
+}
+
+export type LadderOpponentRangeInput = {
+  tier: 'BRONZE' | 'SILVER' | 'GOLD' | 'PLATINUM' | 'DIAMOND' | 'MASTER' | 'DOG_KING'
+  wins: number
+  round: number
+}
+
 export function isTrainingMatchRound(round: number) {
   return Math.max(0, Math.floor(round)) < TRAINING_MATCH_ROUNDS
 }
 
 export function targetOpponentWins(wins: number) {
   return Math.max(0, Math.floor(wins) - 1)
+}
+
+export function targetLadderOpponentWinsRange(input: LadderOpponentRangeInput) {
+  const wins = Math.max(0, Math.floor(input.wins))
+  if (input.tier === 'BRONZE' || input.tier === 'SILVER') {
+    const preferred = targetOpponentWins(wins)
+    return { min: preferred, max: wins, preferred }
+  }
+  if ((input.tier === 'DIAMOND' || input.tier === 'MASTER' || input.tier === 'DOG_KING') && input.round >= 6) {
+    return { min: wins, max: wins + 1, preferred: wins }
+  }
+  return { min: wins, max: wins, preferred: wins }
 }
 
 function stableScore(seed: string) {
@@ -40,6 +63,18 @@ export function selectCasualGhostSnapshot<T extends CasualGhostCandidate>(candid
     .sort((left, right) => {
       const leftDistance = Math.abs(left.wins - targetWins)
       const rightDistance = Math.abs(right.wins - targetWins)
+      return leftDistance - rightDistance
+        || stableScore(`${input.seed}-${left.id}`) - stableScore(`${input.seed}-${right.id}`)
+        || left.createdAt.getTime() - right.createdAt.getTime()
+    })[0] ?? null
+}
+
+export function selectLadderGhostSnapshot<T extends CasualGhostCandidate>(candidates: T[], input: LadderGhostSelectionInput) {
+  return candidates
+    .slice()
+    .sort((left, right) => {
+      const leftDistance = Math.abs(left.wins - input.preferredWins)
+      const rightDistance = Math.abs(right.wins - input.preferredWins)
       return leftDistance - rightDistance
         || stableScore(`${input.seed}-${left.id}`) - stableScore(`${input.seed}-${right.id}`)
         || left.createdAt.getTime() - right.createdAt.getTime()

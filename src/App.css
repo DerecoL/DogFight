@@ -1535,6 +1535,30 @@ input {
   display: grid;
   place-items: center;
 }
+.forfeit-run-action {
+  width: min(760px, 100%);
+  margin: 14px auto 0;
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.forfeit-run-action div {
+  display: grid;
+  gap: 4px;
+}
+
+.forfeit-run-action span {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.forfeit-run-action .danger-button {
+  flex: 0 0 auto;
+}
 .log-toggle {
   position: relative;
   overflow: hidden;
@@ -1890,6 +1914,94 @@ input {
   gap: 14px;
 }
 
+.ladder-screen {
+  width: min(1120px, 100%);
+  display: grid;
+  gap: 16px;
+  margin: 0 auto;
+}
+
+.ladder-layout {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 14px;
+}
+
+.ladder-panel, .ladder-start {
+  padding: 16px;
+  display: grid;
+  gap: 12px;
+}
+
+.ladder-rank {
+  font-size: 30px;
+  line-height: 1;
+}
+
+.ladder-progress {
+  height: 14px;
+  overflow: hidden;
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  background: #fff7d6;
+}
+
+.ladder-progress i {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, #31b981, #f59e0b);
+}
+
+.ladder-board {
+  display: grid;
+  gap: 8px;
+}
+
+.ladder-row {
+  display: grid;
+  grid-template-columns: minmax(88px, auto) minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 10px;
+  border: 2px solid rgba(61, 45, 37, .22);
+  border-radius: 8px;
+  background: rgba(255, 250, 241, .76);
+}
+
+.ladder-row strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ladder-row b.gain { color: #15803d; }
+.ladder-row b.loss { color: #b4233d; }
+
+.dog-select.compact {
+  align-items: start;
+}
+
+.dog-select.compact .dog-card-grid {
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  align-items: stretch;
+}
+
+.ladder-formula {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 2px solid var(--ink);
+  border-radius: 8px;
+  background: #fff7d6;
+}
+
+.ladder-formula p {
+  margin: 0;
+  color: var(--muted);
+  font-weight: 800;
+}
+
 .player-history-panel {
   position: relative;
   width: 100%;
@@ -1927,14 +2039,15 @@ input {
 }
 
 .history-summary {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(172px, .62fr) minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
   gap: 16px;
 }
 
 .history-summary span,
-.history-best small {
+.history-best small,
+.history-ladder-slot small {
   color: var(--blue);
   font-size: 12px;
   font-weight: 950;
@@ -1946,9 +2059,59 @@ input {
 
 .history-summary p,
 .history-best strong,
+.history-ladder-slot p,
 .history-run-row small {
   color: rgba(61, 45, 37, .74);
   font-weight: 850;
+}
+
+.history-ladder-slot {
+  min-height: 74px;
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 2px solid rgba(61, 45, 37, .22);
+  border-radius: 8px;
+  background: rgba(255, 247, 214, .72);
+}
+
+.history-ladder-slot strong {
+  display: block;
+  min-width: 0;
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.history-ladder-slot p {
+  margin: 0;
+  font-size: 12px;
+}
+
+.dog-rank-trophy {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  color: #a16207;
+  border: 2px solid var(--ink);
+  border-radius: 50%;
+  background: #ffe08a;
+  box-shadow: 3px 4px 0 rgba(61, 45, 37, .22);
+}
+
+.dog-rank-trophy svg:last-child {
+  position: absolute;
+  right: 5px;
+  bottom: 5px;
+  color: #7c2d12;
+  padding: 1px;
+  border-radius: 50%;
+  background: #fff7d6;
 }
 
 .history-best {
@@ -3498,7 +3661,8 @@ input {
   :root { --slot-w: 58px; --slot-h: 82px; --board-slot-h: 150px; }
   .app-shell { padding: 0 12px 24px; }
   .topbar { height: auto; align-items: flex-start; flex-direction: column; }
-  .history-summary { align-items: flex-start; flex-direction: column; }
+  .history-summary { grid-template-columns: 1fr; align-items: flex-start; }
+  .history-ladder-slot { width: 100%; }
   .history-best { justify-items: start; text-align: left; }
   .history-run-list { grid-template-columns: 1fr; }
   .player-history-overlay { padding: 8px; }
@@ -3510,6 +3674,10 @@ input {
   .visual-battle { gap: 6px; padding: 8px; }
   .battle-toolbar { grid-template-columns: 1fr; align-items: flex-start; }
   .battle-toolbar .speed-row { width: 100%; justify-content: center; }
+  .forfeit-run-action {
+    align-items: stretch;
+    flex-direction: column;
+  }
   .battle-stage { grid-template-columns: 1fr; min-height: 440px; padding: 10px; }
   .battle-dice { order: 2; min-height: 108px; }
   .battle-dog.opponent { order: 1; }

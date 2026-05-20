@@ -29,7 +29,7 @@ function relicDefIds() {
 describe('selection screen structure', () => {
   it('renders a mode lobby and opens the peak arena screen from the peak card', () => {
     expect(app).toContain("type GameMode = 'CASUAL' | 'LADDER' | 'DOGFIGHT' | 'PEAK'")
-    expect(app).toContain("type AppScreen = 'LOBBY' | 'CASUAL' | 'DOGFIGHT' | 'PEAK'")
+    expect(app).toContain("type AppScreen = 'LOBBY' | 'CASUAL' | 'LADDER' | 'DOGFIGHT' | 'PEAK'")
     expect(app).toContain("const [appScreen, setAppScreen] = useState<AppScreen>('LOBBY')")
     expect(app).toContain('function ModeLobby')
     expect(app).toContain('休闲模式')
@@ -39,6 +39,17 @@ describe('selection screen structure', () => {
     expect(app).toContain('战斗结束后的狗进入巅峰竞技场')
     expect(app).toContain('onEnterPeak={() => setAppScreen(\'PEAK\')}')
     expect(app).toContain('进入巅峰模式')
+  })
+
+  it('unlocks ladder mode with profile, leaderboard, and settlement formula hooks', () => {
+    expect(app).toContain('function LadderHome')
+    expect(app).toContain("api<LadderMeResponse>('/ladder/me')")
+    expect(app).toContain("api<LadderLeaderboardResponse>('/ladder/leaderboard')")
+    expect(app).toContain("onEnterLadder={() => setAppScreen('LADDER')}")
+    expect(app).toContain("body: JSON.stringify({ ...choice, mode: 'LADDER' })")
+    expect(app).toContain('犬王积分榜')
+    expect(app).toContain('ladderSettlement')
+    expect(app).toContain('基础 {settlement.baseScore >= 0 ?')
   })
 
   it('wires dogfight mode to room APIs and shows room actions plus spectator entry points', () => {
@@ -183,6 +194,17 @@ describe('selection screen structure', () => {
     expect(app).toContain("run.phase === 'BATTLE' && isFinished")
   })
 
+  it('offers active runs a confirmed forfeit settlement action outside battle playback', () => {
+    expect(app).toContain('function ForfeitRunAction')
+    expect(app).toContain('window.confirm')
+    expect(app).toContain('/settle')
+    expect(app).toContain("run.status === 'ACTIVE'")
+    expect(app).toContain("run.phase !== 'BATTLE'")
+    expect(app).toContain("{!battle && !showClassRewardCeremony && run.status === 'ACTIVE' && run.phase !== 'BATTLE' && (")
+    expect(app).toContain('onForfeit={() => void settleRun()}')
+    expect(css).toContain('.forfeit-run-action')
+  })
+
   it('does not show the previous battle snapshot outside playback', () => {
     expect(app).not.toContain('function LastBattleRecord')
     expect(app).not.toContain('<LastBattleRecord run={run} />')
@@ -192,16 +214,20 @@ describe('selection screen structure', () => {
 
   it('shows player run history in the mode lobby as the multi-game battle record', () => {
     expect(app).toContain('type PlayerRunHistory')
+    expect(app).toContain('const [ladderProfile, setLadderProfile]')
     expect(app).toContain('const [runHistory, setRunHistory]')
     expect(app).toContain('const [historyOverlayOpen, setHistoryOverlayOpen]')
     expect(app).toContain('type HistoryModeTab')
     expect(app).toContain("api<{ history: PlayerRunHistory }>('/runs/history')")
     expect(app).toContain('function PlayerRunHistoryPanel')
     expect(app).toContain('function PlayerHistoryOverlay')
-    expect(app).toContain('<PlayerRunHistoryPanel history={runHistory} onOpen={() => setHistoryOverlayOpen(true)} />')
+    expect(app).toContain('<PlayerRunHistoryPanel history={runHistory} ladderProfile={ladderProfile} onOpen={() => setHistoryOverlayOpen(true)} />')
     expect(app).toContain('<ModeLobby run={run}')
     expect(app).toContain('<PlayerHistoryOverlay history={runHistory} onClose={() => setHistoryOverlayOpen(false)} />')
     expect(app).toContain('个人战绩')
+    expect(app).toContain('天梯段位')
+    expect(app).toContain('犬爪奖杯')
+    expect(app).toContain('history-ladder-slot')
     expect(app).toContain('最近对局')
     expect(app).toContain('全部')
     expect(app).toContain('休闲模式')
@@ -210,6 +236,8 @@ describe('selection screen structure', () => {
     expect(app).toContain('天梯模式')
     expect(app).toContain('查看装备')
     expect(css).toContain('.player-history-panel')
+    expect(css).toContain('.history-ladder-slot')
+    expect(css).toContain('.dog-rank-trophy')
     expect(css).toContain('.player-history-overlay')
     expect(css).toContain('.history-mode-tabs')
     expect(css).toContain('.history-run-list')

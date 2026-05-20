@@ -162,6 +162,9 @@ describe('equipment layout scale', () => {
 
   it('adds fourth-pass handdrawn detail to history, tips, relics, and reward choices', () => {
     expect(cssRule('.player-history-panel::before')).toContain('content: ""')
+    expect(cssRule('.history-summary')).toContain('grid-template-columns')
+    expect(cssRule('.history-ladder-slot')).toContain('min-height')
+    expect(cssRule('.dog-rank-trophy')).toContain('position: relative')
     expect(cssRule('.history-run-row::before')).toContain('linear-gradient')
     expect(cssRule('.history-open-action')).toContain('var(--pressed-sketch-shadow)')
     expect(cssRule('.floating-tip.paper-card::before')).toContain('content: ""')

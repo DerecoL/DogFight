@@ -17,6 +17,7 @@ import {
   Coins,
   Crown,
   Dice5,
+  Flag,
   Gamepad2,
   Grid3X3,
   HeartPulse,
@@ -26,6 +27,7 @@ import {
   Medal,
   Music,
   PackagePlus,
+  PawPrint,
   RadioTower,
   RefreshCcw,
   Shield,
@@ -43,9 +45,11 @@ type Area = 'EQUIPMENT' | 'BAG'
 type ShopType = 'GENERAL' | 'LARGE' | 'MEDIUM' | 'SMALL' | 'SMALL_DICE' | 'BIG_DICE' | 'RELIC'
 type ItemQuality = 'BRONZE' | 'SILVER' | 'GOLD' | 'DIAMOND'
 type GameMode = 'CASUAL' | 'LADDER' | 'DOGFIGHT' | 'PEAK'
-type AppScreen = 'LOBBY' | 'CASUAL' | 'DOGFIGHT' | 'PEAK'
+type AppScreen = 'LOBBY' | 'CASUAL' | 'LADDER' | 'DOGFIGHT' | 'PEAK'
 type HistoryModeTab = 'ALL' | 'CASUAL' | 'DOGFIGHT' | 'PEAK' | 'LADDER'
 type HistoryRunMode = Exclude<HistoryModeTab, 'ALL'>
+type RunMode = 'CASUAL' | 'LADDER'
+type LadderTier = 'BRONZE' | 'SILVER' | 'GOLD' | 'PLATINUM' | 'DIAMOND' | 'MASTER' | 'DOG_KING'
 
 type ItemDef = {
   id: string
@@ -118,6 +122,7 @@ type Battle = {
 }
 type Run = {
   id: string
+  mode: RunMode
   dogType: DogType
   luckyNumber?: number | null
   wins: number
@@ -135,8 +140,41 @@ type Run = {
   refreshCost: number
   matchedGhost: null | { name: string; dogType: DogType; luckyNumber?: number | null; wins: number; losses: number; round: number }
   lastBattle: Battle | null
+  ladderSettlement: LadderSettlement | null
   items: Item[]
 }
+type LadderSettlement = {
+  id: string
+  beforeTier: LadderTier
+  beforeScore: number
+  afterTier: LadderTier
+  afterScore: number
+  delta: number
+  rawDelta: number
+  baseScore: number
+  tierTax: number
+  lossPenalty: number
+  perfectBonus: number
+  newbieProtection: number
+  wins: number
+  losses: number
+  createdAt: string
+}
+type LadderProfile = {
+  seasonId: string
+  tier: LadderTier
+  tierLabel: string
+  score: number
+  highestTier: LadderTier
+  highestTierLabel: string
+  gamesPlayed: number
+  totalWins: number
+  totalLosses: number
+  updatedAt: string
+}
+type LadderMeResponse = { profile: LadderProfile; recentSettlements: LadderSettlement[] }
+type LadderLeaderboardEntry = { rank: number; title: string; name: string; profile: LadderProfile }
+type LadderLeaderboardResponse = { leaderboard: LadderLeaderboardEntry[]; playerRank: number | null; playerProfile: LadderProfile }
 type PlayerRunHistoryEntry = Pick<Run, 'id' | 'dogType' | 'luckyNumber' | 'wins' | 'losses' | 'round' | 'status' | 'phase'> & {
   mode: HistoryRunMode
   items: Item[]
@@ -393,6 +431,15 @@ const historyModeTabs: Array<{ id: HistoryModeTab; label: string }> = [
   { id: 'PEAK', label: '巅峰模式' },
   { id: 'LADDER', label: '天梯模式' },
 ]
+const ladderTierLabel: Record<LadderTier, string> = {
+  BRONZE: '青铜',
+  SILVER: '白银',
+  GOLD: '黄金',
+  PLATINUM: '白金',
+  DIAMOND: '钻石',
+  MASTER: '大师',
+  DOG_KING: '犬王',
+}
 const dogOptions: DogType[] = ['SHIBA', 'SAMOYED', 'MUTT', 'BULLY', 'EMPEROR']
 const shopChoiceOrder: ShopType[] = ['GENERAL', 'LARGE', 'MEDIUM', 'SMALL', 'SMALL_DICE', 'BIG_DICE', 'RELIC']
 const dogStrategies: Record<DogType, string> = {
@@ -670,6 +717,7 @@ export default function App() {
   const [musicBlocked, setMusicBlocked] = useState(false)
   const [appHasAudioFocus, setAppHasAudioFocus] = useState(() => !document.hidden && document.hasFocus())
   const [runHistory, setRunHistory] = useState<PlayerRunHistory>(emptyRunHistory)
+  const [ladderProfile, setLadderProfile] = useState<LadderProfile | null>(null)
   const [historyOverlayOpen, setHistoryOverlayOpen] = useState(false)
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
@@ -680,15 +728,21 @@ export default function App() {
     setRunHistory(data.history)
   }, [])
 
+  const loadLadderProfile = useCallback(async () => {
+    const data = await api<LadderMeResponse>('/ladder/me')
+    setLadderProfile(data.profile)
+  }, [])
+
   useEffect(() => {
     api<{ user: AuthUser; activeRun: Run | null }>('/me')
       .then((data) => {
         setUser(data.user)
         setRun(data.activeRun)
         void loadRunHistory().catch(() => undefined)
+        void loadLadderProfile().catch(() => undefined)
       })
       .catch(() => undefined)
-  }, [loadRunHistory])
+  }, [loadLadderProfile, loadRunHistory])
 
   useEffect(() => {
     if (!battle) return
@@ -757,11 +811,15 @@ export default function App() {
         if (!data.user) {
           setRun(null)
           setRunHistory(emptyRunHistory)
+          setLadderProfile(null)
         } else if ('activeRun' in data) {
           setRun(data.activeRun ?? null)
         }
         setNeedsNicknameSetup(Boolean(data.user && data.needsNickname))
-        if (data.user) void loadRunHistory().catch(() => undefined)
+        if (data.user) {
+          void loadRunHistory().catch(() => undefined)
+          void loadLadderProfile().catch(() => undefined)
+        }
       } else {
         setRun(data.run)
         if (data.battle) {
@@ -769,6 +827,7 @@ export default function App() {
           setBattle(data.battle)
         }
         void loadRunHistory().catch(() => undefined)
+        void loadLadderProfile().catch(() => undefined)
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : '操作失败')
@@ -796,6 +855,23 @@ export default function App() {
       setBattle(null)
       setEventIndex(0)
       void loadRunHistory().catch(() => undefined)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '操作失败')
+    }
+  }
+
+  const settleRun = async () => {
+    if (!run) return
+    const confirmed = window.confirm('将按当前胜负结算，不会额外增加失败。确定放弃本局吗？')
+    if (!confirmed) return
+    setError('')
+    try {
+      const data = await api<{ run: Run }>(`/runs/${run.id}/settle`, { method: 'POST' })
+      setRun(data.run)
+      setBattle(null)
+      setEventIndex(0)
+      void loadRunHistory().catch(() => undefined)
+      void loadLadderProfile().catch(() => undefined)
     } catch (err) {
       setError(err instanceof Error ? err.message : '操作失败')
     }
@@ -900,9 +976,17 @@ export default function App() {
   if (appScreen === 'LOBBY') {
     return (
       <Shell run={run ?? undefined} error={error} musicEnabled={musicEnabled} musicBlocked={musicBlocked} onToggleMusic={toggleMusic} onLogout={() => action(() => api('/auth/logout', { method: 'POST' }).then(() => ({ user: null })))}>
-        <PlayerRunHistoryPanel history={runHistory} onOpen={() => setHistoryOverlayOpen(true)} />
-        <ModeLobby run={run} runHistory={runHistory} onOpen={() => setHistoryOverlayOpen(true)} onEnterCasual={() => setAppScreen('CASUAL')} onEnterDogfight={() => setAppScreen('DOGFIGHT')} onEnterPeak={() => setAppScreen('PEAK')} />
+        <PlayerRunHistoryPanel history={runHistory} ladderProfile={ladderProfile} onOpen={() => setHistoryOverlayOpen(true)} />
+        <ModeLobby run={run} runHistory={runHistory} onOpen={() => setHistoryOverlayOpen(true)} onEnterCasual={() => setAppScreen('CASUAL')} onEnterLadder={() => setAppScreen('LADDER')} onEnterDogfight={() => setAppScreen('DOGFIGHT')} onEnterPeak={() => setAppScreen('PEAK')} />
         {historyOverlayOpen && <PlayerHistoryOverlay history={runHistory} onClose={() => setHistoryOverlayOpen(false)} />}
+      </Shell>
+    )
+  }
+
+  if (appScreen === 'LADDER' && run?.mode !== 'LADDER') {
+    return (
+      <Shell run={run ?? undefined} error={error} musicEnabled={musicEnabled} musicBlocked={musicBlocked} onToggleMusic={toggleMusic} onOpenLobby={() => setAppScreen('LOBBY')} onLogout={() => action(() => api('/auth/logout', { method: 'POST' }).then(() => ({ user: null })))}>
+        <LadderHome onStart={(choice) => action(() => api('/runs', { method: 'POST', body: JSON.stringify({ ...choice, mode: 'LADDER' }) }))} />
       </Shell>
     )
   }
@@ -1054,6 +1138,9 @@ export default function App() {
           onRestart={() => setRun(null)}
         />
       )}
+      {!battle && !showClassRewardCeremony && run.status === 'ACTIVE' && run.phase !== 'BATTLE' && (
+        <ForfeitRunAction run={run} onForfeit={() => void settleRun()} />
+      )}
     </Shell>
   )
 }
@@ -1075,9 +1162,9 @@ const modeCards: Array<{
   {
     id: 'LADDER',
     title: '天梯模式',
-    description: '累计排名、积分、赛季冲榜，未开放',
+    description: '按整局表现结算积分，冲击大师与犬王排行榜',
     icon: <Medal size={38} />,
-    locked: true,
+    locked: false,
   },
   {
     id: 'DOGFIGHT',
@@ -1095,8 +1182,9 @@ const modeCards: Array<{
   },
 ]
 
-function ModeLobby({ run, runHistory, onOpen, onEnterCasual, onEnterDogfight, onEnterPeak }: { run: Run | null; runHistory: PlayerRunHistory; onOpen: () => void; onEnterCasual: () => void; onEnterDogfight: () => void; onEnterPeak: () => void }) {
-  const casualAction = run ? '继续休闲模式' : '开始休闲模式'
+function ModeLobby({ run, runHistory, onOpen, onEnterCasual, onEnterLadder, onEnterDogfight, onEnterPeak }: { run: Run | null; runHistory: PlayerRunHistory; onOpen: () => void; onEnterCasual: () => void; onEnterLadder: () => void; onEnterDogfight: () => void; onEnterPeak: () => void }) {
+  const casualAction = run?.mode === 'CASUAL' ? '继续休闲模式' : '开始休闲模式'
+  const ladderAction = run?.mode === 'LADDER' ? '继续天梯模式' : '进入天梯模式'
   return (
     <section className="mode-lobby-screen" data-history-count={runHistory.totalRuns} data-history-action={onOpen.name}>
       <div className="screen-heading centered">
@@ -1119,6 +1207,8 @@ function ModeLobby({ run, runHistory, onOpen, onEnterCasual, onEnterDogfight, on
             </div>
             {mode.id === 'CASUAL' ? (
               <button className="primary action-button mode-action" onClick={onEnterCasual}>{casualAction}</button>
+            ) : mode.id === 'LADDER' ? (
+              <button className="primary action-button mode-action" onClick={onEnterLadder}>{ladderAction}</button>
             ) : mode.id === 'DOGFIGHT' ? (
               <button className="primary action-button mode-action" onClick={onEnterDogfight}>进入斗狗模式</button>
             ) : mode.id === 'PEAK' ? (
@@ -1135,11 +1225,13 @@ function ModeLobby({ run, runHistory, onOpen, onEnterCasual, onEnterDogfight, on
   )
 }
 
-function PlayerRunHistoryPanel({ history, onOpen }: { history: PlayerRunHistory; onOpen: () => void }) {
+function PlayerRunHistoryPanel({ history, ladderProfile, onOpen }: { history: PlayerRunHistory; ladderProfile: LadderProfile | null; onOpen: () => void }) {
   const bestRun = history.bestRun
   const winRate = history.totalWins + history.totalLosses > 0
     ? Math.round((history.totalWins / (history.totalWins + history.totalLosses)) * 100)
     : 0
+  const rankLabel = ladderProfile?.tierLabel ?? '青铜'
+  const rankScore = ladderProfile?.score ?? 0
 
   return (
     <section className="player-history-panel" aria-label="个人战绩">
@@ -1148,6 +1240,17 @@ function PlayerRunHistoryPanel({ history, onOpen }: { history: PlayerRunHistory;
           <span>个人战绩</span>
           <h2>{history.totalWins}胜 {history.totalLosses}败</h2>
           <p>共 {history.totalRuns} 局 · 胜率 {winRate}% · 完成 {history.completedRuns} 局</p>
+        </div>
+        <div className="history-ladder-slot" aria-label="天梯段位">
+          <span className="dog-rank-trophy" title="犬爪奖杯">
+            <Trophy size={34} />
+            <PawPrint size={15} />
+          </span>
+          <div>
+            <small>天梯段位</small>
+            <strong>{rankLabel}</strong>
+            <p>{rankScore} 分</p>
+          </div>
         </div>
         <div className="history-best">
           <small>最佳成绩</small>
@@ -1270,6 +1373,7 @@ function HistoryRunDetails({ entry, inspectedItem, tipAnchor, onInspectItem, onC
   const bag = entry.items.filter((item) => item.area === 'BAG')
   const tipRun: Run = {
     id: entry.id,
+    mode: entry.mode === 'LADDER' ? 'LADDER' : 'CASUAL',
     dogType: entry.dogType,
     luckyNumber: entry.luckyNumber,
     wins: entry.wins,
@@ -1287,6 +1391,7 @@ function HistoryRunDetails({ entry, inspectedItem, tipAnchor, onInspectItem, onC
     refreshCost: 1,
     matchedGhost: null,
     lastBattle: null,
+    ladderSettlement: null,
     items: entry.items,
   }
 
@@ -1718,6 +1823,7 @@ function battleToRun(battle: Battle | null): Run | null {
   if (!snapshot) return null
   return {
     id: 'dogfight-spectator-battle',
+    mode: 'CASUAL',
     dogType: snapshot.dogType,
     luckyNumber: snapshot.luckyNumber,
     wins: snapshot.wins,
@@ -1735,6 +1841,7 @@ function battleToRun(battle: Battle | null): Run | null {
     refreshCost: 1,
     matchedGhost: null,
     lastBattle: null,
+    ladderSettlement: null,
     items: snapshot.items,
   }
 }
@@ -1879,6 +1986,7 @@ function ApexSnapshotDetails({ entry }: { entry: ApexEntry }) {
   const bag = entry.items.filter((item) => item.area === 'BAG')
   const apexTipRun: Run = {
     id: entry.id,
+    mode: 'CASUAL',
     dogType: entry.dogType,
     luckyNumber: entry.luckyNumber,
     wins: entry.wins,
@@ -1896,6 +2004,7 @@ function ApexSnapshotDetails({ entry }: { entry: ApexEntry }) {
     refreshCost: 1,
     matchedGhost: null,
     lastBattle: null,
+    ladderSettlement: null,
     items: entry.items,
   }
   const setInspectedItemWithAnchor = (item: Item, element: HTMLElement) => {
@@ -1938,6 +2047,151 @@ function ApexSnapshotDetails({ entry }: { entry: ApexEntry }) {
         <p>{entry.relics.length > 0 ? `遗物 ${entry.relics.length} 个` : '没有遗物'} · 背包物品 {bag.length} 个</p>
       </div>
       <FloatingTip run={apexTipRun} item={inspectedItem} offer={null} anchor={tipAnchor} onClose={closeTip} onBuy={null} onSell={null} onUpgrade={null} />
+    </div>
+  )
+}
+
+function LadderHome({ onStart }: { onStart: (choice: { dogType: DogType; luckyNumber?: number }) => void | Promise<void> }) {
+  const [overview, setOverview] = useState<LadderMeResponse | null>(null)
+  const [leaderboard, setLeaderboard] = useState<LadderLeaderboardResponse | null>(null)
+  const [selectedDog, setSelectedDog] = useState<DogType>('SHIBA')
+  const [luckyNumber, setLuckyNumber] = useState(1)
+  const slots = Array.from({ length: DOG_SELECTION_SLOT_COUNT }, (_, index) => dogOptions[index] ?? null)
+
+  useEffect(() => {
+    let cancelled = false
+    Promise.all([
+      api<LadderMeResponse>('/ladder/me'),
+      api<LadderLeaderboardResponse>('/ladder/leaderboard'),
+    ]).then(([me, board]) => {
+      if (cancelled) return
+      setOverview(me)
+      setLeaderboard(board)
+    }).catch(() => undefined)
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const profile = overview?.profile
+  const progress = profile
+    ? profile.tier === 'MASTER' || profile.tier === 'DOG_KING'
+      ? Math.min(100, Math.round((profile.score / 500) * 100))
+      : Math.min(100, profile.score)
+    : 0
+  const startRun = () => {
+    onStart(selectedDog === 'EMPEROR' ? { dogType: selectedDog, luckyNumber } : { dogType: selectedDog })
+  }
+
+  return (
+    <section className="ladder-screen">
+      <div className="screen-heading centered">
+        <h2>天梯模式</h2>
+        <p>12 胜或 5 败结算积分，低段位更宽松，高段位按犬王积分榜竞争。</p>
+      </div>
+      <div className="ladder-layout">
+        <section className="ladder-panel paper-card">
+          <div className="section-title">
+            <div>
+              <h3>当前段位</h3>
+              <p>{profile ? `${profile.gamesPlayed} 局 · ${profile.totalWins}胜 ${profile.totalLosses}败` : '读取天梯资料中'}</p>
+            </div>
+            <Medal size={22} />
+          </div>
+          <strong className="ladder-rank">{profile ? profile.tierLabel : '青铜'}</strong>
+          <div className="ladder-progress" aria-label="天梯积分进度">
+            <i style={{ width: `${progress}%` }} />
+          </div>
+          <p>{profile ? `${profile.score} 分${profile.tier === 'MASTER' ? ' / 500 晋级犬王' : profile.tier === 'DOG_KING' ? ' · 犬王积分' : ' / 100 LP'}` : '0 / 100 LP'}</p>
+        </section>
+
+        <section className="ladder-panel paper-card">
+          <div className="section-title">
+            <div>
+              <h3>犬王积分榜</h3>
+              <p>{leaderboard?.playerRank ? `你的犬王排名：第 ${leaderboard.playerRank} 名` : '进入犬王后参与排名'}</p>
+            </div>
+            <Crown size={22} />
+          </div>
+          <div className="ladder-board">
+            {(leaderboard?.leaderboard ?? []).slice(0, 5).map((entry) => (
+              <div key={`${entry.rank}-${entry.name}`} className="ladder-row">
+                <span>{entry.title}</span>
+                <strong>{entry.name}</strong>
+                <b>{entry.profile.score}</b>
+              </div>
+            ))}
+            {leaderboard && leaderboard.leaderboard.length === 0 && <p className="apex-empty">还没有犬王，先冲上大师 500 分。</p>}
+          </div>
+        </section>
+      </div>
+
+      <section className="ladder-start paper-card">
+        <div className="section-title">
+          <div>
+            <h3>选择天梯狗狗</h3>
+            <p>开始天梯会进入独立匹配池，并按整局表现结算。</p>
+          </div>
+          <Trophy size={22} />
+        </div>
+        <div className="dog-select compact">
+          <div className="dog-card-grid">
+            {slots.map((dog, index) => dog ? (
+              <button className={`dog-card paper-card paper-dog-card ${selectedDog === dog ? 'selected' : ''}`} key={dog} onClick={() => setSelectedDog(dog)}>
+                <span className="dog-art-frame">
+                  <img className="dog-avatar" src={dogAssets[dog]} alt="" />
+                </span>
+                <strong>{dogNames[dog]}</strong>
+                <small>{dogTraits[dog]}</small>
+              </button>
+            ) : (
+              <div className="dog-card placeholder paper-card paper-dog-card" key={`ladder-dog-placeholder-${index}`} aria-hidden="true" />
+            ))}
+          </div>
+          <aside className="dog-detail-panel paper-card">
+            <span className="dog-detail-art">
+              <img className="dog-avatar large" src={dogAssets[selectedDog]} alt="" />
+            </span>
+            <h2>{dogNames[selectedDog]}</h2>
+            <p>{dogStrategies[selectedDog]}</p>
+            {selectedDog === 'EMPEROR' && (
+              <div className="lucky-number-picker">
+                <strong>幸运数字</strong>
+                <div>
+                  {[1, 2, 3, 4, 5, 6].map((number) => (
+                    <button key={number} type="button" className={luckyNumber === number ? 'selected' : ''} onClick={() => setLuckyNumber(number)}>{number}</button>
+                  ))}
+                </div>
+              </div>
+            )}
+            <button className="primary action-button" onClick={startRun}>开始天梯</button>
+          </aside>
+        </div>
+      </section>
+
+      {overview && overview.recentSettlements.length > 0 && (
+        <section className="ladder-panel paper-card">
+          <div className="section-title">
+            <div>
+              <h3>最近结算</h3>
+              <p>积分变化按整局胜败统一计算。</p>
+            </div>
+          </div>
+          <div className="ladder-board">
+            {overview.recentSettlements.map((settlement) => <LadderSettlementLine key={settlement.id} settlement={settlement} />)}
+          </div>
+        </section>
+      )}
+    </section>
+  )
+}
+
+function LadderSettlementLine({ settlement }: { settlement: LadderSettlement }) {
+  return (
+    <div className="ladder-row settlement">
+      <span>{settlement.wins}胜{settlement.losses}败</span>
+      <strong>{ladderTierLabel[settlement.beforeTier]} {settlement.beforeScore} → {ladderTierLabel[settlement.afterTier]} {settlement.afterScore}</strong>
+      <b className={settlement.delta >= 0 ? 'gain' : 'loss'}>{settlement.delta >= 0 ? '+' : ''}{settlement.delta}</b>
     </div>
   )
 }
@@ -2519,6 +2773,20 @@ function FloatingTip({ run, item, offer, anchor, onClose, onBuy, onSell, onUpgra
   )
 }
 
+function ForfeitRunAction({ run, onForfeit }: { run: Run; onForfeit: () => void }) {
+  return (
+    <section className="forfeit-run-action paper-card" aria-label="放弃并结算当前跑局">
+      <div>
+        <strong>当前 {run.wins} 胜 {run.losses} 败</strong>
+        <span>放弃后立即按当前记录结算，不会额外增加失败。</span>
+      </div>
+      <button className="danger-button action-button" type="button" onClick={onForfeit}>
+        <Flag size={18} /> 放弃并结算
+      </button>
+    </section>
+  )
+}
+
 function BattleView({ run, battle, currentEvent, eventIndex, speed, score, onSpeed, onContinue, onRestart }: { run: Run; battle: Battle | null; currentEvent?: BattleEvent; eventIndex: number; speed: number; score: number; onSpeed: (speed: number) => void; onContinue: () => void; onRestart: () => void }) {
   const [logOpen, setLogOpen] = useState(false)
   const [battleTip, setBattleTip] = useState<{ item: Item; anchor: TipAnchor } | null>(null)
@@ -2583,13 +2851,14 @@ function BattleView({ run, battle, currentEvent, eventIndex, speed, score, onSpe
         />
       )}
 
-      {run.phase === 'COMPLETE' ? (
-        <div className="result handdrawn-result paper-card">
-          <Trophy size={32} />
-          <h2>跑局结束</h2>
-          <p>{run.wins} 胜 / {run.losses} 败 · 积分 {score}</p>
-          <button className="primary action-button" onClick={onRestart}>重新选择狗狗</button>
-        </div>
+       {run.phase === 'COMPLETE' ? (
+         <div className="result handdrawn-result paper-card">
+           <Trophy size={32} />
+           <h2>跑局结束</h2>
+           <p>{run.wins} 胜 / {run.losses} 败 · 积分 {score}</p>
+           {run.ladderSettlement && <LadderSettlementSummary settlement={run.ladderSettlement} />}
+           <button className="primary action-button" onClick={onRestart}>重新选择狗狗</button>
+         </div>
       ) : run.phase === 'BATTLE' && isFinished && (
         <div className="battle-continue-row">
           <button className="primary action-button" onClick={onContinue}>
@@ -2600,6 +2869,22 @@ function BattleView({ run, battle, currentEvent, eventIndex, speed, score, onSpe
 
       <CollapsedBattleLog events={events} eventIndex={displayIndex} open={logOpen} onToggle={() => setLogOpen((value) => !value)} />
     </section>
+  )
+}
+
+function LadderSettlementSummary({ settlement }: { settlement: LadderSettlement }) {
+  return (
+    <div className="ladder-formula">
+      <strong>{ladderTierLabel[settlement.beforeTier]} {settlement.beforeScore} → {ladderTierLabel[settlement.afterTier]} {settlement.afterScore}</strong>
+      <p>
+        基础 {settlement.baseScore >= 0 ? `+${settlement.baseScore}` : settlement.baseScore}
+        {' '} - 段位税 {settlement.tierTax}
+        {' '} - 败场 {settlement.lossPenalty}
+        {settlement.perfectBonus > 0 ? ` + 完美 ${settlement.perfectBonus}` : ''}
+        {settlement.newbieProtection > 0 ? ` + 新手保护 ${settlement.newbieProtection}` : ''}
+        {' '} = {settlement.delta >= 0 ? `+${settlement.delta}` : settlement.delta}
+      </p>
+    </div>
   )
 }
 

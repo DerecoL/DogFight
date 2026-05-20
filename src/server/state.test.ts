@@ -71,6 +71,7 @@ describe('player run history', () => {
     const history = publicRunHistory([
       {
         id: 'active-run',
+        mode: 'CASUAL',
         dogType: 'SHIBA',
         luckyNumber: null,
         wins: 2,
@@ -85,6 +86,7 @@ describe('player run history', () => {
       },
       {
         id: 'best-run',
+        mode: 'CASUAL',
         dogType: 'EMPEROR',
         luckyNumber: 6,
         wins: 12,
@@ -97,6 +99,7 @@ describe('player run history', () => {
       },
       {
         id: 'abandoned-run',
+        mode: 'CASUAL',
         dogType: 'MUTT',
         luckyNumber: null,
         wins: 1,
