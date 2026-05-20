@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { resolveWinnerByHealthPercent, simulateBattle } from './game/battle'
-import { CLASS_REWARD_DEFS, DOGS, RELIC_DEFS, itemDef, itemDefForQuality, shopPool } from './game/data'
+import { CLASS_REWARD_DEFS, DOGS, RELIC_DEFS, TERM_DEFS, itemDef, itemDefForQuality, shopPool } from './game/data'
 import { canPlace, findSlot, triggerOrder } from './game/grid'
 import { createRng } from './game/rng'
 import { createShop, itemPurchaseValue, itemSellValue } from './game/shop'
@@ -244,6 +244,10 @@ describe('dog and item definitions', () => {
     expect(itemDefForQuality('v4-growing-chew-sword', 'DIAMOND').description).toContain('初始造成 3 点伤害')
     expect(itemDefForQuality('v4-growing-chew-sword', 'DIAMOND').description).toContain('后续伤害 +7')
   })
+
+  it('describes thorns as two reflected damage per stack', () => {
+    expect(TERM_DEFS.find((term) => term.term === '荆棘')?.description).toContain('造成2点伤害')
+  })
 })
 
 describe('battle simulation', () => {
@@ -257,6 +261,39 @@ describe('battle simulation', () => {
       && event.defId === 'v4-reverse-fur-comb'
     )
   }
+
+  it('reflects two damage per thorn stack when attacked', () => {
+    const player: FighterSnapshot = {
+      name: 'P',
+      dogType: 'MUTT',
+      wins: 0,
+      losses: 0,
+      round: 0,
+      items: [
+        { id: 'hit', defId: 'starter-1', quality: 'BRONZE', area: 'EQUIPMENT', x: 0, y: 0 },
+      ],
+    }
+    const opponent: FighterSnapshot = {
+      name: 'O',
+      dogType: 'MUTT',
+      wins: 0,
+      losses: 0,
+      round: 0,
+      items: [],
+      relics: [openingThornsRelic],
+    }
+
+    const result = simulateBattle(player, opponent, 'thorn-0')
+    const thorn = result.events.find((event) => event.text.includes('【荆棘】反弹'))
+
+    expect(thorn).toMatchObject({
+      effectType: 'DAMAGE',
+      amount: 10,
+      target: 'player',
+      sourceHpDelta: -10,
+    })
+    expect(thorn?.text).toContain('反弹 10 点伤害')
+  })
 
   it('reverse fur comb silver purges enemy thorns first and heals by removed layers', () => {
     const player: FighterSnapshot = {
