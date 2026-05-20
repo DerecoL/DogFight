@@ -3,6 +3,123 @@ import { simulateBattle } from './game/battle'
 import type { FighterSnapshot } from './game/types'
 
 describe('missing equipment effect regressions', () => {
+  it('makes absolute zero freeze stop enemy rolls for two seconds', () => {
+    const player: FighterSnapshot = {
+      name: 'P',
+      dogType: 'SAMOYED',
+      wins: 0,
+      losses: 0,
+      round: 8,
+      relics: [{ id: 'big-only', relicId: 'half-die-left', quality: 'SILVER', slot: 0 }],
+      items: [
+        { id: 'zero', defId: 'samoyed-absolute-zero', quality: 'DIAMOND', area: 'EQUIPMENT', x: 0, y: 0 },
+      ],
+    }
+    const opponent: FighterSnapshot = {
+      name: 'O',
+      dogType: 'SHIBA',
+      wins: 0,
+      losses: 0,
+      round: 8,
+      items: [
+        { id: 'bite', defId: 'starter-1', quality: 'BRONZE', area: 'EQUIPMENT', x: 0, y: 0 },
+      ],
+    }
+    const result = simulateBattle(player, opponent, 'freeze-audit')
+    const freezeEvent = result.events.find((event) => event.kind === 'ITEM' && event.itemId === 'zero')
+    const enemyRollsDuringFreeze = result.events.filter(
+      (event) => event.kind === 'ROLL' && event.actor === 'opponent' && event.time >= 10 && event.time < 12,
+    )
+
+    expect(freezeEvent).toMatchObject({ time: 10, target: 'opponent', amount: 2 })
+    expect(enemyRollsDuringFreeze).toEqual([])
+  })
+
+  it('makes bully demolish disable each enemy large item once', () => {
+    const player: FighterSnapshot = {
+      name: 'P',
+      dogType: 'BULLY',
+      wins: 0,
+      losses: 0,
+      round: 8,
+      items: [
+        { id: 'large', defId: 'giant-bone', quality: 'BRONZE', area: 'EQUIPMENT', x: 0, y: 0 },
+        { id: 'demolish', defId: 'bully-demolish', quality: 'DIAMOND', area: 'EQUIPMENT', x: 4, y: 0 },
+      ],
+    }
+    const opponent: FighterSnapshot = {
+      name: 'O',
+      dogType: 'SHIBA',
+      wins: 0,
+      losses: 0,
+      round: 8,
+      items: [
+        { id: 'opp-a', defId: 'dog-house', quality: 'BRONZE', area: 'EQUIPMENT', x: 0, y: 0 },
+        { id: 'opp-b', defId: 'dog-house', quality: 'BRONZE', area: 'EQUIPMENT', x: 4, y: 0 },
+      ],
+    }
+    const result = simulateBattle(player, opponent, 'plain-10')
+    const firstEnemyLargeTriggers = result.events.filter(
+      (event) => event.kind === 'ITEM' && event.actor === 'opponent' && event.time === 2,
+    )
+
+    expect(firstEnemyLargeTriggers.map((event) => event.itemId)).toEqual(['opp-a', 'opp-b'])
+    expect(firstEnemyLargeTriggers.every((event) => event.amount === 0 && event.target === 'none')).toBe(true)
+  })
+
+  it('makes lucky foxtail safety trigger on the roll after the configured empty-roll streak', () => {
+    const player: FighterSnapshot = {
+      name: 'P',
+      dogType: 'SHIBA',
+      wins: 0,
+      losses: 0,
+      round: 8,
+      relics: [{ id: 'foxtail', relicId: 'v3-lucky-foxtail', quality: 'GOLD', slot: 0 }],
+      items: [
+        { id: 'large', defId: 'giant-bone', quality: 'BRONZE', area: 'EQUIPMENT', x: 0, y: 0 },
+      ],
+    }
+    const opponent: FighterSnapshot = { name: 'O', dogType: 'SHIBA', wins: 0, losses: 0, round: 8, items: [] }
+    const result = simulateBattle(player, opponent, 'lucky-foxtail')
+    const firstSafetyTrigger = result.events.find((event) => event.kind === 'ITEM' && event.actor === 'player')
+
+    expect(firstSafetyTrigger).toMatchObject({ time: 3, itemId: 'large', roll: 3 })
+  })
+
+  it('makes chase tail increase damage during consecutive extra rolls', () => {
+    const starters: FighterSnapshot['items'] = [1, 2, 3, 4, 5, 6].map((n, index) => ({
+      id: `bite-${n}`,
+      defId: `starter-${n}`,
+      quality: 'BRONZE',
+      area: 'EQUIPMENT',
+      x: index,
+      y: 0,
+    }))
+    const player: FighterSnapshot = {
+      name: 'P',
+      dogType: 'MUTT',
+      wins: 0,
+      losses: 0,
+      round: 8,
+      items: [
+        ...starters,
+        { id: 'counter', defId: 'mutt-counting-collar', quality: 'GOLD', area: 'EQUIPMENT', x: 6, y: 0 },
+        { id: 'tail', defId: 'mutt-chase-tail', quality: 'DIAMOND', area: 'EQUIPMENT', x: 8, y: 0 },
+      ],
+    }
+    const opponent: FighterSnapshot = { name: 'O', dogType: 'SHIBA', wins: 0, losses: 0, round: 8, items: [] }
+    const result = simulateBattle(player, opponent, 'mutt-tail-boost')
+    const timeFourDamage = result.events.filter(
+      (event) => event.kind === 'ITEM' && event.actor === 'player' && event.time === 4 && event.effectType === 'DAMAGE',
+    )
+
+    expect(timeFourDamage.map((event) => [event.itemId, event.amount])).toEqual([
+      ['bite-5', 5],
+      ['bite-6', 6],
+      ['bite-1', 6],
+    ])
+  })
+
   it('lets bully gym trigger a non-large item when a large item triggers', () => {
     const player: FighterSnapshot = {
       name: 'P',

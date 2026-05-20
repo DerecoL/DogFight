@@ -75,7 +75,8 @@ type BattleSideState = {
   missedLucky: number
   avalanche: number
   avalancheDamage: number
-  freeze: number
+  freezeStacks: number
+  frozenUntil: number
   disabledLarge: number
   disabledItemIds: string[]
   adjacentDamageBonus: Record<string, number>
@@ -102,7 +103,8 @@ function createSideState(maxHp: number): BattleSideState {
     missedLucky: 0,
     avalanche: 0,
     avalancheDamage: 50,
-    freeze: 0,
+    freezeStacks: 0,
+    frozenUntil: 0,
     disabledLarge: 0,
     disabledItemIds: [],
     adjacentDamageBonus: {},
@@ -260,8 +262,9 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
     return state[side].poison + (poisonBonusRelic ? relicPoisonTickBonus(poisonBonusRelic.relicId, poisonBonusRelic.quality) : 0)
   }
 
-  const statusRows = (side: Side): BattleStatusRows => {
+  const statusRows = (side: Side, time = 0): BattleStatusRows => {
     const disabledCount = state[side].disabledLarge + state[side].disabledItemIds.length
+    const frozenRemaining = Math.max(0, state[side].frozenUntil - time)
     return {
       positive: [
         ...(state[side].shield > 0 ? [{ type: 'shield' as const, label: '护盾', tone: 'positive' as const, amount: Math.round(state[side].shield) }] : []),
@@ -271,7 +274,7 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
       negative: [
         ...(state[side].poison > 0 ? [{ type: 'poison' as const, label: '中毒', tone: 'negative' as const, stacks: state[side].poison, nextTickIn: 1, tickDamage: poisonTickDamage(side) }] : []),
         ...(state[side].weak > 0 ? [{ type: 'weak' as const, label: '虚弱', tone: 'negative' as const, stacks: state[side].weak }] : []),
-        ...(state[side].freeze > 0 ? [{ type: 'freeze' as const, label: '冻结', tone: 'negative' as const, remaining: state[side].freeze }] : []),
+        ...(frozenRemaining > 0 ? [{ type: 'freeze' as const, label: '冻结', tone: 'negative' as const, remaining: roundBattleTime(frozenRemaining) }] : []),
         ...(disabledCount > 0 ? [{ type: 'disabled' as const, label: '失效', tone: 'negative' as const, amount: disabledCount }] : []),
       ],
     }
@@ -286,8 +289,8 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
       opponentMaxHp: state.opponent.maxHp,
       playerShield: Math.max(0, state.player.shield),
       opponentShield: Math.max(0, state.opponent.shield),
-      playerStatuses: statusRows('player'),
-      opponentStatuses: statusRows('opponent'),
+      playerStatuses: statusRows('player', event.time),
+      opponentStatuses: statusRows('opponent', event.time),
     })
   }
 
@@ -370,6 +373,7 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
     queue: TriggerQueueEntry[],
     processed: { count: number; capped: boolean; extraRollRequests: number },
     extra: boolean,
+    extraDepth: number,
     allowExtraRollFanout: boolean,
   ): ItemTrigger[] => {
     const targetSide = opponentOf(actorSide)
@@ -384,8 +388,9 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
     const sacrificeReplacesSmallEffect = def.size === 1
       && triggerOrder(actor.items).some((entry) => itemDef(entry.defId).advancedEffect === 'SMALL_TRIGGERS_LARGE')
 
-    if (actorState.disabledItemIds.includes(item.id)) {
-      actorState.disabledItemIds = actorState.disabledItemIds.filter((id) => id !== item.id)
+    const disabledItemIndex = actorState.disabledItemIds.indexOf(item.id)
+    if (disabledItemIndex >= 0) {
+      actorState.disabledItemIds.splice(disabledItemIndex, 1)
       triggers.push({
         itemId: item.id,
         defId: item.defId,
@@ -432,7 +437,12 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
     const doubled = bullyDoubled || emperorDoubled
     const multiplier = bullyQuad ? 4 : doubled ? 2 : 1
     const traitText = bullyQuad ? '（恶霸4倍翻倍）' : bullyDoubled ? '（恶霸翻倍）' : emperorDoubled ? '（狗皇帝幸运翻倍）' : ''
-    let amount = roundScaled(qualityAmountFrom(def.effect.amount, quality, def.effect.qualityBase) * multiplier, scale * globalEffectScale(actor))
+    const extraRollDamageScale = extra && hasEquippedEffect(actor, 'EXTRA_ROLL_RECURSE') ? 1 + extraDepth * 0.1 : 1
+    const baseAmount = qualityAmountFrom(def.effect.amount, quality, def.effect.qualityBase) * multiplier
+    const scaledBaseAmount = (def.effect.type === 'DAMAGE' || def.effect.type === 'DAMAGE_SELF_SHIELD')
+      ? baseAmount * extraRollDamageScale
+      : baseAmount
+    let amount = roundScaled(scaledBaseAmount, scale * globalEffectScale(actor))
     const damageBonus = actorState.adjacentDamageBonus[item.id] ?? 0
     if (damageBonus > 0 && (def.effect.type === 'DAMAGE' || def.effect.type === 'DAMAGE_SELF_SHIELD')) {
       amount += damageBonus
@@ -482,10 +492,12 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
         })
       }
       if (actor.dogType === 'BULLY' && isLarge(def, actor) && triggerOrder(actor.items).some((entry) => itemDef(entry.defId).advancedEffect === 'DISABLE_ENEMY_LARGE')) {
-        targetState.disabledLarge += 1
+        for (const targetItem of triggerOrder(targetFighter.items).filter((entry) => isLarge(itemDef(entry.defId), targetFighter))) {
+          targetState.disabledItemIds.push(targetItem.id)
+        }
       }
       if (advanced === 'TARGET_WEAK_BONUS_DAMAGE' && targetState.weak > 0) {
-        const bonus = qualityAmount(4, quality)
+        const bonus = roundScaled(qualityAmount(4, quality) * extraRollDamageScale, scale * globalEffectScale(actor))
         const bonusResult = applyDirectHealthDamage(targetSide, bonus)
         triggers.push({
           itemId: item.id,
@@ -581,17 +593,17 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
       actorState.avalanche += 1
       if (actorState.avalanche >= 5) {
         actorState.avalanche = 0
-        const damage = qualityAmount(actorState.avalancheDamage, quality)
+        const damage = roundScaled(qualityAmount(actorState.avalancheDamage, quality) * extraRollDamageScale, scale * globalEffectScale(actor))
         actorState.avalancheDamage *= 2
         const result = applyDamage(targetSide, damage)
         triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'DAMAGE', amount: damage, target: targetSide, sourceHp: getHp(actorSide), targetHp: result.after, sourceHpDelta: 0, targetHpDelta: result.delta, roll, text: `${itemName(def, quality)} 引发雪崩，造成 ${damage} 点伤害` })
       }
     }
     if (!sacrificeReplacesSmallEffect && advanced === 'FREEZE_STACK' && roll >= 4) {
-      actorState.freeze += 1
-      if (actorState.freeze >= 10) {
-        actorState.freeze = 0
-        targetState.weak += 2
+      actorState.freezeStacks += 1
+      if (actorState.freezeStacks >= 10) {
+        actorState.freezeStacks = 0
+        targetState.frozenUntil = Math.max(targetState.frozenUntil, time + 2)
         triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'UTILITY', amount: 2, target: targetSide, sourceHp: getHp(actorSide), targetHp: getHp(targetSide), sourceHpDelta: 0, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 冻结敌人 2 秒` })
       }
     }
@@ -674,7 +686,7 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
     return triggers
   }
 
-  const resolveActor = (time: number, actorSide: Side, extra = false) => {
+  const resolveActor = (time: number, actorSide: Side, extra = false, extraDepth = 0) => {
     const fighter = actorSide === 'player' ? player : opponent
     const fighterState = state[actorSide]
     let roll = rollDog(fighter.dogType, rng)
@@ -701,13 +713,16 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
 
     const initialQueue = triggerOrder(fighter.items).filter((item) => matchingContext(fighter, item, roll, fighterState.forcedItemDice).matches)
     if (hasEquippedEffect(fighter, 'ONLY_LUCKY_DOUBLE') && fighter.luckyNumber !== roll) initialQueue.length = 0
-    if (initialQueue.length === 0) fighterState.emptyRolls += 1
-    else fighterState.emptyRolls = 0
     const emptyRollSafety = relicWithEffect(fighter, 'EMPTY_ROLL_LARGE_SAFETY')
-    if (initialQueue.length === 0 && emptyRollSafety && fighterState.emptyRolls >= relicEmptyRollMisses(emptyRollSafety.relicId, emptyRollSafety.quality)) {
+    const missedBeforeRoll = fighterState.emptyRolls
+    if (initialQueue.length === 0 && emptyRollSafety && missedBeforeRoll >= relicEmptyRollMisses(emptyRollSafety.relicId, emptyRollSafety.quality)) {
       const safety = triggerOrder(fighter.items).find((item) => isLarge(itemDef(item.defId), fighter))
         ?? triggerOrder(fighter.items).find((item) => [2, 3].includes(itemDef(item.defId).size))
       if (safety) initialQueue.push(safety)
+      fighterState.emptyRolls = 0
+    } else if (initialQueue.length === 0) {
+      fighterState.emptyRolls += 1
+    } else {
       fighterState.emptyRolls = 0
     }
     const queuedItems = hasEquippedEffect(fighter, 'ONLY_LUCKY_DOUBLE') && fighter.luckyNumber === roll
@@ -721,7 +736,7 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
       const { item, allowExtraRollFanout } = entry
       const context = matchingContext(fighter, item, roll, fighterState.forcedItemDice)
       processed.count += 1
-      for (const trigger of executeItem(actorSide, fighter, item, time, roll, context.scale, context.note, queue, processed, extra, allowExtraRollFanout)) {
+      for (const trigger of executeItem(actorSide, fighter, item, time, roll, context.scale, context.note, queue, processed, extra, extraDepth, allowExtraRollFanout)) {
         push({
           time,
           actor: actorSide,
@@ -754,14 +769,14 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
 
   const resolveActorChain = (time: number, actorSide: Side, extra = false, allowMuttTrait = false) => {
     const fighter = actorSide === 'player' ? player : opponent
-    let pendingExtraRolls = resolveActor(time, actorSide, extra)
+    let pendingExtraRolls = resolveActor(time, actorSide, extra, extra ? 1 : 0)
     if (allowMuttTrait && fighter.dogType === 'MUTT' && rng() < 0.2) pendingExtraRolls += 1
 
     let resolvedExtraRolls = 0
     while (pendingExtraRolls > 0 && resolvedExtraRolls < EXTRA_ROLL_CHAIN_CAP) {
       pendingExtraRolls -= 1
       resolvedExtraRolls += 1
-      pendingExtraRolls += resolveActor(time, actorSide, true)
+      pendingExtraRolls += resolveActor(time, actorSide, true, resolvedExtraRolls)
     }
 
     if (pendingExtraRolls > 0) {
@@ -869,8 +884,12 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
     if (nextRollTime <= nextSystemTickAt + TIME_EPSILON) {
       for (const actor of ['player', 'opponent'] as const) {
         if (Math.abs(nextRollAt[actor] - time) > TIME_EPSILON) continue
-        resolveActorChain(time, actor, false, true)
-        nextRollAt[actor] = roundBattleTime(time + rollInterval(time, actor))
+        if (state[actor].frozenUntil > time + TIME_EPSILON) {
+          nextRollAt[actor] = roundBattleTime(state[actor].frozenUntil)
+        } else {
+          resolveActorChain(time, actor, false, true)
+          nextRollAt[actor] = roundBattleTime(time + rollInterval(time, actor))
+        }
         if (playerHp <= 0 || opponentHp <= 0) {
           return finish(time, `\u6218\u6597\u7ed3\u675f\uff0c${currentLeadText()}`)
         }
