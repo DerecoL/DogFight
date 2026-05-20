@@ -481,7 +481,7 @@ describe('battle simulation', () => {
     )
 
     expect(hits.slice(0, 5).map((event) => event.amount)).toEqual([1, 4, 7, 10, 13])
-    expect(hits.some((event) => event.amount > 25)).toBe(true)
+    expect(hits.some((event) => (event.amount ?? 0) > 25)).toBe(true)
     expect(growthEvents.slice(0, 3).map((event) => event.amount)).toEqual([3, 3, 3])
   })
 
