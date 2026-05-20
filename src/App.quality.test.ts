@@ -18,10 +18,12 @@ describe('item quality upgrade UI', () => {
 
   it('surfaces click and drag upgrade controls for duplicate items', () => {
     expect(app).toContain('canUpgradeItem')
+    expect(app).toContain('canUpgradeDrop')
     expect(app).toContain('upgradeItem')
     expect(app).toContain("api(`/runs/${run.id}/items/upgrade`")
     expect(app).toContain('targetItemId')
     expect(app).toContain('UPGRADE_ITEM:')
+    expect(app).toContain('moveItem(itemId, targetItem.area, targetItem.x, targetItem.y)')
     expect(app).toContain('upgrade-indicator')
     expect(app).toContain('升级')
   })

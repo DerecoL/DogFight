@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { SHOP_CHOICES, shopPool } from './data'
-import { normalizeQuality } from './quality'
+import { ITEM_QUALITIES, normalizeQuality } from './quality'
 import { pick } from './rng'
 import type { ItemDef, ItemQuality, ShopOffer, ShopType } from './types'
 
@@ -12,8 +12,21 @@ const QUALITY_PRICE_MULTIPLIER: Record<ItemQuality, number> = {
 }
 
 function shopPrice(def: ItemDef, discount: number) {
-  const quality = normalizeQuality(def.defaultQuality)
-  return Math.max(1, Math.floor(def.price * QUALITY_PRICE_MULTIPLIER[quality] * discount))
+  return Math.max(1, Math.floor(itemPurchaseValue(def) * discount))
+}
+
+export function itemPurchaseValue(def: ItemDef, quality: ItemQuality = normalizeQuality(def.defaultQuality)) {
+  const currentQuality = normalizeQuality(quality)
+  const defaultQuality = normalizeQuality(def.defaultQuality)
+  const currentIndex = ITEM_QUALITIES.indexOf(currentQuality)
+  const defaultIndex = ITEM_QUALITIES.indexOf(defaultQuality)
+  const basePurchaseValue = def.price * QUALITY_PRICE_MULTIPLIER[defaultQuality]
+  if (currentIndex <= defaultIndex) return Math.floor(def.price * QUALITY_PRICE_MULTIPLIER[currentQuality])
+  return Math.floor(basePurchaseValue * (2 ** (currentIndex - defaultIndex)))
+}
+
+export function itemSellValue(def: ItemDef, quality?: ItemQuality | string | null) {
+  return Math.floor(itemPurchaseValue(def, normalizeQuality(quality ?? def.defaultQuality)) / 2)
 }
 
 export function createShop(type: ShopType, rng: () => number, round = 0): ShopOffer[] {

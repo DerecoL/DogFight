@@ -3,7 +3,7 @@ import { resolveWinnerByHealthPercent, simulateBattle } from './game/battle'
 import { CLASS_REWARD_DEFS, DOGS, RELIC_DEFS, itemDef, shopPool } from './game/data'
 import { canPlace, findSlot, triggerOrder } from './game/grid'
 import { createRng } from './game/rng'
-import { createShop } from './game/shop'
+import { createShop, itemPurchaseValue, itemSellValue } from './game/shop'
 import type { FighterSnapshot, GameItem, RelicInstance } from './game/types'
 
 function baseItems(): GameItem[] {
@@ -96,6 +96,16 @@ describe('shop generation', () => {
     expect(offer.defId).toBe('v3-golden-kennel')
     expect(offer.quality).toBe('DIAMOND')
     expect(offer.price).toBe(72)
+  })
+
+  it('values upgraded equipment by its total synthesis purchase cost before selling at half', () => {
+    const smallBite = itemDef('small-bite')
+
+    expect(itemPurchaseValue(smallBite, 'BRONZE')).toBe(3)
+    expect(itemPurchaseValue(smallBite, 'SILVER')).toBe(6)
+    expect(itemPurchaseValue(smallBite, 'GOLD')).toBe(12)
+    expect(itemPurchaseValue(smallBite, 'DIAMOND')).toBe(24)
+    expect(itemSellValue(smallBite, 'DIAMOND')).toBe(12)
   })
 })
 

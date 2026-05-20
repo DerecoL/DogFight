@@ -41,9 +41,10 @@ describe('item detail tooltip interactions', () => {
   })
 
   it('shows the sell value next to the sell action for inspected items', () => {
-    expect(app).toContain('function sellValueForItem(def: ItemDef)')
-    expect(app).toContain("def.tags.includes('starter') ? 1 : Math.floor(def.price / 2)")
-    expect(app).toContain('const sellValue = item ? sellValueForItem(item.def) : null')
+    expect(app).toContain('function purchaseValueForItem(def: ItemDef, quality: ItemQuality = normalizeQuality(def.defaultQuality))')
+    expect(app).toContain('function sellValueForItem(item: Item)')
+    expect(app).toContain('Math.floor(purchaseValueForItem(item.def, item.quality) / 2)')
+    expect(app).toContain('const sellValue = item ? sellValueForItem(item) : null')
     expect(app).toContain('出售 +{sellValue}')
   })
 })

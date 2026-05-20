@@ -260,6 +260,30 @@ async function defaultMockApiScript(buildId = new Date().toISOString().replace(/
     return null;
   }
 
+  function coveredItems(items, moving) {
+    const width = defs[moving.defId]?.width || 1;
+    return items
+      .filter((item) => {
+        if (item.id === moving.id || item.area !== moving.area || item.y !== moving.y) return false;
+        const otherWidth = defs[item.defId]?.width || 1;
+        return moving.x < item.x + otherWidth && item.x < moving.x + width;
+      })
+      .sort((a, b) => (a.x - b.x) || (a.y - b.y));
+  }
+
+  function replacementBagMoves(items, moving, covered) {
+    const coveredIds = new Set(covered.map((item) => item.id));
+    const staged = items.filter((item) => item.id !== moving.id && !coveredIds.has(item.id));
+    const moves = [];
+    for (const item of covered) {
+      const slot = findSlot(staged, item.defId, 'BAG');
+      if (!slot) return null;
+      moves.push({ item, ...slot });
+      staged.push({ ...item, area: 'BAG', ...slot });
+    }
+    return moves;
+  }
+
   async function parseBody(options) {
     if (!options?.body) return {};
     if (typeof options.body === 'string') return JSON.parse(options.body || '{}');
@@ -453,7 +477,10 @@ async function defaultMockApiScript(buildId = new Date().toISOString().replace(/
       if (!offer) return error('商品不存在', 404);
       if (run.gold < offer.price) return error('金币不足');
       const offerQuality = normalizeQuality(offer.quality);
-      const upgradeTarget = run.items.find((entry) => entry.defId === offer.defId && normalizeQuality(entry.quality) === offerQuality && nextQuality(entry.quality));
+      const slot = findSlot(run.items, offer.defId, body.area || 'BAG', typeof equipmentWidthForRun === 'function' ? equipmentWidthForRun(run) : 12);
+      const upgradeTarget = !slot && (body.area || 'BAG') === 'BAG'
+        ? run.items.find((entry) => entry.defId === offer.defId && normalizeQuality(entry.quality) === offerQuality && nextQuality(entry.quality))
+        : null;
       if (upgradeTarget) {
         upgradeTarget.quality = nextQuality(upgradeTarget.quality);
         run.gold -= offer.price;
@@ -461,7 +488,6 @@ async function defaultMockApiScript(buildId = new Date().toISOString().replace(/
         saveState(state);
         return json({ run: publicRun(run) });
       }
-      const slot = findSlot(run.items, offer.defId, body.area || 'BAG', typeof equipmentWidthForRun === 'function' ? equipmentWidthForRun(run) : 12);
       if (!slot) return error('目标区域空间不足');
       run.gold -= offer.price;
       run.shopItems = run.shopItems.filter((entry) => entry.offerId !== offer.offerId);
@@ -482,6 +508,20 @@ async function defaultMockApiScript(buildId = new Date().toISOString().replace(/
       const item = run.items.find((entry) => entry.id === body.itemId);
       if (!item) return error('道具不存在', 404);
       const candidate = { ...item, area: body.area, x: Number(body.x), y: Number(body.y) };
+      if (!canPlace(run.items, candidate, candidate.area, candidate.x, candidate.y, typeof equipmentWidthForRun === 'function' ? equipmentWidthForRun(run) : 12)) {
+        const equipmentWidth = typeof equipmentWidthForRun === 'function' ? equipmentWidthForRun(run) : 12;
+        const covered = candidate.area === 'EQUIPMENT' ? coveredItems(run.items, candidate) : [];
+        const remaining = run.items.filter((entry) => !covered.some((coveredItem) => coveredItem.id === entry.id));
+        const bagMoves = covered.length > 0 && canPlace(remaining, candidate, candidate.area, candidate.x, candidate.y, equipmentWidth)
+          ? replacementBagMoves(run.items, candidate, covered, equipmentWidth)
+          : null;
+        if (bagMoves) {
+          Object.assign(item, candidate);
+          for (const move of bagMoves) Object.assign(move.item, { area: 'BAG', x: move.x, y: move.y });
+          saveState(state);
+          return json({ run: publicRun(run) });
+        }
+      }
       if (!canPlace(run.items, candidate, candidate.area, candidate.x, candidate.y, typeof equipmentWidthForRun === 'function' ? equipmentWidthForRun(run) : 12)) return error('目标位置不可放置');
       Object.assign(item, candidate);
       saveState(state);
@@ -897,6 +937,30 @@ async function currentMockApiScript(buildId) {
     return null;
   }
 
+  function coveredItems(items, moving) {
+    const def = defs[moving.defId] || defs['starter-1'];
+    return items
+      .filter((item) => {
+        if (item.id === moving.id || item.area !== moving.area || item.y !== moving.y) return false;
+        const other = defs[item.defId] || defs['starter-1'];
+        return moving.x < item.x + other.width && item.x < moving.x + def.width;
+      })
+      .sort((a, b) => (a.x - b.x) || (a.y - b.y));
+  }
+
+  function replacementBagMoves(items, moving, covered, equipmentWidth = 12) {
+    const coveredIds = new Set(covered.map((item) => item.id));
+    const staged = items.filter((item) => item.id !== moving.id && !coveredIds.has(item.id));
+    const moves = [];
+    for (const item of covered) {
+      const slot = findSlot(staged, item.defId, 'BAG', equipmentWidth);
+      if (!slot) return null;
+      moves.push({ item, ...slot });
+      staged.push({ ...item, area: 'BAG', ...slot });
+    }
+    return moves;
+  }
+
   function classRewardChoices(dogType, round) {
     return classRewardDefs.filter((item) => item.classDog === dogType && item.unlockRound === round).map((item) => item.id);
   }
@@ -1297,8 +1361,11 @@ async function currentMockApiScript(buildId) {
     if (action === '/shop/buy' && method === 'POST') {
       const offer = run.shopItems.find((entry) => entry.offerId === body.offerId);
       const offerQuality = offer ? normalizeQuality(offer.quality) : 'BRONZE';
+      const availableSlot = offer ? findSlot(run.items, offer.defId, body.area || 'BAG', typeof equipmentWidthForRun === 'function' ? equipmentWidthForRun(run) : 12) : null;
       if (offer && run.gold >= offer.price) {
-        const upgradeTarget = run.items.find((entry) => entry.defId === offer.defId && normalizeQuality(entry.quality) === offerQuality && nextQuality(entry.quality));
+        const upgradeTarget = !availableSlot && (body.area || 'BAG') === 'BAG'
+          ? run.items.find((entry) => entry.defId === offer.defId && normalizeQuality(entry.quality) === offerQuality && nextQuality(entry.quality))
+          : null;
         if (upgradeTarget) {
           upgradeTarget.quality = nextQuality(upgradeTarget.quality);
           run.gold -= offer.price;
@@ -1330,6 +1397,20 @@ async function currentMockApiScript(buildId) {
       const item = run.items.find((entry) => entry.id === body.itemId);
       if (!item) return error('道具不存在', 404);
       const candidate = { ...item, area: body.area, x: Number(body.x), y: Number(body.y) };
+      if (!canPlace(run.items, candidate, candidate.area, candidate.x, candidate.y, typeof equipmentWidthForRun === 'function' ? equipmentWidthForRun(run) : 12)) {
+        const equipmentWidth = typeof equipmentWidthForRun === 'function' ? equipmentWidthForRun(run) : 12;
+        const covered = candidate.area === 'EQUIPMENT' ? coveredItems(run.items, candidate) : [];
+        const remaining = run.items.filter((entry) => !covered.some((coveredItem) => coveredItem.id === entry.id));
+        const bagMoves = covered.length > 0 && canPlace(remaining, candidate, candidate.area, candidate.x, candidate.y, equipmentWidth)
+          ? replacementBagMoves(run.items, candidate, covered, equipmentWidth)
+          : null;
+        if (bagMoves) {
+          Object.assign(item, candidate);
+          for (const move of bagMoves) Object.assign(move.item, { area: 'BAG', x: move.x, y: move.y });
+          saveState(state);
+          return json({ run: publicRun(run) });
+        }
+      }
       if (!canPlace(run.items, candidate, candidate.area, candidate.x, candidate.y, typeof equipmentWidthForRun === 'function' ? equipmentWidthForRun(run) : 12)) return error('目标位置不可放置');
       Object.assign(item, candidate);
       saveState(state);

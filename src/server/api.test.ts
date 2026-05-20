@@ -343,6 +343,33 @@ describeWithDatabase('run API', () => {
     expect(bought.body.run.items.filter((item: { defId: string }) => item.defId === 'small-bite')).toHaveLength(1)
   })
 
+  it('buys a matching shop item into the bag when the bag has room', async () => {
+    const agent = request.agent(app.server)
+    await app.ready()
+
+    await agent.post('/api/auth/register').send({ email: `openbag${Date.now()}@dog.test`, password: 'dogdice' }).expect(200)
+    const created = await agent.post('/api/runs').send({ dogType: 'SHIBA' }).expect(200)
+    const runId = created.body.run.id
+    const offer = { offerId: 'buy-small-bite-copy', defId: 'small-bite', price: 3, discount: 1, quality: 'BRONZE' }
+
+    const owned = await prisma.itemInstance.create({
+      data: { runId, defId: 'small-bite', quality: 'BRONZE', area: 'EQUIPMENT', x: 6, y: 0 },
+    })
+    await prisma.run.update({
+      where: { id: runId },
+      data: { gold: 10, shopItems: JSON.stringify([offer]) },
+    })
+
+    const bought = await agent.post(`/api/runs/${runId}/shop/buy`).send({ offerId: offer.offerId, area: 'BAG' }).expect(200)
+
+    expect(bought.body.run.gold).toBe(7)
+    expect(bought.body.run.shopItems).toEqual([])
+    expect(bought.body.run.items).toHaveLength(created.body.run.items.length + 2)
+    expect(bought.body.run.items.find((item: { id: string }) => item.id === owned.id)).toMatchObject({ quality: 'BRONZE' })
+    expect(bought.body.run.items).toContainEqual(expect.objectContaining({ defId: 'small-bite', quality: 'BRONZE', area: 'BAG', x: 0, y: 0 }))
+    expect(bought.body.run.items.filter((item: { defId: string }) => item.defId === 'small-bite')).toHaveLength(2)
+  })
+
   it('lets fourth-dimensional kennel place one item in the thirteenth equipment slot', async () => {
     const agent = request.agent(app.server)
     await app.ready()
@@ -377,6 +404,26 @@ describeWithDatabase('run API', () => {
       x: 12,
       y: 0,
     })
+  })
+
+  it('replaces covered equipment and moves it into the bag', async () => {
+    const agent = request.agent(app.server)
+    await app.ready()
+
+    await agent.post('/api/auth/register').send({ email: `replace${Date.now()}@dog.test`, password: 'dogdice' }).expect(200)
+    const created = await agent.post('/api/runs').send({ dogType: 'SHIBA' }).expect(200)
+    const runId = created.body.run.id
+    const left = created.body.run.items.find((item: { x: number }) => item.x === 0)
+    const right = created.body.run.items.find((item: { x: number }) => item.x === 1)
+    const moving = await prisma.itemInstance.create({
+      data: { runId, defId: 'spiked-collar', quality: 'BRONZE', area: 'BAG', x: 0, y: 0 },
+    })
+
+    const moved = await agent.post(`/api/runs/${runId}/items/move`).send({ itemId: moving.id, area: 'EQUIPMENT', x: 0, y: 0 }).expect(200)
+
+    expect(moved.body.run.items.find((item: { id: string }) => item.id === moving.id)).toMatchObject({ area: 'EQUIPMENT', x: 0, y: 0 })
+    expect(moved.body.run.items.find((item: { id: string }) => item.id === left.id)).toMatchObject({ area: 'BAG', x: 0, y: 0 })
+    expect(moved.body.run.items.find((item: { id: string }) => item.id === right.id)).toMatchObject({ area: 'BAG', x: 1, y: 0 })
   })
 
   it('rejects upgrades for mismatched, max-quality, or cross-user items', async () => {

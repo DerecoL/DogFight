@@ -362,6 +362,12 @@ const qualityLabel: Record<ItemQuality, string> = {
   GOLD: '黄金',
   DIAMOND: '钻石',
 }
+const qualityPriceMultiplier: Record<ItemQuality, number> = {
+  BRONZE: 1,
+  SILVER: 1.5,
+  GOLD: 2,
+  DIAMOND: 4,
+}
 const DOG_SELECTION_SLOT_COUNT = 8
 const SHOP_CHOICE_SLOT_COUNT = 7
 const BASE_EQUIPMENT_SLOT_COUNT = 12
@@ -528,8 +534,18 @@ function effectText(def: ItemDef, quality: ItemQuality = 'BRONZE') {
   return '特殊效果'
 }
 
-function sellValueForItem(def: ItemDef) {
-  return def.tags.includes('starter') ? 1 : Math.floor(def.price / 2)
+function purchaseValueForItem(def: ItemDef, quality: ItemQuality = normalizeQuality(def.defaultQuality)) {
+  const currentQuality = normalizeQuality(quality)
+  const defaultQuality = normalizeQuality(def.defaultQuality)
+  const currentIndex = qualityOrder.indexOf(currentQuality)
+  const defaultIndex = qualityOrder.indexOf(defaultQuality)
+  const basePurchaseValue = def.price * qualityPriceMultiplier[defaultQuality]
+  if (currentIndex <= defaultIndex) return Math.floor(def.price * qualityPriceMultiplier[currentQuality])
+  return Math.floor(basePurchaseValue * (2 ** (currentIndex - defaultIndex)))
+}
+
+function sellValueForItem(item: Item) {
+  return Math.floor(purchaseValueForItem(item.def, item.quality) / 2)
 }
 
 function maxHealthForRound(round: number) {
@@ -562,6 +578,12 @@ function effectToneText(def: ItemDef) {
 function canUpgradeItem(item: Item, items: Item[]) {
   const quality = normalizeQuality(item.quality)
   return quality !== 'DIAMOND' && items.some((entry) => entry.id !== item.id && entry.defId === item.defId && normalizeQuality(entry.quality) === quality)
+}
+
+function canUpgradeDrop(source: Item | undefined, target: Item | undefined) {
+  if (!source || !target || source.id === target.id) return false
+  const quality = normalizeQuality(source.quality)
+  return quality !== 'DIAMOND' && source.defId === target.defId && normalizeQuality(target.quality) === quality
 }
 
 function parseSlotId(id: string) {
@@ -830,7 +852,13 @@ export default function App() {
     const overId = event.over ? String(event.over.id) : ''
     if (overId.startsWith('UPGRADE_ITEM:')) {
       const targetItemId = overId.slice('UPGRADE_ITEM:'.length)
-      if (targetItemId && targetItemId !== itemId) upgradeItem(itemId, targetItemId)
+      const sourceItem = run?.items.find((item) => item.id === itemId)
+      const targetItem = run?.items.find((item) => item.id === targetItemId)
+      if (canUpgradeDrop(sourceItem, targetItem)) {
+        upgradeItem(itemId, targetItemId)
+      } else if (targetItem && targetItem.id !== itemId) {
+        moveItem(itemId, targetItem.area, targetItem.x, targetItem.y)
+      }
       return
     }
     if (String(event.over?.id) === 'SELL_ZONE' && run?.phase === 'SHOP') {
@@ -1550,7 +1578,13 @@ function DogfightRoomView({ room, onRoomChange, onLeave }: { room: DogfightRoom;
     const overId = event.over ? String(event.over.id) : ''
     if (overId.startsWith('UPGRADE_ITEM:')) {
       const targetItemId = overId.slice('UPGRADE_ITEM:'.length)
-      if (targetItemId && targetItemId !== itemId) upgradeItem(itemId, targetItemId)
+      const sourceItem = run.items.find((item) => item.id === itemId)
+      const targetItem = run.items.find((item) => item.id === targetItemId)
+      if (canUpgradeDrop(sourceItem, targetItem)) {
+        upgradeItem(itemId, targetItemId)
+      } else if (targetItem && targetItem.id !== itemId) {
+        moveItem(itemId, targetItem.area, targetItem.x, targetItem.y)
+      }
       return
     }
     if (String(event.over?.id) === 'SELL_ZONE' && run.phase === 'SHOP') {
@@ -2370,7 +2404,7 @@ function Slot({ id, x, y, title, onClick }: { id: string; x: number; y: number; 
 
 function DraggableItem({ item, selected, dragging, upgradeable, onSelect }: { item: Item; selected: boolean; dragging: boolean; upgradeable: boolean; onSelect: (element: HTMLElement) => void }) {
   const { attributes, listeners, setNodeRef: setDraggableNodeRef } = useDraggable({ id: item.id })
-  const { isOver, setNodeRef: setDropNodeRef } = useDroppable({ id: `UPGRADE_ITEM:${item.id}`, disabled: !upgradeable })
+  const { isOver, setNodeRef: setDropNodeRef } = useDroppable({ id: `UPGRADE_ITEM:${item.id}` })
   const setNodeRef = (node: HTMLElement | null) => {
     setDraggableNodeRef(node)
     setDropNodeRef(node)
@@ -2430,7 +2464,7 @@ function FloatingTip({ run, item, offer, anchor, onClose, onBuy, onSell, onUpgra
   const isOffer = Boolean(offer)
   const quality = normalizeQuality(item?.quality ?? offer?.quality)
   const canAfford = !offer || run.gold >= offer.price
-  const sellValue = item ? sellValueForItem(item.def) : null
+  const sellValue = item ? sellValueForItem(item) : null
   const style = anchor ? { '--tip-x': `${anchor.x}px`, '--tip-y': `${anchor.y}px` } as React.CSSProperties : undefined
   return (
     <aside className="floating-tip paper-card" style={style}>

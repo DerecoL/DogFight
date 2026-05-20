@@ -168,6 +168,42 @@ describe('buildStandaloneIndex', () => {
     }
   })
 
+  test('standalone mock buys a matching shop item into the bag when the bag has room', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'dogfight-standalone-buy-copy-'))
+    try {
+      const distDir = await createMinimalDist(root)
+      const outputFile = path.join(root, 'click-index.html')
+      const launcherFile = path.join(root, 'DogFight-standalone.cmd')
+      await buildStandaloneIndex({ distDir, outputFile, launcherFile })
+
+      const html = await readFile(outputFile, 'utf8')
+      const { window, localStorage, storageKey } = evaluateMockScript(extractMockScript(html))
+      await window.fetch('/api/auth/register', { method: 'POST', body: JSON.stringify({ email: 'copy@dog.test', password: 'dogdice' }) })
+      const created = await readJson(await window.fetch('/api/runs', { method: 'POST', body: JSON.stringify({ dogType: 'SHIBA' }) }))
+      const offer = { offerId: 'buy-small-bite-copy', defId: 'small-bite', price: 3, discount: 1, quality: 'BRONZE' }
+      const state = JSON.parse(localStorage.getItem(storageKey))
+      state.run.gold = 10
+      state.run.shopItems = [offer]
+      state.run.items = [
+        ...state.run.items,
+        { id: 'owned-small-bite', defId: 'small-bite', quality: 'BRONZE', area: 'EQUIPMENT', x: 6, y: 0 },
+      ]
+      localStorage.setItem(storageKey, JSON.stringify(state))
+
+      const boughtResponse = await window.fetch(`/api/runs/${created.run.id}/shop/buy`, { method: 'POST', body: JSON.stringify({ offerId: offer.offerId, area: 'BAG' }) })
+      const bought = await readJson(boughtResponse)
+
+      expect(boughtResponse.status).toBe(200)
+      expect(bought.run.gold).toBe(7)
+      expect(bought.run.shopItems).toEqual([])
+      expect(bought.run.items.find((item) => item.id === 'owned-small-bite')).toMatchObject({ quality: 'BRONZE' })
+      expect(bought.run.items).toContainEqual(expect.objectContaining({ defId: 'small-bite', quality: 'BRONZE', area: 'BAG', x: 0, y: 0 }))
+      expect(bought.run.items.filter((item) => item.defId === 'small-bite')).toHaveLength(2)
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   test('standalone mock lets fourth-dimensional kennel place an item in the thirteenth equipment slot', async () => {
     const root = await mkdtemp(path.join(tmpdir(), 'dogfight-standalone-space-relic-'))
     try {
@@ -199,6 +235,38 @@ describe('buildStandaloneIndex', () => {
 
       expect(movedResponse.status).toBe(200)
       expect(moved.run.items.find((item) => item.id === 'extra')).toMatchObject({ area: 'EQUIPMENT', x: 12, y: 0 })
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  test('standalone mock replaces covered equipment into the bag', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'dogfight-standalone-replace-equipment-'))
+    try {
+      const distDir = await createMinimalDist(root)
+      const outputFile = path.join(root, 'click-index.html')
+      const launcherFile = path.join(root, 'DogFight-standalone.cmd')
+      await buildStandaloneIndex({ distDir, outputFile, launcherFile })
+
+      const html = await readFile(outputFile, 'utf8')
+      const { window, localStorage, storageKey } = evaluateMockScript(extractMockScript(html))
+      await window.fetch('/api/auth/register', { method: 'POST', body: JSON.stringify({ email: 'replace@dog.test', password: 'dogdice' }) })
+      const created = await readJson(await window.fetch('/api/runs', { method: 'POST', body: JSON.stringify({ dogType: 'SHIBA' }) }))
+      const state = JSON.parse(localStorage.getItem(storageKey))
+      state.run.items = [
+        { id: 'left', defId: 'starter-1', quality: 'BRONZE', area: 'EQUIPMENT', x: 0, y: 0 },
+        { id: 'right', defId: 'starter-2', quality: 'BRONZE', area: 'EQUIPMENT', x: 1, y: 0 },
+        { id: 'wide', defId: 'spiked-collar', quality: 'BRONZE', area: 'BAG', x: 0, y: 0 },
+      ]
+      localStorage.setItem(storageKey, JSON.stringify(state))
+
+      const movedResponse = await window.fetch(`/api/runs/${created.run.id}/items/move`, { method: 'POST', body: JSON.stringify({ itemId: 'wide', area: 'EQUIPMENT', x: 0, y: 0 }) })
+      const moved = await readJson(movedResponse)
+
+      expect(movedResponse.status).toBe(200)
+      expect(moved.run.items.find((item) => item.id === 'wide')).toMatchObject({ area: 'EQUIPMENT', x: 0, y: 0 })
+      expect(moved.run.items.find((item) => item.id === 'left')).toMatchObject({ area: 'BAG', x: 0, y: 0 })
+      expect(moved.run.items.find((item) => item.id === 'right')).toMatchObject({ area: 'BAG', x: 1, y: 0 })
     } finally {
       await rm(root, { recursive: true, force: true })
     }

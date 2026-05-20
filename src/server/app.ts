@@ -13,6 +13,7 @@ import { buildApexSeedEntries, resolveApexChallenge, type ApexOpponent } from '.
 import { itemDef, itemDefForQuality, relicDef, relicDefForQuality } from './game/data'
 import { canPlace, findSlot, type PlacementOptions } from './game/grid'
 import { canUpgradePair, nextQuality, normalizeQuality } from './game/quality'
+import { itemSellValue } from './game/shop'
 import { simulateBattle } from './game/battle'
 import { STARTING_GOLD, isTrainingMatchRound } from './game/matchmaking'
 import type { BattleResult, DogType, FighterSnapshot, GameItem, RelicInstance, ShopOffer, ShopType } from './game/types'
@@ -109,6 +110,30 @@ export function buildApp() {
   const placementOptionsForRun = (run: { relics: string }): PlacementOptions => {
     const hasExtraEquipment = relicsFromRun(run).some((relic) => relicDef(relic.relicId).effect === 'EXTRA_EQUIPMENT_REDUCED_EFFECT')
     return hasExtraEquipment ? { equipmentWidth: 13 } : {}
+  }
+
+  const overlappingItems = (items: GameItem[], moving: GameItem, area: GameItem['area'], x: number, y: number) => {
+    const movingDef = itemDef(moving.defId)
+    return items
+      .filter((item) => {
+        if (item.id === moving.id || item.area !== area || item.y !== y) return false
+        const otherDef = itemDef(item.defId)
+        return x < item.x + otherDef.width && item.x < x + movingDef.width
+      })
+      .sort((a, b) => (a.x - b.x) || (a.y - b.y))
+  }
+
+  const replacementBagMoves = (items: GameItem[], moving: GameItem, covered: GameItem[]) => {
+    const coveredIds = new Set(covered.map((item) => item.id))
+    const staged = items.filter((item) => item.id !== moving.id && !coveredIds.has(item.id))
+    const moves: { id: string; x: number; y: number }[] = []
+    for (const item of covered) {
+      const slot = findSlot(staged, item.defId, 'BAG')
+      if (!slot) return null
+      moves.push({ id: item.id, x: slot.x, y: slot.y })
+      staged.push({ ...item, area: 'BAG', x: slot.x, y: slot.y })
+    }
+    return moves
   }
 
   const ensureApexSeeds = async () => {
@@ -354,11 +379,12 @@ export function buildApp() {
     const items = toGameItems(run.items)
     const offerQuality = normalizeQuality(offer.quality)
     const remaining = offers.filter((entry) => entry.offerId !== body.offerId)
-    const upgradeTarget = items.find((entry) =>
+    const slot = findSlot(items, offer.defId, body.area, placementOptionsForRun(run))
+    const upgradeTarget = !slot && body.area === 'BAG' ? items.find((entry) =>
       entry.defId === offer.defId
       && normalizeQuality(entry.quality) === offerQuality
       && nextQuality(entry.quality) !== null
-    )
+    ) : null
     const upgradedQuality = upgradeTarget ? nextQuality(upgradeTarget.quality) : null
     if (upgradeTarget && upgradedQuality) {
       const [, updated] = await prisma.$transaction([
@@ -372,7 +398,6 @@ export function buildApp() {
       return { run: publicRun(updated) }
     }
 
-    const slot = findSlot(items, offer.defId, body.area, placementOptionsForRun(run))
     if (!slot) return reply.code(400).send({ error: '目标区域空间不足' })
     const updated = await prisma.run.update({
       where: { id: run.id },
@@ -394,7 +419,7 @@ export function buildApp() {
     const item = run.items.find((entry) => entry.id === body.itemId)
     if (!item) return reply.code(404).send({ error: '道具不存在' })
     const def = itemDef(item.defId)
-    const sellValue = def.tags.includes('starter') ? 1 : Math.floor(def.price / 2)
+    const sellValue = itemSellValue(def, item.quality)
     await prisma.itemInstance.delete({ where: { id: item.id } })
     const updated = await prisma.run.update({ where: { id: run.id }, data: { gold: run.gold + sellValue }, include: { items: true } })
     return { run: publicRun(updated) }
@@ -409,6 +434,24 @@ export function buildApp() {
     const item = run.items.find((entry) => entry.id === body.itemId)
     if (!item) return reply.code(404).send({ error: '道具不存在' })
     const gameItems = toGameItems(run.items)
+    const moving = { id: item.id, defId: item.defId, quality: normalizeQuality(item.quality), area: body.area, x: body.x, y: body.y }
+    const placementOptions = placementOptionsForRun(run)
+    if (!canPlace(gameItems, moving, body.area, body.x, body.y, placementOptions)) {
+      const covered = body.area === 'EQUIPMENT' ? overlappingItems(gameItems, moving, body.area, body.x, body.y) : []
+      const remainingItems = gameItems.filter((entry) => !covered.some((coveredItem) => coveredItem.id === entry.id))
+      const bagMoves = covered.length > 0
+        && canPlace(remainingItems, moving, body.area, body.x, body.y, placementOptions)
+        ? replacementBagMoves(gameItems, moving, covered)
+        : null
+      if (bagMoves) {
+        await prisma.$transaction([
+          prisma.itemInstance.update({ where: { id: item.id }, data: { area: body.area, x: body.x, y: body.y } }),
+          ...bagMoves.map((move) => prisma.itemInstance.update({ where: { id: move.id }, data: { area: 'BAG', x: move.x, y: move.y } })),
+        ])
+        const updated = await prisma.run.findUniqueOrThrow({ where: { id: run.id }, include: { items: true } })
+        return { run: publicRun(updated) }
+      }
+    }
     if (!canPlace(gameItems, { id: item.id, defId: item.defId, quality: normalizeQuality(item.quality), area: body.area, x: body.x, y: body.y }, body.area, body.x, body.y, placementOptionsForRun(run))) {
       return reply.code(400).send({ error: '目标位置不可放置' })
     }
