@@ -630,7 +630,8 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
       queueItems(queue, triggerOrder(actor.items).filter((entry) => isLarge(itemDef(entry.defId), actor)))
     }
     if (!sacrificeReplacesSmallEffect && advanced === 'EXTRA_ROLL_TRIGGERS_ALL' && extra && allowExtraRollFanout) {
-      queueItems(queue, triggerOrder(actor.items).filter((entry) => entry.id !== item.id).slice(0, 3), false)
+      const target = triggerOrder(actor.items).find((entry) => entry.id !== item.id)
+      if (target) queueItems(queue, [target, target], false)
     }
     if (!sacrificeReplacesSmallEffect && advanced === 'ROLL_COUNTER_EXTRA' && actorState.rollCount % 4 === 0) {
       processed.extraRollRequests += 1

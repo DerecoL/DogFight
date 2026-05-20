@@ -165,7 +165,7 @@ describe('dog and item definitions', () => {
     expect(itemDef('small-bite')).toMatchObject({ size: 1 })
     expect(itemDef('v3-cone-collar')).toMatchObject({ size: 1, effect: { type: 'UTILITY', amount: 3 } })
     expect(itemDef('v3-wooden-shield')).toMatchObject({ dice: [2, 3, 4], effect: { type: 'UTILITY', amount: 8 } })
-    expect(itemDef('v3-spiked-vest')).toMatchObject({ dice: [4, 5, 6], effect: { type: 'UTILITY', amount: 5 } })
+    expect(itemDef('v3-spiked-vest')).toMatchObject({ dice: [4, 5, 6], effect: { type: 'UTILITY', amount: 1 } })
     expect(itemDef('v3-dinosaur-leg-bone')).toMatchObject({ dice: [5, 6], effect: { type: 'DAMAGE', amount: 18 }, advancedEffect: 'DOUBLE_SHIELD_DAMAGE' })
     expect(itemDef('v3-auto-waterer')).toMatchObject({ effect: { type: 'HEAL', amount: 8 }, advancedEffect: 'HEAL_OR_MAX_HP' })
     expect(itemDef('samoyed-soft-fur')).toMatchObject({ effect: { type: 'HEAL', amount: 8 } })
@@ -735,7 +735,26 @@ describe('battle simulation', () => {
     expect(poisonTick).toMatchObject({ amount: 2, target: 'player' })
   })
 
-  it('limits chase car extra-roll fanout to three equipment triggers', () => {
+  it('lets spiked vest grant one shield while keeping its thorns', () => {
+    const player: FighterSnapshot = {
+      name: 'P',
+      dogType: 'SHIBA',
+      wins: 0,
+      losses: 0,
+      round: 0,
+      items: [
+        { id: 'vest', defId: 'v3-spiked-vest', quality: 'BRONZE', area: 'EQUIPMENT', x: 0, y: 0 },
+      ],
+    }
+    const opponent: FighterSnapshot = { name: 'O', dogType: 'SHIBA', wins: 0, losses: 0, round: 0, items: [] }
+    const result = simulateBattle(player, opponent, 'spiked-vest-shield-thorns')
+    const vestEvent = result.events.find((event) => event.itemId === 'vest')
+
+    expect(vestEvent).toMatchObject({ amount: 1, playerShield: 1 })
+    expect(vestEvent?.playerStatuses?.positive).toContainEqual(expect.objectContaining({ type: 'thorns', stacks: 1 }))
+  })
+
+  it('lets chase car extra-roll fanout trigger one other equipment twice', () => {
     const player: FighterSnapshot = {
       name: 'P',
       dogType: 'MUTT',
@@ -762,6 +781,6 @@ describe('battle simulation', () => {
     )
 
     expect(firstExtraRoll).toBeDefined()
-    expect(extraRollDamage.length).toBeLessThanOrEqual(3)
+    expect(extraRollDamage.map((event) => event.itemId)).toEqual(['bite-a', 'bite-a'])
   })
 })

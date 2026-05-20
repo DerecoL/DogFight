@@ -92,8 +92,8 @@ export const ITEM_DEFS: ItemDef[] = [
     advancedEffect: 'GAIN_SHIELD',
     defaultQuality: 'BRONZE',
   }),
-  slotItem('v3-spiked-vest', '带刺防爆冲胸背', 2, 7, [4, 5, 6], ['big', 'thorn', 'shield'], { type: 'UTILITY', amount: 5 }, {
-    description: '获得 5 点护盾，并获得 1 层【荆棘】。',
+  slotItem('v3-spiked-vest', '带刺防爆冲胸背', 2, 7, [4, 5, 6], ['big', 'thorn', 'shield'], { type: 'UTILITY', amount: 1 }, {
+    description: '获得 1 点护盾，并获得 1 层【荆棘】。',
     advancedEffect: 'GAIN_SHIELD_THORNS',
     defaultQuality: 'BRONZE',
   }),
@@ -153,7 +153,7 @@ export const CLASS_REWARD_DEFS: ItemDef[] = [
   classItem('MUTT', 3, 'mutt-counting-collar', '计数项圈', 2, [1, 2, 3, 4, 5, 6], ['extra-roll'], '战斗中每发生 4 次投掷，立即进行一次额外投掷', 'ROLL_COUNTER_EXTRA', 'GOLD'),
   classItem('MUTT', 3, 'mutt-charged-collar', '充能项圈', 1, [1, 2, 3, 4, 5, 6], ['extra-roll'], '发生额外投掷时，触发该装备【相邻】的装备1次', 'ADJACENT_ON_EXTRA_ROLL', 'GOLD'),
   classItem('MUTT', 6, 'mutt-chase-tail', '咬尾巴', 3, [1, 2, 3, 4, 5, 6], ['extra-roll'], '你的“额外投掷”也有 20% 的概率再次触发额外投掷（无嵌套上限）。且单局每一次连续投掷，使所有伤害临时提升10%', 'EXTRA_ROLL_RECURSE', 'DIAMOND'),
-  classItem('MUTT', 6, 'mutt-chase-car', '追车车', 1, [1, 2, 3, 4, 5, 6], ['extra-roll'], '额外投掷会额外触发最多3件其他装备1次', 'EXTRA_ROLL_TRIGGERS_ALL', 'DIAMOND'),
+  classItem('MUTT', 6, 'mutt-chase-car', '追车车', 1, [1, 2, 3, 4, 5, 6], ['extra-roll'], '额外投掷会额外触发1件其他装备2次', 'EXTRA_ROLL_TRIGGERS_ALL', 'DIAMOND'),
   classItem('MUTT', 6, 'mutt-eat-air', '吃空气', 4, [1, 2, 3, 4, 5, 6], ['extra-roll'], '战斗开始后的前 10 秒内，基础投掷频率固定提升2倍，作为代价，此期间你无法通过任何途径获得治疗与护盾', 'DOUBLE_RATE_FIRST_TEN', 'DIAMOND'),
 
   classItem('BULLY', 3, 'bully-vault', '恶霸金库', 2, [1, 2, 3, 4, 5, 6], ['large'], '每回合战斗结束后获得一个【大型物品】', 'POST_BATTLE_LARGE_ITEM', 'GOLD'),
