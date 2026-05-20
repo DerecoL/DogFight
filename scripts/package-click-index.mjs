@@ -1505,6 +1505,19 @@ async function currentMockApiScript(buildId) {
       const item = run.items.find((entry) => entry.id === body.itemId);
       if (!item) return error('道具不存在', 404);
       const candidate = { ...item, area: body.area, x: Number(body.x), y: Number(body.y) };
+      const coveredForUpgrade = coveredItems(run.items, candidate);
+      const upgradeTarget = coveredForUpgrade.length === 1 ? coveredForUpgrade[0] : null;
+      const upgradedQuality = upgradeTarget
+        && upgradeTarget.defId === candidate.defId
+        && normalizeQuality(upgradeTarget.quality) === normalizeQuality(candidate.quality)
+        ? nextQuality(upgradeTarget.quality)
+        : null;
+      if (upgradeTarget && upgradedQuality) {
+        upgradeTarget.quality = upgradedQuality;
+        run.items = run.items.filter((entry) => entry.id !== item.id);
+        saveState(state);
+        return json({ run: publicRun(run) });
+      }
       if (!canPlace(run.items, candidate, candidate.area, candidate.x, candidate.y, typeof equipmentWidthForRun === 'function' ? equipmentWidthForRun(run) : 12)) {
         const equipmentWidth = typeof equipmentWidthForRun === 'function' ? equipmentWidthForRun(run) : 12;
         const covered = candidate.area === 'EQUIPMENT' ? coveredItems(run.items, candidate) : [];
