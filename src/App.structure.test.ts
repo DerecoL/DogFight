@@ -102,6 +102,16 @@ describe('selection screen structure', () => {
     expect(app).not.toContain("tone={3 - run.losses <= 1 ? 'danger' : 'safe'}")
   })
 
+  it('keeps the current dog trait visible in the top banner during a run', () => {
+    expect(app).toContain('<DogTraitSummary run={run} />')
+    expect(app).toContain('function DogTraitSummary')
+    expect(app).toContain('dogTraits[run.dogType]')
+    expect(app).toContain('run.dogType === \'EMPEROR\' && run.luckyNumber')
+    expect(css).toContain('.dog-trait-summary')
+    expect(css).toContain('.dog-trait-summary img')
+    expect(css).toContain('.dog-trait-summary p')
+  })
+
   it('wires peak arena to apex APIs and keeps the lobby button in the top banner', () => {
     expect(app).toContain('function ApexArena')
     expect(app).toContain("api<ApexOverview>('/apex')")

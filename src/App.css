@@ -161,6 +161,46 @@ input {
   box-shadow: 0 12px 34px rgba(112, 72, 30, .10);
 }
 .stats { flex-wrap: wrap; justify-content: center; }
+.dog-trait-summary {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  align-items: center;
+  column-gap: 8px;
+  min-height: 42px;
+  max-width: min(430px, 100%);
+  padding: 6px 12px 6px 8px;
+  border: 1px solid rgba(255, 255, 255, .7);
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: inset 0 -10px 20px rgba(37, 48, 71, .04);
+}
+.dog-trait-summary img {
+  grid-row: 1 / 3;
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+}
+.dog-trait-summary > span {
+  font-size: 11px;
+  line-height: 1;
+  color: var(--muted);
+}
+.dog-trait-summary strong {
+  font-size: 13px;
+  line-height: 1;
+}
+.dog-trait-summary p {
+  grid-column: 2 / 4;
+  margin: 0;
+  min-width: 0;
+  overflow: hidden;
+  color: #667085;
+  font-size: 12px;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .resource-pill {
   display: inline-grid;
   grid-template-columns: auto auto;
@@ -1262,8 +1302,8 @@ input {
   width: 100%;
   align-items: stretch;
   justify-items: stretch;
-  gap: 8px;
-  padding: 10px;
+  gap: 6px;
+  padding: 8px 10px;
 }
 .battle-toolbar {
   display: grid;
@@ -1272,15 +1312,18 @@ input {
   justify-content: space-between;
   gap: 12px;
 }
-.battle-toolbar > div {
+.battle-status {
   display: grid;
-  gap: 6px;
+  gap: 4px;
   min-width: 0;
 }
 .battle-toolbar p {
   color: var(--muted);
 }
 .battle-toolbar .speed-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  width: auto;
   justify-self: end;
 }
 .battle-equipment-row {
@@ -1352,7 +1395,7 @@ input {
 }
 .battle-stage {
   position: relative;
-  min-height: 250px;
+  min-height: 220px;
   display: grid;
   grid-template-columns: minmax(180px, 1fr) minmax(130px, .48fr) minmax(180px, 1fr);
   align-items: center;
@@ -1721,6 +1764,21 @@ input {
   border-radius: 8px;
   background: var(--paper);
   box-shadow: 3px 4px 0 rgba(61, 45, 37, .18);
+}
+
+.dog-trait-summary {
+  min-height: 32px;
+  max-width: min(460px, 38vw);
+  padding: 4px 10px 4px 7px;
+  border: 3px solid var(--ink);
+  border-radius: 8px;
+  background: var(--paper);
+  box-shadow: 3px 4px 0 rgba(61, 45, 37, .18);
+}
+
+.dog-trait-summary img {
+  width: 28px;
+  height: 28px;
 }
 
 .resource-pill.win { background: #bff0d2; }
@@ -3873,6 +3931,10 @@ input {
   .topbar > .stats {
     margin-left: 0;
     justify-content: start;
+  }
+
+  .dog-trait-summary {
+    max-width: 100%;
   }
 
   .chapter-progress {

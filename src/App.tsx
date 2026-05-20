@@ -2356,6 +2356,7 @@ function TopBar({ run, musicEnabled, musicBlocked, onToggleMusic, onOpenLobby, o
       </div>
       {run && (
         <div className="stats">
+          <DogTraitSummary run={run} />
           <ResourcePill icon={<Trophy size={16} />} label="胜场" value={`${run.wins}/12`} tone="win" />
           <ResourcePill icon={<Shield size={16} />} label="容错" value={`${5 - run.losses}`} tone={5 - run.losses <= 1 ? 'danger' : 'safe'} />
           <ResourcePill icon={<Coins size={16} />} label="金币" value={run.gold} tone="gold" />
@@ -2374,6 +2375,20 @@ function TopBar({ run, musicEnabled, musicBlocked, onToggleMusic, onOpenLobby, o
         <IconButton title="退出登录" onClick={onLogout}><LogOut size={18} /></IconButton>
       </div>
     </header>
+  )
+}
+
+function DogTraitSummary({ run }: { run: Run }) {
+  const trait = run.dogType === 'EMPEROR' && run.luckyNumber
+    ? `${dogTraits[run.dogType]}（天命 ${run.luckyNumber}）`
+    : dogTraits[run.dogType]
+  return (
+    <span className="dog-trait-summary" title={`${dogNames[run.dogType]}：${trait}`}>
+      <img src={dogAssets[run.dogType]} alt="" />
+      <span>当前狗狗</span>
+      <strong>{dogNames[run.dogType]}</strong>
+      <p>{trait}</p>
+    </span>
   )
 }
 
@@ -2899,7 +2914,7 @@ function BattleView({ run, battle, currentEvent, eventIndex, speed, score, onSpe
   return (
     <section className="battle-panel visual-battle sketch-panel">
       <div className="battle-toolbar">
-        <div>
+        <div className="battle-status">
           <h2>自动战斗</h2>
           <p>{event ? `${event.time}s · ${event.text}` : '准备播放战斗结果'}</p>
         </div>

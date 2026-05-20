@@ -146,6 +146,17 @@ describe('equipment layout scale', () => {
     expect(css).toContain('.battle-dog-img { width: 92px; height: 92px; }')
   })
 
+  it('keeps battle playback controls in one compact three-button row', () => {
+    expect(app).toContain('className="battle-status"')
+    expect(cssRule('.battle-status')).toContain('display: grid')
+    expect(cssRule('.battle-status')).toContain('gap: 4px')
+    expect(cssRule('.battle-toolbar > div')).toBe('')
+    expect(cssRule('.battle-toolbar .speed-row')).toContain('display: grid')
+    expect(cssRule('.battle-toolbar .speed-row')).toContain('grid-template-columns: repeat(3, minmax(0, 1fr))')
+    expect(cssRule('.battle-toolbar .speed-row')).toContain('width: auto')
+    expect(cssRule('.battle-stage')).toContain('min-height: 220px')
+  })
+
   it('adds third-pass handdrawn detail to the shop, inventory, and dog selection surfaces', () => {
     expect(cssRule('.shop-shelf.sketch-panel::before')).toContain('content: ""')
     expect(cssRule('.shop-shelf.sketch-panel::after')).toContain('linear-gradient')
@@ -202,10 +213,10 @@ describe('equipment layout scale', () => {
   })
 
   it('keeps explanatory copy separated from nearby headings', () => {
-    for (const selector of ['.auth-panel .brand-block > div', '.section-title > div', '.battle-toolbar > div']) {
+    for (const selector of ['.auth-panel .brand-block > div', '.section-title > div', '.battle-status']) {
       const rule = cssRule(selector)
       expect(rule).toContain('display: grid')
-      expect(rule).toContain('gap: 6px')
+      expect(rule).toContain(selector === '.battle-status' ? 'gap: 4px' : 'gap: 6px')
     }
     expect(cssRule('.battle-toolbar p')).not.toContain('margin-top')
   })
