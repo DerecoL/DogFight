@@ -1535,6 +1535,30 @@ input {
   display: grid;
   place-items: center;
 }
+.forfeit-run-action {
+  width: min(760px, 100%);
+  margin: 14px auto 0;
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.forfeit-run-action div {
+  display: grid;
+  gap: 4px;
+}
+
+.forfeit-run-action span {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.forfeit-run-action .danger-button {
+  flex: 0 0 auto;
+}
 .log-toggle {
   position: relative;
   overflow: hidden;
@@ -3650,6 +3674,10 @@ input {
   .visual-battle { gap: 6px; padding: 8px; }
   .battle-toolbar { grid-template-columns: 1fr; align-items: flex-start; }
   .battle-toolbar .speed-row { width: 100%; justify-content: center; }
+  .forfeit-run-action {
+    align-items: stretch;
+    flex-direction: column;
+  }
   .battle-stage { grid-template-columns: 1fr; min-height: 440px; padding: 10px; }
   .battle-dice { order: 2; min-height: 108px; }
   .battle-dog.opponent { order: 1; }

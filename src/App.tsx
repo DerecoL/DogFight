@@ -17,6 +17,7 @@ import {
   Coins,
   Crown,
   Dice5,
+  Flag,
   Gamepad2,
   Grid3X3,
   HeartPulse,
@@ -859,6 +860,23 @@ export default function App() {
     }
   }
 
+  const settleRun = async () => {
+    if (!run) return
+    const confirmed = window.confirm('将按当前胜负结算，不会额外增加失败。确定放弃本局吗？')
+    if (!confirmed) return
+    setError('')
+    try {
+      const data = await api<{ run: Run }>(`/runs/${run.id}/settle`, { method: 'POST' })
+      setRun(data.run)
+      setBattle(null)
+      setEventIndex(0)
+      void loadRunHistory().catch(() => undefined)
+      void loadLadderProfile().catch(() => undefined)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '操作失败')
+    }
+  }
+
   const onInspectOffer = (offerId: string, element: HTMLElement) => {
     setSelectedOfferId(offerId)
     setSelectedItemId(null)
@@ -1119,6 +1137,9 @@ export default function App() {
           onContinue={() => void finishBattle()}
           onRestart={() => setRun(null)}
         />
+      )}
+      {!battle && run.status === 'ACTIVE' && run.phase !== 'BATTLE' && (
+        <ForfeitRunAction run={run} onForfeit={() => void settleRun()} />
       )}
     </Shell>
   )
@@ -2749,6 +2770,20 @@ function FloatingTip({ run, item, offer, anchor, onClose, onBuy, onSell, onUpgra
         {!canAfford && <small className="disabled-reason">金币不足，还差 {(offer?.price ?? 0) - run.gold} 金币。</small>}
       </div>
     </aside>
+  )
+}
+
+function ForfeitRunAction({ run, onForfeit }: { run: Run; onForfeit: () => void }) {
+  return (
+    <section className="forfeit-run-action paper-card" aria-label="放弃并结算当前跑局">
+      <div>
+        <strong>当前 {run.wins} 胜 {run.losses} 败</strong>
+        <span>放弃后立即按当前记录结算，不会额外增加失败。</span>
+      </div>
+      <button className="danger-button action-button" type="button" onClick={onForfeit}>
+        <Flag size={18} /> 放弃并结算
+      </button>
+    </section>
   )
 }
 
