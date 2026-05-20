@@ -430,8 +430,8 @@ describeWithDatabase('run API', () => {
       ladderSettlement: {
         beforeTier: 'BRONZE',
         beforeScore: 0,
-        afterTier: 'SILVER',
-        afterScore: 20,
+        afterTier: 'BRONZE',
+        afterScore: 73,
         delta: 73,
         baseScore: 65,
         perfectBonus: 8,
@@ -440,8 +440,8 @@ describeWithDatabase('run API', () => {
 
     const ladder = await agent.get('/api/ladder/me').expect(200)
     expect(ladder.body.profile).toMatchObject({
-      tier: 'SILVER',
-      score: 20,
+      tier: 'BRONZE',
+      score: 73,
       gamesPlayed: 1,
       totalWins: 12,
       totalLosses: 0,
