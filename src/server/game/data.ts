@@ -87,13 +87,13 @@ export const ITEM_DEFS: ItemDef[] = [
     description: '造成 8 点伤害。',
     defaultQuality: 'BRONZE',
   }),
-  slotItem('v3-wooden-shield', '狗屋木板盾', 2, 6, [2, 3, 4], ['stable', 'shield'], { type: 'UTILITY', amount: 9 }, {
-    description: '获得 9 点护盾。',
+  slotItem('v3-wooden-shield', '狗屋木板盾', 2, 6, [2, 3, 4], ['stable', 'shield'], { type: 'UTILITY', amount: 8 }, {
+    description: '获得 8 点护盾。',
     advancedEffect: 'GAIN_SHIELD',
     defaultQuality: 'BRONZE',
   }),
-  slotItem('v3-spiked-vest', '带刺防爆冲胸背', 2, 7, [4, 5, 6], ['big', 'thorn', 'shield'], { type: 'UTILITY', amount: 6 }, {
-    description: '获得 6 点护盾，并获得 1 层【荆棘】。',
+  slotItem('v3-spiked-vest', '带刺防爆冲胸背', 2, 7, [4, 5, 6], ['big', 'thorn', 'shield'], { type: 'UTILITY', amount: 5 }, {
+    description: '获得 5 点护盾，并获得 1 层【荆棘】。',
     advancedEffect: 'GAIN_SHIELD_THORNS',
     defaultQuality: 'BRONZE',
   }),
@@ -102,13 +102,13 @@ export const ITEM_DEFS: ItemDef[] = [
     advancedEffect: 'APPLY_WEAK_ON_HIT',
     defaultQuality: 'BRONZE',
   }),
-  slotItem('v3-dinosaur-leg-bone', '巨型恐龙腿骨', 4, 10, [6], ['big', 'shield-break'], { type: 'DAMAGE', amount: 25 }, {
-    description: '造成 25 点伤害。如果敌方有护盾，该次伤害直接对护盾造成 2 倍伤害。',
+  slotItem('v3-dinosaur-leg-bone', '巨型恐龙腿骨', 4, 10, [5, 6], ['big', 'shield-break'], { type: 'DAMAGE', amount: 18 }, {
+    description: '造成 18 点伤害。如果敌方有护盾，该次伤害直接对护盾造成 2 倍伤害。',
     advancedEffect: 'DOUBLE_SHIELD_DAMAGE',
     defaultQuality: 'BRONZE',
   }),
-  slotItem('v3-auto-waterer', '全自动饮水机', 4, 9, [1, 2, 3], ['small', 'growth', 'heal'], { type: 'HEAL', amount: 10 }, {
-    description: '恢复 10 点生命值。如果你当前处于满血，则永久提升自身 1 点最大生命值。',
+  slotItem('v3-auto-waterer', '全自动饮水机', 4, 9, [1, 2, 3], ['small', 'growth', 'heal'], { type: 'HEAL', amount: 8 }, {
+    description: '恢复 8 点生命值。如果你当前处于满血，则永久提升自身 1 点最大生命值。',
     advancedEffect: 'HEAL_OR_MAX_HP',
     defaultQuality: 'BRONZE',
   }),
@@ -142,7 +142,7 @@ export const CLASS_REWARD_DEFS: ItemDef[] = [
   classItem('SHIBA', 6, 'shiba-break', '忍法·破', 1, [1, 2, 3], ['small'], '装备将不按照点数触发，按照其容量触发', 'TRIGGER_BY_SIZE', 'DIAMOND'),
   classItem('SHIBA', 6, 'shiba-poison', '忍法·剧毒', 1, [1, 2, 3, 4, 5, 6], ['poison'], '每次投掷都会对敌人叠加3层【中毒】（不随品质提升）', 'POISON_ON_ROLL', 'DIAMOND'),
 
-  classItem('SAMOYED', 3, 'samoyed-soft-fur', '松软毛皮', 2, [4, 5, 6], ['big', 'heal'], '每次触发恢复10的血量', 'NONE', 'GOLD', { type: 'HEAL', amount: 10 }),
+  classItem('SAMOYED', 3, 'samoyed-soft-fur', '松软毛皮', 2, [4, 5, 6], ['big', 'heal'], '每次触发恢复8的血量', 'NONE', 'GOLD', { type: 'HEAL', amount: 8 }),
   classItem('SAMOYED', 3, 'samoyed-thorn-fur', '荆棘毛发', 2, [4, 5, 6], ['big', 'thorn'], '每次触发有 50% 概率获得1层【荆棘】', 'GAIN_THORNS', 'GOLD'),
   classItem('SAMOYED', 3, 'samoyed-frost-fur', '冰霜毛发', 1, [4, 5, 6], ['big', 'weak'], '每次触发有 50% 概率给敌人施加 1 层【虚弱】', 'APPLY_WEAK', 'GOLD'),
   classItem('SAMOYED', 6, 'samoyed-avalanche-core', '雪崩核心', 3, [1, 2, 3], ['big'], '每当掷出【小点】时，积攒1层“雪崩”。5层雪崩时会清空层数同时对敌人造成50点伤害。每次雪崩后下次雪崩伤害加倍。', 'AVALANCHE', 'DIAMOND'),

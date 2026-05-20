@@ -25,7 +25,8 @@ describe('quality-adjusted item descriptions', () => {
 
   it('shows upgraded base effects for described equipment and class rewards', () => {
     expect(numbers('v3-large-bone-sword', 'DIAMOND')).toContain('27')
-    expect(numbers('samoyed-soft-fur', 'DIAMOND')).toContain('34')
+    expect(numbers('v3-auto-waterer', 'DIAMOND')).toContain('27')
+    expect(numbers('samoyed-soft-fur', 'DIAMOND')).toContain('27')
     expect(numbers('shiba-speed-katana', 'DIAMOND')).toContain('20')
     expect(numbers('shiba-great-katana', 'DIAMOND')).toContain('27')
     expect(numbers('shiba-swallow-katana', 'DIAMOND')).toContain('17')

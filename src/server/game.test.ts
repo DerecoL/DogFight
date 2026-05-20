@@ -10,6 +10,22 @@ function baseItems(): GameItem[] {
   return [1, 2, 3, 4, 5, 6].map((n, index) => ({ id: `i${n}`, defId: `starter-${n}`, quality: 'BRONZE' as const, area: 'EQUIPMENT' as const, x: index, y: 0 }))
 }
 
+function equipment(id: string, defId: string, x: number, quality: GameItem['quality'] = 'DIAMOND'): GameItem {
+  return { id, defId, quality, area: 'EQUIPMENT', x, y: 0 }
+}
+
+function repeatedEquipment(defId: string, count: number, quality: GameItem['quality'] = 'DIAMOND'): GameItem[] {
+  return Array.from({ length: count }, (_, index) => equipment(`${defId}-${index}`, defId, index * 2, quality))
+}
+
+function lateGameFighter(name: string, dogType: FighterSnapshot['dogType'], items: GameItem[]): FighterSnapshot {
+  return { name, dogType, wins: 0, losses: 0, round: 6, items }
+}
+
+function eventAtOrBefore(result: ReturnType<typeof simulateBattle>, time: number) {
+  return [...result.events].reverse().find((event) => event.time <= time) ?? result.events[0]
+}
+
 describe('grid placement', () => {
   it('rejects overlaps and out-of-bounds placement', () => {
     const items = baseItems()
@@ -119,6 +135,11 @@ describe('dog and item definitions', () => {
   it('appends V3 common equipment and relic definitions without removing the existing pool', () => {
     expect(itemDef('small-bite')).toMatchObject({ size: 1 })
     expect(itemDef('v3-cone-collar')).toMatchObject({ size: 1, effect: { type: 'UTILITY', amount: 3 } })
+    expect(itemDef('v3-wooden-shield')).toMatchObject({ dice: [2, 3, 4], effect: { type: 'UTILITY', amount: 8 } })
+    expect(itemDef('v3-spiked-vest')).toMatchObject({ dice: [4, 5, 6], effect: { type: 'UTILITY', amount: 5 } })
+    expect(itemDef('v3-dinosaur-leg-bone')).toMatchObject({ dice: [5, 6], effect: { type: 'DAMAGE', amount: 18 }, advancedEffect: 'DOUBLE_SHIELD_DAMAGE' })
+    expect(itemDef('v3-auto-waterer')).toMatchObject({ effect: { type: 'HEAL', amount: 8 }, advancedEffect: 'HEAL_OR_MAX_HP' })
+    expect(itemDef('samoyed-soft-fur')).toMatchObject({ effect: { type: 'HEAL', amount: 8 } })
     expect(itemDef('v3-golden-kennel')).toMatchObject({ size: 4, defaultQuality: 'DIAMOND' })
     expect(shopPool('SMALL').some((item) => item.id === 'v3-flea-disc')).toBe(true)
     expect(shopPool('LARGE').some((item) => item.id === 'v3-dinosaur-leg-bone')).toBe(true)
@@ -514,6 +535,75 @@ describe('battle simulation', () => {
     expect(shieldEvents.length).toBeGreaterThanOrEqual(2)
     expect(shieldEvents.reduce((sum, event) => sum + (event.amount ?? 0), 0)).toBeGreaterThan(100)
     expect(absorbedDamage).toMatchObject({ playerHp: 100, targetHpDelta: 0 })
+  })
+
+  it('keeps wooden shield as a normal-attack counter without extreme shield banking', () => {
+    let maxShieldBeforePoison = 0
+    let zeroHealthDamageHits = 0
+    let attackHits = 0
+    const sampleCount = 40
+
+    for (let index = 0; index < sampleCount; index += 1) {
+      const result = simulateBattle(
+        lateGameFighter('P', 'SHIBA', repeatedEquipment('v3-wooden-shield', 4)),
+        lateGameFighter('O', 'SHIBA', repeatedEquipment('v3-large-bone-sword', 4)),
+        `wooden-shield-balance-${index}`,
+      )
+      maxShieldBeforePoison += Math.max(...result.events.filter((event) => event.time <= 60).map((event) => event.playerShield))
+
+      for (const event of result.events.filter((entry) => entry.time <= 60 && entry.actor === 'opponent' && entry.kind === 'ITEM' && entry.effectType === 'DAMAGE')) {
+        attackHits += 1
+        if (event.targetHpDelta === 0) zeroHealthDamageHits += 1
+      }
+    }
+
+    expect(maxShieldBeforePoison / sampleCount).toBeLessThan(900)
+    expect(zeroHealthDamageHits / attackHits).toBeGreaterThan(0.85)
+  })
+
+  it('lets stable shield-break equipment answer stacked wooden shields', () => {
+    let hpAtPoisonRamp = 0
+    let shieldAtPoisonRamp = 0
+    const sampleCount = 40
+
+    for (let index = 0; index < sampleCount; index += 1) {
+      const result = simulateBattle(
+        lateGameFighter('P', 'SHIBA', repeatedEquipment('v3-wooden-shield', 4)),
+        lateGameFighter('O', 'SHIBA', repeatedEquipment('v3-dinosaur-leg-bone', 4)),
+        `shield-break-balance-${index}`,
+      )
+      const event = eventAtOrBefore(result, 60)
+      hpAtPoisonRamp += event.playerHp
+      shieldAtPoisonRamp += event.playerShield
+    }
+
+    expect(hpAtPoisonRamp / sampleCount).toBeLessThan(5)
+    expect(shieldAtPoisonRamp / sampleCount).toBeLessThan(20)
+  })
+
+  it('keeps high-output healing from outpacing equal-quality sustained damage', () => {
+    let watererWins = 0
+    let softFurWins = 0
+    const sampleCount = 40
+
+    for (let index = 0; index < sampleCount; index += 1) {
+      const watererResult = simulateBattle(
+        lateGameFighter('P', 'SHIBA', repeatedEquipment('v3-auto-waterer', 4)),
+        lateGameFighter('O', 'SHIBA', repeatedEquipment('v3-large-bone-sword', 4)),
+        `auto-waterer-balance-${index}`,
+      )
+      if (watererResult.winner === 'player') watererWins += 1
+
+      const softFurResult = simulateBattle(
+        lateGameFighter('P', 'SAMOYED', repeatedEquipment('samoyed-soft-fur', 4)),
+        lateGameFighter('O', 'SHIBA', repeatedEquipment('v3-large-bone-sword', 4)),
+        `soft-fur-balance-${index}`,
+      )
+      if (softFurResult.winner === 'player') softFurWins += 1
+    }
+
+    expect(watererWins).toBeLessThanOrEqual(8)
+    expect(softFurWins).toBeLessThanOrEqual(3)
   })
 
   it('records current shield values on each battle event', () => {

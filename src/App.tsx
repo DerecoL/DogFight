@@ -562,7 +562,7 @@ function RuleText({ text }: { text: string }) {
           <span className="rule-term-wrap" key={`${term}-${index}`}>
             <button type="button" className="rule-term" onClick={(event) => { event.stopPropagation(); setOpenTerm(openTerm === term ? null : term) }}>【{term}】</button>
             {openTerm === term && (
-              <span className="rule-tip" role="tooltip">
+              <span className="rule-tip paper-card" role="tooltip">
                 <b>{term}</b>
                 <span>{entry.description}</span>
                 {entry.note !== '无' && <small>{entry.note}</small>}
@@ -787,7 +787,7 @@ export default function App() {
   if (!user) {
     return (
       <main className="auth-shell">
-        <section className="auth-panel">
+        <section className="auth-panel paper-card sticker-card">
           <div className="brand-block">
             <img className="game-logo" src={gameIcon} alt="" />
             <div>
@@ -1023,7 +1023,7 @@ function ModeLobby({ run, runHistory, onOpen, onEnterCasual, onEnterDogfight, on
       </div>
       <div className="mode-grid">
         {modeCards.map((mode) => (
-          <article key={mode.id} className={mode.locked ? 'mode-card locked' : 'mode-card available'}>
+          <article key={mode.id} className={`mode-card paper-card sticker-card ${mode.locked ? 'locked' : 'available'}`}>
             <span className="mode-icon">{mode.icon}</span>
             {mode.locked && (
               <span className="lock-chain" aria-label={`${mode.title}未解锁`}>
@@ -1869,7 +1869,7 @@ function DogSelect({ onPick }: { onPick: (choice: { dogType: DogType; luckyNumbe
       <div className="dog-select">
         <div className="dog-card-grid">
           {slots.map((dog, index) => dog ? (
-            <button className={`dog-card ${selectedDog === dog ? 'selected' : ''}`} key={dog} onClick={() => setSelectedDog(dog)}>
+            <button className={`dog-card paper-card paper-dog-card ${selectedDog === dog ? 'selected' : ''}`} key={dog} onClick={() => setSelectedDog(dog)}>
               <span className="dog-art-frame">
                 <img className="dog-avatar" src={dogAssets[dog]} alt="" />
               </span>
@@ -1878,10 +1878,10 @@ function DogSelect({ onPick }: { onPick: (choice: { dogType: DogType; luckyNumbe
               <span className="tag-row">{dogTags[dog].map((tag) => <b key={tag}>{tag}</b>)}</span>
             </button>
           ) : (
-            <div className="dog-card placeholder" key={`dog-placeholder-${index}`} aria-hidden="true" />
+            <div className="dog-card placeholder paper-card paper-dog-card" key={`dog-placeholder-${index}`} aria-hidden="true" />
           ))}
         </div>
-        <aside className="dog-detail-panel">
+        <aside className="dog-detail-panel paper-card">
           <span className="dog-detail-art">
             <img className="dog-avatar large" src={dogAssets[selectedDog]} alt="" />
           </span>
@@ -1934,7 +1934,7 @@ function Shell({ children, run, error, musicEnabled, musicBlocked, onToggleMusic
 function TopBar({ run, musicEnabled, musicBlocked, onToggleMusic, onOpenLobby, onLogout }: { run?: Run; musicEnabled: boolean; musicBlocked: boolean; onToggleMusic: () => void; onOpenLobby?: () => void; onLogout: () => void }) {
   const musicTitle = musicEnabled ? (musicBlocked ? '音乐待播放，点击重试' : '关闭音乐') : '开启音乐'
   return (
-    <header className="topbar">
+    <header className="topbar paper-card">
       <div className="brand-block compact">
         <img className="game-logo" src={gameIcon} alt="" />
         <div>
@@ -2016,13 +2016,13 @@ function ShopChoiceSelect({ choices, onPick }: { choices: ShopType[]; onPick: (s
       </div>
       <div className="choice-grid">
         {slots.map((choice, index) => choice ? (
-          <button key={choice} className={`choice ${selectedChoice === choice ? 'selected' : ''}`} onClick={() => setSelectedChoice(choice)}>
+          <button key={choice} className={`choice paper-card sticker-card ${selectedChoice === choice ? 'selected' : ''}`} onClick={() => setSelectedChoice(choice)}>
             <span className="choice-icon">{shopChoiceIcon(choice)}</span>
             <strong>{shopNames[choice]}</strong>
             <span>{shopDescriptions[choice]}</span>
           </button>
         ) : (
-          <div className="choice placeholder" key={`choice-placeholder-${index}`} aria-hidden="true" />
+          <div className="choice placeholder paper-card sticker-card" key={`choice-placeholder-${index}`} aria-hidden="true" />
         ))}
       </div>
       <button className="primary action-button choice-submit" disabled={!selectedChoice} onClick={() => selectedChoice && onPick(selectedChoice)}>
@@ -2095,14 +2095,14 @@ function ClassRewardCeremony({ run, choices, onDismiss }: { run: Run; choices: C
 function ClassRewardSelect({ choices, onPick }: { choices: ClassRewardChoice[]; onPick: (defId: string) => void }) {
   const [selected, setSelected] = useState(choices[0]?.defId ?? '')
   return (
-    <section className="reward-panel">
+    <section className="reward-panel paper-card">
       <div className="screen-heading centered">
         <h2>选择职业装备</h2>
         <p>先整理背包，再选择一个职业装备放入背包。</p>
       </div>
       <div className="reward-choice-grid">
         {choices.map((choice) => (
-          <div key={choice.defId} role="button" tabIndex={0} className={`choice reward-choice ${selected === choice.defId ? 'selected' : ''}`} onClick={() => setSelected(choice.defId)} onKeyDown={(event) => handleChoiceCardKeyDown(event, () => setSelected(choice.defId))}>
+          <div key={choice.defId} role="button" tabIndex={0} className={`choice paper-card sticker-card reward-choice ${selected === choice.defId ? 'selected' : ''}`} onClick={() => setSelected(choice.defId)} onKeyDown={(event) => handleChoiceCardKeyDown(event, () => setSelected(choice.defId))}>
             <strong>{choice.def.name}</strong>
             <span className={`tip-tag ${qualityClass(choice.quality)}`}>{qualityLabel[choice.quality]}</span>
             <span>{choice.def.size}格 · {choice.def.dice.join('/')}</span>
@@ -2125,7 +2125,7 @@ function RelicChoiceSelect({ choices, onPick }: { choices: RelicChoice[]; onPick
       </div>
       <div className="choice-grid relic-choice-grid">
         {choices.map((choice) => (
-          <div key={choice.relicId} role="button" tabIndex={0} className={`choice relic-choice ${selected === choice.relicId ? 'selected' : ''}`} onClick={() => setSelected(choice.relicId)} onKeyDown={(event) => handleChoiceCardKeyDown(event, () => setSelected(choice.relicId))}>
+          <div key={choice.relicId} role="button" tabIndex={0} className={`choice paper-card sticker-card relic-choice ${selected === choice.relicId ? 'selected' : ''}`} onClick={() => setSelected(choice.relicId)} onKeyDown={(event) => handleChoiceCardKeyDown(event, () => setSelected(choice.relicId))}>
             <RelicGlyph relic={choice} size={44} />
             <strong>{choice.def.name}</strong>
             <span className={`tip-tag ${qualityClass(choice.quality)}`}>{qualityLabel[choice.quality]}</span>
@@ -2140,7 +2140,7 @@ function RelicChoiceSelect({ choices, onPick }: { choices: RelicChoice[]; onPick
 
 function ShopShelf({ run, selectedOfferId, draggingItemId, onInspectOffer, onReroll, onMatch }: { run: Run; selectedOfferId: string | null; draggingItemId: string | null; onInspectOffer: (offerId: string, element: HTMLElement) => void; onReroll: () => void; onMatch: () => void }) {
   return (
-    <section className="shop-shelf">
+    <section className="shop-shelf sketch-panel">
       <div className="section-title">
         <div>
           <h2>{shopNames[run.shopType]}</h2>
@@ -2180,7 +2180,7 @@ function ShopCard({ offer, selected, onClick }: { offer: ShopOffer; selected: bo
   const def = offer.def
   const quality = normalizeQuality(offer.quality)
   return (
-    <button className={`shop-card ${qualityClass(offer.quality)} ${selected ? 'selected' : ''}`} onClick={(event) => onClick(event.currentTarget)}>
+    <button className={`shop-card paper-shop-card paper-card ${qualityClass(offer.quality)} ${selected ? 'selected' : ''}`} onClick={(event) => onClick(event.currentTarget)}>
       <span className="quality-chip shop-quality-chip">{qualityLabel[quality]}</span>
       {def && <img className="shop-item-icon" src={itemIcon(def)} alt="" />}
       <div className="shop-card-main">
@@ -2206,7 +2206,7 @@ function SizePreview({ size }: { size: number }) {
 function InventoryBoard({ run, selectedItemId, draggingItemId, onSelectItem, onSlotClick }: { run: Run; selectedItemId: string | null; draggingItemId: string | null; onSelectItem: (itemId: string, element: HTMLElement) => void; onSlotClick: (area: Area, x: number, y: number) => void }) {
   const equipmentSlots = equipmentSlotCount(run.relics)
   return (
-    <section className="inventory-board expanded">
+    <section className="inventory-board expanded paper-inventory">
       <GridPanel title="装备栏" subtitle={`${equipmentSlots} 格单行，从左向右触发`} icon={<Grid3X3 size={18} />} area="EQUIPMENT" w={equipmentSlots} h={1} items={run.items} selectedItemId={selectedItemId} draggingItemId={draggingItemId} onSelectItem={onSelectItem} onSlotClick={onSlotClick} />
       <div className="bag-relic-row">
         <RelicRail relics={run.relics ?? []} />
@@ -2266,7 +2266,7 @@ function RelicFloatingTip({ relic, anchor, onClose }: { relic: Relic | null; anc
   if (!relic) return null
   const style = anchor ? { '--tip-x': `${anchor.x}px`, '--tip-y': `${anchor.y}px` } as React.CSSProperties : undefined
   return (
-    <aside className="relic-floating-tip floating-tip" style={style}>
+    <aside className="relic-floating-tip floating-tip paper-card" style={style}>
       <div className="tip-tags">
         <span className={`tip-tag ${qualityClass(relic.quality)}`}>{qualityLabel[relic.quality]}</span>
         {relic.def.tags.map((tag) => <span key={tag} className="tip-tag">{tag}</span>)}
@@ -2322,7 +2322,7 @@ function DraggableItem({ item, selected, dragging, upgradeable, onSelect }: { it
   return (
     <button
       ref={setNodeRef}
-      className={`item-card ${itemTone(item.def)} ${qualityClass(item.quality)} ${selected ? 'selected' : ''} ${dragging ? 'dragging' : ''} ${upgradeable ? 'can-upgrade' : ''} ${isOver ? 'upgrade-over' : ''}`}
+      className={`item-card paper-item-card ${itemTone(item.def)} ${qualityClass(item.quality)} ${selected ? 'selected' : ''} ${dragging ? 'dragging' : ''} ${upgradeable ? 'can-upgrade' : ''} ${isOver ? 'upgrade-over' : ''}`}
       style={style}
       onClick={(event) => {
         event.stopPropagation()
@@ -2355,7 +2355,7 @@ function DraggingItemOverlay({ item }: { item: Item | null }) {
   if (!item) return null
   return (
     <div
-      className={`drag-overlay-item item-card ${itemTone(item.def)} ${qualityClass(item.quality)}`}
+      className={`drag-overlay-item item-card paper-item-card ${itemTone(item.def)} ${qualityClass(item.quality)}`}
       style={{ width: `calc(${item.def.width} * var(--slot-w))`, height: `calc(${item.def.height} * var(--board-slot-h))` }}
     >
       <ItemCardContent item={item} />
@@ -2373,7 +2373,7 @@ function FloatingTip({ run, item, offer, anchor, onClose, onBuy, onSell, onUpgra
   const sellValue = item ? sellValueForItem(item.def) : null
   const style = anchor ? { '--tip-x': `${anchor.x}px`, '--tip-y': `${anchor.y}px` } as React.CSSProperties : undefined
   return (
-    <aside className="floating-tip" style={style}>
+    <aside className="floating-tip paper-card" style={style}>
       <div className="tip-tags">
         <span className={`size-badge ${itemTone(def)}`}>{def.size}格</span>
         <span className={`tip-tag ${qualityClass(quality)}`}>{qualityLabel[quality]}</span>
@@ -2459,7 +2459,7 @@ function BattleView({ run, battle, currentEvent, eventIndex, speed, score, onSpe
   const isFinished = Boolean(playback && (!battle || eventIndex >= events.length - 1))
 
   return (
-    <section className="battle-panel visual-battle">
+    <section className="battle-panel visual-battle sketch-panel">
       <div className="battle-toolbar">
         <div>
           <h2>自动战斗</h2>
@@ -2495,7 +2495,7 @@ function BattleView({ run, battle, currentEvent, eventIndex, speed, score, onSpe
       )}
 
       {run.phase === 'COMPLETE' ? (
-        <div className="result">
+        <div className="result handdrawn-result paper-card">
           <Trophy size={32} />
           <h2>跑局结束</h2>
           <p>{run.wins} 胜 / {run.losses} 败 · 积分 {score}</p>
@@ -2519,7 +2519,7 @@ function BattleEquipmentRow({ owner, snapshot, activeEvent, onInspect }: { owner
   const activeItemId = activeEvent?.actor === owner && activeEvent.kind === 'ITEM' ? activeEvent.itemId : null
   const slots = equipmentSlotCount(snapshot.relics)
   return (
-    <div className={`battle-equipment-row ${owner}`}>
+    <div className={`battle-equipment-row ${owner} sketch-panel`}>
       <div className="battle-row-title">
         <span>{owner === 'player' ? '你的装备栏' : '对手装备栏'}</span>
         <small>{snapshot.name} · {dogNames[snapshot.dogType]}</small>
@@ -2530,7 +2530,7 @@ function BattleEquipmentRow({ owner, snapshot, activeEvent, onInspect }: { owner
           <button
             type="button"
             key={item.id}
-            className={`battle-item item-card ${itemTone(item.def)} ${qualityClass(item.quality)} ${activeItemId === item.id ? 'active' : ''}`}
+            className={`battle-item item-card paper-item-card ${itemTone(item.def)} ${qualityClass(item.quality)} ${activeItemId === item.id ? 'active' : ''}`}
             style={{
               gridColumn: `${item.x + 1} / span ${item.def.width}`,
               gridRow: 1,
@@ -2557,7 +2557,7 @@ function BattleStage({ player, opponent, event, lastRoll, speed, finished, winne
   const playerShield = event?.playerShield ?? 0
   const opponentShield = event?.opponentShield ?? 0
   return (
-    <div className="battle-stage">
+    <div className="battle-stage handdrawn-stage">
       <BattleFxCanvas event={event} speed={speed} />
       <BattleDog
         side="opponent"
@@ -2600,7 +2600,7 @@ function BattleDog({ side, snapshot, hp, maxHp, shield, event, finished, winner 
   const poisonPreviewPercent = maxHp > 0 ? ((poisonStatus?.tickDamage ?? 0) / maxHp) * 100 : 0
   const poisonPreviewLeft = Math.max(0, Math.min(100, hpPercent - poisonPreviewPercent))
   return (
-    <div className={`battle-dog ${side} ${isActor ? 'attacking' : ''} ${isTarget && event?.effectType !== 'HEAL' ? 'hit' : ''} ${healing ? 'healing' : ''} ${poisonStatus ? 'poisoned' : ''} ${won ? 'winner' : ''} ${lost ? 'loser' : ''}`}>
+    <div className={`battle-dog ${side} ${isActor ? 'attacking' : ''} ${isTarget && event?.effectType !== 'HEAL' ? 'hit' : ''} ${healing ? 'healing' : ''} ${shieldValue > 0 ? 'status-shield' : ''} ${poisonStatus ? 'poisoned status-poison' : ''} ${won ? 'winner' : ''} ${lost ? 'loser' : ''}`}>
       <div className="hp">
         <span><HeartPulse size={16} /> {snapshot.name}</span>
         <StatusEffectRow tone="positive" statuses={positiveStatuses} />
@@ -2629,8 +2629,8 @@ function StatusEffectRow({ tone, statuses }: { tone: 'positive' | 'negative'; st
   const hidden = statuses.length - visible.length
   return (
     <div className={`status-effects ${tone}`}>
-      {visible.map((status) => <span key={`${tone}-${status.type}`} className={`status-chip ${status.type}`}>{statusText(status)}</span>)}
-      {hidden > 0 && <span className="status-chip more" title={statuses.map(statusText).join(' / ')}>+{hidden}</span>}
+      {visible.map((status) => <span key={`${tone}-${status.type}`} className={`status-chip handdrawn-status-chip ${status.type}`}>{statusText(status)}</span>)}
+      {hidden > 0 && <span className="status-chip handdrawn-status-chip more" title={statuses.map(statusText).join(' / ')}>+{hidden}</span>}
     </div>
   )
 }
@@ -2647,7 +2647,7 @@ function BattleDice({ event, lastRoll }: { event?: BattleEvent; lastRoll?: Battl
   const actor = event?.kind === 'ROLL' ? event.actor : lastRoll?.actor ?? event?.actor
   const roll = event?.roll ?? lastRoll?.roll
   return (
-    <div className={`battle-dice ${event?.kind === 'ROLL' ? 'rolling' : ''}`}>
+    <div className={`battle-dice handdrawn-dice ${event?.kind === 'ROLL' ? 'rolling' : ''}`}>
       <Dice5 size={32} />
       <b>{roll ?? '-'}</b>
       <span>{actor === 'opponent' ? '对手掷骰' : actor === 'player' ? '玩家掷骰' : '战斗结算'}</span>
@@ -2718,7 +2718,7 @@ function BattleFxCanvas({ event, speed }: { event?: BattleEvent; speed: number }
     return () => window.cancelAnimationFrame(frame)
   }, [event, speed])
 
-  return <canvas ref={canvasRef} className="battle-fx-canvas" aria-hidden="true" />
+  return <canvas ref={canvasRef} className="battle-fx-canvas handdrawn-fx-canvas" aria-hidden="true" />
 }
 
 function createBattleParticles(event: BattleEvent, x: number, y: number) {
