@@ -200,6 +200,7 @@ describe('selection screen structure', () => {
     expect(app).toContain('/settle')
     expect(app).toContain("run.status === 'ACTIVE'")
     expect(app).toContain("run.phase !== 'BATTLE'")
+    expect(app).toContain("{!battle && !showClassRewardCeremony && run.status === 'ACTIVE' && run.phase !== 'BATTLE' && (")
     expect(app).toContain('onForfeit={() => void settleRun()}')
     expect(css).toContain('.forfeit-run-action')
   })

@@ -1138,7 +1138,7 @@ export default function App() {
           onRestart={() => setRun(null)}
         />
       )}
-      {!battle && run.status === 'ACTIVE' && run.phase !== 'BATTLE' && (
+      {!battle && !showClassRewardCeremony && run.status === 'ACTIVE' && run.phase !== 'BATTLE' && (
         <ForfeitRunAction run={run} onForfeit={() => void settleRun()} />
       )}
     </Shell>
