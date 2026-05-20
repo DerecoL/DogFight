@@ -509,6 +509,42 @@ describe('battle simulation', () => {
     expect(nextPlayerEvent).not.toMatchObject({ itemId: 'counter', effectType: 'HEAL' })
   })
 
+  it('replaced small items do not count toward boom counter', () => {
+    const player: FighterSnapshot = {
+      name: 'P',
+      dogType: 'BULLY',
+      wins: 0,
+      losses: 0,
+      round: 10,
+      items: [
+        ...Array.from({ length: 10 }, (_, index) => ({
+          id: `small-${index}`,
+          defId: 'starter-1',
+          quality: 'BRONZE' as const,
+          area: 'EQUIPMENT' as const,
+          x: index,
+          y: 0,
+        })),
+        { id: 'counter', defId: 'v4-boom-counter', quality: 'GOLD', area: 'EQUIPMENT', x: 10, y: 0 },
+        { id: 'sacrifice', defId: 'bully-sacrifice', quality: 'DIAMOND', area: 'EQUIPMENT', x: 12, y: 0 },
+        { id: 'large', defId: 'giant-bone', quality: 'BRONZE', area: 'EQUIPMENT', x: 16, y: 0 },
+      ],
+    }
+    const opponent: FighterSnapshot = { name: 'O', dogType: 'SHIBA', wins: 0, losses: 0, round: 10, items: [] }
+    const result = simulateBattle(player, opponent, 'sacrifice-boom-4')
+    const firstPlayerRoll = result.events.find((event) => event.kind === 'ROLL' && event.actor === 'player')
+    const firstRollBoom = result.events.find((event) =>
+      event.time === firstPlayerRoll?.time
+      && event.actor === 'player'
+      && event.itemId === 'counter'
+      && event.defId === 'v4-boom-counter'
+      && event.effectType === 'DAMAGE'
+    )
+
+    expect(firstPlayerRoll?.roll).toBe(1)
+    expect(firstRollBoom).toBeUndefined()
+  })
+
   it('resolves deterministic battle logs with poison or victory', () => {
     const player: FighterSnapshot = { name: 'P', dogType: 'MUTT', wins: 0, losses: 0, round: 0, items: baseItems() }
     const opponent: FighterSnapshot = { name: 'O', dogType: 'SHIBA', wins: 0, losses: 0, round: 0, items: baseItems() }

@@ -440,7 +440,7 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
     }
 
     const boomCounterItem = equippedItemsWithEffect(actor, 'BOOM_COUNTER')[0]
-    if (boomCounterItem) {
+    if (!sacrificeReplacesSmallEffect && boomCounterItem) {
       actorState.boomCounter += 1
       if (actorState.boomCounter >= 30) {
         actorState.boomCounter = 0
