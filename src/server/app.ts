@@ -3,7 +3,7 @@ import cookie from '@fastify/cookie'
 import cors from '@fastify/cors'
 import jwt from '@fastify/jwt'
 import Fastify from 'fastify'
-import { Prisma, type ApexEntry } from '@prisma/client'
+import { Prisma, type ApexEntry, type ItemInstance } from '@prisma/client'
 import { z } from 'zod'
 import { cookieOptionsForEnv, resolveServerConfig } from './config'
 import { prisma } from './db'
@@ -21,6 +21,16 @@ import type { BattleResult, DogType, FighterSnapshot, GameItem, RelicInstance, S
 import { applyRelicChoice, classRewardChoices, createFinishedBattleRecord, initialItems, makeChoices, makeRelicChoices, makeShop, parseJson, postBattleLargeItemReward, publicLadderSettlement, publicRun, publicRunHistory, relicsFromRun, removeRelicByInstanceId, seedGhost, snapshotFromRun, toGameItems } from './state'
 
 type PrismaTransaction = Prisma.TransactionClient
+type ApexSourceRun = {
+  id: string
+  dogType: string
+  luckyNumber: number | null
+  round: number
+  wins: number
+  losses: number
+  relics: string
+  items: ItemInstance[]
+}
 
 declare module 'fastify' {
   interface FastifyRequest {
@@ -276,7 +286,7 @@ export function buildApp() {
     boardType: ApexBoardType,
     boardKey: string,
     userId: string,
-    run: Awaited<ReturnType<typeof prisma.run.findFirstOrThrow>>,
+    run: ApexSourceRun,
     challengerName: string,
     report: ApexChallengeReport,
   ) => {
