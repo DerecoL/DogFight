@@ -15,7 +15,7 @@ import { canPlace, findSlot, type PlacementOptions } from './game/grid'
 import { canUpgradePair, nextQuality, normalizeQuality } from './game/quality'
 import { itemSellValue } from './game/shop'
 import { simulateBattle } from './game/battle'
-import { STARTING_GOLD, isTrainingMatchRound } from './game/matchmaking'
+import { STARTING_GOLD, isTrainingMatchRound, selectCasualGhostSnapshot, targetOpponentWins } from './game/matchmaking'
 import type { BattleResult, DogType, FighterSnapshot, GameItem, RelicInstance, ShopOffer, ShopType } from './game/types'
 import { applyRelicChoice, classRewardChoices, createFinishedBattleRecord, initialItems, makeChoices, makeRelicChoices, makeShop, parseJson, postBattleLargeItemReward, publicRun, publicRunHistory, relicsFromRun, seedGhost, snapshotFromRun, toGameItems } from './state'
 
@@ -72,6 +72,13 @@ export function buildApp() {
   }).refine((body) => body.account || body.email, { message: '账号不能为空' })
 
   const authAccountFrom = (body: z.infer<typeof authBodySchema>) => normalizeAccount(body.account ?? body.email ?? '')
+  const isUniqueAccountError = (error: unknown) => {
+    const message = error instanceof Error ? error.message : ''
+    return (
+      ((error instanceof Prisma.PrismaClientKnownRequestError || (typeof error === 'object' && error !== null && 'code' in error)) && (error as { code?: string }).code === 'P2002')
+      || (message.includes('duplicate key value') && message.includes('User_account_key'))
+    )
+  }
 
   const publicUser = (user: { id: string; account: string; nickname: string | null }) => ({
     id: user.id,
@@ -171,9 +178,7 @@ export function buildApp() {
     const passwordHash = await bcrypt.hash(body.password, 10)
     const account = authAccountFrom(body)
     const user = await prisma.user.create({ data: { account, passwordHash } }).catch((error: unknown) => {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-        return null
-      }
+      if (isUniqueAccountError(error)) return null
       throw error
     })
     if (!user) return reply.code(409).send({ error: '账号已注册，请直接登录' })
@@ -580,15 +585,25 @@ export function buildApp() {
         seed: `${run.id}-${run.round}-${run.wins}-${run.losses}`,
       },
     })
-    const ghost = isTrainingMatchRound(run.round)
+    const opponentWins = targetOpponentWins(run.wins)
+    const ghostCandidates = isTrainingMatchRound(run.round)
       ? null
-      : await prisma.ghostSnapshot.findFirst({
-        where: { round: run.round, NOT: { runId: run.id }, wins: { gte: Math.max(0, run.wins - 1), lte: run.wins + 1 }, losses: { gte: Math.max(0, run.losses - 1), lte: run.losses + 1 } },
+      : await prisma.ghostSnapshot.findMany({
+        where: {
+          round: run.round,
+          NOT: [{ runId: run.id }, { userId }],
+          wins: { gte: opponentWins, lte: run.wins },
+          losses: { gte: Math.max(0, run.losses - 1), lte: run.losses + 1 },
+        },
         orderBy: { createdAt: 'desc' },
+        take: 50,
       })
+    const ghost = ghostCandidates
+      ? selectCasualGhostSnapshot(ghostCandidates, { wins: run.wins, seed: `${run.id}-${run.round}-${run.wins}-${run.losses}` })
+      : null
     const opponent = ghost
       ? { name: ghost.name, dogType: ghost.dogType as DogType, luckyNumber: ghost.luckyNumber, wins: ghost.wins, losses: ghost.losses, round: ghost.round, items: parseJson(ghost.items, []), relics: parseJson(ghost.relics, []) }
-      : seedGhost(run.round, run.wins, run.losses)
+      : seedGhost(run.round, opponentWins, run.losses)
     const updated = await prisma.run.update({
       where: { id: run.id },
       data: { phase: 'MATCH', matchedGhost: JSON.stringify({ ...opponent, ghostId: ghost?.id ?? null }) },

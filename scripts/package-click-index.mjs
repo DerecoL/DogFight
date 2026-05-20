@@ -1068,7 +1068,7 @@ async function currentMockApiScript(buildId) {
   }
 
   function createGhost(run) {
-    return buildOfflineFighter({ round: run.round, wins: run.wins, losses: run.losses });
+    return buildOfflineFighter({ round: run.round, wins: Math.max(0, run.wins - 1), losses: run.losses });
   }
 
   function snapshot(name, runOrGhost) {

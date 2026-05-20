@@ -336,7 +336,10 @@ describe('buildStandaloneIndex', () => {
       ghostState.run.matchedGhost = null
       localStorage.setItem(storageKey, JSON.stringify(ghostState))
       const matched = await readJson(await window.fetch(`/api/runs/${runId}/battle/match`, { method: 'POST', body: '{}' }))
-      expect(matched.run.matchedGhost.items.some((item) => item.defId.startsWith('mutt-'))).toBe(true)
+      expect(matched.run.matchedGhost.wins).toBe(4)
+      expect(matched.run.matchedGhost.items.some((item) =>
+        ['shiba-', 'samoyed-', 'mutt-', 'bully-', 'emperor-'].some((prefix) => item.defId.startsWith(prefix)),
+      )).toBe(true)
       expect(matched.run.matchedGhost.relics.length).toBeGreaterThan(0)
     } finally {
       await rm(root, { recursive: true, force: true })

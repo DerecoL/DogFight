@@ -98,6 +98,72 @@ describeWithDatabase('run API', () => {
     expect(battled.body.battle.opponentSnapshot.name).toBe('猛犬教练')
   })
 
+  it('prefers weaker non-self ghosts for casual matchmaking', async () => {
+    const agent = request.agent(app.server)
+    await app.ready()
+
+    const account = `match-relief-${Date.now()}`
+    const registered = await agent.post('/api/auth/register').send({ account, password: 'dogdice' }).expect(200)
+    const created = await agent.post('/api/runs').send({ dogType: 'SHIBA' }).expect(200)
+    const runId = created.body.run.id
+    await prisma.run.update({
+      where: { id: runId },
+      data: { round: 6, wins: 5, losses: 1 },
+    })
+
+    await prisma.ghostSnapshot.createMany({
+      data: [
+        {
+          runId: 'self-old-run',
+          userId: registered.body.user.id,
+          name: 'Self Old Ghost',
+          dogType: 'BULLY',
+          round: 6,
+          wins: 4,
+          losses: 1,
+          gold: 0,
+          items: '[]',
+          relics: '[]',
+          seed: 'self-old',
+        },
+        {
+          runId: 'same-win-run',
+          userId: 'other-user-same',
+          name: 'Same Wins Ghost',
+          dogType: 'SAMOYED',
+          round: 6,
+          wins: 5,
+          losses: 1,
+          gold: 0,
+          items: '[]',
+          relics: '[]',
+          seed: 'same-win',
+        },
+        {
+          runId: 'lower-win-run',
+          userId: 'other-user-lower',
+          name: 'Lower Wins Ghost',
+          dogType: 'MUTT',
+          round: 6,
+          wins: 4,
+          losses: 1,
+          gold: 0,
+          items: '[]',
+          relics: '[]',
+          seed: 'lower-win',
+        },
+      ],
+    })
+
+    const matched = await agent.post(`/api/runs/${runId}/battle/match`).send({}).expect(200)
+
+    expect(matched.body.run.matchedGhost).toMatchObject({
+      ghostId: expect.any(String),
+      name: 'Lower Wins Ghost',
+      wins: 4,
+    })
+  })
+
   it('uses offline training opponents for the first two rounds even when real ghosts exist', async () => {
     const first = request.agent(app.server)
     const second = request.agent(app.server)
