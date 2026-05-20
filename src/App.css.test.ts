@@ -173,6 +173,18 @@ describe('equipment layout scale', () => {
     expect(cssRule('.reward-choice.selected')).toContain('var(--selection-wash)')
   })
 
+  it('adds fifth-pass handdrawn feedback detail to controls, logs, and history overlays', () => {
+    expect(css).toMatch(/\.action-button::after,[\s\S]*\.log-toggle::after\s*\{[\s\S]*content: ""/)
+    expect(css).toMatch(/\.action-button:hover,[\s\S]*\.log-toggle:hover\s*\{[\s\S]*rotate/)
+    expect(cssRule('.speed-row .active::after')).toContain('content: ""')
+    expect(cssRule('.battle-log::before')).toContain('var(--paper-fiber)')
+    expect(cssRule('.battle-log p::before')).toContain('content: ""')
+    expect(cssRule('.battle-log p.system::before')).toContain('#ffe08a')
+    expect(cssRule('.player-history-page::before')).toContain('radial-gradient')
+    expect(cssRule('.history-detail-row.selected::before')).toContain('var(--selection-wash)')
+    expect(cssRule('.history-empty-state::before')).toContain('border')
+  })
+
   it('keeps explanatory copy separated from nearby headings', () => {
     for (const selector of ['.auth-panel .brand-block > div', '.section-title > div', '.battle-toolbar > div']) {
       const rule = cssRule(selector)

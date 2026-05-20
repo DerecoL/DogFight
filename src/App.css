@@ -1234,6 +1234,20 @@ input {
 .speed-row { padding: 5px; border-radius: 999px; background: #fff; border: 1px solid var(--line); }
 .speed-row button { min-height: 32px; padding: 6px 10px; border-radius: 999px; background: transparent; color: #475467; font-weight: 900; }
 .speed-row .active { background: var(--blue); color: #fff; }
+.speed-row .active {
+  position: relative;
+  overflow: hidden;
+}
+.speed-row .active::after {
+  content: "";
+  position: absolute;
+  inset: 3px 8px auto;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .44);
+  transform: rotate(-2deg);
+  pointer-events: none;
+}
 .result { display: grid; justify-items: center; gap: 10px; padding: 16px; }
 
 .visual-battle {
@@ -1483,6 +1497,8 @@ input {
   place-items: center;
 }
 .log-toggle {
+  position: relative;
+  overflow: hidden;
   min-height: 34px;
   padding: 6px 12px;
   border-radius: 999px;
@@ -1660,9 +1676,35 @@ input {
 .primary,
 .secondary,
 .danger-button {
+  position: relative;
+  overflow: hidden;
   min-height: 40px;
   padding: 7px 14px;
   border-radius: 7px;
+}
+
+.action-button::after,
+.primary::after,
+.secondary::after,
+.danger-button::after,
+.log-toggle::after {
+  content: "";
+  position: absolute;
+  inset: 4px 5px auto;
+  height: 34%;
+  border-radius: 6px 6px 3px 3px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, .42), rgba(255, 255, 255, 0));
+  pointer-events: none;
+  transform: rotate(-.45deg);
+}
+
+.action-button:hover,
+.primary:hover,
+.secondary:hover,
+.danger-button:hover,
+.log-toggle:hover {
+  transform: translateY(-1px) rotate(-.35deg);
+  box-shadow: 5px 6px 0 rgba(61, 45, 37, .22);
 }
 
 button.primary.action-button,
@@ -1954,6 +1996,7 @@ input {
 }
 
 .player-history-page {
+  position: relative;
   min-width: 0;
   min-height: 0;
   display: grid;
@@ -1965,6 +2008,24 @@ input {
   border: 3px solid var(--ink);
   border-radius: 10px;
   box-shadow: 8px 10px 0 rgba(24, 18, 14, .34);
+}
+
+.player-history-page::before {
+  content: "";
+  position: absolute;
+  inset: 10px;
+  border-radius: 8px;
+  background:
+    radial-gradient(circle at 18% 16%, rgba(255, 255, 255, .44), transparent 22%),
+    radial-gradient(circle at 86% 22%, rgba(255, 216, 107, .16), transparent 20%),
+    var(--paper-fiber);
+  opacity: .62;
+  pointer-events: none;
+}
+
+.player-history-page > * {
+  position: relative;
+  z-index: 1;
 }
 
 .history-page-header {
@@ -2052,6 +2113,7 @@ input {
 }
 
 .history-detail-row {
+  position: relative;
   min-width: 0;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
@@ -2063,11 +2125,28 @@ input {
   background: var(--paper);
   border: 2px solid rgba(61, 45, 37, .28);
   border-radius: 8px;
+  overflow: hidden;
 }
 
 .history-detail-row.selected {
   border-color: var(--ink);
   background: #fff7d6;
+}
+
+.history-detail-row.selected::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    var(--selection-wash),
+    linear-gradient(135deg, rgba(255, 255, 255, .45), transparent 48%);
+  opacity: .85;
+  pointer-events: none;
+}
+
+.history-detail-row > * {
+  position: relative;
+  z-index: 1;
 }
 
 .history-detail-row img {
@@ -2090,12 +2169,22 @@ input {
 }
 
 .history-empty-state {
+  position: relative;
   display: grid;
   gap: 6px;
   padding: 18px;
   background: var(--paper);
   border: 2px dashed rgba(61, 45, 37, .35);
   border-radius: 8px;
+}
+
+.history-empty-state::before {
+  content: "";
+  position: absolute;
+  inset: 8px;
+  border: 1px dashed rgba(61, 45, 37, .2);
+  border-radius: 6px;
+  pointer-events: none;
 }
 
 .history-run-details {
@@ -2846,8 +2935,46 @@ input {
 }
 
 .battle-log {
+  position: relative;
   background: var(--paper);
   color: var(--ink);
+}
+.battle-log::before {
+  content: "";
+  position: absolute;
+  inset: 8px;
+  border-radius: 8px;
+  background:
+    var(--paper-fiber),
+    linear-gradient(180deg, rgba(255, 255, 255, .28), transparent);
+  opacity: .58;
+  pointer-events: none;
+}
+.battle-log p {
+  position: relative;
+  z-index: 1;
+  padding-left: 14px;
+}
+.battle-log p::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: .88em;
+  width: 7px;
+  height: 7px;
+  border: 1px solid rgba(61, 45, 37, .42);
+  border-radius: 999px;
+  background: #b9d7ff;
+  transform: rotate(-8deg);
+}
+.battle-log p.opponent::before {
+  background: #ffb4c6;
+}
+.battle-log p.system::before {
+  background: #ffe08a;
+}
+.battle-log p.poison::before {
+  background: #7fe3a7;
 }
 
 .shop-shelf.sketch-panel {
