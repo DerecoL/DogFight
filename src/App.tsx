@@ -34,6 +34,7 @@ import {
   Trophy,
   VolumeX,
 } from 'lucide-react'
+import { resolveSlotPlacement } from './placement'
 import './App.css'
 
 type DogType = 'SHIBA' | 'SAMOYED' | 'MUTT' | 'BULLY' | 'EMPEROR'
@@ -102,6 +103,8 @@ type BattleEvent = {
   sourceHpDelta?: number
   targetHpDelta?: number
 }
+type BattleVfxKind = 'none' | 'roll' | 'damage' | 'heal' | 'shield' | 'poison' | 'weak' | 'freeze' | 'thorns' | 'miss' | 'utility'
+type BattleVfxStyle = { kind: BattleVfxKind; color: string; accent: string; prefix: string; particleCount: number }
 type Battle = {
   winner: string
   duration: number
@@ -464,6 +467,53 @@ function equipmentSlotCount(relics?: Relic[]) {
   return relics?.some((relic) => relic.def.effect === 'EXTRA_EQUIPMENT_REDUCED_EFFECT') ? EXTRA_EQUIPMENT_SLOT_COUNT : BASE_EQUIPMENT_SLOT_COUNT
 }
 
+function battleEventHasStatus(event: BattleEvent, type: string) {
+  const rows = [event.playerStatuses, event.opponentStatuses]
+  return rows.some((row) => [...(row?.positive ?? []), ...(row?.negative ?? [])].some((status) => status.type === type))
+}
+
+function battleVfxKind(event?: BattleEvent): BattleVfxKind {
+  if (!event) return 'none'
+  if (event.kind === 'ROLL') return 'roll'
+  if (event.effectType === 'DAMAGE') return event.targetHpDelta === 0 ? 'miss' : 'damage'
+  if (event.effectType === 'HEAL') return 'heal'
+  if (event.effectType === 'POISON' || event.kind === 'POISON') return 'poison'
+  if (event.effectType === 'UTILITY') {
+    if (battleEventHasStatus(event, 'shield') || (event.actor === 'player' ? event.playerShield : event.opponentShield)) return 'shield'
+    if (battleEventHasStatus(event, 'weak')) return 'weak'
+    if (battleEventHasStatus(event, 'freeze')) return 'freeze'
+    if (battleEventHasStatus(event, 'thorns')) return 'thorns'
+    if (battleEventHasStatus(event, 'disabled')) return 'miss'
+    return 'utility'
+  }
+  return 'utility'
+}
+
+function battleVfxTargetSide(event?: BattleEvent): 'player' | 'opponent' | null {
+  if (!event) return null
+  if (event.target === 'player' || event.target === 'opponent') return event.target
+  if ((event.effectType === 'HEAL' || battleVfxKind(event) === 'shield' || battleVfxKind(event) === 'thorns') && (event.actor === 'player' || event.actor === 'opponent')) return event.actor
+  return null
+}
+
+const battleVfxStyles: Record<BattleVfxKind, BattleVfxStyle> = {
+  none: { kind: 'none', color: '#8b735d', accent: '#fff4e4', prefix: '', particleCount: 0 },
+  roll: { kind: 'roll', color: '#5a84f6', accent: '#ffe08a', prefix: '', particleCount: 18 },
+  damage: { kind: 'damage', color: '#ef4444', accent: '#fbbf24', prefix: '-', particleCount: 26 },
+  heal: { kind: 'heal', color: '#16a34a', accent: '#86efac', prefix: '+', particleCount: 24 },
+  shield: { kind: 'shield', color: '#2563eb', accent: '#93c5fd', prefix: '+', particleCount: 22 },
+  poison: { kind: 'poison', color: '#22c55e', accent: '#a7f3d0', prefix: '+', particleCount: 32 },
+  weak: { kind: 'weak', color: '#7c3aed', accent: '#ddd6fe', prefix: '', particleCount: 20 },
+  freeze: { kind: 'freeze', color: '#38bdf8', accent: '#dbeafe', prefix: '', particleCount: 22 },
+  thorns: { kind: 'thorns', color: '#b7791f', accent: '#fde68a', prefix: '+', particleCount: 24 },
+  miss: { kind: 'miss', color: '#8b735d', accent: '#e7d7c4', prefix: '', particleCount: 12 },
+  utility: { kind: 'utility', color: '#5a84f6', accent: '#bfdbfe', prefix: '', particleCount: 18 },
+}
+
+function createBattleFxStyle(event: BattleEvent) {
+  return battleVfxStyles[battleVfxKind(event)]
+}
+
 function effectText(def: ItemDef, quality: ItemQuality = 'BRONZE') {
   const amount = qualityAmountFrom(def.effect.amount, quality, def.effect.qualityBase)
   if (def.effect.type === 'HEAL') return `回复 ${amount} 生命`
@@ -518,6 +568,14 @@ function parseSlotId(id: string) {
   const [area, x, y] = id.split(':')
   if ((area !== 'EQUIPMENT' && area !== 'BAG') || x == null || y == null) return null
   return { area: area as Area, x: Number(x), y: Number(y) }
+}
+
+function gridWidthForArea(run: Run, area: Area) {
+  return area === 'EQUIPMENT' ? equipmentSlotCount(run.relics) : BASE_EQUIPMENT_SLOT_COUNT
+}
+
+function resolveRunSlotPlacement(run: Run, itemId: string, area: Area, x: number, y: number) {
+  return resolveSlotPlacement(run.items, itemId, area, x, y, gridWidthForArea(run, area))
 }
 
 function getFloatingTipPosition(element: HTMLElement): TipAnchor {
@@ -702,7 +760,8 @@ export default function App() {
 
   const moveItem = (itemId: string, area: Area, x: number, y: number) => {
     if (!run) return
-    void action(() => api(`/runs/${run.id}/items/move`, { method: 'POST', body: JSON.stringify({ itemId, area, x, y }) }))
+    const placement = resolveRunSlotPlacement(run, itemId, area, x, y)
+    void action(() => api(`/runs/${run.id}/items/move`, { method: 'POST', body: JSON.stringify({ itemId, area: placement?.area ?? area, x: placement?.x ?? x, y: placement?.y ?? y }) }))
   }
 
   const upgradeItem = (itemId: string, targetItemId?: string) => {
@@ -1451,7 +1510,8 @@ function DogfightRoomView({ room, onRoomChange, onLeave }: { room: DogfightRoom;
 
   const moveItem = (itemId: string, area: Area, x: number, y: number) => {
     if (!run) return
-    void runAction(() => api<{ run: Run }>(`/runs/${run.id}/items/move`, { method: 'POST', body: JSON.stringify({ itemId, area, x, y }) }))
+    const placement = resolveRunSlotPlacement(run, itemId, area, x, y)
+    void runAction(() => api<{ run: Run }>(`/runs/${run.id}/items/move`, { method: 'POST', body: JSON.stringify({ itemId, area: placement?.area ?? area, x: placement?.x ?? x, y: placement?.y ?? y }) }))
   }
 
   const upgradeItem = (itemId: string, targetItemId?: string) => {
@@ -2517,6 +2577,7 @@ function BattleView({ run, battle, currentEvent, eventIndex, speed, score, onSpe
 function BattleEquipmentRow({ owner, snapshot, activeEvent, onInspect }: { owner: 'player' | 'opponent'; snapshot: BattleSnapshot; activeEvent?: BattleEvent; onInspect: (item: Item, element: HTMLElement) => void }) {
   const items = snapshot.items.filter((item) => item.area === 'EQUIPMENT')
   const activeItemId = activeEvent?.actor === owner && activeEvent.kind === 'ITEM' ? activeEvent.itemId : null
+  const activeVfxKind = battleVfxKind(activeEvent)
   const slots = equipmentSlotCount(snapshot.relics)
   return (
     <div className={`battle-equipment-row ${owner} sketch-panel`}>
@@ -2530,7 +2591,8 @@ function BattleEquipmentRow({ owner, snapshot, activeEvent, onInspect }: { owner
           <button
             type="button"
             key={item.id}
-            className={`battle-item item-card paper-item-card ${itemTone(item.def)} ${qualityClass(item.quality)} ${activeItemId === item.id ? 'active' : ''}`}
+            className={`battle-item item-card paper-item-card ${itemTone(item.def)} ${qualityClass(item.quality)} ${activeItemId === item.id ? `active battle-item-trigger vfx-trigger-${activeVfxKind}` : ''}`}
+            data-vfx-kind={battleVfxKind(activeEvent)}
             style={{
               gridColumn: `${item.x + 1} / span ${item.def.width}`,
               gridRow: 1,
@@ -2586,8 +2648,11 @@ function BattleStage({ player, opponent, event, lastRoll, speed, finished, winne
 
 function BattleDog({ side, snapshot, hp, maxHp, shield, event, finished, winner }: { side: 'player' | 'opponent'; snapshot: BattleSnapshot; hp: number; maxHp: number; shield: number; event?: BattleEvent; finished: boolean; winner?: string }) {
   const isActor = event?.actor === side
-  const isTarget = event?.target === side || event?.target === 'both'
-  const healing = isActor && event?.effectType === 'HEAL'
+  const vfxKind = battleVfxKind(event)
+  const vfxTargetSide = battleVfxTargetSide(event)
+  const isTarget = vfxTargetSide === side || event?.target === 'both'
+  const isVfxTarget = isTarget && vfxKind !== 'none' && vfxKind !== 'roll'
+  const healing = isTarget && event?.effectType === 'HEAL'
   const lost = finished && winner && winner !== side
   const won = finished && winner === side
   const hpPercent = maxHp > 0 ? (hp / maxHp) * 100 : 0
@@ -2600,7 +2665,7 @@ function BattleDog({ side, snapshot, hp, maxHp, shield, event, finished, winner 
   const poisonPreviewPercent = maxHp > 0 ? ((poisonStatus?.tickDamage ?? 0) / maxHp) * 100 : 0
   const poisonPreviewLeft = Math.max(0, Math.min(100, hpPercent - poisonPreviewPercent))
   return (
-    <div className={`battle-dog ${side} ${isActor ? 'attacking' : ''} ${isTarget && event?.effectType !== 'HEAL' ? 'hit' : ''} ${healing ? 'healing' : ''} ${shieldValue > 0 ? 'status-shield' : ''} ${poisonStatus ? 'poisoned status-poison' : ''} ${won ? 'winner' : ''} ${lost ? 'loser' : ''}`}>
+    <div className={`battle-dog ${side} ${isActor ? 'attacking' : ''} ${isTarget && event?.effectType !== 'HEAL' ? 'hit' : ''} ${healing ? 'healing' : ''} ${isVfxTarget ? `vfx-target-${battleVfxKind(event)}` : ''} ${shieldValue > 0 ? 'status-shield' : ''} ${poisonStatus ? 'poisoned status-poison' : ''} ${won ? 'winner' : ''} ${lost ? 'loser' : ''}`}>
       <div className="hp">
         <span><HeartPulse size={16} /> {snapshot.name}</span>
         <StatusEffectRow tone="positive" statuses={positiveStatuses} />
@@ -2673,10 +2738,12 @@ function BattleFxCanvas({ event, speed }: { event?: BattleEvent; speed: number }
       return rect
     }
     let rect = resize()
-    const targetX = event.target === 'player' ? rect.width * 0.74 : event.target === 'opponent' ? rect.width * 0.26 : rect.width * 0.5
+    const fx = createBattleFxStyle(event)
+    const targetSide = battleVfxTargetSide(event)
+    const targetX = targetSide === 'player' ? rect.width * 0.74 : targetSide === 'opponent' ? rect.width * 0.26 : rect.width * 0.5
     const actorX = event.actor === 'player' ? rect.width * 0.74 : event.actor === 'opponent' ? rect.width * 0.26 : rect.width * 0.5
     const centerY = rect.height * 0.5
-    const particles = createBattleParticles(event, event.effectType === 'HEAL' ? actorX : targetX, centerY)
+    const particles = createBattleParticles(event, fx, targetX, centerY)
     const started = performance.now()
     const duration = Math.max(260, 760 / speed)
     let frame = 0
@@ -2685,6 +2752,7 @@ function BattleFxCanvas({ event, speed }: { event?: BattleEvent; speed: number }
       rect = resize()
       const t = Math.min(1, (now - started) / duration)
       context.clearRect(0, 0, rect.width, rect.height)
+      drawBattleFxTrail(context, actorX, targetX, centerY, t, fx)
       for (const particle of particles) {
         const x = particle.x + particle.vx * t
         const y = particle.y + particle.vy * t
@@ -2703,14 +2771,7 @@ function BattleFxCanvas({ event, speed }: { event?: BattleEvent; speed: number }
           context.fill()
         }
       }
-      if (event.amount && event.kind !== 'ROLL') {
-        context.globalAlpha = Math.max(0, 1 - t)
-        context.font = '900 28px Inter, Microsoft YaHei, sans-serif'
-        context.textAlign = 'center'
-        context.fillStyle = event.effectType === 'HEAL' ? '#16a34a' : event.effectType === 'POISON' ? '#22c55e' : '#ef4444'
-        const prefix = event.effectType === 'HEAL' ? '+' : '-'
-        context.fillText(`${prefix}${event.amount}`, targetX, centerY - 46 - t * 34)
-      }
+      drawHandwrittenBattleNumber(context, event, fx, targetX, centerY, t)
       context.globalAlpha = 1
       if (t < 1) frame = window.requestAnimationFrame(draw)
     }
@@ -2718,19 +2779,54 @@ function BattleFxCanvas({ event, speed }: { event?: BattleEvent; speed: number }
     return () => window.cancelAnimationFrame(frame)
   }, [event, speed])
 
-  return <canvas ref={canvasRef} className="battle-fx-canvas handdrawn-fx-canvas" aria-hidden="true" />
+  return <canvas ref={canvasRef} className="battle-fx-canvas handdrawn-fx-canvas" data-vfx-kind={battleVfxKind(event)} aria-hidden="true" />
 }
 
-function createBattleParticles(event: BattleEvent, x: number, y: number) {
+function drawBattleFxTrail(context: CanvasRenderingContext2D, actorX: number, targetX: number, centerY: number, t: number, fx: BattleVfxStyle) {
+  if (fx.kind === 'none' || fx.kind === 'roll' || actorX === targetX) return
+  const progress = Math.min(1, t * 1.35)
+  const currentX = actorX + (targetX - actorX) * progress
+  const lift = fx.kind === 'heal' || fx.kind === 'shield' ? -42 : -26
+  context.save()
+  context.globalAlpha = Math.max(0, .78 - t * .55)
+  context.strokeStyle = fx.color
+  context.lineWidth = 4
+  context.lineCap = 'round'
+  context.setLineDash([10, 9])
+  context.beginPath()
+  context.moveTo(actorX, centerY + 4)
+  context.quadraticCurveTo((actorX + targetX) / 2, centerY + lift, currentX, centerY)
+  context.stroke()
+  context.setLineDash([])
+  context.fillStyle = fx.accent
+  context.beginPath()
+  context.arc(currentX, centerY - 4, 7 + 4 * (1 - t), 0, Math.PI * 2)
+  context.fill()
+  context.restore()
+}
+
+function drawHandwrittenBattleNumber(context: CanvasRenderingContext2D, event: BattleEvent, fx: BattleVfxStyle, targetX: number, centerY: number, t: number) {
+  if (!event.amount || event.kind === 'ROLL') return
+  const label = fx.kind === 'weak' ? '弱' : fx.kind === 'freeze' ? '冻' : fx.kind === 'miss' ? '抵消' : `${fx.prefix}${event.amount}`
+  context.save()
+  context.globalAlpha = Math.max(0, 1 - t)
+  context.font = '900 28px Inter, Microsoft YaHei, sans-serif'
+  context.textAlign = 'center'
+  context.lineWidth = 5
+  context.strokeStyle = 'rgba(255, 250, 241, .92)'
+  context.fillStyle = fx.color
+  const y = centerY - 46 - t * 34
+  context.translate(targetX, y)
+  context.rotate((fx.kind === 'damage' ? -2 : 1.2) * Math.PI / 180)
+  context.strokeText(label, 0, 0)
+  context.fillText(label, 0, 0)
+  context.restore()
+}
+
+function createBattleParticles(event: BattleEvent, fx: BattleVfxStyle, x: number, y: number) {
   const particles: Array<{ x: number; y: number; vx: number; vy: number; size: number; grow: number; alpha: number; color: string; kind: 'dot' | 'slash' }> = []
-  const palette = event.effectType === 'HEAL'
-    ? ['#34d399', '#86efac', '#22c55e']
-    : event.effectType === 'POISON'
-      ? ['#7c3aed', '#84cc16', '#a7f3d0']
-      : event.kind === 'ROLL'
-        ? ['#60a5fa', '#fbbf24', '#ffffff']
-        : ['#ef4444', '#fb7185', '#fbbf24']
-  const count = event.effectType === 'POISON' ? 32 : event.kind === 'ROLL' ? 18 : 24
+  const palette = [fx.color, fx.accent, event.kind === 'ROLL' ? '#ffffff' : '#fff4e4']
+  const count = fx.particleCount
   for (let index = 0; index < count; index += 1) {
     const angle = (Math.PI * 2 * index) / count
     const distance = 30 + (index % 5) * 12
@@ -2739,11 +2835,11 @@ function createBattleParticles(event: BattleEvent, x: number, y: number) {
       y: y + Math.sin(angle) * 8,
       vx: Math.cos(angle) * distance,
       vy: Math.sin(angle) * distance - (index % 3) * 10,
-      size: event.effectType === 'POISON' ? 9 + (index % 4) : 3 + (index % 5),
-      grow: event.effectType === 'POISON' ? 16 : event.effectType === 'HEAL' ? 10 : 4,
-      alpha: event.effectType === 'POISON' ? 0.32 : 0.82,
+      size: fx.kind === 'poison' ? 9 + (index % 4) : fx.kind === 'freeze' ? 5 + (index % 3) : 3 + (index % 5),
+      grow: fx.kind === 'poison' ? 16 : fx.kind === 'heal' || fx.kind === 'shield' ? 10 : 4,
+      alpha: fx.kind === 'poison' ? 0.32 : fx.kind === 'miss' ? 0.5 : 0.82,
       color: palette[index % palette.length],
-      kind: event.effectType === 'DAMAGE' && index % 4 === 0 ? 'slash' : 'dot',
+      kind: fx.kind === 'damage' && index % 4 === 0 ? 'slash' : 'dot',
     })
   }
   return particles

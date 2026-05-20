@@ -1329,6 +1329,19 @@ input {
   outline: 4px solid rgba(255, 255, 255, .95);
   box-shadow: 0 0 0 5px rgba(251, 191, 36, .38), 0 0 28px rgba(251, 191, 36, .9), inset 0 -26px 36px rgba(37, 48, 71, .10);
 }
+.battle-item-trigger {
+  animation: battleTriggerStamp .5s ease-out 1, itemPulse .58s ease-in-out 2;
+}
+.battle-item-trigger::after {
+  content: "";
+  position: absolute;
+  inset: 6px;
+  border: 2px dashed rgba(61, 45, 37, .35);
+  border-radius: inherit;
+  background: linear-gradient(110deg, transparent 20%, rgba(255, 255, 255, .55), transparent 70%);
+  pointer-events: none;
+  animation: paperShimmer .72s ease-out 1;
+}
 .battle-stage {
   position: relative;
   min-height: 250px;
@@ -1362,6 +1375,7 @@ input {
   transition: transform .18s ease, filter .18s ease, opacity .18s ease;
 }
 .battle-dog .hp {
+  position: relative;
   width: min(260px, 100%);
   padding: 7px;
   border: 1px solid var(--line);
@@ -1382,6 +1396,31 @@ input {
 .battle-dog.player.attacking { animation: playerLunge .36s ease; }
 .battle-dog.opponent.attacking { animation: opponentLunge .36s ease; }
 .battle-dog.hit { animation: dogHit .28s ease; }
+.battle-dog.vfx-target-damage .battle-dog-img {
+  animation: vfxDamageJolt .32s ease;
+  filter: drop-shadow(0 18px 24px rgba(112, 72, 30, .20)) drop-shadow(0 0 12px rgba(239, 68, 68, .45));
+}
+.battle-dog.vfx-target-heal .battle-dog-img {
+  filter: drop-shadow(0 18px 24px rgba(112, 72, 30, .20)) drop-shadow(0 0 16px rgba(52, 211, 153, .5));
+}
+.battle-dog.vfx-target-shield .hp::after {
+  content: "";
+  position: absolute;
+  inset: -6px;
+  border: 2px solid rgba(96, 165, 250, .72);
+  border-radius: 18px;
+  box-shadow: 0 0 14px rgba(96, 165, 250, .28);
+  pointer-events: none;
+}
+.battle-dog.vfx-target-poison .battle-dog-img {
+  filter: drop-shadow(0 18px 24px rgba(112, 72, 30, .20)) drop-shadow(0 0 15px rgba(34, 197, 94, .42)) saturate(1.16);
+}
+.battle-dog.vfx-target-weak .battle-dog-img {
+  filter: drop-shadow(0 18px 24px rgba(112, 72, 30, .20)) hue-rotate(24deg) saturate(.82);
+}
+.battle-dog.vfx-target-freeze .battle-dog-img {
+  filter: drop-shadow(0 18px 24px rgba(112, 72, 30, .20)) drop-shadow(0 0 14px rgba(56, 189, 248, .5));
+}
 .battle-dog.healing::after {
   content: "";
   position: absolute;
@@ -3436,6 +3475,17 @@ input {
 }
 @keyframes dicePop {
   50% { transform: translateY(-8px) scale(1.16) rotate(8deg); }
+}
+@keyframes battleTriggerStamp {
+  0% { transform: translateY(0) rotate(0); }
+  45% { transform: translateY(-5px) rotate(-2deg) scale(1.04); }
+  100% { transform: translateY(0) rotate(-.3deg) scale(1); }
+}
+@keyframes vfxDamageJolt {
+  0% { transform: translateX(0) rotate(0); }
+  30% { transform: translateX(-5px) rotate(-2deg); }
+  62% { transform: translateX(4px) rotate(1.4deg); }
+  100% { transform: translateX(0) rotate(0); }
 }
 
 @media (max-width: 1180px) {

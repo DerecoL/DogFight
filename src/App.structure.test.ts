@@ -241,7 +241,7 @@ describe('selection screen structure', () => {
   })
 
   it('highlights poison battle effects with green damage and log styling', () => {
-    expect(app).toContain("event.effectType === 'POISON' ? '#22c55e'")
+    expect(app).toContain("poison: { kind: 'poison', color: '#22c55e'")
     expect(css).toContain('.battle-log p.poison')
   })
 
@@ -400,5 +400,19 @@ describe('selection screen structure', () => {
     expect(app).toContain('rule-tip paper-card')
     expect(app).toContain('status-shield')
     expect(app).toContain('status-poison')
+  })
+
+  it('exposes stable hooks for the battle vfx causality pass', () => {
+    expect(app).toContain('function battleVfxKind')
+    expect(app).toContain('function battleVfxTargetSide')
+    expect(app).toContain('battle-item-trigger')
+    expect(app).toContain('data-vfx-kind={battleVfxKind(activeEvent)}')
+    expect(app).toContain('vfx-target-${battleVfxKind(event)}')
+    expect(app).toContain('createBattleFxStyle(event)')
+    expect(app).toContain('drawBattleFxTrail')
+    expect(app).toContain('drawHandwrittenBattleNumber')
+    expect(app).toContain("kind: 'shield'")
+    expect(app).toContain("kind: 'weak'")
+    expect(app).toContain("kind: 'freeze'")
   })
 })

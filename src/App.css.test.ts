@@ -185,6 +185,19 @@ describe('equipment layout scale', () => {
     expect(cssRule('.history-empty-state::before')).toContain('border')
   })
 
+  it('adds battle vfx causality styling for triggers, targets, and handwritten feedback', () => {
+    expect(cssRule('.battle-item-trigger')).toContain('animation')
+    expect(cssRule('.battle-item-trigger::after')).toContain('content: ""')
+    expect(cssRule('.battle-dog.vfx-target-damage .battle-dog-img')).toContain('filter')
+    expect(cssRule('.battle-dog.vfx-target-heal .battle-dog-img')).toContain('drop-shadow')
+    expect(cssRule('.battle-dog.vfx-target-shield .hp::after')).toContain('content: ""')
+    expect(cssRule('.battle-dog.vfx-target-poison .battle-dog-img')).toContain('saturate')
+    expect(cssRule('.battle-dog.vfx-target-weak .battle-dog-img')).toContain('hue-rotate')
+    expect(cssRule('.battle-dog.vfx-target-freeze .battle-dog-img')).toContain('drop-shadow')
+    expect(css).toContain('@keyframes battleTriggerStamp')
+    expect(css).toContain('@keyframes vfxDamageJolt')
+  })
+
   it('keeps explanatory copy separated from nearby headings', () => {
     for (const selector of ['.auth-panel .brand-block > div', '.section-title > div', '.battle-toolbar > div']) {
       const rule = cssRule(selector)
