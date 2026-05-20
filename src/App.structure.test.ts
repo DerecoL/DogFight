@@ -194,6 +194,16 @@ describe('selection screen structure', () => {
     expect(app).toContain("run.phase === 'BATTLE' && isFinished")
   })
 
+  it('offers active runs a confirmed forfeit settlement action outside battle playback', () => {
+    expect(app).toContain('function ForfeitRunAction')
+    expect(app).toContain('window.confirm')
+    expect(app).toContain('/settle')
+    expect(app).toContain("run.status === 'ACTIVE'")
+    expect(app).toContain("run.phase !== 'BATTLE'")
+    expect(app).toContain('onForfeit={() => void settleRun()}')
+    expect(css).toContain('.forfeit-run-action')
+  })
+
   it('does not show the previous battle snapshot outside playback', () => {
     expect(app).not.toContain('function LastBattleRecord')
     expect(app).not.toContain('<LastBattleRecord run={run} />')
