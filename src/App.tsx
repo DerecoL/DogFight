@@ -527,7 +527,7 @@ const ruleTerms: Record<string, { description: string; note: string }> = {
   小点: { description: '投掷出1~3点', note: '无' },
   大点: { description: '投掷出4~6点', note: '无' },
   极值: { description: '投掷出1和6点', note: '无' },
-  荆棘: { description: '每次受到攻击对敌方玩家造成3点伤害（可叠加）', note: '无' },
+  荆棘: { description: '每次受到攻击对敌方玩家造成2点伤害（可叠加）', note: '无' },
   中毒: { description: '造成2秒持续伤害，每秒结算1次（可叠加，叠加刷新持续时间）', note: '无' },
   虚弱: { description: '玩家的下次攻击造成的伤害减少50%（可叠加层数，不叠加效果）', note: '无' },
   大型物品: { description: '容量为4的物品', note: '恶霸袖标可让3格物品也按大型物品处理' },

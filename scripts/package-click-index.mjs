@@ -691,6 +691,7 @@ async function loadStandaloneGameData() {
     relicDefs: dataModule.RELIC_DEFS,
     itemDescriptions,
     shibaPoisonOnRollAmount: dataModule.SHIBA_POISON_ON_ROLL_AMOUNT,
+    thornsDamagePerStack: dataModule.THORNS_DAMAGE_PER_STACK,
   }
 }
 
@@ -711,6 +712,7 @@ async function currentMockApiScript(buildId) {
   const classRewardDefs = gameData.classRewardDefs;
   const relicDefs = gameData.relicDefs;
   const shibaPoisonOnRollAmount = gameData.shibaPoisonOnRollAmount;
+  const thornsDamagePerStack = gameData.thornsDamagePerStack;
   const allItemDefs = [...itemDefs, ...classRewardDefs];
   const defs = Object.fromEntries(allItemDefs.map((def) => [def.id, def]));
   const relicDefsById = Object.fromEntries(relicDefs.map((def) => [def.id, def]));
@@ -1592,6 +1594,11 @@ async function currentMockApiScript(buildId) {
             if (advanced === 'GROWTH_DAMAGE') state[side].growthDamageByItemId[item.id] = amount + growthDamageStep(quality);
             const growthText = advanced === 'GROWTH_DAMAGE' ? '，后续伤害 +' + growthDamageStep(quality) : '';
             push({ actor: side, kind: 'ITEM', itemId: item.id, defId: item.defId, effectType: 'DAMAGE', amount: actualHealthDamage, target, text: def.name + ' 造成 ' + actualHealthDamage + ' 点伤害' + growthText + '。' });
+            if (state[target].thorns > 0) {
+              const thorn = state[target].thorns * thornsDamagePerStack;
+              const thornResult = applyDamage(side, thorn);
+              push({ actor: side, kind: 'ITEM', itemId: item.id, defId: item.defId, effectType: 'DAMAGE', amount: thorn, target: side, text: '【荆棘】反弹 ' + thorn + ' 点伤害。', sourceHpDelta: thornResult.delta, targetHpDelta: 0 });
+            }
           }
           if (!sacrificeReplacesSmallEffect && advanced === 'SHIBA_SPEED') state[side].shibaSpeedStacks = Math.min(5, state[side].shibaSpeedStacks + 1);
           if (playerHp <= 0 || opponentHp <= 0) break;

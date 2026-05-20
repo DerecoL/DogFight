@@ -10,6 +10,7 @@ export const DOGS: Record<DogType, { name: string; trait: string }> = {
 }
 
 export const SHIBA_POISON_ON_ROLL_AMOUNT = 6
+export const THORNS_DAMAGE_PER_STACK = 2
 
 function slotItem(
   id: string,
@@ -221,7 +222,7 @@ export const TERM_DEFS = [
   { term: '小点', description: '投掷出1~3点', note: '无' },
   { term: '大点', description: '投掷出4~6点', note: '无' },
   { term: '极值', description: '投掷出1和6点', note: '无' },
-  { term: '荆棘', description: '每次受到攻击对敌方玩家造成3点伤害（可叠加）', note: '无' },
+  { term: '荆棘', description: '每次受到攻击对敌方玩家造成2点伤害（可叠加）', note: '无' },
   { term: '激昂', description: '自身所有攻击伤害 +1（可叠加）', note: '由巨型骨棒等效果获得' },
   { term: '中毒', description: '造成2秒持续伤害，每秒结算1次（可叠加，叠加刷新持续时间）', note: '无' },
   { term: '虚弱', description: '玩家的下次攻击造成的伤害减少50%（可叠加层数，不叠加效果）', note: '无' },

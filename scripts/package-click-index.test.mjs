@@ -494,6 +494,46 @@ describe('buildStandaloneIndex', () => {
     }
   })
 
+  test('standalone mock reflects two damage per thorn stack during battle', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'dogfight-standalone-thorns-'))
+    try {
+      const distDir = await createMinimalDist(root)
+      const outputFile = path.join(root, 'click-index.html')
+      const launcherFile = path.join(root, 'DogFight-standalone.cmd')
+      await buildStandaloneIndex({ distDir, outputFile, launcherFile })
+
+      const html = await readFile(outputFile, 'utf8')
+      const { window, localStorage, storageKey } = evaluateMockScript(extractMockScript(html))
+      await window.fetch('/api/auth/register', { method: 'POST', body: JSON.stringify({ email: 'thorns@dog.test', password: 'dogdice' }) })
+      const created = await readJson(await window.fetch('/api/runs', { method: 'POST', body: JSON.stringify({ dogType: 'MUTT' }) }))
+      const runId = created.run.id
+      const state = JSON.parse(localStorage.getItem(storageKey))
+      state.run.round = 3
+      state.run.phase = 'MATCH'
+      state.run.items = [
+        { id: 'hit', defId: 'starter-6', quality: 'BRONZE', area: 'EQUIPMENT', x: 0, y: 0 },
+      ]
+      state.run.matchedGhost = {
+        name: 'O',
+        dogType: 'MUTT',
+        wins: 0,
+        losses: 0,
+        round: 3,
+        items: [],
+        relics: [{ id: 'opening-thorns', relicId: 'v3-fluffed-spike-collar', quality: 'GOLD', slot: 0 }],
+      }
+      localStorage.setItem(storageKey, JSON.stringify(state))
+
+      const battled = await readJson(await window.fetch(`/api/runs/${runId}/battle/start`, { method: 'POST', body: '{}' }))
+      const thorn = battled.battle.events.find((event) => event.text.includes('【荆棘】反弹'))
+
+      expect(thorn).toMatchObject({ effectType: 'DAMAGE', amount: 10, target: 'player' })
+      expect(thorn.text).toContain('反弹 10 点伤害')
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   test('standalone mock applies new common archetype growth damage during battle', async () => {
     const root = await mkdtemp(path.join(tmpdir(), 'dogfight-standalone-growth-damage-'))
     try {

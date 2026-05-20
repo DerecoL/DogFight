@@ -14,6 +14,7 @@ import {
   growthDamageStep,
   itemDefForQuality,
   nightPatrolLightTriggerCount,
+  THORNS_DAMAGE_PER_STACK,
 } from './data'
 import { triggerOrder } from './grid'
 import { normalizeQuality, qualityAmount, qualityAmountFrom, QUALITY_LABELS } from './quality'
@@ -696,7 +697,7 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
         })
       }
       if (targetState.thorns > 0) {
-        const thorn = targetState.thorns * 3
+        const thorn = targetState.thorns * THORNS_DAMAGE_PER_STACK
         const thornResult = applyDamage(actorSide, thorn)
         triggers.push({
           itemId: item.id,
