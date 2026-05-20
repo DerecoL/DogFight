@@ -138,7 +138,9 @@ model LadderSettlement {
 model ApexEntry {
   id            String   @id @default(cuid())
   userId        String?
-  sourceRunId   String?  @unique
+  sourceRunId   String?
+  boardType     String   @default("OVERALL")
+  boardKey      String   @default("default")
   name          String
   dogType       String
   luckyNumber   Int?
@@ -147,13 +149,15 @@ model ApexEntry {
   losses        Int
   items         String
   relics        String   @default("[]")
-  rank          Int      @unique
+  rank          Int
   challengeWins Int      @default(0)
   isSeed        Boolean  @default(false)
   createdAt     DateTime @default(now())
 
+  @@unique([sourceRunId, boardType])
+  @@unique([boardType, boardKey, rank])
   @@index([userId])
-  @@index([rank])
+  @@index([boardType, boardKey, rank])
 }
 
 model BattleLog {

@@ -276,6 +276,11 @@ describe('selection screen structure', () => {
     expect(css).toContain('.history-run-list')
   })
 
+  it('limits the mode lobby history strip to the latest five runs', () => {
+    expect(app).toContain('const lobbyRecentRuns = history.recentRuns.slice(0, 5)')
+    expect(app).toContain('lobbyRecentRuns.length > 0 ? lobbyRecentRuns.map((entry) => (')
+  })
+
   it('renders battle health bars as a percentage of max health', () => {
     expect(app).toContain('playerMaxHp')
     expect(app).toContain('opponentMaxHp')

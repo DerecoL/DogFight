@@ -900,7 +900,7 @@ describeWithDatabase('run API', () => {
     expect(sold.body.run.relics.map((relic: { slot: number }) => relic.slot)).toEqual([0, 1])
   })
 
-  it('lists apex seeds and submits any completed run once', async () => {
+  it('lists apex seeds and submits any completed run to overall and daily boards once', async () => {
     const agent = request.agent(app.server)
     await app.ready()
 
@@ -915,20 +915,27 @@ describeWithDatabase('run API', () => {
     })
 
     const overview = await agent.get('/api/apex').expect(200)
-    expect(overview.body.leaderboard).toHaveLength(50)
-    expect(overview.body.leaderboard[0]).toMatchObject({ rank: 1, isSeed: true })
-    expect(overview.body.leaderboard[0].items.length).toBeGreaterThan(0)
-    expect(overview.body.leaderboard[0].items[0].def).toMatchObject({ name: expect.any(String) })
-    expect(overview.body.leaderboard[0].relics.length).toBeGreaterThan(0)
-    expect(overview.body.leaderboard[0].relics[0].def).toMatchObject({ name: expect.any(String) })
+    expect(overview.body.dailyBoardKey).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+    expect(overview.body.dailyResetHour).toBe(5)
+    expect(overview.body.leaderboards.overall).toHaveLength(50)
+    expect(overview.body.leaderboards.daily).toHaveLength(50)
+    expect(overview.body.leaderboards.overall[0]).toMatchObject({ rank: 1, isSeed: true, boardType: 'OVERALL', boardKey: 'default' })
+    expect(overview.body.leaderboards.daily[0]).toMatchObject({ rank: 1, isSeed: true, boardType: 'DAILY', boardKey: overview.body.dailyBoardKey })
+    expect(overview.body.leaderboards.overall[0].items.length).toBeGreaterThan(0)
+    expect(overview.body.leaderboards.overall[0].items[0].def).toMatchObject({ name: expect.any(String) })
+    expect(overview.body.leaderboards.overall[0].relics.length).toBeGreaterThan(0)
+    expect(overview.body.leaderboards.overall[0].relics[0].def).toMatchObject({ name: expect.any(String) })
     expect(overview.body.candidates.map((run: { id: string }) => run.id)).toContain(runId)
 
     const submitted = await agent.post('/api/apex/submit').send({ runId }).expect(200)
-    expect(submitted.body.entry).toMatchObject({ sourceRunId: runId, isSeed: false, name: expect.stringContaining('Apex Player') })
-    expect(submitted.body.entry.items.length).toBeGreaterThan(0)
-    expect(submitted.body.entry.items[0].def).toMatchObject({ name: expect.any(String) })
-    expect(submitted.body.report.battles.length).toBeGreaterThan(0)
-    expect(submitted.body.leaderboard).toHaveLength(51)
+    expect(submitted.body.entries.overall).toMatchObject({ sourceRunId: runId, isSeed: false, boardType: 'OVERALL', boardKey: 'default', name: expect.stringContaining('Apex Player') })
+    expect(submitted.body.entries.daily).toMatchObject({ sourceRunId: runId, isSeed: false, boardType: 'DAILY', boardKey: overview.body.dailyBoardKey, name: expect.stringContaining('Apex Player') })
+    expect(submitted.body.entries.overall.items.length).toBeGreaterThan(0)
+    expect(submitted.body.entries.overall.items[0].def).toMatchObject({ name: expect.any(String) })
+    expect(submitted.body.reports.overall.battles.length).toBeGreaterThan(0)
+    expect(submitted.body.reports.daily.battles.length).toBeGreaterThan(0)
+    expect(submitted.body.leaderboards.overall).toHaveLength(51)
+    expect(submitted.body.leaderboards.daily).toHaveLength(51)
 
     const afterSubmit = await agent.get('/api/apex').expect(200)
     expect(afterSubmit.body.candidates.map((run: { id: string }) => run.id)).not.toContain(runId)

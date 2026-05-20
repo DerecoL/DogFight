@@ -4,11 +4,14 @@ import type { BattleResult, DogType, FighterSnapshot } from './types'
 
 const APEX_SEED_COUNT = 50
 const DOG_TYPES: DogType[] = ['SHIBA', 'SAMOYED', 'MUTT', 'BULLY', 'EMPEROR']
+const SHANGHAI_DAILY_RESET_OFFSET_MS = 3 * 60 * 60 * 1000
 
 export type ApexSeedEntry = {
   rank: number
   fighter: FighterSnapshot
 }
+
+export type ApexBoardType = 'OVERALL' | 'DAILY'
 
 export type ApexOpponent = {
   id: string
@@ -56,6 +59,14 @@ export function buildApexSeedEntries(): ApexSeedEntry[] {
       },
     }
   })
+}
+
+export function dailyApexBoardKey(date = new Date()): string {
+  const shifted = new Date(date.getTime() + SHANGHAI_DAILY_RESET_OFFSET_MS)
+  const year = shifted.getUTCFullYear()
+  const month = String(shifted.getUTCMonth() + 1).padStart(2, '0')
+  const day = String(shifted.getUTCDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
 }
 
 export function resolveApexChallenge(challenger: FighterSnapshot, opponents: ApexOpponent[], seed: string): ApexChallengeReport {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildApexSeedEntries, resolveApexChallenge } from './apex'
+import { buildApexSeedEntries, dailyApexBoardKey, resolveApexChallenge } from './apex'
 import type { FighterSnapshot } from './types'
 
 function fighter(name: string, round: number, wins = 12): FighterSnapshot {
@@ -40,5 +40,10 @@ describe('apex arena logic', () => {
     expect(report.challengeWins).toBe(1)
     expect(report.placementRank).toBe(3)
     expect(report.battles.at(-1)?.winner).toBe('opponent')
+  })
+
+  it('rolls the daily board key at 05:00 in Asia/Shanghai', () => {
+    expect(dailyApexBoardKey(new Date('2026-05-19T20:59:59.000Z'))).toBe('2026-05-19')
+    expect(dailyApexBoardKey(new Date('2026-05-19T21:00:00.000Z'))).toBe('2026-05-20')
   })
 })

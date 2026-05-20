@@ -1273,6 +1273,7 @@ function PlayerRunHistoryPanel({ history, ladderProfile, onOpen }: { history: Pl
     : 0
   const rankLabel = ladderProfile?.tierLabel ?? '青铜'
   const rankScore = ladderProfile?.score ?? 0
+  const lobbyRecentRuns = history.recentRuns.slice(0, 5)
 
   return (
     <section className="player-history-panel" aria-label="个人战绩">
@@ -1304,7 +1305,7 @@ function PlayerRunHistoryPanel({ history, ladderProfile, onOpen }: { history: Pl
         <button className="history-open-action" type="button" onClick={onOpen}>查看详情和装备</button>
       </div>
       <div className="history-run-list" aria-label="最近对局">
-        {history.recentRuns.length > 0 ? history.recentRuns.map((entry) => (
+        {lobbyRecentRuns.length > 0 ? lobbyRecentRuns.map((entry) => (
           <div className="history-run-row" key={entry.id}>
             <span>{dogNames[entry.dogType]}</span>
             <strong>{entry.wins}胜 {entry.losses}败</strong>

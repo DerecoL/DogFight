@@ -9,7 +9,7 @@ import { cookieOptionsForEnv, resolveServerConfig } from './config'
 import { prisma } from './db'
 import { registerDogfightRoutes } from './dogfight'
 import { publicErrorMessage } from './errors'
-import { buildApexSeedEntries, resolveApexChallenge, type ApexOpponent } from './game/apex'
+import { buildApexSeedEntries, dailyApexBoardKey, resolveApexChallenge, type ApexBoardType, type ApexChallengeReport, type ApexOpponent } from './game/apex'
 import { itemDef, itemDefForQuality, relicDef, relicDefForQuality } from './game/data'
 import { canPlace, findSlot, type PlacementOptions } from './game/grid'
 import { canUpgradePair, nextQuality, normalizeQuality } from './game/quality'
@@ -103,6 +103,8 @@ export function buildApp() {
   const publicApexEntry = (entry: ApexEntry) => ({
     id: entry.id,
     sourceRunId: entry.sourceRunId,
+    boardType: entry.boardType as ApexBoardType,
+    boardKey: entry.boardKey,
     name: entry.name,
     dogType: entry.dogType as DogType,
     luckyNumber: entry.luckyNumber,
@@ -239,12 +241,14 @@ export function buildApp() {
     return moves
   }
 
-  const ensureApexSeeds = async () => {
-    const count = await prisma.apexEntry.count()
+  const ensureApexSeeds = async (boardType: ApexBoardType, boardKey: string) => {
+    const count = await prisma.apexEntry.count({ where: { boardType, boardKey } })
     if (count > 0) return
 
     await prisma.apexEntry.createMany({
       data: buildApexSeedEntries().map((entry) => ({
+        boardType,
+        boardKey,
         name: entry.fighter.name,
         dogType: entry.fighter.dogType,
         luckyNumber: entry.fighter.luckyNumber,
@@ -260,9 +264,45 @@ export function buildApp() {
     })
   }
 
-  const apexLeaderboard = async () => {
-    await ensureApexSeeds()
-    return prisma.apexEntry.findMany({ orderBy: { rank: 'asc' } })
+  const apexLeaderboard = async (boardType: ApexBoardType, boardKey: string) => {
+    await ensureApexSeeds(boardType, boardKey)
+    return prisma.apexEntry.findMany({ where: { boardType, boardKey }, orderBy: { rank: 'asc' } })
+  }
+
+  const apexBoardSeed = (boardType: ApexBoardType, boardKey: string, runId: string) => `${runId}-apex-${boardType.toLowerCase()}-${boardKey}`
+
+  const insertApexEntry = async (
+    tx: PrismaTransaction,
+    boardType: ApexBoardType,
+    boardKey: string,
+    userId: string,
+    run: Awaited<ReturnType<typeof prisma.run.findFirstOrThrow>>,
+    challengerName: string,
+    report: ApexChallengeReport,
+  ) => {
+    const rankOffset = 1_000_000
+    await tx.$executeRaw`UPDATE "ApexEntry" SET "rank" = "rank" + ${rankOffset} WHERE "boardType" = ${boardType} AND "boardKey" = ${boardKey} AND "rank" >= ${report.placementRank}`
+    const created = await tx.apexEntry.create({
+      data: {
+        userId,
+        sourceRunId: run.id,
+        boardType,
+        boardKey,
+        name: challengerName,
+        dogType: run.dogType,
+        luckyNumber: run.luckyNumber,
+        round: run.round,
+        wins: run.wins,
+        losses: run.losses,
+        items: JSON.stringify(toGameItems(run.items)),
+        relics: JSON.stringify(relicsFromRun(run)),
+        rank: report.placementRank,
+        challengeWins: report.challengeWins,
+        isSeed: false,
+      },
+    })
+    await tx.$executeRaw`UPDATE "ApexEntry" SET "rank" = "rank" - ${rankOffset - 1} WHERE "boardType" = ${boardType} AND "boardKey" = ${boardKey} AND "rank" >= ${report.placementRank + rankOffset}`
+    return created
   }
 
   registerDogfightRoutes(app, requireUser)
@@ -421,9 +461,13 @@ export function buildApp() {
 
   app.get('/api/apex', async (request) => {
     const userId = requireUser(request.userId)
-    const leaderboard = await apexLeaderboard()
+    const dailyBoardKey = dailyApexBoardKey()
+    const [overallLeaderboard, dailyLeaderboard] = await Promise.all([
+      apexLeaderboard('OVERALL', 'default'),
+      apexLeaderboard('DAILY', dailyBoardKey),
+    ])
     const submitted = await prisma.apexEntry.findMany({
-      where: { userId, sourceRunId: { not: null } },
+      where: { userId, boardType: 'OVERALL', sourceRunId: { not: null } },
       select: { sourceRunId: true },
     })
     const submittedRunIds = submitted
@@ -441,7 +485,12 @@ export function buildApp() {
     })
 
     return {
-      leaderboard: leaderboard.map(publicApexEntry),
+      dailyBoardKey,
+      dailyResetHour: 5,
+      leaderboards: {
+        overall: overallLeaderboard.map(publicApexEntry),
+        daily: dailyLeaderboard.map(publicApexEntry),
+      },
       candidates: candidates.map(publicRun),
     }
   })
@@ -454,48 +503,54 @@ export function buildApp() {
     if (!run) return reply.code(404).send({ error: 'Run not found' })
     if (run.status !== 'COMPLETE') return reply.code(400).send({ error: 'Only completed dogs can enter apex arena' })
 
-    const existing = await prisma.apexEntry.findUnique({ where: { sourceRunId: run.id } })
+    const existing = await prisma.apexEntry.findFirst({ where: { sourceRunId: run.id, boardType: 'OVERALL' } })
     if (existing) return reply.code(409).send({ error: 'This dog has already entered apex arena' })
 
-    const leaderboard = await apexLeaderboard()
+    const dailyBoardKey = dailyApexBoardKey()
+    const [overallLeaderboard, dailyLeaderboard] = await Promise.all([
+      apexLeaderboard('OVERALL', 'default'),
+      apexLeaderboard('DAILY', dailyBoardKey),
+    ])
     const challengerName = `${user.nickname ?? user.account}#${user.id.slice(0, 6)}`
     const challenger = snapshotFromRun(run, challengerName)
-    const opponents: ApexOpponent[] = leaderboard.map((entry) => ({
+    const overallOpponents: ApexOpponent[] = overallLeaderboard.map((entry) => ({
       id: entry.id,
       rank: entry.rank,
       fighter: apexEntryToFighter(entry),
     }))
-    const report = resolveApexChallenge(challenger, opponents, `${run.id}-apex`)
-    const rankOffset = 1_000_000
+    const dailyOpponents: ApexOpponent[] = dailyLeaderboard.map((entry) => ({
+      id: entry.id,
+      rank: entry.rank,
+      fighter: apexEntryToFighter(entry),
+    }))
+    const overallReport = resolveApexChallenge(challenger, overallOpponents, apexBoardSeed('OVERALL', 'default', run.id))
+    const dailyReport = resolveApexChallenge(challenger, dailyOpponents, apexBoardSeed('DAILY', dailyBoardKey, run.id))
 
-    const entry = await prisma.$transaction(async (tx) => {
-      await tx.$executeRaw`UPDATE "ApexEntry" SET "rank" = "rank" + ${rankOffset} WHERE "rank" >= ${report.placementRank}`
-      const created = await tx.apexEntry.create({
-        data: {
-          userId,
-          sourceRunId: run.id,
-          name: challengerName,
-          dogType: run.dogType,
-          luckyNumber: run.luckyNumber,
-          round: run.round,
-          wins: run.wins,
-          losses: run.losses,
-          items: JSON.stringify(toGameItems(run.items)),
-          relics: JSON.stringify(relicsFromRun(run)),
-          rank: report.placementRank,
-          challengeWins: report.challengeWins,
-          isSeed: false,
-        },
-      })
-      await tx.$executeRaw`UPDATE "ApexEntry" SET "rank" = "rank" - ${rankOffset - 1} WHERE "rank" >= ${report.placementRank + rankOffset}`
-      return created
+    const entries = await prisma.$transaction(async (tx) => {
+      const overall = await insertApexEntry(tx, 'OVERALL', 'default', userId, run, challengerName, overallReport)
+      const daily = await insertApexEntry(tx, 'DAILY', dailyBoardKey, userId, run, challengerName, dailyReport)
+      return { overall, daily }
     })
-    const updatedLeaderboard = await prisma.apexEntry.findMany({ orderBy: { rank: 'asc' } })
+    const [updatedOverallLeaderboard, updatedDailyLeaderboard] = await Promise.all([
+      prisma.apexEntry.findMany({ where: { boardType: 'OVERALL', boardKey: 'default' }, orderBy: { rank: 'asc' } }),
+      prisma.apexEntry.findMany({ where: { boardType: 'DAILY', boardKey: dailyBoardKey }, orderBy: { rank: 'asc' } }),
+    ])
 
     return {
-      entry: publicApexEntry(entry),
-      report,
-      leaderboard: updatedLeaderboard.map(publicApexEntry),
+      entries: {
+        overall: publicApexEntry(entries.overall),
+        daily: publicApexEntry(entries.daily),
+      },
+      reports: {
+        overall: overallReport,
+        daily: dailyReport,
+      },
+      dailyBoardKey,
+      dailyResetHour: 5,
+      leaderboards: {
+        overall: updatedOverallLeaderboard.map(publicApexEntry),
+        daily: updatedDailyLeaderboard.map(publicApexEntry),
+      },
     }
   })
 
