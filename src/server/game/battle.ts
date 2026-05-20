@@ -82,6 +82,7 @@ type BattleSideState = {
   lifestealItemIds: string[]
   forcedItemDice: Record<string, number>
   shibaSpeedStacks: number
+  boomCounter: number
 }
 
 function maxHealthForRound(round: number) {
@@ -110,6 +111,7 @@ function createSideState(maxHp: number): BattleSideState {
     lifestealItemIds: [],
     forcedItemDice: {},
     shibaSpeedStacks: 0,
+    boomCounter: 0,
   }
 }
 
@@ -435,6 +437,32 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
         text: `${itemName(def, quality)} 被【失效】抵消`,
       })
       return triggers
+    }
+
+    const boomCounterItem = equippedItemsWithEffect(actor, 'BOOM_COUNTER')[0]
+    if (boomCounterItem) {
+      actorState.boomCounter += 1
+      if (actorState.boomCounter >= 30) {
+        actorState.boomCounter = 0
+        const boomQuality = normalizeQuality(boomCounterItem.quality)
+        const boomDef = itemDef(boomCounterItem.defId)
+        const damage = qualityAmountFrom(boomDef.effect.amount, boomQuality, boomDef.effect.qualityBase)
+        const result = applyDirectHealthDamage(targetSide, damage)
+        triggers.push({
+          itemId: boomCounterItem.id,
+          defId: boomCounterItem.defId,
+          quality: boomQuality,
+          effectType: 'DAMAGE',
+          amount: result.before - result.after,
+          target: targetSide,
+          sourceHp: getHp(actorSide),
+          targetHp: result.after,
+          sourceHpDelta: 0,
+          targetHpDelta: result.delta,
+          roll,
+          text: `${itemName(boomDef, boomQuality)} 爆鸣计数达到 30，造成 ${result.before - result.after} 点直接伤害`,
+        })
+      }
     }
 
     if (!sacrificeReplacesSmallEffect && advanced === 'GRANT_LIFESTEAL_ADJACENT') {

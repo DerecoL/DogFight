@@ -418,6 +418,97 @@ describe('battle simulation', () => {
     expect(nextEvent).not.toMatchObject({ actor: 'player', itemId: 'left-bite', effectType: 'HEAL' })
   })
 
+  it('gold boom counter explodes for 300 damage after 30 successful equipment triggers', () => {
+    const player: FighterSnapshot = {
+      name: 'P',
+      dogType: 'SHIBA',
+      wins: 0,
+      losses: 0,
+      round: 10,
+      items: [
+        { id: 'counter', defId: 'v4-boom-counter', quality: 'GOLD', area: 'EQUIPMENT', x: 0, y: 0 },
+      ],
+    }
+    const opponent: FighterSnapshot = { name: 'O', dogType: 'SHIBA', wins: 0, losses: 0, round: 10, items: [] }
+    const result = simulateBattle(player, opponent, 'boom-counter-gold')
+    const explosion = result.events.find((event) =>
+      event.actor === 'player'
+      && event.itemId === 'counter'
+      && event.defId === 'v4-boom-counter'
+      && event.effectType === 'DAMAGE'
+      && event.text.includes('爆鸣计数达到 30')
+    )
+
+    expect(explosion).toMatchObject({
+      quality: 'GOLD',
+      amount: 300,
+      target: 'opponent',
+      targetHpDelta: -300,
+      time: 30,
+    })
+  })
+
+  it('diamond boom counter keeps threshold 30 and damage 450', () => {
+    const player: FighterSnapshot = {
+      name: 'P',
+      dogType: 'SHIBA',
+      wins: 0,
+      losses: 0,
+      round: 11,
+      items: [
+        { id: 'counter', defId: 'v4-boom-counter', quality: 'DIAMOND', area: 'EQUIPMENT', x: 0, y: 0 },
+      ],
+    }
+    const opponent: FighterSnapshot = { name: 'O', dogType: 'SHIBA', wins: 0, losses: 0, round: 11, items: [] }
+    const result = simulateBattle(player, opponent, 'boom-counter-diamond')
+    const explosion = result.events.find((event) =>
+      event.actor === 'player'
+      && event.itemId === 'counter'
+      && event.effectType === 'DAMAGE'
+      && event.text.includes('爆鸣计数达到 30')
+    )
+
+    expect(explosion).toMatchObject({
+      quality: 'DIAMOND',
+      amount: 450,
+      targetHpDelta: -450,
+      time: 30,
+    })
+  })
+
+  it('boom counter explosion does not trigger lifesteal when granted by diamond blood contract fang', () => {
+    const player: FighterSnapshot = {
+      name: 'P',
+      dogType: 'SHIBA',
+      wins: 0,
+      losses: 0,
+      round: 10,
+      items: [
+        { id: 'fang', defId: 'v4-blood-contract-fang', quality: 'DIAMOND', area: 'EQUIPMENT', x: 0, y: 0 },
+        { id: 'counter', defId: 'v4-boom-counter', quality: 'GOLD', area: 'EQUIPMENT', x: 2, y: 0 },
+      ],
+    }
+    const opponent: FighterSnapshot = { name: 'O', dogType: 'SHIBA', wins: 0, losses: 0, round: 10, items: [] }
+    const result = simulateBattle(player, opponent, 'boom-counter-lifesteal')
+    const grantIndex = result.events.findIndex((event) =>
+      event.actor === 'player'
+      && event.itemId === 'fang'
+      && event.effectType === 'UTILITY'
+      && event.text.includes('吸血')
+    )
+    const explosionIndex = result.events.findIndex((event) =>
+      event.actor === 'player'
+      && event.itemId === 'counter'
+      && event.effectType === 'DAMAGE'
+      && event.text.includes('爆鸣计数达到 30')
+    )
+    const nextPlayerEvent = result.events.slice(explosionIndex + 1).find((event) => event.actor === 'player')
+
+    expect(grantIndex).toBeGreaterThanOrEqual(0)
+    expect(explosionIndex).toBeGreaterThan(grantIndex)
+    expect(nextPlayerEvent).not.toMatchObject({ itemId: 'counter', effectType: 'HEAL' })
+  })
+
   it('resolves deterministic battle logs with poison or victory', () => {
     const player: FighterSnapshot = { name: 'P', dogType: 'MUTT', wins: 0, losses: 0, round: 0, items: baseItems() }
     const opponent: FighterSnapshot = { name: 'O', dogType: 'SHIBA', wins: 0, losses: 0, round: 0, items: baseItems() }
