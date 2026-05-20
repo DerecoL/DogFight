@@ -364,9 +364,9 @@ const qualityLabel: Record<ItemQuality, string> = {
 }
 const qualityPriceMultiplier: Record<ItemQuality, number> = {
   BRONZE: 1,
-  SILVER: 1.5,
-  GOLD: 2,
-  DIAMOND: 4,
+  SILVER: 2,
+  GOLD: 4,
+  DIAMOND: 8,
 }
 const DOG_SELECTION_SLOT_COUNT = 8
 const SHOP_CHOICE_SLOT_COUNT = 7
@@ -536,12 +536,7 @@ function effectText(def: ItemDef, quality: ItemQuality = 'BRONZE') {
 
 function purchaseValueForItem(def: ItemDef, quality: ItemQuality = normalizeQuality(def.defaultQuality)) {
   const currentQuality = normalizeQuality(quality)
-  const defaultQuality = normalizeQuality(def.defaultQuality)
-  const currentIndex = qualityOrder.indexOf(currentQuality)
-  const defaultIndex = qualityOrder.indexOf(defaultQuality)
-  const basePurchaseValue = def.price * qualityPriceMultiplier[defaultQuality]
-  if (currentIndex <= defaultIndex) return Math.floor(def.price * qualityPriceMultiplier[currentQuality])
-  return Math.floor(basePurchaseValue * (2 ** (currentIndex - defaultIndex)))
+  return Math.floor(def.price * qualityPriceMultiplier[currentQuality])
 }
 
 function sellValueForItem(item: Item) {

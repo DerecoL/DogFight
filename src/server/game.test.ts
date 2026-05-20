@@ -95,17 +95,36 @@ describe('shop generation', () => {
 
     expect(offer.defId).toBe('v3-golden-kennel')
     expect(offer.quality).toBe('DIAMOND')
-    expect(offer.price).toBe(72)
+    expect(offer.price).toBe(173)
   })
 
-  it('values upgraded equipment by its total synthesis purchase cost before selling at half', () => {
+  it('values upgraded equipment by each item price doubled per quality before selling at half', () => {
     const smallBite = itemDef('small-bite')
+    const luckyPaw = itemDef('lucky-paw')
 
     expect(itemPurchaseValue(smallBite, 'BRONZE')).toBe(3)
     expect(itemPurchaseValue(smallBite, 'SILVER')).toBe(6)
     expect(itemPurchaseValue(smallBite, 'GOLD')).toBe(12)
     expect(itemPurchaseValue(smallBite, 'DIAMOND')).toBe(24)
+    expect(itemSellValue(smallBite, 'BRONZE')).toBe(1)
+    expect(itemSellValue(smallBite, 'SILVER')).toBe(3)
+    expect(itemSellValue(smallBite, 'GOLD')).toBe(6)
     expect(itemSellValue(smallBite, 'DIAMOND')).toBe(12)
+
+    expect(itemPurchaseValue(luckyPaw, 'BRONZE')).toBe(4)
+    expect(itemPurchaseValue(luckyPaw, 'SILVER')).toBe(8)
+    expect(itemPurchaseValue(luckyPaw, 'GOLD')).toBe(16)
+    expect(itemPurchaseValue(luckyPaw, 'DIAMOND')).toBe(32)
+    expect(itemSellValue(luckyPaw, 'BRONZE')).toBe(2)
+    expect(itemSellValue(luckyPaw, 'SILVER')).toBe(4)
+    expect(itemSellValue(luckyPaw, 'GOLD')).toBe(8)
+    expect(itemSellValue(luckyPaw, 'DIAMOND')).toBe(16)
+
+    const bloodFang = itemDef('v3-blood-mad-fang')
+    expect(itemPurchaseValue(bloodFang, 'GOLD')).toBe(48)
+    expect(itemSellValue(bloodFang, 'GOLD')).toBe(24)
+    expect(itemPurchaseValue(bloodFang, 'DIAMOND')).toBe(96)
+    expect(itemSellValue(bloodFang, 'DIAMOND')).toBe(48)
   })
 })
 

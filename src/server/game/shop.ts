@@ -1,28 +1,24 @@
 import { randomUUID } from 'node:crypto'
 import { SHOP_CHOICES, shopPool } from './data'
-import { ITEM_QUALITIES, normalizeQuality } from './quality'
+import { normalizeQuality } from './quality'
 import { pick } from './rng'
 import type { ItemDef, ItemQuality, ShopOffer, ShopType } from './types'
 
-const QUALITY_PRICE_MULTIPLIER: Record<ItemQuality, number> = {
+const QUALITY_VALUE_MULTIPLIER: Record<ItemQuality, number> = {
   BRONZE: 1,
-  SILVER: 1.5,
-  GOLD: 2,
-  DIAMOND: 4,
+  SILVER: 2,
+  GOLD: 4,
+  DIAMOND: 8,
 }
+const DIRECT_PURCHASE_MARKUP = 1.2
 
 function shopPrice(def: ItemDef, discount: number) {
-  return Math.max(1, Math.floor(itemPurchaseValue(def) * discount))
+  return Math.max(1, Math.ceil(itemPurchaseValue(def) * DIRECT_PURCHASE_MARKUP * discount))
 }
 
 export function itemPurchaseValue(def: ItemDef, quality: ItemQuality = normalizeQuality(def.defaultQuality)) {
   const currentQuality = normalizeQuality(quality)
-  const defaultQuality = normalizeQuality(def.defaultQuality)
-  const currentIndex = ITEM_QUALITIES.indexOf(currentQuality)
-  const defaultIndex = ITEM_QUALITIES.indexOf(defaultQuality)
-  const basePurchaseValue = def.price * QUALITY_PRICE_MULTIPLIER[defaultQuality]
-  if (currentIndex <= defaultIndex) return Math.floor(def.price * QUALITY_PRICE_MULTIPLIER[currentQuality])
-  return Math.floor(basePurchaseValue * (2 ** (currentIndex - defaultIndex)))
+  return Math.floor(def.price * QUALITY_VALUE_MULTIPLIER[currentQuality])
 }
 
 export function itemSellValue(def: ItemDef, quality?: ItemQuality | string | null) {
