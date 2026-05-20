@@ -262,6 +262,123 @@ describeWithDatabase('run API', () => {
     expect(fifthLoss.body.run).toMatchObject({ losses: 5, status: 'COMPLETE', phase: 'COMPLETE' })
   })
 
+  it('settles a casual active run at the current record without adding a loss', async () => {
+    const agent = request.agent(app.server)
+    await app.ready()
+
+    await agent.post('/api/auth/register').send({ account: `forfeit-casual-${Date.now()}`, password: 'dogdice' }).expect(200)
+    const created = await agent.post('/api/runs').send({ dogType: 'MUTT' }).expect(200)
+    const runId = created.body.run.id
+
+    await prisma.run.update({
+      where: { id: runId },
+      data: {
+        wins: 4,
+        losses: 2,
+        round: 6,
+        gold: 23,
+        phase: 'CHOICE',
+        status: 'ACTIVE',
+        matchedGhost: JSON.stringify({ name: 'Pending Opponent' }),
+      },
+    })
+
+    const settled = await agent.post(`/api/runs/${runId}/settle`).send({}).expect(200)
+
+    expect(settled.body.run).toMatchObject({
+      id: runId,
+      mode: 'CASUAL',
+      wins: 4,
+      losses: 2,
+      round: 6,
+      gold: 23,
+      status: 'COMPLETE',
+      phase: 'COMPLETE',
+      matchedGhost: null,
+      ladderSettlement: null,
+    })
+
+    const history = await agent.get('/api/runs/history').expect(200)
+    expect(history.body.history).toMatchObject({
+      completedRuns: 1,
+      abandonedRuns: 0,
+      totalWins: 4,
+      totalLosses: 2,
+    })
+  })
+
+  it('settles a ladder active run at the current record and updates the ladder profile', async () => {
+    const agent = request.agent(app.server)
+    await app.ready()
+
+    await agent.post('/api/auth/register').send({ account: `forfeit-ladder-${Date.now()}`, password: 'dogdice' }).expect(200)
+    const created = await agent.post('/api/runs').send({ dogType: 'SHIBA', mode: 'LADDER' }).expect(200)
+    const runId = created.body.run.id
+
+    await prisma.run.update({
+      where: { id: runId },
+      data: {
+        wins: 7,
+        losses: 2,
+        round: 9,
+        phase: 'PREP',
+        status: 'ACTIVE',
+      },
+    })
+
+    const settled = await agent.post(`/api/runs/${runId}/settle`).send({}).expect(200)
+
+    expect(settled.body.run).toMatchObject({
+      id: runId,
+      mode: 'LADDER',
+      wins: 7,
+      losses: 2,
+      round: 9,
+      status: 'COMPLETE',
+      phase: 'COMPLETE',
+      ladderSettlement: {
+        beforeTier: 'BRONZE',
+        beforeScore: 0,
+        wins: 7,
+        losses: 2,
+      },
+    })
+
+    const ladder = await agent.get('/api/ladder/me').expect(200)
+    expect(ladder.body.profile).toMatchObject({
+      gamesPlayed: 1,
+      totalWins: 7,
+      totalLosses: 2,
+    })
+    expect(ladder.body.recentSettlements[0]).toMatchObject({
+      wins: 7,
+      losses: 2,
+    })
+  })
+
+  it('rejects settling a run that is already complete', async () => {
+    const agent = request.agent(app.server)
+    await app.ready()
+
+    await agent.post('/api/auth/register').send({ account: `forfeit-complete-${Date.now()}`, password: 'dogdice' }).expect(200)
+    const created = await agent.post('/api/runs').send({ dogType: 'SAMOYED' }).expect(200)
+    const runId = created.body.run.id
+
+    await prisma.run.update({
+      where: { id: runId },
+      data: {
+        wins: 3,
+        losses: 1,
+        phase: 'COMPLETE',
+        status: 'COMPLETE',
+      },
+    })
+
+    const rejected = await agent.post(`/api/runs/${runId}/settle`).send({}).expect(400)
+
+    expect(rejected.body.error).toContain('当前跑局已经结算或不可放弃')
+  })
+
   it('creates ladder runs and settles ladder score when the run completes', async () => {
     const agent = request.agent(app.server)
     await app.ready()
