@@ -295,6 +295,7 @@ type DogfightRoomSummary = {
 }
 type DogfightRoomsResponse = { rooms: DogfightRoomSummary[] }
 type DogfightRoomResponse = { room: DogfightRoom }
+type DogfightLeaveResponse = { room: DogfightRoom | null }
 type DogfightBattleResponse = { battle: { id: string; roomId: string; round: number; opponentKind: string; result: Battle } }
 
 const dogNames: Record<DogType, string> = { SHIBA: '柴犬', SAMOYED: '萨摩耶', MUTT: '土狗', BULLY: '恶霸', EMPEROR: '狗皇帝' }
@@ -1553,8 +1554,20 @@ function DogfightLobby() {
     }
   }
 
+  const leaveRoom = async () => {
+    if (room) {
+      try {
+        await api<DogfightLeaveResponse>(`/dogfight/rooms/${room.id}/leave`, { method: 'POST' })
+      } catch {
+        // The room may already have been removed by another client; still return locally.
+      }
+    }
+    setRoom(null)
+    void loadRooms()
+  }
+
   if (room) {
-    return <DogfightRoomView room={room} onRoomChange={setRoom} onLeave={() => { setRoom(null); void loadRooms() }} />
+    return <DogfightRoomView room={room} onRoomChange={setRoom} onLeave={() => void leaveRoom()} />
   }
 
   return (
@@ -1761,6 +1774,14 @@ function DogfightRoomView({ room, onRoomChange, onLeave }: { room: DogfightRoom;
         <div className="dogfight-phase-track">
           {(['DOG_SELECT', 'SHOP', 'BATTLE'] as DogfightRoomPhase[]).map((phase) => <span key={phase} className={room.phase === phase ? 'active' : ''}>{dogfightPhaseLabel(phase)}</span>)}
         </div>
+        {run && (
+          <div className="dogfight-run-stats" aria-label="斗狗当前属性">
+            <span className="resource-pill gold"><Coins size={16} /> 金币 {run.gold}</span>
+            <span className="resource-pill win"><Trophy size={16} /> {run.wins}胜 {run.losses}败</span>
+            <span className="resource-pill round"><RefreshCcw size={16} /> 第 {run.round} 回合</span>
+            {currentMember && <span className={`resource-pill ${currentMember.ready ? 'safe' : 'round'}`}>{currentMember.ready ? '已准备' : '调整中'}</span>}
+          </div>
+        )}
         {currentMember && <span className="resource-pill safe"><Shield size={16} /> 剩余存活 {dogfightLives(currentMember)}</span>}
         {room.isHost && room.status === 'WAITING' && <button className="primary action-button" onClick={startRoom}>开始房间</button>}
         {run && room.phase === 'SHOP' && !currentMember?.ready && !currentMember?.eliminated && <button className="primary action-button" onClick={readyRoom}>完成本回合</button>}

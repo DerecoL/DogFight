@@ -3,6 +3,107 @@ import { simulateBattle } from './game/battle'
 import type { FighterSnapshot } from './game/types'
 
 describe('missing equipment effect regressions', () => {
+  it('lets bully gym trigger a non-large item when a large item triggers', () => {
+    const player: FighterSnapshot = {
+      name: 'P',
+      dogType: 'BULLY',
+      wins: 0,
+      losses: 0,
+      round: 8,
+      items: [
+        { id: 'large', defId: 'giant-bone', quality: 'BRONZE', area: 'EQUIPMENT', x: 0, y: 0 },
+        { id: 'gym', defId: 'bully-gym', quality: 'GOLD', area: 'EQUIPMENT', x: 4, y: 0 },
+        { id: 'small', defId: 'small-bite', quality: 'BRONZE', area: 'EQUIPMENT', x: 7, y: 0 },
+      ],
+    }
+    const opponent: FighterSnapshot = { name: 'O', dogType: 'SHIBA', wins: 0, losses: 0, round: 8, items: [] }
+    const result = simulateBattle(player, opponent, 'plain-10')
+    const firstPlayerRoll = result.events.find((event) => event.kind === 'ROLL' && event.actor === 'player')
+    const firstRollEvents = result.events.filter(
+      (event) => event.kind === 'ITEM' && event.actor === 'player' && event.time === firstPlayerRoll?.time,
+    )
+    const smallEvent = firstRollEvents.find((event) => event.itemId === 'small')
+
+    expect(firstPlayerRoll?.roll).toBe(6)
+    expect(firstRollEvents.map((event) => event.itemId)).toContain('large')
+    expect(smallEvent).toMatchObject({ defId: 'small-bite', amount: 4, targetHpDelta: -4 })
+  })
+
+  it('makes bully demolish disable the enemy large item instead of the next allied large item', () => {
+    const player: FighterSnapshot = {
+      name: 'P',
+      dogType: 'BULLY',
+      wins: 0,
+      losses: 0,
+      round: 8,
+      items: [
+        { id: 'large', defId: 'giant-bone', quality: 'BRONZE', area: 'EQUIPMENT', x: 0, y: 0 },
+        { id: 'demolish', defId: 'bully-demolish', quality: 'DIAMOND', area: 'EQUIPMENT', x: 4, y: 0 },
+      ],
+    }
+    const opponent: FighterSnapshot = {
+      name: 'O',
+      dogType: 'SHIBA',
+      wins: 0,
+      losses: 0,
+      round: 8,
+      items: [
+        { id: 'opp-large', defId: 'giant-bone', quality: 'BRONZE', area: 'EQUIPMENT', x: 0, y: 0 },
+      ],
+    }
+    const result = simulateBattle(player, opponent, 'plain-10')
+    const alliedFollowup = result.events.find(
+      (event) => event.kind === 'ITEM' && event.actor === 'player' && event.itemId === 'large' && event.time === 3,
+    )
+    const enemyFollowup = result.events.find(
+      (event) => event.kind === 'ITEM' && event.actor === 'opponent' && event.itemId === 'opp-large',
+    )
+
+    expect(alliedFollowup?.amount).toBeGreaterThan(0)
+    expect(alliedFollowup?.target).toBe('opponent')
+    expect(enemyFollowup).toMatchObject({ amount: 0, target: 'none', targetHpDelta: 0 })
+  })
+
+  it('lets bully armband make three-slot items count as large for bully trait doubling', () => {
+    const player: FighterSnapshot = {
+      name: 'P',
+      dogType: 'BULLY',
+      wins: 0,
+      losses: 0,
+      round: 8,
+      items: [
+        { id: 'vest', defId: 'guard-vest', quality: 'BRONZE', area: 'EQUIPMENT', x: 0, y: 0 },
+        { id: 'armband', defId: 'bully-armband', quality: 'GOLD', area: 'EQUIPMENT', x: 3, y: 0 },
+      ],
+    }
+    const opponent: FighterSnapshot = { name: 'O', dogType: 'SHIBA', wins: 0, losses: 0, round: 8, items: [] }
+    const result = simulateBattle(player, opponent, 'bully-audit-3')
+    const vestEvent = result.events.find((event) => event.kind === 'ITEM' && event.actor === 'player' && event.itemId === 'vest')
+
+    expect(vestEvent).toMatchObject({ defId: 'guard-vest', effectType: 'HEAL', amount: 16 })
+  })
+
+  it('lets bully colossus upgrade a successful large-item double to quadruple', () => {
+    const player: FighterSnapshot = {
+      name: 'P',
+      dogType: 'BULLY',
+      wins: 0,
+      losses: 0,
+      round: 8,
+      items: [
+        { id: 'large', defId: 'giant-bone', quality: 'BRONZE', area: 'EQUIPMENT', x: 0, y: 0 },
+        { id: 'colossus', defId: 'bully-colossus', quality: 'DIAMOND', area: 'EQUIPMENT', x: 4, y: 0 },
+      ],
+    }
+    const opponent: FighterSnapshot = { name: 'O', dogType: 'SHIBA', wins: 0, losses: 0, round: 8, items: [] }
+    const result = simulateBattle(player, opponent, 'bully-quad-12')
+    const quadrupled = result.events.find(
+      (event) => event.kind === 'ITEM' && event.actor === 'player' && event.itemId === 'large' && event.amount === 64,
+    )
+
+    expect(quadrupled).toMatchObject({ defId: 'giant-bone', targetHpDelta: -64 })
+  })
+
   it('lets shiba speed katana add extra rolls as it stacks attack speed', () => {
     const player: FighterSnapshot = {
       name: 'P',

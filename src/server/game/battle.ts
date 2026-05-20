@@ -384,8 +384,8 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
     const sacrificeReplacesSmallEffect = def.size === 1
       && triggerOrder(actor.items).some((entry) => itemDef(entry.defId).advancedEffect === 'SMALL_TRIGGERS_LARGE')
 
-    if (targetState.disabledItemIds.includes(item.id)) {
-      targetState.disabledItemIds = targetState.disabledItemIds.filter((id) => id !== item.id)
+    if (actorState.disabledItemIds.includes(item.id)) {
+      actorState.disabledItemIds = actorState.disabledItemIds.filter((id) => id !== item.id)
       triggers.push({
         itemId: item.id,
         defId: item.defId,
@@ -403,8 +403,8 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
       return triggers
     }
 
-    if (targetState.disabledLarge > 0 && isLarge(def, actor)) {
-      targetState.disabledLarge -= 1
+    if (actorState.disabledLarge > 0 && isLarge(def, actor)) {
+      actorState.disabledLarge -= 1
       triggers.push({
         itemId: item.id,
         defId: item.defId,
@@ -623,8 +623,11 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
     if (!sacrificeReplacesSmallEffect && advanced === 'TRIGGER_MINUS_THREE' && roll >= 4) {
       queueItems(queue, triggerOrder(actor.items).filter((entry) => itemDef(entry.defId).dice.includes(roll - 3)))
     }
-    if (!sacrificeReplacesSmallEffect && advanced === 'LARGE_TRIGGERS_NON_LARGE' && isLarge(def, actor)) {
-      const candidates = triggerOrder(actor.items).filter((entry) => !isLarge(itemDef(entry.defId), actor))
+    if (!sacrificeReplacesSmallEffect && hasEquippedEffect(actor, 'LARGE_TRIGGERS_NON_LARGE') && isLarge(def, actor)) {
+      const candidates = triggerOrder(actor.items).filter((entry) => {
+        const candidateDef = itemDef(entry.defId)
+        return !isLarge(candidateDef, actor) && candidateDef.advancedEffect !== 'LARGE_TRIGGERS_NON_LARGE'
+      })
       if (candidates.length > 0) queueItems(queue, [candidates[Math.floor(rng() * candidates.length)]])
     }
     if (sacrificeReplacesSmallEffect) {

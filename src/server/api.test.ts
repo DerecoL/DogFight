@@ -1013,6 +1013,57 @@ describeWithDatabase('run API', () => {
     expect(nextRoom.body.room.status).toBe('WAITING')
   })
 
+  it('removes players from dogfight rooms when they leave and deletes empty rooms', async () => {
+    const host = request.agent(app.server)
+    const guest = request.agent(app.server)
+    await app.ready()
+
+    await host.post('/api/auth/register').send({ email: `dogfight-leave-host${Date.now()}@dog.test`, password: 'dogdice' }).expect(200)
+    const created = await host.post('/api/dogfight/rooms').send({}).expect(200)
+    const roomId = created.body.room.id
+
+    await guest.post('/api/auth/register').send({ email: `dogfight-leave-guest${Date.now()}@dog.test`, password: 'dogdice' }).expect(200)
+    await guest.post(`/api/dogfight/rooms/${roomId}/join`).send({}).expect(200)
+
+    const hostLeft = await host.post(`/api/dogfight/rooms/${roomId}/leave`).send({}).expect(200)
+    expect(hostLeft.body.room).toBeNull()
+
+    const guestView = await guest.get(`/api/dogfight/rooms/${roomId}`).expect(200)
+    expect(guestView.body.room).toMatchObject({ isHost: true, hostUserId: guestView.body.room.members[0].userId })
+    expect(guestView.body.room.members).toHaveLength(1)
+
+    await guest.post(`/api/dogfight/rooms/${roomId}/leave`).send({}).expect(200)
+    await guest.get(`/api/dogfight/rooms/${roomId}`).expect(404)
+    expect(await prisma.dogfightRoom.findUnique({ where: { id: roomId } })).toBeNull()
+  })
+
+  it('abandons an active dogfight run and removes bot data when the last player leaves', async () => {
+    const host = request.agent(app.server)
+    const guest = request.agent(app.server)
+    await app.ready()
+
+    await host.post('/api/auth/register').send({ email: `dogfight-active-leave-host${Date.now()}@dog.test`, password: 'dogdice' }).expect(200)
+    const created = await host.post('/api/dogfight/rooms').send({}).expect(200)
+    const roomId = created.body.room.id
+
+    await guest.post('/api/auth/register').send({ email: `dogfight-active-leave-guest${Date.now()}@dog.test`, password: 'dogdice' }).expect(200)
+    await guest.post(`/api/dogfight/rooms/${roomId}/join`).send({}).expect(200)
+    await host.post(`/api/dogfight/rooms/${roomId}/start`).send({}).expect(200)
+    const selected = await host.post(`/api/dogfight/rooms/${roomId}/dog-choice`).send({ dogType: 'SHIBA' }).expect(200)
+    const hostRunId = selected.body.room.currentRun.id
+    const botRunIds = selected.body.room.members
+      .filter((member: { kind: string; runId: string | null }) => member.kind === 'BOT' && member.runId)
+      .map((member: { runId: string }) => member.runId)
+
+    await host.post(`/api/dogfight/rooms/${roomId}/leave`).send({}).expect(200)
+    const abandoned = await prisma.run.findUniqueOrThrow({ where: { id: hostRunId } })
+    expect(abandoned).toMatchObject({ status: 'DOGFIGHT_ABANDONED', phase: 'COMPLETE' })
+
+    await guest.post(`/api/dogfight/rooms/${roomId}/leave`).send({}).expect(200)
+    expect(await prisma.dogfightRoom.findUnique({ where: { id: roomId } })).toBeNull()
+    expect(await prisma.run.findMany({ where: { id: { in: botRunIds } } })).toEqual([])
+  })
+
   it('advances synchronized dogfight phases with dog choices, shop ready, battle viewing, and player-ranked members', async () => {
     const agents = [request.agent(app.server), request.agent(app.server), request.agent(app.server)]
     await app.ready()

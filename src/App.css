@@ -3679,6 +3679,13 @@ input {
   background: #eef4ff;
 }
 
+.dogfight-run-stats {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .dogfight-room-columns {
   display: grid;
   grid-template-columns: 280px minmax(0, 1fr) 280px;

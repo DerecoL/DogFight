@@ -59,6 +59,7 @@ describe('selection screen structure', () => {
     expect(app).toContain("api<DogfightRoomResponse>('/dogfight/rooms'")
     expect(app).toContain("api<DogfightRoomResponse>('/dogfight/match'")
     expect(app).toContain("api<DogfightRoomResponse>(`/dogfight/rooms/${roomId}/join`")
+    expect(app).toContain("api<DogfightLeaveResponse>(`/dogfight/rooms/${room.id}/leave`")
     expect(app).toContain("api<DogfightRoomResponse>(`/dogfight/rooms/${room.id}/ready`")
     expect(app).toContain("api<DogfightRoomResponse>(`/dogfight/rooms/${room.id}/dog-choice`")
     expect(app).toContain("api<DogfightBattleResponse>(`/dogfight/battles/${battleId}`")
@@ -75,6 +76,7 @@ describe('selection screen structure', () => {
     expect(app).toContain('DOG_SELECT')
     expect(app).toContain('SHOP')
     expect(app).toContain('BATTLE')
+    expect(app).toContain('dogfight-run-stats')
     expect(app).toContain('创建房间')
     expect(app).toContain('加入房间')
     expect(app).toContain('随机匹配')
@@ -93,6 +95,7 @@ describe('selection screen structure', () => {
     expect(css).toContain('.dogfight-survivor-board')
     expect(css).toContain('.dogfight-player-frame')
     expect(css).toContain('.dogfight-phase-track')
+    expect(css).toContain('.dogfight-run-stats')
   })
 
   it('shows five-loss tolerance for casual runs in the top banner', () => {

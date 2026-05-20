@@ -638,6 +638,46 @@ async function joinRoomForUser(roomId: string, userId: string) {
   return loadDogfightRoom(room.id)
 }
 
+async function deleteRoomIfNoHumanPlayers(tx: Tx, roomId: string) {
+  const remaining = await tx.dogfightParticipant.findMany({ where: { roomId }, orderBy: { createdAt: 'asc' } })
+  const humanPlayers = remaining.filter((participant) => participant.kind !== 'BOT' && participant.userId)
+  if (humanPlayers.length > 0) {
+    const host = humanPlayers.find((participant) => participant.isHost) ?? humanPlayers[0]
+    await tx.dogfightParticipant.updateMany({ where: { roomId, kind: { not: 'BOT' } }, data: { isHost: false } })
+    await tx.dogfightParticipant.update({ where: { id: host.id }, data: { isHost: true } })
+    await tx.dogfightRoom.update({ where: { id: roomId }, data: { hostUserId: host.userId! } })
+    return false
+  }
+
+  const botRunIds = remaining
+    .filter((participant) => participant.kind === 'BOT' && participant.runId)
+    .map((participant) => participant.runId!)
+  if (botRunIds.length > 0) {
+    await tx.run.deleteMany({ where: { id: { in: botRunIds } } })
+  }
+  await tx.dogfightRoom.delete({ where: { id: roomId } })
+  return true
+}
+
+async function leaveRoomForUser(roomId: string, userId: string) {
+  return prisma.$transaction(async (tx) => {
+    const room = await tx.dogfightRoom.findUnique({ where: { id: roomId }, include: { participants: true } })
+    if (!room) return { found: false, deleted: false }
+    const participant = room.participants.find((entry) => entry.userId === userId)
+    if (!participant) return { found: true, deleted: false }
+
+    if (room.status === 'ACTIVE' && participant.runId) {
+      await tx.run.update({
+        where: { id: participant.runId },
+        data: { status: 'DOGFIGHT_ABANDONED', phase: 'COMPLETE', matchedGhost: null, lastBattle: null },
+      })
+    }
+    await tx.dogfightParticipant.delete({ where: { id: participant.id } })
+    const deleted = await deleteRoomIfNoHumanPlayers(tx, roomId)
+    return { found: true, deleted }
+  })
+}
+
 async function fillBotsAndStart(room: DogfightRoomWithDetails) {
   await prisma.$transaction(async (tx) => {
     const fresh = await tx.dogfightRoom.findUniqueOrThrow({ where: { id: room.id }, include: dogfightRoomInclude })
@@ -712,7 +752,7 @@ export function registerDogfightRoutes(app: FastifyInstance, requireUser: Requir
   app.get('/api/dogfight/rooms', async (request) => {
     const userId = requireUser(request.userId)
     const rooms = await prisma.dogfightRoom.findMany({
-      where: { status: { in: ['WAITING', 'ACTIVE', 'COMPLETE'] } },
+      where: { status: { in: ['WAITING', 'ACTIVE'] } },
       orderBy: [{ status: 'asc' }, { updatedAt: 'desc' }],
       take: 30,
       include: dogfightRoomInclude,
@@ -725,6 +765,14 @@ export function registerDogfightRoutes(app: FastifyInstance, requireUser: Requir
     const room = await createRoomForUser(userId)
     if (!room) return reply.code(500).send({ error: 'Failed to create dogfight room' })
     return responseFor(room, userId)
+  })
+
+  app.post('/api/dogfight/rooms/:roomId/leave', async (request, reply) => {
+    const userId = requireUser(request.userId)
+    const { roomId } = roomParamsSchema.parse(request.params)
+    const result = await leaveRoomForUser(roomId, userId)
+    if (!result.found) return reply.code(404).send({ error: 'Dogfight room not found' })
+    return { room: null }
   })
 
   app.post('/api/dogfight/rooms/:roomId/join', async (request, reply) => {
