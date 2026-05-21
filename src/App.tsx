@@ -37,6 +37,16 @@ import {
   Trophy,
   VolumeX,
 } from 'lucide-react'
+import {
+  buildFxTimeline,
+  battlePresentationTargetSide,
+  createBattlePresentation,
+  createUiFeedbackEvent,
+  type PresentationEvent,
+  type PresentationKind,
+  type UiFeedbackEvent,
+  type UiFeedbackKind,
+} from './feedback'
 import { resolveSlotPlacement } from './placement'
 import './App.css'
 
@@ -121,7 +131,7 @@ type BattleEvent = {
   sourceHpDelta?: number
   targetHpDelta?: number
 }
-type BattleVfxKind = 'none' | 'roll' | 'damage' | 'heal' | 'shield' | 'poison' | 'weak' | 'freeze' | 'thorns' | 'miss' | 'utility'
+type BattleVfxKind = PresentationKind
 type BattleVfxStyle = { kind: BattleVfxKind; color: string; accent: string; prefix: string; particleCount: number }
 type Battle = {
   winner: string
@@ -613,33 +623,12 @@ function equipmentSlotCount(relics?: Relic[]) {
   return relics?.some((relic) => relic.def.effect === 'EXTRA_EQUIPMENT_REDUCED_EFFECT') ? EXTRA_EQUIPMENT_SLOT_COUNT : BASE_EQUIPMENT_SLOT_COUNT
 }
 
-function battleEventHasStatus(event: BattleEvent, type: string) {
-  const rows = [event.playerStatuses, event.opponentStatuses]
-  return rows.some((row) => [...(row?.positive ?? []), ...(row?.negative ?? [])].some((status) => status.type === type))
-}
-
 function battleVfxKind(event?: BattleEvent): BattleVfxKind {
-  if (!event) return 'none'
-  if (event.kind === 'ROLL') return 'roll'
-  if (event.effectType === 'DAMAGE') return event.targetHpDelta === 0 ? 'miss' : 'damage'
-  if (event.effectType === 'HEAL') return 'heal'
-  if (event.effectType === 'POISON' || event.kind === 'POISON') return 'poison'
-  if (event.effectType === 'UTILITY') {
-    if (battleEventHasStatus(event, 'shield') || (event.actor === 'player' ? event.playerShield : event.opponentShield)) return 'shield'
-    if (battleEventHasStatus(event, 'weak')) return 'weak'
-    if (battleEventHasStatus(event, 'freeze')) return 'freeze'
-    if (battleEventHasStatus(event, 'thorns')) return 'thorns'
-    if (battleEventHasStatus(event, 'disabled')) return 'miss'
-    return 'utility'
-  }
-  return 'utility'
+  return createBattlePresentation(event).kind
 }
 
 function battleVfxTargetSide(event?: BattleEvent): 'player' | 'opponent' | null {
-  if (!event) return null
-  if (event.target === 'player' || event.target === 'opponent') return event.target
-  if ((event.effectType === 'HEAL' || battleVfxKind(event) === 'shield' || battleVfxKind(event) === 'thorns') && (event.actor === 'player' || event.actor === 'opponent')) return event.actor
-  return null
+  return battlePresentationTargetSide(event, battleVfxKind(event))
 }
 
 const battleVfxStyles: Record<BattleVfxKind, BattleVfxStyle> = {
@@ -969,8 +958,20 @@ export default function App() {
   const showClassRewardCeremony = Boolean(run?.phase === 'CLASS_REWARD' && classRewardCeremonyKey && !ceremonyDismissedRounds.has(classRewardCeremonyKey))
   const enchantCeremonyKey = run?.phase === 'ENCHANT_CHOICE' ? `${run.id}:enchant:${run.round}` : ''
   const showEnchantCeremony = Boolean(run?.phase === 'ENCHANT_CHOICE' && enchantCeremonyKey && !ceremonyDismissedRounds.has(enchantCeremonyKey))
+  const [uiFeedbacks, setUiFeedbacks] = useState<UiFeedbackEvent[]>([])
 
-  const action = async (fn: () => Promise<{ run: Run; battle?: Battle } | { user: AuthUser | null; activeRun?: Run | null; needsNickname?: boolean }>) => {
+  const pushUiFeedback = useCallback((kind: UiFeedbackKind, label?: string) => {
+    const feedback = createUiFeedbackEvent(kind, label)
+    setUiFeedbacks((current) => [...current.slice(-3), feedback])
+    window.setTimeout(() => {
+      setUiFeedbacks((current) => current.filter((entry) => entry.id !== feedback.id))
+    }, feedback.durationMs)
+  }, [])
+
+  const action = async (
+    fn: () => Promise<{ run: Run; battle?: Battle } | { user: AuthUser | null; activeRun?: Run | null; needsNickname?: boolean }>,
+    feedback?: { success?: UiFeedbackKind; failure?: UiFeedbackKind; successLabel?: string; failureLabel?: string },
+  ) => {
     setError('')
     try {
       const data = await fn()
@@ -998,33 +999,52 @@ export default function App() {
         void loadRunHistory().catch(() => undefined)
         void loadLadderProfile().catch(() => undefined)
       }
+      if (feedback?.success) pushUiFeedback(feedback.success, feedback.successLabel)
     } catch (err) {
-      setError(err instanceof Error ? err.message : '操作失败')
+      const message = err instanceof Error ? err.message : '操作失败'
+      setError(message)
+      pushUiFeedback(feedback?.failure ?? (message.includes('金币') ? 'gold-shortage' : 'action-failed'), feedback?.failureLabel ?? message)
     }
   }
 
   const moveItem = (itemId: string, area: Area, x: number, y: number) => {
     if (!run) return
     const placement = resolveRunSlotPlacement(run, itemId, area, x, y)
-    void action(() => api(`/runs/${run.id}/items/move`, { method: 'POST', body: JSON.stringify({ itemId, area: placement?.area ?? area, x: placement?.x ?? x, y: placement?.y ?? y }) }))
+    if (!placement) {
+      pushUiFeedback('place-failed')
+      return
+    }
+    void action(
+      () => api(`/runs/${run.id}/items/move`, { method: 'POST', body: JSON.stringify({ itemId, area: placement.area, x: placement.x, y: placement.y }) }),
+      { success: 'place-success', failure: 'place-failed' },
+    )
   }
 
   const upgradeItem = (itemId: string, targetItemId?: string) => {
     if (!run) return
     setTipAnchor(null)
-    void action(() => api(`/runs/${run.id}/items/upgrade`, { method: 'POST', body: JSON.stringify({ itemId, targetItemId }) }))
+    void action(
+      () => api(`/runs/${run.id}/items/upgrade`, { method: 'POST', body: JSON.stringify({ itemId, targetItemId }) }),
+      { success: 'upgrade-success', failure: 'upgrade-failed' },
+    )
   }
 
   const sellRelic = (relicId: string) => {
     if (!run) return
-    void action(() => api(`/runs/${run.id}/relic/sell`, { method: 'POST', body: JSON.stringify({ relicId }) }))
+    void action(
+      () => api(`/runs/${run.id}/relic/sell`, { method: 'POST', body: JSON.stringify({ relicId }) }),
+      { success: 'relic-sold' },
+    )
   }
 
   const applyEnchant = (itemId: string) => {
     if (!run || !selectedEnchant) return
     setTipAnchor(null)
     setSelectedItemId(null)
-    void action(() => api(`/runs/${run.id}/enchant/select`, { method: 'POST', body: JSON.stringify({ enchantId: selectedEnchant.id, itemId }) }))
+    void action(
+      () => api(`/runs/${run.id}/enchant/select`, { method: 'POST', body: JSON.stringify({ enchantId: selectedEnchant.id, itemId }) }),
+      { success: 'enchant-applied' },
+    )
   }
 
   const finishBattle = async () => {
@@ -1114,17 +1134,23 @@ export default function App() {
         upgradeItem(itemId, targetItemId)
       } else if (targetItem && targetItem.id !== itemId) {
         moveItem(itemId, targetItem.area, targetItem.x, targetItem.y)
+      } else {
+        pushUiFeedback('upgrade-failed')
       }
       return
     }
     if (String(event.over?.id) === 'SELL_ZONE' && run?.phase === 'SHOP') {
       setSelectedItemId(null)
       setTipAnchor(null)
-      void action(() => api(`/runs/${run.id}/shop/sell`, { method: 'POST', body: JSON.stringify({ itemId }) }))
+      void action(
+        () => api(`/runs/${run.id}/shop/sell`, { method: 'POST', body: JSON.stringify({ itemId }) }),
+        { success: 'sell-success' },
+      )
       return
     }
     const slot = event.over ? parseSlotId(overId) : null
     if (slot) moveItem(itemId, slot.area, slot.x, slot.y)
+    else pushUiFeedback('place-failed')
   }
 
   if (!user) {
@@ -1146,13 +1172,14 @@ export default function App() {
             <button className="secondary action-button" onClick={() => action(() => api('/auth/register', { method: 'POST', body: JSON.stringify({ account, password }) }))}>注册</button>
           </div>
         </section>
+        <FeedbackLayer feedbacks={uiFeedbacks} />
       </main>
     )
   }
 
   if (needsNicknameSetup) {
     return (
-      <Shell error={error} musicEnabled={musicEnabled} musicBlocked={musicBlocked} onToggleMusic={toggleMusic} onLogout={() => action(() => api('/auth/logout', { method: 'POST' }).then(() => ({ user: null })))}>
+      <Shell feedbacks={uiFeedbacks} error={error} musicEnabled={musicEnabled} musicBlocked={musicBlocked} onToggleMusic={toggleMusic} onLogout={() => action(() => api('/auth/logout', { method: 'POST' }).then(() => ({ user: null })))}>
         <NicknameSetup onSubmit={(nickname) => action(() => api('/profile/nickname', { method: 'POST', body: JSON.stringify({ nickname }) }))} />
       </Shell>
     )
@@ -1160,7 +1187,7 @@ export default function App() {
 
   if (appScreen === 'LOBBY') {
     return (
-      <Shell run={run ?? undefined} error={error} musicEnabled={musicEnabled} musicBlocked={musicBlocked} onToggleMusic={toggleMusic} onLogout={() => action(() => api('/auth/logout', { method: 'POST' }).then(() => ({ user: null })))}>
+      <Shell feedbacks={uiFeedbacks} run={run ?? undefined} error={error} musicEnabled={musicEnabled} musicBlocked={musicBlocked} onToggleMusic={toggleMusic} onLogout={() => action(() => api('/auth/logout', { method: 'POST' }).then(() => ({ user: null })))}>
         <PlayerRunHistoryPanel history={runHistory} ladderProfile={ladderProfile} onOpen={() => setHistoryOverlayOpen(true)} />
         <ModeLobby run={run} runHistory={runHistory} onOpen={() => setHistoryOverlayOpen(true)} onEnterCasual={() => setAppScreen('CASUAL')} onEnterLadder={() => setAppScreen('LADDER')} onEnterDogfight={() => setAppScreen('DOGFIGHT')} onEnterPeak={() => setAppScreen('PEAK')} />
         {historyOverlayOpen && <PlayerHistoryOverlay history={runHistory} onClose={() => setHistoryOverlayOpen(false)} />}
@@ -1170,7 +1197,7 @@ export default function App() {
 
   if (appScreen === 'LADDER' && run?.mode !== 'LADDER') {
     return (
-      <Shell run={run ?? undefined} error={error} musicEnabled={musicEnabled} musicBlocked={musicBlocked} onToggleMusic={toggleMusic} onOpenLobby={() => setAppScreen('LOBBY')} onLogout={() => action(() => api('/auth/logout', { method: 'POST' }).then(() => ({ user: null })))}>
+      <Shell feedbacks={uiFeedbacks} run={run ?? undefined} error={error} musicEnabled={musicEnabled} musicBlocked={musicBlocked} onToggleMusic={toggleMusic} onOpenLobby={() => setAppScreen('LOBBY')} onLogout={() => action(() => api('/auth/logout', { method: 'POST' }).then(() => ({ user: null })))}>
         <LadderHome onStart={(choice) => action(() => api('/runs', { method: 'POST', body: JSON.stringify({ ...choice, mode: 'LADDER' }) }))} />
       </Shell>
     )
@@ -1178,7 +1205,7 @@ export default function App() {
 
   if (appScreen === 'DOGFIGHT') {
     return (
-      <Shell run={run ?? undefined} error={error} musicEnabled={musicEnabled} musicBlocked={musicBlocked} onToggleMusic={toggleMusic} onOpenLobby={() => setAppScreen('LOBBY')} onLogout={() => action(() => api('/auth/logout', { method: 'POST' }).then(() => ({ user: null })))}>
+      <Shell feedbacks={uiFeedbacks} run={run ?? undefined} error={error} musicEnabled={musicEnabled} musicBlocked={musicBlocked} onToggleMusic={toggleMusic} onOpenLobby={() => setAppScreen('LOBBY')} onLogout={() => action(() => api('/auth/logout', { method: 'POST' }).then(() => ({ user: null })))}>
         <DogfightLobby />
       </Shell>
     )
@@ -1186,7 +1213,7 @@ export default function App() {
 
   if (appScreen === 'PEAK') {
     return (
-      <Shell run={run ?? undefined} error={error} musicEnabled={musicEnabled} musicBlocked={musicBlocked} onToggleMusic={toggleMusic} onOpenLobby={() => setAppScreen('LOBBY')} onLogout={() => action(() => api('/auth/logout', { method: 'POST' }).then(() => ({ user: null })))}>
+      <Shell feedbacks={uiFeedbacks} run={run ?? undefined} error={error} musicEnabled={musicEnabled} musicBlocked={musicBlocked} onToggleMusic={toggleMusic} onOpenLobby={() => setAppScreen('LOBBY')} onLogout={() => action(() => api('/auth/logout', { method: 'POST' }).then(() => ({ user: null })))}>
         <ApexArena />
       </Shell>
     )
@@ -1194,13 +1221,13 @@ export default function App() {
 
   if (!run) {
     return (
-      <Shell error={error} musicEnabled={musicEnabled} musicBlocked={musicBlocked} onToggleMusic={toggleMusic} onOpenLobby={() => setAppScreen('LOBBY')} onLogout={() => action(() => api('/auth/logout', { method: 'POST' }).then(() => ({ user: null })))}>
+      <Shell feedbacks={uiFeedbacks} error={error} musicEnabled={musicEnabled} musicBlocked={musicBlocked} onToggleMusic={toggleMusic} onOpenLobby={() => setAppScreen('LOBBY')} onLogout={() => action(() => api('/auth/logout', { method: 'POST' }).then(() => ({ user: null })))}>
         <DogSelect onPick={(choice) => action(() => api('/runs', { method: 'POST', body: JSON.stringify(choice) }))} />
       </Shell>
     )
   }
   return (
-    <Shell run={run} error={error} musicEnabled={musicEnabled} musicBlocked={musicBlocked} onToggleMusic={toggleMusic} onOpenLobby={() => setAppScreen('LOBBY')} onLogout={() => action(() => api('/auth/logout', { method: 'POST' }).then(() => ({ user: null })))}>
+    <Shell feedbacks={uiFeedbacks} run={run} error={error} musicEnabled={musicEnabled} musicBlocked={musicBlocked} onToggleMusic={toggleMusic} onOpenLobby={() => setAppScreen('LOBBY')} onLogout={() => action(() => api('/auth/logout', { method: 'POST' }).then(() => ({ user: null })))}>
       {!battle && run.phase === 'CHOICE' && (
         <ShopChoiceSelect choices={run.choices} onPick={(shopType) => action(() => api(`/runs/${run.id}/choice/select`, { method: 'POST', body: JSON.stringify({ shopType }) }))} />
       )}
@@ -1218,7 +1245,7 @@ export default function App() {
           <section className="reward-workbench">
             <ClassRewardSelect
               choices={run.classRewardChoices}
-              onPick={(defId) => action(() => api(`/runs/${run.id}/class-reward/select`, { method: 'POST', body: JSON.stringify({ defId }) }))}
+              onPick={(defId) => action(() => api(`/runs/${run.id}/class-reward/select`, { method: 'POST', body: JSON.stringify({ defId }) }), { success: 'reward-picked' })}
             />
             <InventoryBoard
               run={run}
@@ -1256,7 +1283,7 @@ export default function App() {
       )}
 
       {!battle && run.phase === 'RELIC_CHOICE' && (
-        <RelicChoiceSelect choices={run.relicChoices} onPick={(relicId) => action(() => api(`/runs/${run.id}/relic/select`, { method: 'POST', body: JSON.stringify({ relicId }) }))} />
+        <RelicChoiceSelect choices={run.relicChoices} onPick={(relicId) => action(() => api(`/runs/${run.id}/relic/select`, { method: 'POST', body: JSON.stringify({ relicId }) }), { success: 'relic-picked' })} />
       )}
 
       {!battle && run.phase === 'SHOP' && (
@@ -1267,8 +1294,8 @@ export default function App() {
               selectedOfferId={selectedOfferId}
               draggingItemId={draggingItemId}
               onInspectOffer={onInspectOffer}
-              onReroll={() => action(() => api(`/runs/${run.id}/shop/reroll`, { method: 'POST' }))}
-              onMatch={() => action(() => api(`/runs/${run.id}/battle/match`, { method: 'POST' }))}
+              onReroll={() => action(() => api(`/runs/${run.id}/shop/reroll`, { method: 'POST' }), { success: 'reroll-success' })}
+              onMatch={() => action(() => api(`/runs/${run.id}/battle/match`, { method: 'POST' }), { success: 'battle-start' })}
             />
             <InventoryBoard
               run={run}
@@ -1284,8 +1311,8 @@ export default function App() {
               offer={selectedOffer}
               anchor={tipAnchor}
               onClose={closeShopTip}
-              onBuy={() => selectedOffer && action(() => api(`/runs/${run.id}/shop/buy`, { method: 'POST', body: JSON.stringify({ offerId: selectedOffer.offerId, area: 'BAG' }) }))}
-              onSell={() => selectedItem && action(() => api(`/runs/${run.id}/shop/sell`, { method: 'POST', body: JSON.stringify({ itemId: selectedItem.id }) }))}
+              onBuy={() => selectedOffer && action(() => api(`/runs/${run.id}/shop/buy`, { method: 'POST', body: JSON.stringify({ offerId: selectedOffer.offerId, area: 'BAG' }) }), { success: 'buy-success', failure: 'gold-shortage' })}
+              onSell={() => selectedItem && action(() => api(`/runs/${run.id}/shop/sell`, { method: 'POST', body: JSON.stringify({ itemId: selectedItem.id }) }), { success: 'sell-success' })}
               onUpgrade={selectedItem && canUpgradeItem(selectedItem, run.items) ? () => upgradeItem(selectedItem.id) : null}
             />
           </section>
@@ -1321,7 +1348,7 @@ export default function App() {
               onSell={null}
               onUpgrade={selectedItem && canUpgradeItem(selectedItem, run.items) ? () => upgradeItem(selectedItem.id) : null}
             />
-            <button className="primary action-button" onClick={() => action(() => api(run.phase === 'PREP' ? `/runs/${run.id}/battle/match` : `/runs/${run.id}/battle/start`, { method: 'POST' }))}>
+            <button className="primary action-button" onClick={() => action(() => api(run.phase === 'PREP' ? `/runs/${run.id}/battle/match` : `/runs/${run.id}/battle/start`, { method: 'POST' }), { success: 'battle-start' })}>
               <Dice5 size={18} /> {run.phase === 'PREP' ? '匹配对手' : '开始战斗'}
             </button>
           </section>
@@ -2563,13 +2590,26 @@ function DogSelect({ onPick }: { onPick: (choice: { dogType: DogType; luckyNumbe
   )
 }
 
-function Shell({ children, run, error, musicEnabled, musicBlocked, onToggleMusic, onOpenLobby, onLogout }: { children: React.ReactNode; run?: Run; error?: string; musicEnabled: boolean; musicBlocked: boolean; onToggleMusic: () => void; onOpenLobby?: () => void; onLogout: () => void }) {
+function Shell({ children, run, error, feedbacks = [], musicEnabled, musicBlocked, onToggleMusic, onOpenLobby, onLogout }: { children: React.ReactNode; run?: Run; error?: string; feedbacks?: UiFeedbackEvent[]; musicEnabled: boolean; musicBlocked: boolean; onToggleMusic: () => void; onOpenLobby?: () => void; onLogout: () => void }) {
   return (
     <main className="app-shell">
       <TopBar run={run} musicEnabled={musicEnabled} musicBlocked={musicBlocked} onToggleMusic={onToggleMusic} onOpenLobby={onOpenLobby} onLogout={onLogout} />
       {error && <p className="error">{error}</p>}
       <div className="screen-content">{children}</div>
+      <FeedbackLayer feedbacks={feedbacks} />
     </main>
+  )
+}
+
+function FeedbackLayer({ feedbacks }: { feedbacks: UiFeedbackEvent[] }) {
+  return (
+    <div className="feedback-layer" aria-live="polite" aria-atomic="false">
+      {feedbacks.map((feedback) => (
+        <div key={feedback.id} className={`ui-feedback-toast ${feedback.tone}`} data-feedback-kind={feedback.kind}>
+          <span>{feedback.label}</span>
+        </div>
+      ))}
+    </div>
   )
 }
 
@@ -3212,6 +3252,7 @@ function BattleView({ run, battle, currentEvent, eventIndex, speed, score, onSpe
   const events = playback?.events ?? []
   const displayIndex = battle ? eventIndex : Math.max(0, events.length - 1)
   const event = currentEvent ?? events[Math.min(displayIndex, Math.max(0, events.length - 1))]
+  const presentation = event ? createBattlePresentation(event) : null
   const playerSnapshot = playback?.playerSnapshot ?? {
     name: '你的狗狗',
     dogType: run.dogType,
@@ -3250,6 +3291,7 @@ function BattleView({ run, battle, currentEvent, eventIndex, speed, score, onSpe
         player={playerSnapshot}
         opponent={opponentSnapshot}
         event={event}
+        presentation={presentation}
         lastRoll={lastRollEvent}
         speed={speed}
         finished={isFinished}
@@ -3349,7 +3391,7 @@ function BattleEquipmentRow({ owner, snapshot, events, displayIndex, activeEvent
   )
 }
 
-function BattleStage({ player, opponent, event, lastRoll, speed, finished, winner }: { player: BattleSnapshot; opponent: BattleSnapshot; event?: BattleEvent; lastRoll?: BattleEvent; speed: number; finished: boolean; winner?: string }) {
+function BattleStage({ player, opponent, event, presentation, lastRoll, speed, finished, winner }: { player: BattleSnapshot; opponent: BattleSnapshot; event?: BattleEvent; presentation: PresentationEvent | null; lastRoll?: BattleEvent; speed: number; finished: boolean; winner?: string }) {
   const [statusTip, setStatusTip] = useState<StatusTipState | null>(null)
   const inspectStatus = (status: BattleStatusEntry, side: 'player' | 'opponent', polarity: 'positive' | 'negative', element: HTMLElement) => {
     setStatusTip({ status, side, polarity, anchor: getFloatingTipPosition(element) })
@@ -3361,9 +3403,10 @@ function BattleStage({ player, opponent, event, lastRoll, speed, finished, winne
   const opponentHp = event?.opponentHp ?? opponentMaxHp
   const playerShield = event?.playerShield ?? 0
   const opponentShield = event?.opponentShield ?? 0
+  const activePresentationKind = presentation?.kind ?? 'none'
   return (
-    <div className="battle-stage handdrawn-stage">
-      <BattleFxCanvas event={event} speed={speed} />
+    <div className="battle-stage handdrawn-stage" data-presentation-kind={activePresentationKind}>
+      <BattleFxStage event={event} presentation={presentation} speed={speed} />
       <BattleDog
         side="opponent"
         snapshot={opponent}
@@ -3488,8 +3531,10 @@ function BattleDice({ event, lastRoll }: { event?: BattleEvent; lastRoll?: Battl
   )
 }
 
-function BattleFxCanvas({ event, speed }: { event?: BattleEvent; speed: number }) {
+function BattleFxStage({ event, presentation, speed }: { event?: BattleEvent; presentation: PresentationEvent | null; speed: number }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
+  const reducedMotion = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+  const timeline = presentation ? buildFxTimeline(presentation, Boolean(reducedMotion)) : []
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -3547,7 +3592,16 @@ function BattleFxCanvas({ event, speed }: { event?: BattleEvent; speed: number }
     return () => window.cancelAnimationFrame(frame)
   }, [event, speed])
 
-  return <canvas ref={canvasRef} className="battle-fx-canvas handdrawn-fx-canvas" data-vfx-kind={battleVfxKind(event)} aria-hidden="true" />
+  return (
+    <div className="battle-fx-stage" data-vfx-kind={battleVfxKind(event)} data-timeline={timeline.map((step) => step.phase).join(' ')}>
+      <canvas ref={canvasRef} className="battle-fx-canvas handdrawn-fx-canvas" data-vfx-kind={battleVfxKind(event)} aria-hidden="true" />
+      {presentation && presentation.kind !== 'none' && (
+        <span className={`battle-feedback-burst ${presentation.kind}`} aria-hidden="true">
+          {presentation.kind === 'roll' ? '掷' : presentation.amount ?? ''}
+        </span>
+      )}
+    </div>
+  )
 }
 
 function drawBattleFxTrail(context: CanvasRenderingContext2D, actorX: number, targetX: number, centerY: number, t: number, fx: BattleVfxStyle) {
@@ -3614,14 +3668,18 @@ function createBattleParticles(event: BattleEvent, fx: BattleVfxStyle, x: number
 }
 
 function CollapsedBattleLog({ events, eventIndex, open, onToggle }: { events: BattleEvent[]; eventIndex: number; open: boolean; onToggle: () => void }) {
-  const visible = open ? events.slice(Math.max(0, eventIndex - 40), eventIndex + 1) : events.slice(Math.max(0, eventIndex - 3), eventIndex + 1)
+  const startIndex = open ? Math.max(0, eventIndex - 40) : Math.max(0, eventIndex - 3)
+  const visible = events.slice(startIndex, eventIndex + 1)
   return (
     <div className={`battle-log-shell ${open ? 'open' : ''}`}>
       <button className="log-toggle" onClick={onToggle}>{open ? '收起日志' : '展开日志'}</button>
       <div className="battle-log">
-        {visible.map((event, index) => (
-          <p key={`${event.time}-${index}-${event.text}`} className={`${event.actor} ${event.effectType === 'POISON' ? 'poison' : ''}`}>{event.time}s · {event.text}</p>
-        ))}
+        {visible.map((event, index) => {
+          const absoluteIndex = startIndex + index
+          return (
+            <p key={`${event.time}-${index}-${event.text}`} className={`${event.actor} ${event.effectType === 'POISON' ? 'poison' : ''} ${absoluteIndex === eventIndex ? 'active-feedback' : ''}`}>{event.time}s · {event.text}</p>
+          )
+        })}
       </div>
     </div>
   )

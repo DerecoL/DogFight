@@ -200,6 +200,15 @@ describe('equipment layout scale', () => {
   })
 
   it('adds battle vfx causality styling for triggers, targets, and handwritten feedback', () => {
+    expect(cssRule('.battle-fx-stage')).toContain('position: absolute')
+    expect(cssRule('.battle-feedback-burst')).toContain('animation')
+    expect(cssRule('.battle-log p.active-feedback')).toContain('background')
+    expect(cssRule('.feedback-layer')).toContain('pointer-events: none')
+    expect(cssRule('.ui-feedback-toast')).toContain('animation')
+    expect(cssRule('.ui-feedback-toast.danger')).toContain('border-color')
+    expect(cssRule('.ui-feedback-toast.success')).toContain('border-color')
+    expect(cssRule('.feedback-flash-success')).toContain('animation')
+    expect(cssRule('.feedback-flash-danger')).toContain('animation')
     expect(cssRule('.battle-item-trigger')).toContain('animation')
     expect(cssRule('.battle-item-trigger::after')).toContain('content: ""')
     expect(cssRule('.battle-dog.vfx-target-damage .battle-dog-img')).toContain('filter')
