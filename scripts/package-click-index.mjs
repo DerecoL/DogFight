@@ -835,6 +835,7 @@ async function currentMockApiScript(buildId) {
 
   function relicEquipmentEffectScale(relicId, quality) {
     const def = relicDefsById[relicId];
+    if (def?.effect === 'EXTRA_EQUIPMENT_REDUCED_EFFECT') return 1;
     return def ? clamp(0.85 * relicQualityRatio(def, quality), 0.5, 1) : 1;
   }
 
@@ -844,7 +845,6 @@ async function currentMockApiScript(buildId) {
     const retained = Math.round(relicEffectScale(relicId, quality) * 100);
     const rollBias = Math.round(relicRollBiasChance(relicId, quality) * 100);
     const effectReduction = 100 - retained;
-    const extraEquipmentReduction = 100 - Math.round(relicEquipmentEffectScale(relicId, quality) * 100);
     const descriptions = {
       MIRROR_BIG_TO_SMALL: '你场上所有绑定在 4~6 点数的道具，现在在掷出对应减3的点数（即1~3）时也会触发，映射触发保留 ' + retained + '% 效果',
       MIRROR_SMALL_TO_BIG: '你场上所有绑定在 1~3 点数的道具，现在在掷出对应加3的点数（即4~6）时也会触发，映射触发保留 ' + retained + '% 效果',
@@ -856,7 +856,7 @@ async function currentMockApiScript(buildId) {
       POISON_TICK_BONUS: '敌方身上的【中毒】状态每次结算时，额外造成 ' + relicPoisonTickBonus(relicId, quality) + ' 点伤害。',
       OPENING_THORNS: '战斗开始时，你直接获得 ' + relicOpeningThorns(relicId, quality) + ' 层【荆棘】。',
       HUSKY_ENGINE: def.description,
-      EXTRA_EQUIPMENT_REDUCED_EFFECT: '你可以突破背包限制，将第 13 个装备放入战斗区，但你所有装备的触发效果降低 ' + extraEquipmentReduction + '%。',
+      EXTRA_EQUIPMENT_REDUCED_EFFECT: '你可以突破背包限制，将第 13 个装备放入战斗区。',
     };
     return descriptions[def.effect] || def.description;
   }

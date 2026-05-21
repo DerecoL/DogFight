@@ -230,6 +230,11 @@ describe('buildStandaloneIndex', () => {
       relicState.run.relics = [{ id: 'space-relic', relicId: 'v3-fourth-dimensional-kennel', quality: 'DIAMOND', slot: 0 }]
       localStorage.setItem(storageKey, JSON.stringify(relicState))
 
+      const me = await readJson(await window.fetch('/api/me'))
+      const kennelDescription = me.activeRun.relics.find((relic) => relic.relicId === 'v3-fourth-dimensional-kennel')?.def.description
+      expect(kennelDescription).not.toContain('降低')
+      expect(kennelDescription).not.toContain('15%')
+
       const movedResponse = await window.fetch(`/api/runs/${created.run.id}/items/move`, { method: 'POST', body: JSON.stringify({ itemId: 'extra', area: 'EQUIPMENT', x: 12, y: 0 }) })
       const moved = await readJson(movedResponse)
 
