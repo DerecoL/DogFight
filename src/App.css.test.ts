@@ -261,6 +261,19 @@ describe('equipment layout scale', () => {
     expect(cssRule('.dogfight-room-columns')).toContain('grid-template-columns')
   })
 
+  it('makes player apex leaderboard entries easy to find', () => {
+    expect(app).toContain('isMine: boolean')
+    expect(app).toContain("entry.isMine ? 'player-entry' : ''")
+    expect(app).toContain('{entry.isMine && <span className="apex-self-marker">我的记录</span>}')
+    expect(app).toContain('className="apex-self-marker"')
+    expect(app).toContain('我的记录')
+    expect(cssRule('.apex-rank-row.player-entry')).toContain('border: 3px solid')
+    expect(cssRule('.apex-rank-row.player-entry')).toContain('box-shadow')
+    expect(cssRule('.apex-rank-row.player-entry::before')).toContain('content: "我的记录"')
+    expect(cssRule('.apex-self-marker')).toContain('background')
+    expect(cssRule('.apex-self-marker')).toContain('font-weight: 950')
+  })
+
   it('stacks dogfight room columns on narrow screens', () => {
     expect(css).toContain('.dogfight-layout,')
     expect(css).toContain('.dogfight-room-columns {')

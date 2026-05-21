@@ -243,6 +243,7 @@ type ApexEntry = {
   rank: number
   challengeWins: number
   isSeed: boolean
+  isMine: boolean
   createdAt: string
   items: Item[]
   relics: Relic[]
@@ -2296,13 +2297,14 @@ function ApexArena() {
           <div className="apex-rank-list">
             {leaderboard.map((entry) => (
               <div className="apex-rank-entry" key={entry.id}>
-                <article className={`apex-rank-row ${entry.isSeed ? 'seed' : 'player-entry'}`}>
+                <article className={`apex-rank-row ${entry.isSeed ? 'seed' : ''} ${entry.isMine ? 'player-entry' : ''}`}>
                   <b>#{entry.rank}</b>
                   <img className="dog-avatar small" src={dogAssets[entry.dogType]} alt="" />
                   <div>
                     <strong>{entry.name}</strong>
                     <p>{dogNames[entry.dogType]} · {entry.wins}胜{entry.losses}败 · 第 {entry.round} 回合</p>
                   </div>
+                  {entry.isMine && <span className="apex-self-marker">我的记录</span>}
                   <span>{entry.isSeed ? '种子' : `${entry.challengeWins}连胜`}</span>
                   <button className="secondary action-button apex-config-toggle" onClick={() => setExpandedEntryId(expandedEntryId === entry.id ? null : entry.id)}>
                     {expandedEntryId === entry.id ? '收起配置' : '查看配置'}

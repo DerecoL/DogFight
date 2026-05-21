@@ -1104,9 +1104,13 @@ describeWithDatabase('run API', () => {
     expect(submitted.body.reports.daily.battles.length).toBeGreaterThan(0)
     expect(submitted.body.leaderboards.overall).toHaveLength(51)
     expect(submitted.body.leaderboards.daily).toHaveLength(51)
+    expect(submitted.body.leaderboards.overall.find((entry: { sourceRunId: string }) => entry.sourceRunId === runId)).toMatchObject({ isMine: true })
+    expect(submitted.body.leaderboards.daily.find((entry: { sourceRunId: string }) => entry.sourceRunId === runId)).toMatchObject({ isMine: true })
 
     const afterSubmit = await agent.get('/api/apex').expect(200)
     expect(afterSubmit.body.candidates.map((run: { id: string }) => run.id)).not.toContain(runId)
+    expect(afterSubmit.body.leaderboards.overall.find((entry: { sourceRunId: string }) => entry.sourceRunId === runId)).toMatchObject({ isMine: true })
+    expect(afterSubmit.body.leaderboards.overall.find((entry: { isSeed: boolean }) => entry.isSeed)).toMatchObject({ isMine: false })
     await agent.post('/api/apex/submit').send({ runId }).expect(409)
   })
 

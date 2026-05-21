@@ -2957,7 +2957,7 @@ input {
 
 .apex-rank-row {
   display: grid;
-  grid-template-columns: auto auto minmax(0, 1fr) auto auto;
+  grid-template-columns: auto auto minmax(0, 1fr) auto auto auto;
   gap: 12px;
   align-items: center;
 }
@@ -2972,8 +2972,25 @@ input {
 }
 
 .apex-rank-row.player-entry {
+  position: relative;
   background: #fff8d7;
-  border-color: rgba(245, 158, 11, .5);
+  border: 3px solid rgba(245, 158, 11, .88);
+  box-shadow: 0 10px 0 rgba(245, 158, 11, .24), 0 18px 32px rgba(112, 72, 30, .16);
+}
+
+.apex-rank-row.player-entry::before {
+  content: "我的记录";
+  position: absolute;
+  inset: -10px auto auto 12px;
+  padding: 3px 9px;
+  border: 2px solid rgba(61, 45, 37, .22);
+  border-radius: 999px;
+  background: #f59e0b;
+  color: #fffaf1;
+  font-size: 11px;
+  font-weight: 950;
+  line-height: 1;
+  box-shadow: 0 4px 0 rgba(112, 72, 30, .18);
 }
 
 .apex-rank-row > b {
@@ -2982,7 +2999,7 @@ input {
   font-size: 18px;
 }
 
-.apex-rank-row > span {
+.apex-rank-row > span:not(.apex-self-marker) {
   min-width: 58px;
   padding: 5px 8px;
   border-radius: 999px;
@@ -2991,6 +3008,19 @@ input {
   text-align: center;
   font-size: 12px;
   font-weight: 950;
+}
+
+.apex-self-marker {
+  min-width: 72px;
+  padding: 6px 10px;
+  border: 2px solid rgba(61, 45, 37, .24);
+  border-radius: 999px;
+  background: #fbbf24;
+  color: #3d2d25;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 950;
+  box-shadow: 0 4px 0 rgba(112, 72, 30, .16);
 }
 
 .apex-config-toggle {
@@ -4208,6 +4238,7 @@ input {
     grid-template-columns: auto auto minmax(0, 1fr);
   }
   .apex-candidate-card .action-button,
+  .apex-self-marker,
   .apex-rank-row > span,
   .apex-config-toggle {
     grid-column: 1 / -1;

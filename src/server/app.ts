@@ -110,7 +110,7 @@ export function buildApp() {
     relics: parseJson(entry.relics, []),
   })
 
-  const publicApexEntry = (entry: ApexEntry) => ({
+  const publicApexEntry = (entry: ApexEntry, currentUserId?: string) => ({
     id: entry.id,
     sourceRunId: entry.sourceRunId,
     boardType: entry.boardType as ApexBoardType,
@@ -124,6 +124,7 @@ export function buildApp() {
     rank: entry.rank,
     challengeWins: entry.challengeWins,
     isSeed: entry.isSeed,
+    isMine: Boolean(currentUserId && entry.userId === currentUserId),
     createdAt: entry.createdAt,
     items: parseJson<GameItem[]>(entry.items, []).map((item) => ({ ...item, def: itemDefForQuality(item.defId, item.quality) })),
     relics: parseJson<RelicInstance[]>(entry.relics, []).map((relic) => ({ ...relic, def: relicDefForQuality(relic.relicId, relic.quality) })),
@@ -497,8 +498,8 @@ export function buildApp() {
       dailyBoardKey,
       dailyResetHour: 5,
       leaderboards: {
-        overall: overallLeaderboard.map(publicApexEntry),
-        daily: dailyLeaderboard.map(publicApexEntry),
+        overall: overallLeaderboard.map((entry) => publicApexEntry(entry, userId)),
+        daily: dailyLeaderboard.map((entry) => publicApexEntry(entry, userId)),
       },
       candidates: candidates.map(publicRun),
     }
@@ -547,8 +548,8 @@ export function buildApp() {
 
     return {
       entries: {
-        overall: publicApexEntry(entries.overall),
-        daily: publicApexEntry(entries.daily),
+        overall: publicApexEntry(entries.overall, userId),
+        daily: publicApexEntry(entries.daily, userId),
       },
       reports: {
         overall: overallReport,
@@ -557,8 +558,8 @@ export function buildApp() {
       dailyBoardKey,
       dailyResetHour: 5,
       leaderboards: {
-        overall: updatedOverallLeaderboard.map(publicApexEntry),
-        daily: updatedDailyLeaderboard.map(publicApexEntry),
+        overall: updatedOverallLeaderboard.map((entry) => publicApexEntry(entry, userId)),
+        daily: updatedDailyLeaderboard.map((entry) => publicApexEntry(entry, userId)),
       },
     }
   })
