@@ -847,6 +847,65 @@ describeWithDatabase('run API', () => {
     })
   })
 
+  it('selects a free enchantment and applies it to a chosen item', async () => {
+    const agent = request.agent(app.server)
+    await app.ready()
+
+    await agent.post('/api/auth/register').send({ email: `enchant${Date.now()}@dog.test`, password: 'dogdice' }).expect(200)
+    const created = await agent.post('/api/runs').send({ dogType: 'MUTT' }).expect(200)
+    const runId = created.body.run.id
+    const targetItem = created.body.run.items[0]
+    const choices = [
+      {
+        id: 'choice-shield',
+        description: '触发时获得 11 点护盾。',
+        enchant: { kind: 'BASE_EFFECT', effect: 'SHIELD', amount: 11, label: '触发时获得11护盾' },
+      },
+    ]
+    await prisma.run.update({ where: { id: runId }, data: { round: 4, phase: 'ENCHANT_CHOICE', enchantChoices: JSON.stringify(choices) } })
+
+    const selected = await agent.post(`/api/runs/${runId}/enchant/select`).send({ enchantId: 'choice-shield', itemId: targetItem.id }).expect(200)
+
+    expect(selected.body.run.phase).toBe('CHOICE')
+    expect(selected.body.run.enchantChoices).toEqual([])
+    expect(selected.body.run.items.find((item: { id: string }) => item.id === targetItem.id).enchant).toMatchObject({
+      kind: 'BASE_EFFECT',
+      effect: 'SHIELD',
+      amount: 11,
+    })
+  })
+
+  it('keeps the target item enchantment when upgrading and discards the consumed enchantment', async () => {
+    const agent = request.agent(app.server)
+    await app.ready()
+
+    await agent.post('/api/auth/register').send({ email: `enchant-upgrade${Date.now()}@dog.test`, password: 'dogdice' }).expect(200)
+    const created = await agent.post('/api/runs').send({ dogType: 'SHIBA' }).expect(200)
+    const runId = created.body.run.id
+    const target = created.body.run.items[0]
+    await prisma.itemInstance.update({
+      where: { id: target.id },
+      data: { enchant: JSON.stringify({ kind: 'BASE_EFFECT', effect: 'DAMAGE', amount: 10, label: 'target enchant' }) },
+    })
+    const consumed = await prisma.itemInstance.create({
+      data: {
+        runId,
+        defId: target.defId,
+        quality: target.quality,
+        area: 'BAG',
+        x: 0,
+        y: 0,
+        enchant: JSON.stringify({ kind: 'BASE_EFFECT', effect: 'HEAL', amount: 12, label: 'consumed enchant' }),
+      },
+    })
+
+    const upgraded = await agent.post(`/api/runs/${runId}/items/upgrade`).send({ itemId: consumed.id, targetItemId: target.id }).expect(200)
+
+    const item = upgraded.body.run.items.find((entry: { id: string }) => entry.id === target.id)
+    expect(item).toMatchObject({ quality: 'SILVER', enchant: { effect: 'DAMAGE', amount: 10 } })
+    expect(upgraded.body.run.items.some((entry: { id: string }) => entry.id === consumed.id)).toBe(false)
+  })
+
   it('supports relic shop choice, free relic selection, direct PREP, and duplicate relic upgrades', async () => {
     const agent = request.agent(app.server)
     await app.ready()

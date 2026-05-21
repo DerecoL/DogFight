@@ -957,6 +957,91 @@ describe('battle simulation', () => {
     expect(result.opponentSnapshot.items).toEqual([])
   })
 
+  it('lets enchantments add concrete trigger dice to an item instance', () => {
+    const player: FighterSnapshot = {
+      name: 'P',
+      dogType: 'MUTT',
+      wins: 0,
+      losses: 0,
+      round: 0,
+      items: [
+        {
+          id: 'enchanted-six',
+          defId: 'starter-6',
+          quality: 'BRONZE',
+          area: 'EQUIPMENT',
+          x: 0,
+          y: 0,
+          enchant: { kind: 'EXTRA_DICE', dice: [1, 2, 3, 4, 5], label: '1/2/3/4/5点也触发' },
+        },
+      ],
+    }
+    const opponent: FighterSnapshot = { name: 'O', dogType: 'MUTT', wins: 0, losses: 0, round: 0, items: [] }
+
+    const result = simulateBattle(player, opponent, 'enchant-extra-dice')
+    const damage = result.events.find((event) => event.kind === 'ITEM' && event.itemId === 'enchanted-six')
+
+    expect(damage).toMatchObject({ effectType: 'DAMAGE', amount: 5, target: 'opponent' })
+    expect(result.playerSnapshot.items[0].enchant).toMatchObject({ kind: 'EXTRA_DICE', dice: [1, 2, 3, 4, 5] })
+  })
+
+  it('applies flat enchantment effects without scaling them by item quality', () => {
+    const player: FighterSnapshot = {
+      name: 'P',
+      dogType: 'MUTT',
+      wins: 0,
+      losses: 0,
+      round: 0,
+      items: [
+        {
+          id: 'shield-enchanted',
+          defId: 'mutt-old-collar',
+          quality: 'DIAMOND',
+          area: 'EQUIPMENT',
+          x: 0,
+          y: 0,
+          enchant: { kind: 'BASE_EFFECT', effect: 'SHIELD', amount: 11, label: '触发时获得11护盾' },
+        },
+      ],
+    }
+    const opponent: FighterSnapshot = { name: 'O', dogType: 'MUTT', wins: 0, losses: 0, round: 0, items: [] }
+
+    const result = simulateBattle(player, opponent, 'enchant-flat-shield')
+    const shield = result.events.find((event) => event.kind === 'ITEM' && event.itemId === 'shield-enchanted' && event.text.includes('附魔'))
+
+    expect(shield).toMatchObject({ effectType: 'UTILITY', amount: 11, target: 'player' })
+  })
+
+  it('lets a trigger enchantment queue its neighboring item', () => {
+    const player: FighterSnapshot = {
+      name: 'P',
+      dogType: 'MUTT',
+      wins: 0,
+      losses: 0,
+      round: 0,
+      items: [
+        {
+          id: 'trigger-source',
+          defId: 'mutt-old-collar',
+          quality: 'GOLD',
+          area: 'EQUIPMENT',
+          x: 0,
+          y: 0,
+          enchant: { kind: 'TRIGGER_NEIGHBOR', target: 'RIGHT', label: '触发右侧装备' },
+        },
+        { id: 'right-item', defId: 'starter-6', quality: 'BRONZE', area: 'EQUIPMENT', x: 1, y: 0 },
+      ],
+    }
+    const opponent: FighterSnapshot = { name: 'O', dogType: 'MUTT', wins: 0, losses: 0, round: 0, items: [] }
+
+    const result = simulateBattle(player, opponent, 'enchant-trigger-right')
+    const sourceIndex = result.events.findIndex((event) => event.kind === 'ITEM' && event.itemId === 'trigger-source')
+    const rightIndex = result.events.findIndex((event, index) => index > sourceIndex && event.kind === 'ITEM' && event.itemId === 'right-item')
+
+    expect(sourceIndex).toBeGreaterThanOrEqual(0)
+    expect(rightIndex).toBeGreaterThan(sourceIndex)
+  })
+
   it('lets small bite sometimes inflict weak after dealing damage', () => {
     const player: FighterSnapshot = {
       name: 'P',
