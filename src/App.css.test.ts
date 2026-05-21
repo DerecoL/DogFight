@@ -253,4 +253,13 @@ describe('equipment layout scale', () => {
     expect(css).toContain('.dogfight-room-card {')
     expect(css).toContain('grid-template-columns: 1fr')
   })
+  it('styles clickable battle status chips and their compact tips without resizing rows', () => {
+    expect(cssRule('.status-chip')).toContain('appearance: none')
+    expect(cssRule('.status-chip')).toContain('cursor: pointer')
+    expect(cssRule('.status-chip')).toContain('font-family: inherit')
+    expect(cssRule('.status-chip:hover, .status-chip:focus-visible')).toContain('transform: translateY(-1px)')
+    expect(cssRule('.status-floating-tip')).toContain('width: min(320px, calc(100vw - 28px))')
+    expect(cssRule('.status-tip-title')).toContain('display: flex')
+    expect(cssRule('.status-tip-description')).toContain('line-height: 1.55')
+  })
 })

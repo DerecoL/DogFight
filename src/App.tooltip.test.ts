@@ -56,6 +56,7 @@ describe('item detail tooltip interactions', () => {
     expect(app).toContain('const sellValue = item ? sellValueForItem(item) : null')
     expect(app).toContain('出售 +{sellValue}')
   })
+
   it('keeps tip copy readable when names, tags, or rule terms wrap', () => {
     expect(cssRule('.floating-tip')).toContain('min-width: 0')
     expect(cssRule('.floating-tip')).toContain('overflow-wrap: anywhere')
@@ -74,6 +75,26 @@ describe('item detail tooltip interactions', () => {
     expect(cssRule('.rule-tip')).toContain('overflow-wrap: anywhere')
     expect(cssRule('.relic-tip-identity')).toContain('min-width: 0')
     expect(cssRule('.relic-tip-identity h3')).toContain('overflow-wrap: anywhere')
+  })
+
+  it('lets battle status chips open compact rule tips', () => {
+    expect(app).toContain('type StatusTipState')
+    expect(app).toContain('const statusTipDetails')
+    expect(app).toContain('function StatusFloatingTip')
+    expect(app).toContain('const [statusTip, setStatusTip] = useState<StatusTipState | null>(null)')
+    expect(app).toContain('onStatusInspect')
+    expect(app).toContain('aria-label={`查看${status.label}说明`}')
+    expect(app).toContain('className={`status-chip handdrawn-status-chip ${status.type}`}')
+    expect(app).toContain('<StatusFloatingTip statusTip={statusTip} onClose={() => setStatusTip(null)} />')
+    expect(app).toContain('useOutsideTipDismiss(Boolean(statusTip), onClose)')
+    expect(app).toContain('statusTipId')
+    expect(app).toContain('aria-describedby')
+    expect(app).toContain('aria-expanded')
+    expect(app).toContain('aria-controls')
+    expect(app).toContain("event.key === 'Escape'")
+    for (const statusType of ['shield', 'thorns', 'extraRoll', 'fury', 'poison', 'weak', 'freeze', 'disabled']) {
+      expect(app).toContain(`${statusType}: {`)
+    }
   })
 })
 
