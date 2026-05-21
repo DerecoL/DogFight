@@ -209,6 +209,12 @@ type PlayerRunHistory = {
 }
 type AuthUser = { id: string; account: string; nickname: string | null }
 type TipAnchor = { x: number; y: number }
+type StatusTipState = {
+  status: BattleStatusEntry
+  side: 'player' | 'opponent'
+  polarity: 'positive' | 'negative'
+  anchor: TipAnchor
+}
 type ApexEntry = {
   id: string
   sourceRunId: string | null
@@ -514,6 +520,50 @@ const ruleTerms: Record<string, { description: string; note: string }> = {
   小型物品: { description: '容量为1的物品', note: '无' },
   失效: { description: '下次生效将不会有任何行为，生效后去除一层该效果', note: '无' },
   天命数字: { description: '开局时确定的幸运数字', note: '狗皇帝专属规则' },
+}
+const statusTipDetails: Record<string, { polarity: '正面效果' | '负面效果'; timing: string; description: string; source: string }> = {
+  shield: {
+    polarity: '正面效果',
+    timing: '受到伤害时优先结算',
+    description: '护盾会先吸收即将受到的伤害。护盾值被扣完后，剩余伤害才会进入生命值。',
+    source: '常见来源：护盾类装备、职业道具和遗物。',
+  },
+  thorns: {
+    polarity: '正面效果',
+    timing: '受到直接伤害后触发',
+    description: '荆棘会在被直接攻击后对攻击方造成反伤。层数越高，反伤能力越强。',
+    source: '常见来源：荆棘、反伤和防御类装备。',
+  },
+  extraRoll: {
+    polarity: '正面效果',
+    timing: '后续投骰或触发时消耗',
+    description: '额外骰会增加后续投骰或装备触发机会。显示的数值代表当前剩余次数。',
+    source: '常见来源：加速、连击和额外触发类效果。',
+  },
+  poison: {
+    polarity: '负面效果',
+    timing: '持续结算时造成伤害',
+    description: '中毒会在结算时造成持续伤害。芯片上的层数表示毒性强度，倒计时提示下一次毒伤时机。',
+    source: '常见来源：毒刃、毒牙和持续伤害类装备。',
+  },
+  weak: {
+    polarity: '负面效果',
+    timing: '造成伤害时生效',
+    description: '虚弱会降低后续造成的伤害。层数越高，输出被削弱得越明显。',
+    source: '常见来源：削弱、压制和控制类效果。',
+  },
+  freeze: {
+    polarity: '负面效果',
+    timing: '行动或触发前检查',
+    description: '冻结会限制行动或跳过触发。显示的剩余时间或次数代表控制还会持续多久。',
+    source: '常见来源：冰冻、寒冷和控制类装备。',
+  },
+  disabled: {
+    polarity: '负面效果',
+    timing: '装备或效果触发前检查',
+    description: '失效会让装备或效果被跳过。显示的次数代表还会抵消多少次触发。',
+    source: '常见来源：缴械、破坏和反制类效果。',
+  },
 }
 
 async function api<T>(url: string, options: RequestInit = {}): Promise<T> {
@@ -3098,6 +3148,34 @@ function FloatingTip({ run, item, offer, anchor, descriptionOverride, onClose, o
   )
 }
 
+function StatusFloatingTip({ statusTip, onClose }: { statusTip: StatusTipState | null; onClose: () => void }) {
+  useOutsideTipDismiss(Boolean(statusTip), onClose)
+  if (!statusTip) return null
+  const { status, anchor, side, polarity } = statusTip
+  const detail = statusTipDetails[status.type] ?? {
+    polarity: polarity === 'positive' ? '正面效果' : '负面效果',
+    timing: '状态存在期间生效',
+    description: '这个状态会影响当前战斗。请以芯片上的数值和战斗日志为准。',
+    source: '来源：装备、职业道具或遗物效果。',
+  }
+  const style = { '--tip-x': `${anchor.x}px`, '--tip-y': `${anchor.y}px` } as React.CSSProperties
+  return (
+    <aside className="floating-tip paper-card status-floating-tip" style={style} role="tooltip">
+      <div className="status-tip-title">
+        <strong>{status.label}</strong>
+        <span className={`tip-tag ${status.type}`}>{detail.polarity}</span>
+      </div>
+      <div className="tip-tags">
+        <span className="tip-tag">{side === 'player' ? '我方' : '敌方'}</span>
+        <span className="tip-tag">{statusText(status)}</span>
+      </div>
+      <p className="status-tip-description">{detail.description}</p>
+      <small>{detail.timing}</small>
+      <small>{detail.source}</small>
+    </aside>
+  )
+}
+
 function ForfeitRunAction({ run, onForfeit }: { run: Run; onForfeit: () => void }) {
   return (
     <section className="forfeit-run-action paper-card" aria-label="放弃并结算当前跑局">
@@ -3257,6 +3335,10 @@ function BattleEquipmentRow({ owner, snapshot, events, displayIndex, activeEvent
 }
 
 function BattleStage({ player, opponent, event, lastRoll, speed, finished, winner }: { player: BattleSnapshot; opponent: BattleSnapshot; event?: BattleEvent; lastRoll?: BattleEvent; speed: number; finished: boolean; winner?: string }) {
+  const [statusTip, setStatusTip] = useState<StatusTipState | null>(null)
+  const inspectStatus = (status: BattleStatusEntry, side: 'player' | 'opponent', polarity: 'positive' | 'negative', element: HTMLElement) => {
+    setStatusTip({ status, side, polarity, anchor: getFloatingTipPosition(element) })
+  }
   const playerMaxHp = event?.playerMaxHp ?? maxHealthForRound(player.round)
   const opponentMaxHp = event?.opponentMaxHp ?? maxHealthForRound(opponent.round)
   const playerHp = event?.playerHp ?? playerMaxHp
@@ -3275,6 +3357,7 @@ function BattleStage({ player, opponent, event, lastRoll, speed, finished, winne
         event={event}
         finished={finished}
         winner={winner}
+        onStatusInspect={inspectStatus}
       />
       <BattleDice event={event} lastRoll={lastRoll} />
       <BattleDog
@@ -3286,12 +3369,14 @@ function BattleStage({ player, opponent, event, lastRoll, speed, finished, winne
         event={event}
         finished={finished}
         winner={winner}
+        onStatusInspect={inspectStatus}
       />
+      <StatusFloatingTip statusTip={statusTip} onClose={() => setStatusTip(null)} />
     </div>
   )
 }
 
-function BattleDog({ side, snapshot, hp, maxHp, shield, event, finished, winner }: { side: 'player' | 'opponent'; snapshot: BattleSnapshot; hp: number; maxHp: number; shield: number; event?: BattleEvent; finished: boolean; winner?: string }) {
+function BattleDog({ side, snapshot, hp, maxHp, shield, event, finished, winner, onStatusInspect }: { side: 'player' | 'opponent'; snapshot: BattleSnapshot; hp: number; maxHp: number; shield: number; event?: BattleEvent; finished: boolean; winner?: string; onStatusInspect: (status: BattleStatusEntry, side: 'player' | 'opponent', polarity: 'positive' | 'negative', element: HTMLElement) => void }) {
   const isActor = event?.actor === side
   const vfxKind = battleVfxKind(event)
   const vfxTargetSide = battleVfxTargetSide(event)
@@ -3313,13 +3398,13 @@ function BattleDog({ side, snapshot, hp, maxHp, shield, event, finished, winner 
     <div className={`battle-dog ${side} ${isActor ? 'attacking' : ''} ${isTarget && event?.effectType !== 'HEAL' ? 'hit' : ''} ${healing ? 'healing' : ''} ${isVfxTarget ? `vfx-target-${battleVfxKind(event)}` : ''} ${shieldValue > 0 ? 'status-shield' : ''} ${poisonStatus ? 'poisoned status-poison' : ''} ${won ? 'winner' : ''} ${lost ? 'loser' : ''}`}>
       <div className="hp">
         <span><HeartPulse size={16} /> {snapshot.name}</span>
-        <StatusEffectRow tone="positive" statuses={positiveStatuses} />
+        <StatusEffectRow tone="positive" side={side} statuses={positiveStatuses} onStatusInspect={onStatusInspect} />
         <div className="hp-bar">
           {shieldValue > 0 && <i className="hp-shield" style={{ width: `${Math.max(6, Math.min(100, shieldPercent))}%` }} />}
           <i className="hp-current" style={{ width: `${Math.max(0, Math.min(100, hpPercent))}%` }} />
           {poisonPreviewPercent > 0 && <i className="hp-preview poison" style={{ left: `${poisonPreviewLeft}%`, width: `${Math.max(3, Math.min(100, poisonPreviewPercent))}%` }} />}
         </div>
-        <StatusEffectRow tone="negative" statuses={negativeStatuses} />
+        <StatusEffectRow tone="negative" side={side} statuses={negativeStatuses} onStatusInspect={onStatusInspect} />
         <b>{Math.max(0, Math.round(hp))}/{maxHp}</b>
         {shieldValue > 0 && (
           <div className="shield-bar" aria-label={`护盾 ${shieldValue}`}>
@@ -3334,12 +3419,22 @@ function BattleDog({ side, snapshot, hp, maxHp, shield, event, finished, winner 
   )
 }
 
-function StatusEffectRow({ tone, statuses }: { tone: 'positive' | 'negative'; statuses: BattleStatusEntry[] }) {
+function StatusEffectRow({ tone, side, statuses, onStatusInspect }: { tone: 'positive' | 'negative'; side: 'player' | 'opponent'; statuses: BattleStatusEntry[]; onStatusInspect: (status: BattleStatusEntry, side: 'player' | 'opponent', polarity: 'positive' | 'negative', element: HTMLElement) => void }) {
   const visible = statuses.slice(0, 3)
   const hidden = statuses.length - visible.length
   return (
     <div className={`status-effects ${tone}`}>
-      {visible.map((status) => <span key={`${tone}-${status.type}`} className={`status-chip handdrawn-status-chip ${status.type}`}>{statusText(status)}</span>)}
+      {visible.map((status) => (
+        <button
+          key={`${tone}-${status.type}`}
+          type="button"
+          className={`status-chip handdrawn-status-chip ${status.type}`}
+          aria-label={`查看${status.label}说明`}
+          onClick={(event) => onStatusInspect(status, side, tone, event.currentTarget)}
+        >
+          {statusText(status)}
+        </button>
+      ))}
       {hidden > 0 && <span className="status-chip handdrawn-status-chip more" title={statuses.map(statusText).join(' / ')}>+{hidden}</span>}
     </div>
   )
