@@ -13,7 +13,7 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 40
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -39,7 +39,7 @@ jobs:
           ssh-keyscan -T 20 -H "${{ secrets.SERVER_HOST }}" >> ~/.ssh/known_hosts
 
       - name: Upload source package
-        timeout-minutes: 5
+        timeout-minutes: 15
         run: |
           scp -i ~/.ssh/dogfight_deploy_key \
             -o BatchMode=yes \
