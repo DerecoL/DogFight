@@ -18,6 +18,20 @@ function repeatedEquipment(defId: string, count: number, quality: GameItem['qual
   return Array.from({ length: count }, (_, index) => equipment(`${defId}-${index}`, defId, index * 2, quality))
 }
 
+function boomCounterTestItems(quality: GameItem['quality']): GameItem[] {
+  return [
+    { id: 'counter', defId: 'v4-boom-counter', quality, area: 'EQUIPMENT', x: 0, y: 0 },
+    ...Array.from({ length: 11 }, (_, index) => ({
+      id: `extreme-${index}`,
+      defId: 'v3-chew-scratch-post',
+      quality: 'BRONZE' as const,
+      area: 'EQUIPMENT' as const,
+      x: index + 1,
+      y: 0,
+    })),
+  ]
+}
+
 function lateGameFighter(name: string, dogType: FighterSnapshot['dogType'], items: GameItem[]): FighterSnapshot {
   return { name, dogType, wins: 0, losses: 0, round: 6, items }
 }
@@ -193,7 +207,7 @@ describe('dog and item definitions', () => {
     expect(itemDef('v4-boom-counter')).toMatchObject({
       size: 2,
       price: 14,
-      dice: [1, 2, 3, 4, 5, 6],
+      dice: [1, 6],
       tags: ['counter', 'trigger', 'damage'],
       effect: { type: 'UTILITY', amount: 300, qualityBase: 'GOLD' },
       advancedEffect: 'BOOM_COUNTER',
@@ -760,9 +774,7 @@ describe('battle simulation', () => {
       wins: 0,
       losses: 0,
       round: 10,
-      items: [
-        { id: 'counter', defId: 'v4-boom-counter', quality: 'GOLD', area: 'EQUIPMENT', x: 0, y: 0 },
-      ],
+      items: boomCounterTestItems('GOLD'),
     }
     const opponent: FighterSnapshot = { name: 'O', dogType: 'SHIBA', wins: 0, losses: 0, round: 10, items: [] }
     const result = simulateBattle(player, opponent, 'boom-counter-gold')
@@ -779,8 +791,11 @@ describe('battle simulation', () => {
       amount: 300,
       target: 'opponent',
       targetHpDelta: -300,
-      time: 30,
+      boomCounterValue: 0,
+      boomCounterMax: 30,
     })
+    const explosionIndex = result.events.indexOf(explosion!)
+    expect(result.events.slice(0, explosionIndex + 1).filter((event) => event.boomCounterChanged && event.itemId === 'counter').length).toBe(30)
   })
 
   it('diamond boom counter keeps threshold 30 and damage 450', () => {
@@ -790,9 +805,7 @@ describe('battle simulation', () => {
       wins: 0,
       losses: 0,
       round: 11,
-      items: [
-        { id: 'counter', defId: 'v4-boom-counter', quality: 'DIAMOND', area: 'EQUIPMENT', x: 0, y: 0 },
-      ],
+      items: boomCounterTestItems('DIAMOND'),
     }
     const opponent: FighterSnapshot = { name: 'O', dogType: 'SHIBA', wins: 0, losses: 0, round: 11, items: [] }
     const result = simulateBattle(player, opponent, 'boom-counter-diamond')
@@ -807,7 +820,45 @@ describe('battle simulation', () => {
       quality: 'DIAMOND',
       amount: 450,
       targetHpDelta: -450,
-      time: 30,
+      boomCounterValue: 0,
+      boomCounterMax: 30,
+    })
+    const explosionIndex = result.events.indexOf(explosion!)
+    expect(result.events.slice(0, explosionIndex + 1).filter((event) => event.boomCounterChanged && event.itemId === 'counter').length).toBe(30)
+  })
+
+  it('tracks each boom counter item instance independently', () => {
+    const player: FighterSnapshot = {
+      name: 'P',
+      dogType: 'SHIBA',
+      wins: 0,
+      losses: 0,
+      round: 100,
+      items: [
+        { id: 'gold-counter', defId: 'v4-boom-counter', quality: 'GOLD', area: 'EQUIPMENT', x: 0, y: 0 },
+        { id: 'diamond-counter', defId: 'v4-boom-counter', quality: 'DIAMOND', area: 'EQUIPMENT', x: 2, y: 0 },
+        ...Array.from({ length: 10 }, (_, index) => ({
+          id: `extreme-${index}`,
+          defId: 'v3-chew-scratch-post',
+          quality: 'BRONZE' as const,
+          area: 'EQUIPMENT' as const,
+          x: index + 4,
+          y: 0,
+        })),
+      ],
+    }
+    const opponent: FighterSnapshot = { name: 'O', dogType: 'SHIBA', wins: 0, losses: 0, round: 100, items: [] }
+    const result = simulateBattle(player, opponent, 'two-boom-counters')
+
+    expect(result.events.find((event) => event.itemId === 'gold-counter' && event.effectType === 'DAMAGE')).toMatchObject({
+      amount: 300,
+      quality: 'GOLD',
+      boomCounterValue: 0,
+    })
+    expect(result.events.find((event) => event.itemId === 'diamond-counter' && event.effectType === 'DAMAGE')).toMatchObject({
+      amount: 450,
+      quality: 'DIAMOND',
+      boomCounterValue: 0,
     })
   })
 

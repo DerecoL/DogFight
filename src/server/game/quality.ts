@@ -1,4 +1,4 @@
-import type { GameItem, ItemQuality } from './types'
+import type { Enchantment, GameItem, ItemQuality } from './types'
 
 export const ITEM_QUALITIES: ItemQuality[] = ['BRONZE', 'SILVER', 'GOLD', 'DIAMOND']
 
@@ -36,4 +36,8 @@ export function canUpgradePair(source: GameItem, target: GameItem) {
     && source.defId === target.defId
     && normalizeQuality(source.quality) === normalizeQuality(target.quality)
     && nextQuality(target.quality) !== null
+}
+
+export function upgradeEnchant(targetEnchant?: Enchantment | null, sourceEnchant?: Enchantment | null) {
+  return targetEnchant ?? sourceEnchant ?? null
 }

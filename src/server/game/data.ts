@@ -148,7 +148,7 @@ export const ITEM_DEFS: ItemDef[] = [
     advancedEffect: 'GRANT_LIFESTEAL_ADJACENT',
     defaultQuality: 'GOLD',
   }),
-  slotItem('v4-boom-counter', '爆鸣计数器', 2, 14, [1, 2, 3, 4, 5, 6], ['counter', 'trigger', 'damage'], { type: 'UTILITY', amount: 300, qualityBase: 'GOLD' }, {
+  slotItem('v4-boom-counter', '爆鸣计数器', 2, 14, [1, 6], ['counter', 'trigger', 'damage'], { type: 'UTILITY', amount: 300, qualityBase: 'GOLD' }, {
     description: '己方装备每成功触发 1 次，获得 1 点爆鸣计数。达到 30 点后清零，对敌方造成 300 点直接伤害。升级只提高伤害。',
     advancedEffect: 'BOOM_COUNTER',
     defaultQuality: 'GOLD',

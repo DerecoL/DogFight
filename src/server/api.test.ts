@@ -845,6 +845,37 @@ describeWithDatabase('run API', () => {
     expect(moved.body.run.items.filter((item: { defId: string }) => item.defId === 'small-bite')).toHaveLength(1)
   })
 
+  it('inherits the moving item enchantment when drag-upgrading into an unenchanted target', async () => {
+    const agent = request.agent(app.server)
+    await app.ready()
+
+    await agent.post('/api/auth/register').send({ email: `move-enchant${Date.now()}@dog.test`, password: 'dogdice' }).expect(200)
+    const created = await agent.post('/api/runs').send({ dogType: 'SHIBA' }).expect(200)
+    const runId = created.body.run.id
+    const target = await prisma.itemInstance.create({
+      data: { runId, defId: 'small-bite', quality: 'BRONZE', area: 'EQUIPMENT', x: 6, y: 0 },
+    })
+    const moving = await prisma.itemInstance.create({
+      data: {
+        runId,
+        defId: 'small-bite',
+        quality: 'BRONZE',
+        area: 'BAG',
+        x: 0,
+        y: 0,
+        enchant: JSON.stringify({ kind: 'BASE_EFFECT', effect: 'SHIELD', amount: 11, label: 'moving enchant' }),
+      },
+    })
+
+    const moved = await agent.post(`/api/runs/${runId}/items/move`).send({ itemId: moving.id, area: 'EQUIPMENT', x: 6, y: 0 }).expect(200)
+
+    expect(moved.body.run.items.find((item: { id: string }) => item.id === target.id)).toMatchObject({
+      quality: 'SILVER',
+      enchant: { effect: 'SHIELD', amount: 11 },
+    })
+    expect(moved.body.run.items.some((item: { id: string }) => item.id === moving.id)).toBe(false)
+  })
+
   it('rejects upgrades for mismatched, max-quality, or cross-user items', async () => {
     const agent = request.agent(app.server)
     await app.ready()
@@ -954,6 +985,33 @@ describeWithDatabase('run API', () => {
 
     const item = upgraded.body.run.items.find((entry: { id: string }) => entry.id === target.id)
     expect(item).toMatchObject({ quality: 'SILVER', enchant: { effect: 'DAMAGE', amount: 10 } })
+    expect(upgraded.body.run.items.some((entry: { id: string }) => entry.id === consumed.id)).toBe(false)
+  })
+
+  it('inherits the consumed item enchantment when the upgrade target has none', async () => {
+    const agent = request.agent(app.server)
+    await app.ready()
+
+    await agent.post('/api/auth/register').send({ email: `consumed-enchant${Date.now()}@dog.test`, password: 'dogdice' }).expect(200)
+    const created = await agent.post('/api/runs').send({ dogType: 'SHIBA' }).expect(200)
+    const runId = created.body.run.id
+    const target = created.body.run.items[0]
+    const consumed = await prisma.itemInstance.create({
+      data: {
+        runId,
+        defId: target.defId,
+        quality: target.quality,
+        area: 'BAG',
+        x: 0,
+        y: 0,
+        enchant: JSON.stringify({ kind: 'BASE_EFFECT', effect: 'HEAL', amount: 12, label: 'consumed enchant' }),
+      },
+    })
+
+    const upgraded = await agent.post(`/api/runs/${runId}/items/upgrade`).send({ itemId: consumed.id, targetItemId: target.id }).expect(200)
+
+    const item = upgraded.body.run.items.find((entry: { id: string }) => entry.id === target.id)
+    expect(item).toMatchObject({ quality: 'SILVER', enchant: { effect: 'HEAL', amount: 12 } })
     expect(upgraded.body.run.items.some((entry: { id: string }) => entry.id === consumed.id)).toBe(false)
   })
 
@@ -1158,6 +1216,51 @@ describeWithDatabase('run API', () => {
     const nextRoom = await third.post('/api/dogfight/match').send({}).expect(200)
     expect(nextRoom.body.room.id).not.toBe(created.body.room.id)
     expect(nextRoom.body.room.status).toBe('WAITING')
+  })
+
+  it('cleans duplicate waiting dogfight rooms for the same player before listing rooms', async () => {
+    const agent = request.agent(app.server)
+    await app.ready()
+
+    await agent.post('/api/auth/register').send({ email: `dogfight-stale-room${Date.now()}@dog.test`, password: 'dogdice' }).expect(200)
+    const firstRoom = await agent.post('/api/dogfight/rooms').send({}).expect(200)
+    const secondRoom = await agent.post('/api/dogfight/rooms').send({}).expect(200)
+
+    const listed = await agent.get('/api/dogfight/rooms').expect(200)
+
+    expect(listed.body.rooms.map((room: { id: string }) => room.id)).toContain(secondRoom.body.room.id)
+    expect(listed.body.rooms.map((room: { id: string }) => room.id)).not.toContain(firstRoom.body.room.id)
+    expect(await prisma.dogfightRoom.findUnique({ where: { id: firstRoom.body.room.id } })).toBeNull()
+  })
+
+  it('advances expired active dogfight rooms before listing rooms', async () => {
+    const agent = request.agent(app.server)
+    await app.ready()
+
+    const registered = await agent.post('/api/auth/register').send({ email: `dogfight-expired-room${Date.now()}@dog.test`, password: 'dogdice' }).expect(200)
+    const room = await prisma.dogfightRoom.create({
+      data: {
+        hostUserId: registered.body.user.id,
+        status: 'ACTIVE',
+        phase: 'BATTLE',
+        currentRound: 1,
+        phaseDeadline: new Date(Date.now() - 1_000),
+        participants: {
+          create: {
+            userId: registered.body.user.id,
+            nickname: '过期房主',
+            kind: 'PLAYER',
+            isHost: true,
+          },
+        },
+      },
+    })
+
+    const listed = await agent.get('/api/dogfight/rooms').expect(200)
+
+    expect(listed.body.rooms.map((entry: { id: string }) => entry.id)).not.toContain(room.id)
+    await expect(prisma.dogfightRoom.findUniqueOrThrow({ where: { id: room.id } }))
+      .resolves.toMatchObject({ status: 'COMPLETE', phase: 'COMPLETE' })
   })
 
   it('removes players from dogfight rooms when they leave and deletes empty rooms', async () => {

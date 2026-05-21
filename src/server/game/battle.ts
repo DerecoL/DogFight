@@ -63,6 +63,10 @@ type ItemTrigger = {
   targetHpDelta: number
   text: string
   roll?: number
+  boomCounterItemId?: string
+  boomCounterValue?: number
+  boomCounterMax?: number
+  boomCounterChanged?: boolean
 }
 
 type TriggerQueueEntry = {
@@ -93,7 +97,7 @@ type BattleSideState = {
   forcedItemDice: Record<string, number>
   shibaSpeedStacks: number
   furyStacks: number
-  boomCounter: number
+  boomCountersByItemId: Record<string, number>
 }
 
 function maxHealthForRound(round: number) {
@@ -127,7 +131,7 @@ function createSideState(maxHp: number): BattleSideState {
     forcedItemDice: {},
     shibaSpeedStacks: 0,
     furyStacks: 0,
-    boomCounter: 0,
+    boomCountersByItemId: {},
   }
 }
 
@@ -518,29 +522,58 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
       return triggers
     }
 
-    const boomCounterItem = equippedItemsWithEffect(actor, 'BOOM_COUNTER')[0]
-    if (!sacrificeReplacesSmallEffect && boomCounterItem) {
-      actorState.boomCounter += 1
-      if (actorState.boomCounter >= 30) {
-        actorState.boomCounter = 0
-        const boomQuality = normalizeQuality(boomCounterItem.quality)
-        const boomDef = itemDef(boomCounterItem.defId)
-        const damage = qualityAmountFrom(boomDef.effect.amount, boomQuality, boomDef.effect.qualityBase)
-        const result = applyDirectHealthDamage(targetSide, damage)
-        triggers.push({
-          itemId: boomCounterItem.id,
-          defId: boomCounterItem.defId,
-          quality: boomQuality,
-          effectType: 'DAMAGE',
-          amount: result.before - result.after,
-          target: targetSide,
-          sourceHp: getHp(actorSide),
-          targetHp: result.after,
-          sourceHpDelta: 0,
-          targetHpDelta: result.delta,
-          roll,
-          text: `${itemName(boomDef, boomQuality)} 爆鸣计数达到 30，造成 ${result.before - result.after} 点直接伤害`,
-        })
+    const boomCounterItems = equippedItemsWithEffect(actor, 'BOOM_COUNTER')
+    if (!sacrificeReplacesSmallEffect) {
+      for (const boomCounterItem of boomCounterItems) {
+        const nextCount = (actorState.boomCountersByItemId[boomCounterItem.id] ?? 0) + 1
+        actorState.boomCountersByItemId[boomCounterItem.id] = nextCount
+        const boomCounterSignal = {
+          boomCounterItemId: boomCounterItem.id,
+          boomCounterValue: nextCount,
+          boomCounterMax: 30,
+          boomCounterChanged: true,
+        }
+        if (nextCount >= 30) {
+          actorState.boomCountersByItemId[boomCounterItem.id] = 0
+          boomCounterSignal.boomCounterValue = 0
+          const boomQuality = normalizeQuality(boomCounterItem.quality)
+          const boomDef = itemDef(boomCounterItem.defId)
+          const damage = qualityAmountFrom(boomDef.effect.amount, boomQuality, boomDef.effect.qualityBase)
+          const result = applyDirectHealthDamage(targetSide, damage)
+          triggers.push({
+            itemId: boomCounterItem.id,
+            defId: boomCounterItem.defId,
+            quality: boomQuality,
+            effectType: 'DAMAGE',
+            amount: result.before - result.after,
+            target: targetSide,
+            sourceHp: getHp(actorSide),
+            targetHp: result.after,
+            sourceHpDelta: 0,
+            targetHpDelta: result.delta,
+            roll,
+            ...boomCounterSignal,
+            text: `${itemName(boomDef, boomQuality)} 爆鸣计数达到 30，造成 ${result.before - result.after} 点直接伤害`,
+          })
+        } else {
+          const boomQuality = normalizeQuality(boomCounterItem.quality)
+          const boomDef = itemDef(boomCounterItem.defId)
+          triggers.push({
+            itemId: boomCounterItem.id,
+            defId: boomCounterItem.defId,
+            quality: boomQuality,
+            effectType: 'UTILITY',
+            amount: 1,
+            target: actorSide,
+            sourceHp: getHp(actorSide),
+            targetHp: getHp(targetSide),
+            sourceHpDelta: 0,
+            targetHpDelta: 0,
+            roll,
+            ...boomCounterSignal,
+            text: `${itemName(boomDef, boomQuality)} 爆鸣计数 +${nextCount}/30`,
+          })
+        }
       }
     }
 
@@ -1030,6 +1063,10 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
           itemId: trigger.itemId,
           defId: trigger.defId,
           quality: trigger.quality,
+          boomCounterItemId: trigger.boomCounterItemId,
+          boomCounterValue: trigger.boomCounterValue,
+          boomCounterMax: trigger.boomCounterMax,
+          boomCounterChanged: trigger.boomCounterChanged,
           effectType: trigger.effectType,
           amount: trigger.amount,
           target: trigger.target,

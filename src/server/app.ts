@@ -12,7 +12,7 @@ import { publicErrorMessage } from './errors'
 import { buildApexSeedEntries, dailyApexBoardKey, resolveApexChallenge, type ApexBoardType, type ApexChallengeReport, type ApexOpponent } from './game/apex'
 import { itemDef, itemDefForQuality, relicDef, relicDefForQuality } from './game/data'
 import { canPlace, findSlot, type PlacementOptions } from './game/grid'
-import { canUpgradePair, nextQuality, normalizeQuality } from './game/quality'
+import { canUpgradePair, nextQuality, normalizeQuality, upgradeEnchant } from './game/quality'
 import { itemSellValue } from './game/shop'
 import { simulateBattle } from './game/battle'
 import { calculateLadderResult, ladderTierForScore, ladderTierLabels, ladderTiers, LADDER_SEASON_ID, type LadderTier } from './game/ladder'
@@ -657,14 +657,16 @@ export function buildApp() {
     const item = run.items.find((entry) => entry.id === body.itemId)
     if (!item) return reply.code(404).send({ error: '道具不存在' })
     const gameItems = toGameItems(run.items)
-    const moving = { id: item.id, defId: item.defId, quality: normalizeQuality(item.quality), area: body.area, x: body.x, y: body.y }
+    const movingSource = gameItems.find((entry) => entry.id === item.id)
+    const moving = { ...(movingSource ?? { id: item.id, defId: item.defId, quality: normalizeQuality(item.quality), area: item.area as GameItem['area'], x: item.x, y: item.y }), area: body.area, x: body.x, y: body.y }
     const placementOptions = placementOptionsForRun(run)
     const coveredForUpgrade = overlappingItems(gameItems, moving, body.area, body.x, body.y)
     const upgradeTarget = coveredForUpgrade.length === 1 ? coveredForUpgrade[0] : null
     const upgradedQuality = upgradeTarget && canUpgradePair(moving, upgradeTarget) ? nextQuality(upgradeTarget.quality) : null
     if (upgradeTarget && upgradedQuality) {
+      const enchant = upgradeEnchant(upgradeTarget.enchant, moving.enchant)
       await prisma.$transaction([
-        prisma.itemInstance.update({ where: { id: upgradeTarget.id }, data: { quality: upgradedQuality } }),
+        prisma.itemInstance.update({ where: { id: upgradeTarget.id }, data: { quality: upgradedQuality, enchant: enchant ? JSON.stringify(enchant) : null } }),
         prisma.itemInstance.delete({ where: { id: item.id } }),
       ])
       const updated = await prisma.run.findUniqueOrThrow({ where: { id: run.id }, include: { items: true } })
@@ -718,8 +720,10 @@ export function buildApp() {
     const upgradedQuality = nextQuality(target.quality)
     if (!upgradedQuality) return reply.code(400).send({ error: '钻石品质已满级' })
 
+    const enchant = upgradeEnchant(target.enchant, consumed.enchant)
+
     await prisma.$transaction([
-      prisma.itemInstance.update({ where: { id: target.id }, data: { quality: upgradedQuality } }),
+      prisma.itemInstance.update({ where: { id: target.id }, data: { quality: upgradedQuality, enchant: enchant ? JSON.stringify(enchant) : null } }),
       prisma.itemInstance.delete({ where: { id: consumed.id } }),
     ])
     const updated = await prisma.run.findUniqueOrThrow({ where: { id: run.id }, include: { items: true } })

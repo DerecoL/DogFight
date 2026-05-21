@@ -125,6 +125,10 @@ type BattleEvent = {
   roll?: number
   itemId?: string
   defId?: string
+  boomCounterItemId?: string
+  boomCounterValue?: number
+  boomCounterMax?: number
+  boomCounterChanged?: boolean
   effectType?: string
   amount?: number
   target?: BattleTarget
@@ -683,6 +687,16 @@ function growthDamageTextForBattleItem(item: Item, owner: 'player' | 'opponent',
     return total
   }, 0)
   return `当前伤害 ${baseDamage + growth}；每次成功触发后，本局内后续伤害继续提升。`
+}
+
+function boomCounterStateForBattleItem(item: Item, owner: 'player' | 'opponent', events: BattleEvent[], displayIndex: number, activeEvent?: BattleEvent) {
+  if (item.def.advancedEffect !== 'BOOM_COUNTER') return null
+  const latest = events.slice(0, displayIndex + 1).reverse().find((event) => event.actor === owner && event.boomCounterItemId === item.id)
+  const max = latest?.boomCounterMax ?? 30
+  const count = Math.max(0, Math.min(max, latest?.boomCounterValue ?? 0))
+  const progress = max > 0 ? Math.round((count / max) * 100) : 0
+  const popping = activeEvent?.actor === owner && activeEvent.boomCounterItemId === item.id && activeEvent.boomCounterChanged === true
+  return { count, max, progress, popping }
 }
 
 function enchantmentText(enchant?: Enchantment | null) {
@@ -3364,11 +3378,12 @@ function BattleEquipmentRow({ owner, snapshot, events, displayIndex, activeEvent
         {Array.from({ length: slots }).map((_, x) => <i key={x} className="battle-slot" style={{ gridColumn: x + 1, gridRow: 1 }} />)}
         {items.map((item) => {
           const growthText = growthDamageTextForBattleItem(item, owner, events, displayIndex)
+          const boomCounterState = boomCounterStateForBattleItem(item, owner, events, displayIndex, activeEvent)
           return (
           <button
             type="button"
             key={item.id}
-            className={`battle-item item-card paper-item-card ${itemTone(item.def)} ${qualityClass(item.quality)} ${activeItemId === item.id ? `active battle-item-trigger vfx-trigger-${activeVfxKind}` : ''}`}
+            className={`battle-item item-card paper-item-card ${itemTone(item.def)} ${qualityClass(item.quality)} ${activeItemId === item.id ? `active battle-item-trigger vfx-trigger-${activeVfxKind}` : ''} ${boomCounterState ? 'boom-counter' : ''} ${boomCounterState?.popping ? 'boom-counter-pop' : ''}`}
             data-vfx-kind={battleVfxKind(activeEvent)}
             style={{
               gridColumn: `${item.x + 1} / span ${item.def.width}`,
@@ -3383,6 +3398,12 @@ function BattleEquipmentRow({ owner, snapshot, events, displayIndex, activeEvent
             {item.enchant && <span className="enchant-badge"><Sparkles size={12} />附魔</span>}
             <small><Dice5 size={12} /> {item.def.dice.join('/')}</small>
             <small className="item-effect">{growthText ?? effectText(item.def, normalizeQuality(item.quality))}</small>
+            {boomCounterState && (
+              <span className="boom-counter-meter" aria-label={`爆鸣计数 ${boomCounterState.count}/${boomCounterState.max}`}>
+                <i style={{ width: `${boomCounterState.progress}%` }} />
+                <b>{boomCounterState?.count}/{boomCounterState.max}</b>
+              </span>
+            )}
           </button>
           )
         })}

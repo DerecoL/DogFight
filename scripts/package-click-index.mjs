@@ -1346,8 +1346,8 @@ async function currentMockApiScript(buildId) {
     let playerHp = 100;
     let opponentHp = 100;
     const state = {
-      player: { shield: 0, poison: 0, weak: 0, thorns: 0, disabledItemIds: [], shibaSpeedStacks: 0, furyStacks: 0, lifestealItemIds: [], boomCounter: 0, growthDamageByItemId: {} },
-      opponent: { shield: 0, poison: 0, weak: 0, thorns: 0, disabledItemIds: [], shibaSpeedStacks: 0, furyStacks: 0, lifestealItemIds: [], boomCounter: 0, growthDamageByItemId: {} },
+      player: { shield: 0, poison: 0, weak: 0, thorns: 0, disabledItemIds: [], shibaSpeedStacks: 0, furyStacks: 0, lifestealItemIds: [], boomCountersByItemId: {}, growthDamageByItemId: {} },
+      opponent: { shield: 0, poison: 0, weak: 0, thorns: 0, disabledItemIds: [], shibaSpeedStacks: 0, furyStacks: 0, lifestealItemIds: [], boomCountersByItemId: {}, growthDamageByItemId: {} },
     };
     const events = [];
     let time = 0;
@@ -1487,16 +1487,24 @@ async function currentMockApiScript(buildId) {
           const advanced = def.advancedEffect || 'NONE';
           const quality = normalizeQuality(item.quality);
           const sacrificeReplacesSmallEffect = def.size === 1 && equippedWithEffect(fighter, 'SMALL_TRIGGERS_LARGE').length > 0;
-          const boomCounterItem = equippedWithEffect(fighter, 'BOOM_COUNTER')[0];
-          if (!sacrificeReplacesSmallEffect && boomCounterItem) {
-            state[side].boomCounter += 1;
-            if (state[side].boomCounter >= 30) {
-              state[side].boomCounter = 0;
-              const boomDef = defs[boomCounterItem.defId];
-              const boomQuality = normalizeQuality(boomCounterItem.quality);
-              const boomDamage = qualityAmountFrom(boomDef.effect?.amount || 0, boomQuality, boomDef.effect?.qualityBase);
-              const boomResult = applyDirectHealthDamage(target, boomDamage);
-              push({ actor: side, kind: 'ITEM', itemId: boomCounterItem.id, defId: boomCounterItem.defId, effectType: 'DAMAGE', amount: Math.max(0, -boomResult.delta), target, text: boomDef.name + ' 爆鸣计数达到 30，造成 ' + Math.max(0, -boomResult.delta) + ' 点直接伤害。' });
+          const boomCounterItems = equippedWithEffect(fighter, 'BOOM_COUNTER');
+          if (!sacrificeReplacesSmallEffect) {
+            for (const boomCounterItem of boomCounterItems) {
+              const nextCount = (state[side].boomCountersByItemId[boomCounterItem.id] || 0) + 1;
+              state[side].boomCountersByItemId[boomCounterItem.id] = nextCount;
+              const boomCounterSignal = { boomCounterItemId: boomCounterItem.id, boomCounterValue: nextCount, boomCounterMax: 30, boomCounterChanged: true };
+              if (nextCount >= 30) {
+                state[side].boomCountersByItemId[boomCounterItem.id] = 0;
+                boomCounterSignal.boomCounterValue = 0;
+                const boomDef = defs[boomCounterItem.defId];
+                const boomQuality = normalizeQuality(boomCounterItem.quality);
+                const boomDamage = qualityAmountFrom(boomDef.effect?.amount || 0, boomQuality, boomDef.effect?.qualityBase);
+                const boomResult = applyDirectHealthDamage(target, boomDamage);
+                push({ actor: side, kind: 'ITEM', itemId: boomCounterItem.id, defId: boomCounterItem.defId, effectType: 'DAMAGE', amount: Math.max(0, -boomResult.delta), target, ...boomCounterSignal, text: boomDef.name + ' 爆鸣计数达到 30，造成 ' + Math.max(0, -boomResult.delta) + ' 点直接伤害。' });
+              } else {
+                const boomDef = defs[boomCounterItem.defId];
+                push({ actor: side, kind: 'ITEM', itemId: boomCounterItem.id, defId: boomCounterItem.defId, effectType: 'UTILITY', amount: 1, target: side, ...boomCounterSignal, text: boomDef.name + ' 爆鸣计数 +' + nextCount + '/30。' });
+              }
             }
           }
           let amount = qualityAmountFrom(def.effect?.amount || 0, quality, def.effect?.qualityBase);

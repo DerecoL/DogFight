@@ -201,6 +201,10 @@ export type BattleEvent = {
   itemId?: string
   defId?: string
   quality?: ItemQuality
+  boomCounterItemId?: string
+  boomCounterValue?: number
+  boomCounterMax?: number
+  boomCounterChanged?: boolean
   effectType?: ItemDef['effect']['type'] | 'POISON' | 'ROLL'
   amount?: number
   target?: 'player' | 'opponent' | 'both' | 'none'

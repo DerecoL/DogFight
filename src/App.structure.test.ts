@@ -500,4 +500,12 @@ describe('selection screen structure', () => {
     expect(app).toContain("kind: 'weak'")
     expect(app).toContain("kind: 'freeze'")
   })
+
+  it('exposes boom counter accumulation hooks on battle equipment cards', () => {
+    expect(app).toContain('function boomCounterStateForBattleItem')
+    expect(app).toContain('boom-counter')
+    expect(app).toContain('boom-counter-pop')
+    expect(app).toContain('boomCounterState?.count')
+    expect(app).toContain('style={{ width: `${boomCounterState.progress}%` }}')
+  })
 })
