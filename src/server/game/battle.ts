@@ -13,6 +13,7 @@ import {
   growthDamageBase,
   growthDamageStep,
   itemDefForQuality,
+  nightPatrolLightTriggerCount,
 } from './data'
 import { triggerOrder } from './grid'
 import { normalizeQuality, qualityAmount, qualityAmountFrom, QUALITY_LABELS } from './quality'
@@ -895,7 +896,11 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
     if (!sacrificeReplacesSmallEffect && advanced === 'ADJACENT_DAMAGE_BONUS') {
       for (const adjacent of adjacentItems(actor, item)) actorState.adjacentDamageBonus[adjacent.id] = (actorState.adjacentDamageBonus[adjacent.id] ?? 0) + qualityAmount(4, quality)
     }
-    if (!sacrificeReplacesSmallEffect && (advanced === 'TRIGGER_ADJACENT' || advanced === 'ADJACENT_TEMP_TRIGGER' || (advanced === 'ADJACENT_ON_EXTRA_ROLL' && extra))) {
+    if (!sacrificeReplacesSmallEffect && advanced === 'ADJACENT_TEMP_TRIGGER') {
+      const adjacent = adjacentItems(actor, item)
+      for (let i = 0; i < nightPatrolLightTriggerCount(quality); i += 1) queueItems(queue, adjacent)
+    }
+    if (!sacrificeReplacesSmallEffect && (advanced === 'TRIGGER_ADJACENT' || (advanced === 'ADJACENT_ON_EXTRA_ROLL' && extra))) {
       queueItems(queue, adjacentItems(actor, item))
     }
     if (!sacrificeReplacesSmallEffect && advanced === 'TRIGGER_MINUS_THREE' && roll >= 4) {

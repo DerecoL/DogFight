@@ -800,6 +800,10 @@ async function currentMockApiScript(buildId) {
     return qualityAmountFrom(3, quality, 'SILVER');
   }
 
+  function nightPatrolLightTriggerCount(quality) {
+    return Math.max(1, qualityAmountFrom(1, quality, 'GOLD'));
+  }
+
   function relicQualityRatio(def, quality) {
     return qualityMultiplier(quality) / qualityMultiplier(def.defaultQuality);
   }
@@ -1360,6 +1364,7 @@ async function currentMockApiScript(buildId) {
     const fighterOf = (side) => side === 'player' ? run : opponent;
     const equippedOf = (fighter) => (fighter.items || []).filter((item) => item.area === 'EQUIPMENT').sort((a, b) => a.x - b.x);
     const equippedWithEffect = (fighter, effect) => equippedOf(fighter).filter((item) => defs[item.defId]?.advancedEffect === effect);
+    const adjacentItems = (fighter, item) => equippedOf(fighter).filter((candidate) => candidate.id !== item.id && Math.abs(candidate.x - item.x) <= (defs[item.defId]?.width || 1));
     const bloodContractAdjacentItems = (fighter, item, quality) => {
       const itemLeft = item.x;
       const itemRight = item.x + (defs[item.defId]?.width || 1);
@@ -1526,6 +1531,26 @@ async function currentMockApiScript(buildId) {
               push({ actor: side, kind: 'ITEM', itemId: item.id, defId: item.defId, effectType: 'HEAL', amount: healAmount, target: side, text: def.name + ' 清除 ' + removed + ' 层增益，恢复 ' + Math.max(0, healed.delta) + ' 生命。' });
             } else {
               push({ actor: side, kind: 'ITEM', itemId: item.id, defId: item.defId, effectType: 'UTILITY', amount: removed, target, text: def.name + ' 清除 ' + removed + ' 层增益。' });
+            }
+          } else if (advanced === 'ADJACENT_TEMP_TRIGGER') {
+            const adjacent = adjacentItems(fighter, item);
+            for (let i = 0; i < nightPatrolLightTriggerCount(quality); i += 1) {
+              for (const adjacentItem of adjacent) {
+                const adjacentDef = defs[adjacentItem.defId];
+                if (!adjacentDef) continue;
+                const adjacentAmount = qualityAmountFrom(adjacentDef.effect?.amount || 0, adjacentItem.quality, adjacentDef.effect?.qualityBase);
+                time += 0.25;
+                if (adjacentDef.effect?.type === 'HEAL') {
+                  const healed = applyHeal(side, adjacentAmount);
+                  push({ actor: side, kind: 'ITEM', itemId: adjacentItem.id, defId: adjacentItem.defId, effectType: 'HEAL', amount: adjacentAmount, target: side, text: adjacentDef.name + ' 回复 ' + Math.max(0, healed.delta) + ' 生命。' });
+                } else if (adjacentDef.advancedEffect === 'GAIN_SHIELD' || adjacentDef.advancedEffect === 'SHIELD_IMMUNITY') {
+                  state[side].shield += adjacentAmount;
+                  push({ actor: side, kind: 'ITEM', itemId: adjacentItem.id, defId: adjacentItem.defId, effectType: 'UTILITY', amount: adjacentAmount, target: side, text: adjacentDef.name + ' 获得 ' + adjacentAmount + ' 点护盾。' });
+                } else {
+                  const result = applyDamage(target, adjacentAmount, adjacentDef.advancedEffect === 'DOUBLE_SHIELD_DAMAGE' ? adjacentAmount * 2 : adjacentAmount);
+                  push({ actor: side, kind: 'ITEM', itemId: adjacentItem.id, defId: adjacentItem.defId, effectType: 'DAMAGE', amount: Math.max(0, -result.delta), target, text: adjacentDef.name + ' 造成 ' + Math.max(0, -result.delta) + ' 点伤害。' });
+                }
+              }
             }
           } else if (def.effect?.type === 'HEAL') {
             setHp(side, Math.min(100, hpOf(side) + amount));

@@ -258,6 +258,10 @@ export function growthDamageStep(quality?: string | null) {
   return qualityAmountFrom(3, quality, 'SILVER')
 }
 
+export function nightPatrolLightTriggerCount(quality?: string | null) {
+  return Math.max(1, qualityAmountFrom(1, quality, 'GOLD'))
+}
+
 export function itemDescription(itemId: string, quality?: string | null) {
   const def = itemDef(itemId)
   const currentQuality = normalizeQuality(quality)
@@ -279,6 +283,7 @@ export function itemDescription(itemId: string, quality?: string | null) {
   if (advanced === 'GAIN_FURY_ON_ATTACK') return `${baseEffect}攻击时有 50% 概率触发【激昂】；【激昂】使所有攻击伤害 +1，可叠加。`
   if (advanced === 'DOUBLE_SHIELD_DAMAGE') return `${baseEffect}如果敌方有护盾，该次伤害直接对护盾造成 2 倍伤害。`
   if (advanced === 'HEAL_OR_MAX_HP') return `恢复 ${amount} 点生命值。如果你当前处于满血，则永久提升自身 ${one} 点最大生命值。`
+  if (advanced === 'ADJACENT_TEMP_TRIGGER') return `触发时，额外触发【相邻】装备 ${nightPatrolLightTriggerCount(currentQuality)} 次。`
   if (advanced === 'LIFESTEAL') return `${baseEffect}并将造成伤害的 100% 转化为自身治疗。`
   if (advanced === 'POISON_AND_DISABLE_RIGHTMOST') return `对敌方施加 ${amount} 层【中毒】，并使敌方最右侧的一个装备【失效】一次。`
   if (advanced === 'SHIELD_IMMUNITY') return `获得 ${amount} 点护盾。只要你拥有护盾，你受到的【中毒】和【虚弱】层数减半（向上取整）。`

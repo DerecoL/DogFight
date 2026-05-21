@@ -28,6 +28,9 @@
   --sketch-shadow-soft: 3px 4px 0 rgba(61, 45, 37, .13), 0 12px 24px rgba(112, 72, 30, .08);
   --paper-tilt-left: -0.65deg;
   --paper-tilt-right: 0.58deg;
+  --paper-tilt-soft-left: -0.28deg;
+  --paper-tilt-soft-right: 0.32deg;
+  --paper-tilt-deep-right: 0.76deg;
   --sticker-blue: #cfe7ff;
   --sticker-pink: #ffd5e2;
   --sticker-mint: #d9f8df;
@@ -949,12 +952,25 @@ input {
 .paper-card {
   position: relative;
   isolation: isolate;
-  transform: rotate(var(--paper-tilt-right));
+  --paper-tilt: var(--paper-tilt-right);
+  transform: rotate(var(--paper-tilt));
   box-shadow: var(--sketch-shadow);
 }
 
 .paper-card:nth-child(even) {
-  transform: rotate(var(--paper-tilt-left));
+  --paper-tilt: var(--paper-tilt-left);
+}
+
+.paper-card:nth-child(3n) {
+  --paper-tilt: var(--paper-tilt-soft-right);
+}
+
+.paper-card:nth-child(4n) {
+  --paper-tilt: var(--paper-tilt-soft-left);
+}
+
+.paper-card:nth-child(5n) {
+  --paper-tilt: var(--paper-tilt-deep-right);
 }
 
 .paper-card::before {

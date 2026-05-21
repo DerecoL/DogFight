@@ -272,6 +272,33 @@ describe('battle simulation', () => {
     )
   }
 
+  it('night patrol light upgrade increases adjacent trigger count', () => {
+    const fighterWithLight = (quality: GameItem['quality']): FighterSnapshot => ({
+      name: 'P',
+      dogType: 'BULLY',
+      wins: 0,
+      losses: 0,
+      round: 6,
+      items: [
+        { id: 'neighbor', defId: 'starter-6', quality: 'BRONZE', area: 'EQUIPMENT', x: 0, y: 0 },
+        { id: 'lamp', defId: 'v3-night-patrol-light', quality, area: 'EQUIPMENT', x: 1, y: 0 },
+      ],
+    })
+    const opponent: FighterSnapshot = { name: 'O', dogType: 'BULLY', wins: 0, losses: 0, round: 6, items: [] }
+    const adjacentTriggersAtFirstRoll = (quality: GameItem['quality']) => {
+      const result = simulateBattle(fighterWithLight(quality), opponent, 'night-light-0')
+      return result.events.filter((event) =>
+        event.time === 1
+        && event.kind === 'ITEM'
+        && event.actor === 'player'
+        && event.itemId === 'neighbor'
+      )
+    }
+
+    expect(adjacentTriggersAtFirstRoll('GOLD')).toHaveLength(1)
+    expect(adjacentTriggersAtFirstRoll('DIAMOND')).toHaveLength(2)
+  })
+
   it('reverse fur comb silver purges enemy thorns first and heals by removed layers', () => {
     const player: FighterSnapshot = {
       name: 'P',
