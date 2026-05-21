@@ -1284,6 +1284,7 @@ input {
 .status-effects.positive { justify-content: flex-start; }
 .status-effects.negative { justify-content: flex-start; }
 .status-chip {
+  appearance: none;
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -1292,10 +1293,13 @@ input {
   padding: 3px 7px;
   border: 1px solid rgba(31, 41, 55, .12);
   border-radius: 999px;
+  font-family: inherit;
   font-size: 11px;
   font-weight: 950;
   line-height: 1;
   white-space: nowrap;
+  cursor: pointer;
+  transition: transform .12s ease, box-shadow .12s ease, filter .12s ease;
 }
 .status-chip.shield,
 .status-chip.extraRoll { background: #dbeafe; color: #1d4ed8; }
@@ -1306,6 +1310,32 @@ input {
 .status-chip.freeze { background: #e0f2fe; color: #0369a1; }
 .status-chip.disabled,
 .status-chip.more { background: #e2e8f0; color: #334155; }
+.status-chip:hover, .status-chip:focus-visible {
+  transform: translateY(-1px);
+  box-shadow: 1px 2px 0 rgba(61, 45, 37, .2);
+  filter: brightness(1.03);
+  outline: 2px solid rgba(61, 45, 37, .25);
+  outline-offset: 2px;
+}
+.status-floating-tip {
+  width: min(320px, calc(100vw - 28px));
+}
+.status-tip-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.status-tip-title strong {
+  font-size: 18px;
+  color: var(--ink);
+}
+.status-tip-description {
+  margin: 0;
+  line-height: 1.55;
+  font-weight: 750;
+  color: var(--ink);
+}
 .hp .hp-bar {
   position: relative;
   height: 18px;
