@@ -1929,7 +1929,7 @@ function DogfightRoomView({ room, onRoomChange, onLeave }: { room: DogfightRoom;
               {member.dogType ? <img className="dog-avatar small" src={dogAssets[member.dogType]} alt="" /> : <PawPrint size={28} />}
               <div>
                 <strong>{member.nickname}{member.isHost ? ' · 房主' : ''}</strong>
-                <p>{member.dogType ? dogNames[member.dogType] : '等待选狗'} · {member.kind === 'BOT' ? '机器人' : '玩家'} · {member.wins}胜 {member.losses}败</p>
+                <p>{member.dogType ? dogNames[member.dogType] : '等待选狗'} · {member.kind === 'BOT' ? '参赛者' : '玩家'} · {member.wins}胜 {member.losses}败</p>
               </div>
               <b>{dogfightLives(member)}</b>
             </button>

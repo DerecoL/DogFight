@@ -845,6 +845,9 @@ export function buildApp() {
     const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } })
     const playerName = user.nickname ?? '玩家'
     const run = await prisma.run.findFirstOrThrow({ where: { id: runId, userId }, include: { items: true } })
+    const previousOpponent = parseJson<(FighterSnapshot & { ghostId?: string | null }) | null>(run.matchedGhost || '', null)
+    const previousGhostId = typeof previousOpponent?.ghostId === 'string' ? previousOpponent.ghostId : null
+    const selectionSeed = `${run.id}-${run.round}-${run.wins}-${run.losses}-${Date.now()}`
     await prisma.ghostSnapshot.create({
       data: {
         runId: run.id,
@@ -885,14 +888,17 @@ export function buildApp() {
         orderBy: { createdAt: 'desc' },
         take: 50,
       })
+    const rematchCandidates = previousGhostId
+      ? ghostCandidates?.filter((candidate) => candidate.id !== previousGhostId)
+      : ghostCandidates
     const ghost = ghostCandidates
       ? runMode === 'LADDER'
-        ? selectLadderGhostSnapshot(ghostCandidates, { preferredWins: opponentWins, seed: `${run.id}-${run.round}-${run.wins}-${run.losses}` })
-        : selectCasualGhostSnapshot(ghostCandidates, { wins: run.wins, seed: `${run.id}-${run.round}-${run.wins}-${run.losses}` })
+        ? selectLadderGhostSnapshot(rematchCandidates ?? [], { preferredWins: opponentWins, seed: selectionSeed })
+        : selectCasualGhostSnapshot(rematchCandidates ?? [], { wins: run.wins, seed: selectionSeed })
       : null
     const opponent = ghost
       ? { name: ghost.name, dogType: ghost.dogType as DogType, luckyNumber: ghost.luckyNumber, wins: ghost.wins, losses: ghost.losses, round: ghost.round, items: parseJson(ghost.items, []), relics: parseJson(ghost.relics, []) }
-      : seedGhost(run.round, opponentWins, run.losses)
+      : seedGhost(run.round, opponentWins, run.losses, `${selectionSeed}-offline`)
     const updated = await prisma.run.update({
       where: { id: run.id },
       data: { phase: 'MATCH', matchedGhost: JSON.stringify({ ...opponent, ghostId: ghost?.id ?? null }) },

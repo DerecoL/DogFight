@@ -389,6 +389,6 @@ export function createFinishedBattleRecord(result: BattleResult, wins: number, l
   }
 }
 
-export function seedGhost(round: number, wins: number, losses: number): FighterSnapshot {
-  return buildOfflineFighter({ round, wins, losses })
+export function seedGhost(round: number, wins: number, losses: number, seed?: string): FighterSnapshot {
+  return buildOfflineFighter({ round, wins, losses, seed })
 }

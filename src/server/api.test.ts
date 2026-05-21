@@ -166,6 +166,57 @@ describeWithDatabase('run API', () => {
     })
   })
 
+  it('avoids immediately rematching the same ghost when another close ghost exists', async () => {
+    const agent = request.agent(app.server)
+    await app.ready()
+
+    const account = `rematch-relief-${Date.now()}`
+    await agent.post('/api/auth/register').send({ account, password: 'dogdice' }).expect(200)
+    const created = await agent.post('/api/runs').send({ dogType: 'SHIBA' }).expect(200)
+    const runId = created.body.run.id
+    await prisma.run.update({
+      where: { id: runId },
+      data: { round: 6, wins: 5, losses: 1 },
+    })
+
+    await prisma.ghostSnapshot.createMany({
+      data: [
+        {
+          runId: 'near-run-a',
+          userId: 'other-user-a',
+          name: '风衣阿麦',
+          dogType: 'MUTT',
+          round: 6,
+          wins: 4,
+          losses: 1,
+          gold: 0,
+          items: '[]',
+          relics: '[]',
+          seed: 'near-a',
+        },
+        {
+          runId: 'near-run-b',
+          userId: 'other-user-b',
+          name: '夜市阿航',
+          dogType: 'BULLY',
+          round: 6,
+          wins: 4,
+          losses: 1,
+          gold: 0,
+          items: '[]',
+          relics: '[]',
+          seed: 'near-b',
+        },
+      ],
+    })
+
+    const first = await agent.post(`/api/runs/${runId}/battle/match`).send({}).expect(200)
+    const second = await agent.post(`/api/runs/${runId}/battle/match`).send({}).expect(200)
+
+    expect(second.body.run.matchedGhost.ghostId).toBeTruthy()
+    expect(second.body.run.matchedGhost.ghostId).not.toBe(first.body.run.matchedGhost.ghostId)
+  })
+
   it('uses offline training opponents for the first two rounds even when real ghosts exist', async () => {
     const first = request.agent(app.server)
     const second = request.agent(app.server)

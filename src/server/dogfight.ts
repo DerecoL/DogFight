@@ -5,7 +5,7 @@ import { prisma } from './db'
 import { itemDef } from './game/data'
 import { findSlot } from './game/grid'
 import { STARTING_GOLD } from './game/matchmaking'
-import { buildOfflineFighter } from './game/offline-builder'
+import { buildOfflineFighter, offlineFighterName } from './game/offline-builder'
 import { normalizeQuality } from './game/quality'
 import { simulateBattle } from './game/battle'
 import type { BattleEvent, BattleResult, DogType, EnchantmentChoice, FighterSnapshot, GameItem, ShopType } from './game/types'
@@ -457,7 +457,7 @@ async function settleShopToBattle(tx: Tx, roomId: string, force = false) {
 
   if (refreshed.currentRound < DOGFIGHT_TRAINING_ROUNDS) {
     for (const participant of activeParticipants) {
-      const opponent = seedGhost(refreshed.currentRound, participant.run.wins, participant.run.losses)
+      const opponent = seedGhost(refreshed.currentRound, participant.run.wins, participant.run.losses, `${refreshed.id}-${refreshed.currentRound}-${participant.id}-training`)
       await createDogfightBattle(tx, refreshed, participant, null, opponent, pending)
     }
   } else {
@@ -470,7 +470,7 @@ async function settleShopToBattle(tx: Tx, roomId: string, force = false) {
       const participantB = shuffled[index + 1] ?? null
       const opponent = participantB
         ? snapshotFromRun(participantB.run, participantB.nickname)
-        : seedGhost(refreshed.currentRound, participantA.run.wins, participantA.run.losses)
+        : seedGhost(refreshed.currentRound, participantA.run.wins, participantA.run.losses, `${refreshed.id}-${refreshed.currentRound}-${participantA.id}-bye`)
       await createDogfightBattle(tx, refreshed, participantA, participantB, opponent, pending)
     }
   }
@@ -679,8 +679,15 @@ async function fillBotsAndStart(room: DogfightRoomWithDetails) {
   await prisma.$transaction(async (tx) => {
     const fresh = await tx.dogfightRoom.findUniqueOrThrow({ where: { id: room.id }, include: dogfightRoomInclude })
     const botSlots = Math.max(0, fresh.targetPlayerCount - fresh.participants.length)
+    const usedNames = new Set(fresh.participants.map((participant) => participant.nickname))
     for (let index = 0; index < botSlots; index += 1) {
-      const nickname = `斗狗机器人 ${index + 1}`
+      let nickname = offlineFighterName(`${fresh.id}-bot-${index}`)
+      let attempt = 1
+      while (usedNames.has(nickname)) {
+        nickname = offlineFighterName(`${fresh.id}-bot-${index}-${attempt}`)
+        attempt += 1
+      }
+      usedNames.add(nickname)
       const participant = await tx.dogfightParticipant.create({
         data: {
           roomId: fresh.id,
