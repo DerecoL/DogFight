@@ -1237,6 +1237,38 @@ describeWithDatabase('run API', () => {
     expect(await prisma.dogfightRoom.findUnique({ where: { id: firstRoom.body.room.id } })).toBeNull()
   })
 
+  it('cleans duplicate waiting dogfight rooms for other players before listing rooms', async () => {
+    const viewer = request.agent(app.server)
+    await app.ready()
+
+    const owner = await prisma.user.create({
+      data: { account: `dogfight-other-stale-${Date.now()}`, passwordHash: 'test' },
+    })
+    const firstRoom = await prisma.dogfightRoom.create({
+      data: {
+        hostUserId: owner.id,
+        status: 'WAITING',
+        phase: 'LOBBY',
+        participants: { create: { userId: owner.id, nickname: '福字敏', kind: 'PLAYER', isHost: true } },
+      },
+    })
+    const secondRoom = await prisma.dogfightRoom.create({
+      data: {
+        hostUserId: owner.id,
+        status: 'WAITING',
+        phase: 'LOBBY',
+        participants: { create: { userId: owner.id, nickname: '福字敏', kind: 'PLAYER', isHost: true } },
+      },
+    })
+
+    await viewer.post('/api/auth/register').send({ email: `dogfight-viewer${Date.now()}@dog.test`, password: 'dogdice' }).expect(200)
+    const listed = await viewer.get('/api/dogfight/rooms').expect(200)
+
+    expect(listed.body.rooms.map((room: { id: string }) => room.id)).toContain(secondRoom.id)
+    expect(listed.body.rooms.map((room: { id: string }) => room.id)).not.toContain(firstRoom.id)
+    expect(await prisma.dogfightRoom.findUnique({ where: { id: firstRoom.id } })).toBeNull()
+  })
+
   it('advances expired active dogfight rooms before listing rooms', async () => {
     const agent = request.agent(app.server)
     await app.ready()

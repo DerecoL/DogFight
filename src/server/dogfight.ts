@@ -694,6 +694,34 @@ async function cleanupDuplicateWaitingRoomsForUser(tx: Tx, userId: string, keepR
   }
 }
 
+async function cleanupDuplicateWaitingRoomsForLobby(tx: Tx) {
+  const participants = await tx.dogfightParticipant.findMany({
+    where: {
+      userId: { not: null },
+      room: { is: { status: 'WAITING', phase: 'LOBBY' } },
+    },
+    include: { room: true },
+  })
+  const byUser = new Map<string, typeof participants>()
+  for (const participant of participants) {
+    if (!participant.userId) continue
+    byUser.set(participant.userId, [...(byUser.get(participant.userId) ?? []), participant])
+  }
+
+  for (const memberships of byUser.values()) {
+    const ordered = memberships
+      .slice()
+      .sort((left, right) =>
+        right.room.updatedAt.getTime() - left.room.updatedAt.getTime()
+        || right.createdAt.getTime() - left.createdAt.getTime()
+      )
+    for (const participant of ordered.slice(1)) {
+      await tx.dogfightParticipant.delete({ where: { id: participant.id } })
+      await deleteRoomIfNoHumanPlayers(tx, participant.roomId)
+    }
+  }
+}
+
 async function leaveRoomForUser(roomId: string, userId: string) {
   return prisma.$transaction(async (tx) => {
     const room = await tx.dogfightRoom.findUnique({ where: { id: roomId }, include: { participants: true } })
@@ -794,7 +822,10 @@ export function registerDogfightRoutes(app: FastifyInstance, requireUser: Requir
   app.get('/api/dogfight/rooms', async (request) => {
     const userId = requireUser(request.userId)
     await advanceExpiredDogfightRoomsForLobby()
-    await prisma.$transaction((tx) => cleanupDuplicateWaitingRoomsForUser(tx, userId))
+    await prisma.$transaction(async (tx) => {
+      await cleanupDuplicateWaitingRoomsForLobby(tx)
+      await cleanupDuplicateWaitingRoomsForUser(tx, userId)
+    })
     const rooms = await prisma.dogfightRoom.findMany({
       where: { status: { in: ['WAITING', 'ACTIVE'] } },
       orderBy: [{ status: 'asc' }, { updatedAt: 'desc' }],
@@ -829,7 +860,10 @@ export function registerDogfightRoutes(app: FastifyInstance, requireUser: Requir
 
   app.post('/api/dogfight/match', async (request, reply) => {
     const userId = requireUser(request.userId)
-    await prisma.$transaction((tx) => cleanupDuplicateWaitingRoomsForUser(tx, userId))
+    await prisma.$transaction(async (tx) => {
+      await cleanupDuplicateWaitingRoomsForLobby(tx)
+      await cleanupDuplicateWaitingRoomsForUser(tx, userId)
+    })
     const rooms = await prisma.dogfightRoom.findMany({
       where: { status: 'WAITING', phase: 'LOBBY' },
       orderBy: { createdAt: 'asc' },
