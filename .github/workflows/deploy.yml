@@ -6,9 +6,14 @@ on:
       - main
   workflow_dispatch:
 
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -26,13 +31,15 @@ jobs:
             .
 
       - name: Configure SSH
+        timeout-minutes: 2
         run: |
           install -m 700 -d ~/.ssh
           printf '%s\n' "${{ secrets.SERVER_SSH_KEY }}" > ~/.ssh/dogfight_deploy_key
           chmod 600 ~/.ssh/dogfight_deploy_key
-          ssh-keyscan -H "${{ secrets.SERVER_HOST }}" >> ~/.ssh/known_hosts
+          ssh-keyscan -T 20 -H "${{ secrets.SERVER_HOST }}" >> ~/.ssh/known_hosts
 
       - name: Upload source package
+        timeout-minutes: 5
         run: |
           scp -i ~/.ssh/dogfight_deploy_key \
             -o BatchMode=yes \
@@ -43,6 +50,7 @@ jobs:
             "${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:/tmp/dogfight-${{ github.sha }}.tar.gz"
 
       - name: Deploy to Tencent Cloud
+        timeout-minutes: 18
         run: |
           ssh -i ~/.ssh/dogfight_deploy_key \
             -o BatchMode=yes \
