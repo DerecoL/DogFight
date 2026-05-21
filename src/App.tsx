@@ -521,6 +521,7 @@ const ruleTerms: Record<string, { description: string; note: string }> = {
   失效: { description: '下次生效将不会有任何行为，生效后去除一层该效果', note: '无' },
   天命数字: { description: '开局时确定的幸运数字', note: '狗皇帝专属规则' },
 }
+const statusTipId = 'battle-status-tip'
 const statusTipDetails: Record<string, { polarity: '正面效果' | '负面效果'; timing: string; description: string; source: string }> = {
   shield: {
     polarity: '正面效果',
@@ -539,6 +540,12 @@ const statusTipDetails: Record<string, { polarity: '正面效果' | '负面效�
     timing: '后续投骰或触发时消耗',
     description: '额外骰会增加后续投骰或装备触发机会。显示的数值代表当前剩余次数。',
     source: '常见来源：加速、连击和额外触发类效果。',
+  },
+  fury: {
+    polarity: '正面效果',
+    timing: '后续攻击或造成伤害时生效',
+    description: '激昂会强化后续攻击或伤害表现。显示的层数代表当前增幅强度。',
+    source: '常见来源：激昂、狂怒和进攻类装备。',
   },
   poison: {
     polarity: '负面效果',
@@ -3150,6 +3157,14 @@ function FloatingTip({ run, item, offer, anchor, descriptionOverride, onClose, o
 
 function StatusFloatingTip({ statusTip, onClose }: { statusTip: StatusTipState | null; onClose: () => void }) {
   useOutsideTipDismiss(Boolean(statusTip), onClose)
+  useEffect(() => {
+    if (!statusTip) return undefined
+    const onKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (event.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [statusTip, onClose])
   if (!statusTip) return null
   const { status, anchor, side, polarity } = statusTip
   const detail = statusTipDetails[status.type] ?? {
@@ -3160,7 +3175,7 @@ function StatusFloatingTip({ statusTip, onClose }: { statusTip: StatusTipState |
   }
   const style = { '--tip-x': `${anchor.x}px`, '--tip-y': `${anchor.y}px` } as React.CSSProperties
   return (
-    <aside className="floating-tip paper-card status-floating-tip" style={style} role="tooltip">
+    <aside id={statusTipId} className="floating-tip paper-card status-floating-tip" style={style} role="tooltip">
       <div className="status-tip-title">
         <strong>{status.label}</strong>
         <span className={`tip-tag ${status.type}`}>{detail.polarity}</span>
@@ -3339,6 +3354,7 @@ function BattleStage({ player, opponent, event, lastRoll, speed, finished, winne
   const inspectStatus = (status: BattleStatusEntry, side: 'player' | 'opponent', polarity: 'positive' | 'negative', element: HTMLElement) => {
     setStatusTip({ status, side, polarity, anchor: getFloatingTipPosition(element) })
   }
+  const activeStatusKey = statusTip ? statusTipKey(statusTip.status, statusTip.side, statusTip.polarity) : null
   const playerMaxHp = event?.playerMaxHp ?? maxHealthForRound(player.round)
   const opponentMaxHp = event?.opponentMaxHp ?? maxHealthForRound(opponent.round)
   const playerHp = event?.playerHp ?? playerMaxHp
@@ -3358,6 +3374,7 @@ function BattleStage({ player, opponent, event, lastRoll, speed, finished, winne
         finished={finished}
         winner={winner}
         onStatusInspect={inspectStatus}
+        activeStatusKey={activeStatusKey}
       />
       <BattleDice event={event} lastRoll={lastRoll} />
       <BattleDog
@@ -3370,13 +3387,14 @@ function BattleStage({ player, opponent, event, lastRoll, speed, finished, winne
         finished={finished}
         winner={winner}
         onStatusInspect={inspectStatus}
+        activeStatusKey={activeStatusKey}
       />
       <StatusFloatingTip statusTip={statusTip} onClose={() => setStatusTip(null)} />
     </div>
   )
 }
 
-function BattleDog({ side, snapshot, hp, maxHp, shield, event, finished, winner, onStatusInspect }: { side: 'player' | 'opponent'; snapshot: BattleSnapshot; hp: number; maxHp: number; shield: number; event?: BattleEvent; finished: boolean; winner?: string; onStatusInspect: (status: BattleStatusEntry, side: 'player' | 'opponent', polarity: 'positive' | 'negative', element: HTMLElement) => void }) {
+function BattleDog({ side, snapshot, hp, maxHp, shield, event, finished, winner, onStatusInspect, activeStatusKey }: { side: 'player' | 'opponent'; snapshot: BattleSnapshot; hp: number; maxHp: number; shield: number; event?: BattleEvent; finished: boolean; winner?: string; onStatusInspect: (status: BattleStatusEntry, side: 'player' | 'opponent', polarity: 'positive' | 'negative', element: HTMLElement) => void; activeStatusKey: string | null }) {
   const isActor = event?.actor === side
   const vfxKind = battleVfxKind(event)
   const vfxTargetSide = battleVfxTargetSide(event)
@@ -3398,13 +3416,13 @@ function BattleDog({ side, snapshot, hp, maxHp, shield, event, finished, winner,
     <div className={`battle-dog ${side} ${isActor ? 'attacking' : ''} ${isTarget && event?.effectType !== 'HEAL' ? 'hit' : ''} ${healing ? 'healing' : ''} ${isVfxTarget ? `vfx-target-${battleVfxKind(event)}` : ''} ${shieldValue > 0 ? 'status-shield' : ''} ${poisonStatus ? 'poisoned status-poison' : ''} ${won ? 'winner' : ''} ${lost ? 'loser' : ''}`}>
       <div className="hp">
         <span><HeartPulse size={16} /> {snapshot.name}</span>
-        <StatusEffectRow tone="positive" side={side} statuses={positiveStatuses} onStatusInspect={onStatusInspect} />
+        <StatusEffectRow tone="positive" side={side} statuses={positiveStatuses} onStatusInspect={onStatusInspect} activeStatusKey={activeStatusKey} />
         <div className="hp-bar">
           {shieldValue > 0 && <i className="hp-shield" style={{ width: `${Math.max(6, Math.min(100, shieldPercent))}%` }} />}
           <i className="hp-current" style={{ width: `${Math.max(0, Math.min(100, hpPercent))}%` }} />
           {poisonPreviewPercent > 0 && <i className="hp-preview poison" style={{ left: `${poisonPreviewLeft}%`, width: `${Math.max(3, Math.min(100, poisonPreviewPercent))}%` }} />}
         </div>
-        <StatusEffectRow tone="negative" side={side} statuses={negativeStatuses} onStatusInspect={onStatusInspect} />
+        <StatusEffectRow tone="negative" side={side} statuses={negativeStatuses} onStatusInspect={onStatusInspect} activeStatusKey={activeStatusKey} />
         <b>{Math.max(0, Math.round(hp))}/{maxHp}</b>
         {shieldValue > 0 && (
           <div className="shield-bar" aria-label={`护盾 ${shieldValue}`}>
@@ -3419,25 +3437,35 @@ function BattleDog({ side, snapshot, hp, maxHp, shield, event, finished, winner,
   )
 }
 
-function StatusEffectRow({ tone, side, statuses, onStatusInspect }: { tone: 'positive' | 'negative'; side: 'player' | 'opponent'; statuses: BattleStatusEntry[]; onStatusInspect: (status: BattleStatusEntry, side: 'player' | 'opponent', polarity: 'positive' | 'negative', element: HTMLElement) => void }) {
+function StatusEffectRow({ tone, side, statuses, onStatusInspect, activeStatusKey }: { tone: 'positive' | 'negative'; side: 'player' | 'opponent'; statuses: BattleStatusEntry[]; onStatusInspect: (status: BattleStatusEntry, side: 'player' | 'opponent', polarity: 'positive' | 'negative', element: HTMLElement) => void; activeStatusKey: string | null }) {
   const visible = statuses.slice(0, 3)
   const hidden = statuses.length - visible.length
   return (
     <div className={`status-effects ${tone}`}>
-      {visible.map((status) => (
-        <button
-          key={`${tone}-${status.type}`}
-          type="button"
-          className={`status-chip handdrawn-status-chip ${status.type}`}
-          aria-label={`查看${status.label}说明`}
-          onClick={(event) => onStatusInspect(status, side, tone, event.currentTarget)}
-        >
-          {statusText(status)}
-        </button>
-      ))}
+      {visible.map((status) => {
+        const isActive = activeStatusKey === statusTipKey(status, side, tone)
+        return (
+          <button
+            key={`${tone}-${status.type}`}
+            type="button"
+            className={`status-chip handdrawn-status-chip ${status.type}`}
+            aria-label={`查看${status.label}说明`}
+            aria-describedby={isActive ? statusTipId : undefined}
+            aria-expanded={isActive}
+            aria-controls={statusTipId}
+            onClick={(event) => onStatusInspect(status, side, tone, event.currentTarget)}
+          >
+            {statusText(status)}
+          </button>
+        )
+      })}
       {hidden > 0 && <span className="status-chip handdrawn-status-chip more" title={statuses.map(statusText).join(' / ')}>+{hidden}</span>}
     </div>
   )
+}
+
+function statusTipKey(status: BattleStatusEntry, side: 'player' | 'opponent', polarity: 'positive' | 'negative') {
+  return `${side}-${polarity}-${status.type}`
 }
 
 function statusText(status: BattleStatusEntry) {
