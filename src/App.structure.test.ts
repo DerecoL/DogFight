@@ -480,6 +480,14 @@ describe('selection screen structure', () => {
   })
 
   it('exposes stable hooks for the battle vfx causality pass', () => {
+    expect(app).toContain("from './feedback'")
+    expect(app).toContain('createBattlePresentation')
+    expect(app).toContain('function BattleFxStage')
+    expect(app).toContain('presentation={presentation}')
+    expect(app).toContain('activePresentationKind')
+    expect(app).toContain('uiFeedbacks')
+    expect(app).toContain('pushUiFeedback')
+    expect(app).toContain('feedback-layer')
     expect(app).toContain('function battleVfxKind')
     expect(app).toContain('function battleVfxTargetSide')
     expect(app).toContain('battle-item-trigger')

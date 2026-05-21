@@ -1,0 +1,205 @@
+export type FeedbackSide = 'player' | 'opponent' | 'system'
+export type FeedbackAnchor = 'item' | 'dice' | 'dog' | 'hp' | 'status' | 'log' | 'screen'
+export type PresentationKind = 'none' | 'roll' | 'damage' | 'heal' | 'shield' | 'poison' | 'weak' | 'freeze' | 'thorns' | 'miss' | 'utility'
+export type FxPhase = 'source' | 'trail' | 'impact' | 'result' | 'log'
+export type UiFeedbackTone = 'success' | 'danger' | 'info' | 'reward'
+export type UiFeedbackKind =
+  | 'buy-success'
+  | 'gold-shortage'
+  | 'reroll-success'
+  | 'place-success'
+  | 'place-failed'
+  | 'upgrade-success'
+  | 'upgrade-failed'
+  | 'sell-success'
+  | 'relic-sold'
+  | 'reward-picked'
+  | 'relic-picked'
+  | 'enchant-applied'
+  | 'battle-start'
+  | 'action-failed'
+
+export type FxAnchor = {
+  anchor: FeedbackAnchor
+  side: FeedbackSide
+  id?: string
+}
+
+export type FxCue = {
+  phase: FxPhase
+  atMs: number
+  durationMs: number
+}
+
+export type PresentationEvent = {
+  kind: PresentationKind
+  source: FxAnchor
+  target: FxAnchor
+  amount: number | null
+  statusChanged: string[]
+  logTone: PresentationKind
+  timeline: FxCue[]
+}
+
+export type UiFeedbackEvent = {
+  id: string
+  kind: UiFeedbackKind
+  tone: UiFeedbackTone
+  label: string
+  durationMs: number
+}
+
+type StatusLike = { type: string }
+type StatusRowsLike = { positive?: readonly StatusLike[]; negative?: readonly StatusLike[] }
+type BattleEventLike = {
+  time?: number
+  actor?: FeedbackSide | string
+  kind?: string
+  itemId?: string
+  effectType?: string
+  amount?: number
+  target?: 'player' | 'opponent' | 'both' | 'none' | string
+  targetHpDelta?: number
+  playerShield?: number
+  opponentShield?: number
+  playerStatuses?: StatusRowsLike
+  opponentStatuses?: StatusRowsLike
+  statusChanged?: string[]
+}
+
+export const uiFeedbackDurationMs = 560
+
+const feedbackToneByKind: Record<UiFeedbackKind, UiFeedbackTone> = {
+  'buy-success': 'success',
+  'gold-shortage': 'danger',
+  'reroll-success': 'info',
+  'place-success': 'success',
+  'place-failed': 'danger',
+  'upgrade-success': 'reward',
+  'upgrade-failed': 'danger',
+  'sell-success': 'success',
+  'relic-sold': 'success',
+  'reward-picked': 'reward',
+  'relic-picked': 'reward',
+  'enchant-applied': 'reward',
+  'battle-start': 'info',
+  'action-failed': 'danger',
+}
+
+const defaultFeedbackLabel: Record<UiFeedbackKind, string> = {
+  'buy-success': '购买成功',
+  'gold-shortage': '金币不足',
+  'reroll-success': '商店刷新',
+  'place-success': '放置成功',
+  'place-failed': '不能放这里',
+  'upgrade-success': '升级成功',
+  'upgrade-failed': '无法升级',
+  'sell-success': '出售成功',
+  'relic-sold': '遗物已出售',
+  'reward-picked': '奖励已收入背包',
+  'relic-picked': '遗物已获得',
+  'enchant-applied': '附魔完成',
+  'battle-start': '战斗开始',
+  'action-failed': '操作失败',
+}
+
+export function createBattlePresentation(event?: BattleEventLike | null): PresentationEvent {
+  const kind = battlePresentationKind(event)
+  const source = battlePresentationSource(event, kind)
+  const target = battlePresentationTarget(event, kind)
+  const presentation: PresentationEvent = {
+    kind,
+    source,
+    target,
+    amount: typeof event?.amount === 'number' ? event.amount : null,
+    statusChanged: event?.statusChanged ?? [],
+    logTone: kind,
+    timeline: [],
+  }
+  presentation.timeline = buildFxTimeline(presentation, false)
+  return presentation
+}
+
+export function buildFxTimeline(presentation: Pick<PresentationEvent, 'kind'>, reducedMotion: boolean): FxCue[] {
+  const base: FxCue[] = [
+    { phase: 'source', atMs: 0, durationMs: 170 },
+    { phase: 'trail', atMs: 110, durationMs: 260 },
+    { phase: 'impact', atMs: 300, durationMs: 180 },
+    { phase: 'result', atMs: 390, durationMs: 260 },
+    { phase: 'log', atMs: 460, durationMs: 220 },
+  ]
+  if (presentation.kind === 'none') return []
+  if (reducedMotion) return base.filter((step) => step.phase !== 'trail')
+  return base
+}
+
+export function createUiFeedbackEvent(kind: UiFeedbackKind, label = defaultFeedbackLabel[kind]): UiFeedbackEvent {
+  const randomPart = Math.random().toString(36).slice(2, 8)
+  return {
+    id: `${kind}-${Date.now()}-${randomPart}`,
+    kind,
+    tone: feedbackToneByKind[kind],
+    label,
+    durationMs: uiFeedbackDurationMs,
+  }
+}
+
+function battlePresentationKind(event?: BattleEventLike | null): PresentationKind {
+  if (!event) return 'none'
+  if (event.kind === 'ROLL') return 'roll'
+  if (event.effectType === 'DAMAGE') return event.targetHpDelta === 0 ? 'miss' : 'damage'
+  if (event.effectType === 'HEAL') return 'heal'
+  if (event.effectType === 'POISON' || event.kind === 'POISON') return 'poison'
+  if (event.effectType === 'UTILITY') {
+    if (eventHasStatus(event, 'shield') || shieldValueForActor(event) > 0) return 'shield'
+    if (eventHasStatus(event, 'weak')) return 'weak'
+    if (eventHasStatus(event, 'freeze')) return 'freeze'
+    if (eventHasStatus(event, 'thorns')) return 'thorns'
+    if (eventHasStatus(event, 'disabled')) return 'miss'
+    return 'utility'
+  }
+  return event.kind === 'END' ? 'none' : 'utility'
+}
+
+function battlePresentationSource(event: BattleEventLike | null | undefined, kind: PresentationKind): FxAnchor {
+  const side = normalizeSide(event?.actor)
+  if (kind === 'roll') return { anchor: 'dice', side }
+  if (event?.itemId) return { anchor: 'item', side, id: event.itemId }
+  return { anchor: side === 'system' ? 'screen' : 'dog', side }
+}
+
+function battlePresentationTarget(event: BattleEventLike | null | undefined, kind: PresentationKind): FxAnchor {
+  if (kind === 'roll') return { anchor: 'dice', side: normalizeSide(event?.actor) }
+  const targetSide = battlePresentationTargetSide(event, kind)
+  if (!targetSide) return { anchor: 'screen', side: 'system' }
+  if (kind === 'shield') return { anchor: 'hp', side: targetSide }
+  if (kind === 'poison' || kind === 'weak' || kind === 'freeze' || kind === 'thorns') return { anchor: 'status', side: targetSide }
+  return { anchor: 'dog', side: targetSide }
+}
+
+export function battlePresentationTargetSide(event?: BattleEventLike | null, kind = battlePresentationKind(event)): 'player' | 'opponent' | null {
+  if (!event) return null
+  if (event.target === 'player' || event.target === 'opponent') return event.target
+  const actor = normalizeSide(event.actor)
+  if ((kind === 'heal' || kind === 'shield' || kind === 'thorns') && (actor === 'player' || actor === 'opponent')) return actor
+  if (actor === 'player') return 'opponent'
+  if (actor === 'opponent') return 'player'
+  return null
+}
+
+function eventHasStatus(event: BattleEventLike, type: string) {
+  return [event.playerStatuses, event.opponentStatuses].some((row) => {
+    const statuses = [...(row?.positive ?? []), ...(row?.negative ?? [])]
+    return statuses.some((status) => status.type === type)
+  })
+}
+
+function shieldValueForActor(event: BattleEventLike) {
+  if (event.actor === 'player') return event.playerShield ?? 0
+  if (event.actor === 'opponent') return event.opponentShield ?? 0
+  return Math.max(event.playerShield ?? 0, event.opponentShield ?? 0)
+}
+
+function normalizeSide(side: string | undefined): FeedbackSide {
+  return side === 'player' || side === 'opponent' ? side : 'system'
+}
