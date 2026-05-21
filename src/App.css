@@ -265,7 +265,8 @@ input {
 .dog-avatar.small { width: 58px; height: 58px; border-radius: 16px; }
 
 .shop-workbench { display: grid; gap: 14px; position: relative; min-width: 0; max-width: 100%; }
-.reward-workbench { display: grid; gap: 14px; position: relative; min-width: 0; max-width: 100%; }
+.reward-workbench,
+.enchant-workbench { display: grid; gap: 14px; position: relative; min-width: 0; max-width: 100%; }
 .class-reward-ceremony {
   min-height: min(720px, calc(100vh - 148px));
   width: min(1180px, 100%);
@@ -362,6 +363,23 @@ input {
   font-size: 13px;
   font-weight: 900;
 }
+.enchant-ceremony .ceremony-stage {
+  background:
+    linear-gradient(180deg, #fffdf5, #f0fff7 58%, #e7f0ff);
+}
+.enchant-orb {
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  border: 4px solid var(--ink);
+  border-radius: 24px;
+  background: #fffaf1;
+  color: #315fdd;
+  box-shadow: 6px 8px 0 rgba(61, 45, 37, .18);
+}
+.enchant-chip {
+  background: linear-gradient(180deg, #f7fffb, #eef5ff);
+}
 @keyframes ceremony-rise {
   from { opacity: 0; transform: translateY(16px) scale(.98); }
   to { opacity: 1; transform: translateY(0) scale(1); }
@@ -382,6 +400,19 @@ input {
 }
 .reward-choice-grid { display: grid; grid-template-columns: repeat(3, minmax(220px, 1fr)); gap: 10px; }
 .reward-choice span:last-child, .relic-choice span:last-child { line-height: 1.35; }
+.enchant-panel {
+  border-color: #315fdd;
+}
+.enchant-choice {
+  min-height: 176px;
+}
+.enchant-choice svg {
+  color: #315fdd;
+}
+.enchant-choice.selected {
+  outline: 3px solid rgba(49, 95, 221, .35);
+  outline-offset: 2px;
+}
 .shop-shelf { width: 100%; justify-self: stretch; padding: 16px; display: grid; gap: 13px; min-width: 0; max-width: 100%; }
 .section-title {
   display: flex;
@@ -771,6 +802,22 @@ input {
 }
 .item-card span { font-weight: 950; text-align: center; }
 .item-card small { display: inline-flex; align-items: center; gap: 3px; color: rgba(37, 48, 71, .72); font-weight: 850; }
+.enchant-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  max-width: 100%;
+  padding: 2px 6px;
+  border: 1px solid rgba(49, 95, 221, .42);
+  border-radius: 999px;
+  background: rgba(239, 246, 255, .9);
+  color: #315fdd;
+  font-size: 10px;
+  line-height: 1.1;
+}
+.enchant-badge svg {
+  flex: 0 0 auto;
+}
 .item-effect {
   width: 100%;
   justify-content: center;
@@ -780,6 +827,10 @@ input {
   font-size: 10px;
   line-height: 1.1;
   overflow-wrap: anywhere;
+}
+.item-effect.enchant-text {
+  background: rgba(239, 246, 255, .78);
+  color: #315fdd;
 }
 .item-card .size-preview { grid-template-columns: repeat(4, 9px); gap: 2px; }
 .item-card .size-preview i { height: 6px; }
@@ -1016,6 +1067,17 @@ input {
   background: var(--sticker-blue);
   transform: rotate(3.2deg);
   box-shadow: 2px 3px 0 rgba(61, 45, 37, .1);
+}
+.enchant-tip {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  color: #315fdd;
+  font-weight: 850;
+}
+.enchant-tip svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
 }
 .tip-tags {
   display: flex;

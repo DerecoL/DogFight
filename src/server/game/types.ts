@@ -1,5 +1,5 @@
 export type DogType = 'SHIBA' | 'SAMOYED' | 'MUTT' | 'BULLY' | 'EMPEROR'
-export type Phase = 'SHOP' | 'CHOICE' | 'CLASS_REWARD' | 'RELIC_CHOICE' | 'PREP' | 'MATCH' | 'BATTLE' | 'COMPLETE'
+export type Phase = 'SHOP' | 'CHOICE' | 'CLASS_REWARD' | 'ENCHANT_CHOICE' | 'RELIC_CHOICE' | 'PREP' | 'MATCH' | 'BATTLE' | 'COMPLETE'
 export type ShopType = 'GENERAL' | 'LARGE' | 'MEDIUM' | 'SMALL' | 'SMALL_DICE' | 'BIG_DICE' | 'RELIC'
 export type Area = 'EQUIPMENT' | 'BAG'
 export type ItemQuality = 'BRONZE' | 'SILVER' | 'GOLD' | 'DIAMOND'
@@ -81,6 +81,26 @@ export type GameItem = {
   area: Area
   x: number
   y: number
+  enchant?: Enchantment | null
+}
+
+export type EnchantmentTarget = 'LEFT' | 'RIGHT' | 'ADJACENT'
+export type EnchantmentBaseEffect = 'DAMAGE' | 'HEAL' | 'SHIELD'
+export type EnchantmentSpecialEffect = 'THORNS' | 'FURY' | 'POISON' | 'WEAK'
+export type EnchantmentGrantEffect = 'LIFESTEAL' | 'THORNS' | 'CLEANSE'
+
+export type Enchantment =
+  | { kind: 'EXTRA_DICE'; dice: number[]; label: string }
+  | { kind: 'BASE_EFFECT'; effect: EnchantmentBaseEffect; amount: number; label: string }
+  | { kind: 'SPECIAL'; effect: EnchantmentSpecialEffect; amount: number; label: string }
+  | { kind: 'TRIGGER_NEIGHBOR'; target: EnchantmentTarget; label: string }
+  | { kind: 'BUFF_NEIGHBOR_EFFECT'; target: EnchantmentTarget; effect: EnchantmentBaseEffect; amount: number; label: string }
+  | { kind: 'GRANT_NEIGHBOR_EFFECT'; target: EnchantmentTarget; effect: EnchantmentGrantEffect; amount: number; label: string }
+
+export type EnchantmentChoice = {
+  id: string
+  description: string
+  enchant: Enchantment
 }
 
 export type ShopOffer = {

@@ -1,0 +1,3 @@
+ALTER TABLE "Run" ADD COLUMN "enchantChoices" TEXT NOT NULL DEFAULT '[]';
+ALTER TABLE "Run" ADD COLUMN "enchantThirdLossGranted" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "ItemInstance" ADD COLUMN "enchant" TEXT;

@@ -32,6 +32,7 @@ import {
   RefreshCcw,
   Shield,
   ShoppingBag,
+  Sparkles,
   Swords,
   Trophy,
   VolumeX,
@@ -40,7 +41,7 @@ import { resolveSlotPlacement } from './placement'
 import './App.css'
 
 type DogType = 'SHIBA' | 'SAMOYED' | 'MUTT' | 'BULLY' | 'EMPEROR'
-type Phase = 'SHOP' | 'CHOICE' | 'CLASS_REWARD' | 'RELIC_CHOICE' | 'PREP' | 'MATCH' | 'BATTLE' | 'COMPLETE'
+type Phase = 'SHOP' | 'CHOICE' | 'CLASS_REWARD' | 'ENCHANT_CHOICE' | 'RELIC_CHOICE' | 'PREP' | 'MATCH' | 'BATTLE' | 'COMPLETE'
 type Area = 'EQUIPMENT' | 'BAG'
 type ShopType = 'GENERAL' | 'LARGE' | 'MEDIUM' | 'SMALL' | 'SMALL_DICE' | 'BIG_DICE' | 'RELIC'
 type ItemQuality = 'BRONZE' | 'SILVER' | 'GOLD' | 'DIAMOND'
@@ -64,12 +65,24 @@ type ItemDef = {
   defaultQuality?: ItemQuality
   effect: { type: string; amount: number; qualityBase?: ItemQuality }
 }
-type Item = { id: string; defId: string; quality: ItemQuality; area: Area; x: number; y: number; def: ItemDef }
 type ShopOffer = { offerId: string; defId: string; price: number; discount: number; quality?: ItemQuality; def?: ItemDef }
 type ClassRewardChoice = { defId: string; quality: ItemQuality; def: ItemDef }
 type RelicDef = { id: string; name: string; defaultQuality: ItemQuality; tags: string[]; description: string; effect: string }
 type Relic = { id: string; relicId: string; quality: ItemQuality; slot: number; def: RelicDef }
 type RelicChoice = { relicId: string; quality: ItemQuality; def: RelicDef }
+type EnchantmentTarget = 'LEFT' | 'RIGHT' | 'ADJACENT'
+type EnchantmentBaseEffect = 'DAMAGE' | 'HEAL' | 'SHIELD'
+type EnchantmentSpecialEffect = 'THORNS' | 'FURY' | 'POISON' | 'WEAK'
+type EnchantmentGrantEffect = 'LIFESTEAL' | 'THORNS' | 'CLEANSE'
+type Enchantment =
+  | { kind: 'EXTRA_DICE'; dice: number[]; label: string }
+  | { kind: 'BASE_EFFECT'; effect: EnchantmentBaseEffect; amount: number; label: string }
+  | { kind: 'SPECIAL'; effect: EnchantmentSpecialEffect; amount: number; label: string }
+  | { kind: 'TRIGGER_NEIGHBOR'; target: EnchantmentTarget; label: string }
+  | { kind: 'BUFF_NEIGHBOR_EFFECT'; target: EnchantmentTarget; effect: EnchantmentBaseEffect; amount: number; label: string }
+  | { kind: 'GRANT_NEIGHBOR_EFFECT'; target: EnchantmentTarget; effect: EnchantmentGrantEffect; amount: number; label: string }
+type EnchantmentChoice = { id: string; description: string; enchant: Enchantment }
+type Item = { id: string; defId: string; quality: ItemQuality; area: Area; x: number; y: number; def: ItemDef; enchant?: Enchantment | null }
 type BattleActor = 'player' | 'opponent' | 'system'
 type BattleTarget = 'player' | 'opponent' | 'both' | 'none'
 type BattleSnapshot = { name: string; dogType: DogType; luckyNumber?: number | null; wins: number; losses: number; round: number; items: Item[]; relics?: Relic[] }
@@ -135,6 +148,7 @@ type Run = {
   shopItems: ShopOffer[]
   choices: ShopType[]
   classRewardChoices: ClassRewardChoice[]
+  enchantChoices: EnchantmentChoice[]
   relicChoices: RelicChoice[]
   relics: Relic[]
   refreshCost: number
@@ -592,6 +606,27 @@ function effectText(def: ItemDef, quality: ItemQuality = 'BRONZE') {
   return '特殊效果'
 }
 
+function enchantmentText(enchant?: Enchantment | null) {
+  if (!enchant) return ''
+  if (enchant.kind === 'EXTRA_DICE') return `附魔：额外在 ${enchant.dice.join('/')} 点触发`
+  if (enchant.kind === 'BASE_EFFECT') {
+    const effect = enchant.effect === 'DAMAGE' ? '造成伤害' : enchant.effect === 'HEAL' ? '回复生命' : '获得护盾'
+    return `附魔：触发时额外${effect} ${enchant.amount}`
+  }
+  if (enchant.kind === 'SPECIAL') {
+    const effect = enchant.effect === 'THORNS' ? '荆棘' : enchant.effect === 'FURY' ? '激昂' : enchant.effect === 'POISON' ? '中毒' : '虚弱'
+    return `附魔：触发时额外触发 ${enchant.amount} 层${effect}`
+  }
+  const target = enchant.target === 'LEFT' ? '左侧' : enchant.target === 'RIGHT' ? '右侧' : '相邻'
+  if (enchant.kind === 'TRIGGER_NEIGHBOR') return `附魔：触发时额外触发${target}装备`
+  if (enchant.kind === 'BUFF_NEIGHBOR_EFFECT') {
+    const effect = enchant.effect === 'DAMAGE' ? '攻击' : enchant.effect === 'HEAL' ? '回复生命' : '增加护盾'
+    return `附魔：触发时使${target}装备下次${effect} +${enchant.amount}`
+  }
+  const effect = enchant.effect === 'LIFESTEAL' ? '吸血' : enchant.effect === 'THORNS' ? '荆棘' : '净化'
+  return `附魔：触发时使${target}装备获得${effect} ${enchant.amount}`
+}
+
 function purchaseValueForItem(def: ItemDef, quality: ItemQuality = normalizeQuality(def.defaultQuality)) {
   const currentQuality = normalizeQuality(quality)
   return Math.floor(def.price * qualityPriceMultiplier[currentQuality])
@@ -741,6 +776,7 @@ export default function App() {
   const [error, setError] = useState('')
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
   const [selectedOfferId, setSelectedOfferId] = useState<string | null>(null)
+  const [selectedEnchantId, setSelectedEnchantId] = useState<string | null>(null)
   const [tipAnchor, setTipAnchor] = useState<TipAnchor | null>(null)
   const [draggingItemId, setDraggingItemId] = useState<string | null>(null)
   const [battle, setBattle] = useState<Battle | null>(null)
@@ -829,11 +865,16 @@ export default function App() {
 
   const selectedItem = run?.items.find((item) => item.id === selectedItemId) || null
   const selectedOffer = run?.shopItems.find((offer) => offer.offerId === selectedOfferId) || null
+  const selectedEnchant = run?.phase === 'ENCHANT_CHOICE'
+    ? run.enchantChoices.find((choice) => choice.id === selectedEnchantId) ?? run.enchantChoices[0] ?? null
+    : null
   const draggingItem = run?.items.find((item) => item.id === draggingItemId) || null
   const currentEvent = battle?.events[eventIndex]
   const score = run ? run.wins * 100 + Math.max(0, 12 - run.losses * 2) * 5 : 0
   const classRewardCeremonyKey = run?.phase === 'CLASS_REWARD' ? `${run.id}:${run.round}` : ''
   const showClassRewardCeremony = Boolean(run?.phase === 'CLASS_REWARD' && classRewardCeremonyKey && !ceremonyDismissedRounds.has(classRewardCeremonyKey))
+  const enchantCeremonyKey = run?.phase === 'ENCHANT_CHOICE' ? `${run.id}:enchant:${run.round}` : ''
+  const showEnchantCeremony = Boolean(run?.phase === 'ENCHANT_CHOICE' && enchantCeremonyKey && !ceremonyDismissedRounds.has(enchantCeremonyKey))
 
   const action = async (fn: () => Promise<{ run: Run; battle?: Battle } | { user: AuthUser | null; activeRun?: Run | null; needsNickname?: boolean }>) => {
     setError('')
@@ -885,6 +926,13 @@ export default function App() {
     void action(() => api(`/runs/${run.id}/relic/sell`, { method: 'POST', body: JSON.stringify({ relicId }) }))
   }
 
+  const applyEnchant = (itemId: string) => {
+    if (!run || !selectedEnchant) return
+    setTipAnchor(null)
+    setSelectedItemId(null)
+    void action(() => api(`/runs/${run.id}/enchant/select`, { method: 'POST', body: JSON.stringify({ enchantId: selectedEnchant.id, itemId }) }))
+  }
+
   const finishBattle = async () => {
     if (!run) return
     setError('')
@@ -923,6 +971,10 @@ export default function App() {
   }
 
   const onInspectItem = (itemId: string, element: HTMLElement) => {
+    if (run?.phase === 'ENCHANT_CHOICE' && selectedEnchant) {
+      applyEnchant(itemId)
+      return
+    }
     setSelectedItemId(itemId)
     setSelectedOfferId(null)
     setTipAnchor(getFloatingTipPosition(element))
@@ -1088,6 +1140,25 @@ export default function App() {
             <DraggingItemOverlay item={draggingItem} />
           </DragOverlay>
         </DndContext>
+      )}
+
+      {!battle && run.phase === 'ENCHANT_CHOICE' && showEnchantCeremony && (
+        <EnchantCeremony run={run} choices={run.enchantChoices} onDismiss={() => dismissClassRewardCeremony(enchantCeremonyKey)} />
+      )}
+
+      {!battle && run.phase === 'ENCHANT_CHOICE' && !showEnchantCeremony && (
+        <section className="reward-workbench enchant-workbench">
+          <EnchantChoiceSelect choices={run.enchantChoices} selectedId={selectedEnchant?.id ?? ''} onSelect={setSelectedEnchantId} />
+          <InventoryBoard
+            run={run}
+            selectedItemId={selectedItemId}
+            draggingItemId={draggingItemId}
+            onSellRelic={sellRelic}
+            onSelectItem={onInspectItem}
+            onSlotClick={() => undefined}
+          />
+          <FloatingTip run={run} item={selectedItem} offer={null} anchor={tipAnchor} onClose={closeShopTip} onBuy={null} onSell={null} onUpgrade={null} />
+        </section>
       )}
 
       {!battle && run.phase === 'RELIC_CHOICE' && (
@@ -1427,6 +1498,7 @@ function HistoryRunDetails({ entry, inspectedItem, tipAnchor, onInspectItem, onC
     shopItems: [],
     choices: [],
     classRewardChoices: [],
+    enchantChoices: [],
     relicChoices: [],
     relics: entry.relics,
     refreshCost: 1,
@@ -1622,6 +1694,7 @@ function DogfightRoomView({ room, onRoomChange, onLeave }: { room: DogfightRoom;
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
   const [selectedOfferId, setSelectedOfferId] = useState<string | null>(null)
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null)
+  const [selectedEnchantId, setSelectedEnchantId] = useState<string | null>(null)
   const [tipAnchor, setTipAnchor] = useState<TipAnchor | null>(null)
   const [draggingItemId, setDraggingItemId] = useState<string | null>(null)
   const [battle, setBattle] = useState<Battle | null>(null)
@@ -1634,6 +1707,7 @@ function DogfightRoomView({ room, onRoomChange, onLeave }: { room: DogfightRoom;
   const currentMember = room.currentRunMember ?? (run ? room.members.find((member) => member.runId === run.id) ?? null : null)
   const selectedItem = run?.items.find((item) => item.id === selectedItemId) || null
   const selectedOffer = run?.shopItems.find((offer) => offer.offerId === selectedOfferId) || null
+  const selectedEnchant = run?.enchantChoices.find((choice) => choice.id === selectedEnchantId) ?? run?.enchantChoices[0] ?? null
   const draggingItem = run?.items.find((item) => item.id === draggingItemId) || null
   const deadline = room.phaseDeadline ? Math.max(0, Math.ceil((new Date(room.phaseDeadline).getTime() - now) / 1000)) : 0
   const selectedBattleMemberId = selectedMemberId ?? currentMember?.id ?? sortedDogfightMembers(room.members)[0]?.id ?? null
@@ -1688,7 +1762,11 @@ function DogfightRoomView({ room, onRoomChange, onLeave }: { room: DogfightRoom;
   useEffect(() => {
     if (battle || room.phase !== 'BATTLE') return
     const battleId = currentMember?.currentBattleId ?? sortedDogfightMembers(room.members).find((member) => member.currentBattleId)?.currentBattleId
-    if (battleId) void loadBattle(battleId)
+    if (!battleId) return
+    const timer = window.setTimeout(() => {
+      void loadBattle(battleId)
+    }, 0)
+    return () => window.clearTimeout(timer)
   }, [battle, currentMember?.currentBattleId, room.phase, room.members])
 
   const moveItem = (itemId: string, area: Area, x: number, y: number) => {
@@ -1708,6 +1786,13 @@ function DogfightRoomView({ room, onRoomChange, onLeave }: { room: DogfightRoom;
     void runAction(() => api<{ run: Run }>(`/runs/${run.id}/relic/sell`, { method: 'POST', body: JSON.stringify({ relicId }) }))
   }
 
+  const applyEnchant = (itemId: string) => {
+    if (!run || !selectedEnchant || currentMember?.ready) return
+    setTipAnchor(null)
+    setSelectedItemId(null)
+    void runAction(() => api<{ run: Run }>(`/runs/${run.id}/enchant/select`, { method: 'POST', body: JSON.stringify({ enchantId: selectedEnchant.id, itemId }) }))
+  }
+
   const onInspectOffer = (offerId: string, element: HTMLElement) => {
     setSelectedOfferId(offerId)
     setSelectedItemId(null)
@@ -1715,6 +1800,10 @@ function DogfightRoomView({ room, onRoomChange, onLeave }: { room: DogfightRoom;
   }
 
   const onInspectItem = (itemId: string, element: HTMLElement) => {
+    if (run?.phase === 'ENCHANT_CHOICE' && selectedEnchant) {
+      applyEnchant(itemId)
+      return
+    }
     setSelectedItemId(itemId)
     setSelectedOfferId(null)
     setTipAnchor(getFloatingTipPosition(element))
@@ -1841,6 +1930,8 @@ function DogfightRoomView({ room, onRoomChange, onLeave }: { room: DogfightRoom;
                 onChoice={(shopType) => !currentMember?.ready && runAction(() => api<{ run: Run }>(`/runs/${run.id}/choice/select`, { method: 'POST', body: JSON.stringify({ shopType }) }))}
                 onClassReward={(defId) => !currentMember?.ready && runAction(() => api<{ run: Run }>(`/runs/${run.id}/class-reward/select`, { method: 'POST', body: JSON.stringify({ defId }) }))}
                 onRelic={(relicId) => !currentMember?.ready && runAction(() => api<{ run: Run }>(`/runs/${run.id}/relic/select`, { method: 'POST', body: JSON.stringify({ relicId }) }))}
+                selectedEnchantId={selectedEnchant?.id ?? ''}
+                onEnchantChoice={setSelectedEnchantId}
                 selectedItem={selectedItem}
                 selectedOffer={selectedOffer}
                 tipAnchor={tipAnchor}
@@ -1868,7 +1959,7 @@ function DogfightRoomView({ room, onRoomChange, onLeave }: { room: DogfightRoom;
   )
 }
 
-function DogfightRunWorkbench({ run, selectedItemId, selectedOfferId, draggingItemId, selectedItem, selectedOffer, tipAnchor, onInspectOffer, onInspectItem, onMoveItem, onReroll, onBuy, onSell, onSellRelic, onUpgrade, onChoice, onClassReward, onRelic, onCloseTip }: {
+function DogfightRunWorkbench({ run, selectedItemId, selectedOfferId, draggingItemId, selectedItem, selectedOffer, tipAnchor, onInspectOffer, onInspectItem, onMoveItem, onReroll, onBuy, onSell, onSellRelic, onUpgrade, onChoice, onClassReward, onRelic, selectedEnchantId, onEnchantChoice, onCloseTip }: {
   run: Run
   selectedItemId: string | null
   selectedOfferId: string | null
@@ -1887,6 +1978,8 @@ function DogfightRunWorkbench({ run, selectedItemId, selectedOfferId, draggingIt
   onChoice: (shopType: ShopType) => void
   onClassReward: (defId: string) => void
   onRelic: (relicId: string) => void
+  selectedEnchantId: string
+  onEnchantChoice: (id: string) => void
   onCloseTip: () => void
 }) {
   if (run.phase === 'CHOICE') return <ShopChoiceSelect choices={run.choices} onPick={onChoice} />
@@ -1896,6 +1989,15 @@ function DogfightRunWorkbench({ run, selectedItemId, selectedOfferId, draggingIt
         <ClassRewardSelect choices={run.classRewardChoices} onPick={onClassReward} />
         <InventoryBoard run={run} selectedItemId={selectedItemId} draggingItemId={draggingItemId} onSellRelic={onSellRelic} onSelectItem={onInspectItem} onSlotClick={(area, x, y) => selectedItemId && onMoveItem(selectedItemId, area, x, y)} />
         <FloatingTip run={run} item={selectedItem} offer={null} anchor={tipAnchor} onClose={onCloseTip} onBuy={null} onSell={null} onUpgrade={onUpgrade} />
+      </section>
+    )
+  }
+  if (run.phase === 'ENCHANT_CHOICE') {
+    return (
+      <section className="reward-workbench enchant-workbench">
+        <EnchantChoiceSelect choices={run.enchantChoices} selectedId={selectedEnchantId} onSelect={onEnchantChoice} />
+        <InventoryBoard run={run} selectedItemId={selectedItemId} draggingItemId={draggingItemId} onSellRelic={onSellRelic} onSelectItem={onInspectItem} onSlotClick={() => undefined} />
+        <FloatingTip run={run} item={selectedItem} offer={null} anchor={tipAnchor} onClose={onCloseTip} onBuy={null} onSell={null} onUpgrade={null} />
       </section>
     )
   }
@@ -1927,6 +2029,7 @@ function battleToRun(battle: Battle | null): Run | null {
     shopItems: [],
     choices: [],
     classRewardChoices: [],
+    enchantChoices: [],
     relicChoices: [],
     relics: snapshot.relics ?? [],
     refreshCost: 1,
@@ -2090,6 +2193,7 @@ function ApexSnapshotDetails({ entry }: { entry: ApexEntry }) {
     shopItems: [],
     choices: [],
     classRewardChoices: [],
+    enchantChoices: [],
     relicChoices: [],
     relics: entry.relics,
     refreshCost: 1,
@@ -2564,6 +2668,60 @@ function ClassRewardSelect({ choices, onPick }: { choices: ClassRewardChoice[]; 
   )
 }
 
+function EnchantCeremony({ run, choices, onDismiss }: { run: Run; choices: EnchantmentChoice[]; onDismiss: () => void }) {
+  return (
+    <section
+      className="class-reward-ceremony enchant-ceremony"
+      role="button"
+      tabIndex={0}
+      onClick={onDismiss}
+      onKeyDown={(event) => handleChoiceCardKeyDown(event, onDismiss)}
+      aria-label="附魔商店出现"
+    >
+      <div className="ceremony-stage">
+        <div className="ceremony-round-badge">第 {run.round} 回合</div>
+        <Sparkles className="ceremony-dog-avatar enchant-orb" size={96} />
+        <div className="ceremony-copy">
+          <span>神秘附魔商店</span>
+          <h2>免费附魔</h2>
+          <p>选择一种附魔，再点击任意装备施加；升级后会保留目标装备上的附魔。</p>
+        </div>
+        <div className="ceremony-reward-preview" aria-label="本次可选附魔">
+          {choices.map((choice) => (
+            <span key={choice.id} className="ceremony-reward-chip enchant-chip">
+              <strong>{choice.enchant.label}</strong>
+              <small>{choice.description}</small>
+            </span>
+          ))}
+        </div>
+        <span className="ceremony-skip-hint">点击任意处继续</span>
+      </div>
+    </section>
+  )
+}
+
+function EnchantChoiceSelect({ choices, selectedId, onSelect }: { choices: EnchantmentChoice[]; selectedId: string; onSelect: (id: string) => void }) {
+  return (
+    <section className="reward-panel paper-card enchant-panel">
+      <div className="screen-heading centered">
+        <h2>选择附魔</h2>
+        <p>选中一个附魔后，点击装备栏或背包中的任意装备施加。</p>
+      </div>
+      <div className="reward-choice-grid">
+        {choices.map((choice) => (
+          <div key={choice.id} role="button" tabIndex={0} className={`choice paper-card sticker-card reward-choice enchant-choice ${selectedId === choice.id ? 'selected' : ''}`} onClick={() => onSelect(choice.id)} onKeyDown={(event) => handleChoiceCardKeyDown(event, () => onSelect(choice.id))}>
+            <Sparkles size={28} />
+            <strong>{choice.enchant.label}</strong>
+            <span className="tip-tag">免费</span>
+            <span><RuleText text={choice.description} /></span>
+          </div>
+        ))}
+      </div>
+      <small className="disabled-reason">当前选中：{choices.find((choice) => choice.id === selectedId)?.enchant.label ?? '请选择附魔'}</small>
+    </section>
+  )
+}
+
 function RelicChoiceSelect({ choices, onPick }: { choices: RelicChoice[]; onPick: (relicId: string) => void }) {
   const [selected, setSelected] = useState(choices[0]?.relicId ?? '')
   return (
@@ -2804,9 +2962,11 @@ function ItemCardContent({ item, upgradeable = false }: { item: Item; upgradeabl
       {upgradeable && <span className="upgrade-indicator" title="可升级">↑</span>}
       <img className="item-icon" src={itemIcon(item.def)} alt="" />
       <span>{item.def.name}</span>
+      {item.enchant && <span className="enchant-badge"><Sparkles size={12} />附魔</span>}
       <SizePreview size={item.def.size} />
       <small><Dice5 size={12} /> {item.def.dice.join('/')}</small>
       <small className="item-effect">{effectText(item.def, normalizeQuality(item.quality))}</small>
+      {item.enchant && <small className="item-effect enchant-text">{enchantmentText(item.enchant)}</small>}
     </>
   )
 }
@@ -2857,6 +3017,7 @@ function FloatingTip({ run, item, offer, anchor, onClose, onBuy, onSell, onUpgra
         {def.dice.map((face) => <span key={face}>{face}</span>)}
       </div>
       <p className="tip-description"><RuleText text={def.description ?? effectText(def, quality)} /></p>
+      {item?.enchant && <p className="tip-description enchant-tip"><Sparkles size={16} /> <RuleText text={enchantmentText(item.enchant)} /></p>}
       {isOffer && (
         <div className="tip-price">
           <Coins size={16} />
@@ -3034,6 +3195,7 @@ function BattleEquipmentRow({ owner, snapshot, activeEvent, onInspect }: { owner
             <img className="item-icon" src={itemIcon(item.def)} alt="" />
             <span className="quality-chip">{qualityLabel[normalizeQuality(item.quality)]}</span>
             <span>{item.def.name}</span>
+            {item.enchant && <span className="enchant-badge"><Sparkles size={12} />附魔</span>}
             <small><Dice5 size={12} /> {item.def.dice.join('/')}</small>
           </button>
         ))}

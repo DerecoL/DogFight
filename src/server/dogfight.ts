@@ -8,8 +8,8 @@ import { STARTING_GOLD } from './game/matchmaking'
 import { buildOfflineFighter } from './game/offline-builder'
 import { normalizeQuality } from './game/quality'
 import { simulateBattle } from './game/battle'
-import type { BattleEvent, BattleResult, DogType, FighterSnapshot, GameItem, ShopType } from './game/types'
-import { applyRelicChoice, classRewardChoices, initialItems, makeChoices, makeRelicChoices, makeShop, parseJson, postBattleLargeItemReward, publicRun, relicsFromRun, seedGhost, snapshotFromRun, toGameItems } from './state'
+import type { BattleEvent, BattleResult, DogType, EnchantmentChoice, FighterSnapshot, GameItem, ShopType } from './game/types'
+import { applyRelicChoice, initialItems, makeChoices, makeRelicChoices, makeShop, nextPhaseData as buildNextPhaseData, parseJson, phaseDataAfterEnchant, postBattleLargeItemReward, publicRun, relicsFromRun, seedGhost, snapshotFromRun, toGameItems } from './state'
 
 const DOGFIGHT_TARGET_PLAYERS = 8
 const DOGFIGHT_DOG_SELECT_MS = 15_000
@@ -217,31 +217,8 @@ function responseFor(room: DogfightRoomWithDetails, userId: string) {
   return { room: publicDogfightRoom(room, userId) }
 }
 
-function nextPhaseData(run: Run, nextRound: number) {
-  const nextClassRewards = classRewardChoices(run.dogType as DogType, nextRound)
-  if (nextClassRewards.length > 0) {
-    return {
-      phase: 'CLASS_REWARD',
-      classRewardChoices: JSON.stringify(nextClassRewards),
-      choices: '[]',
-      shopItems: '[]',
-    }
-  }
-  if (nextRound <= 2) {
-    return {
-      phase: 'SHOP',
-      shopType: 'GENERAL',
-      shopItems: JSON.stringify(makeShop('GENERAL', `${run.id}-dogfight-round-${nextRound}`, nextRound)),
-      choices: '[]',
-      classRewardChoices: '[]',
-    }
-  }
-  return {
-    phase: 'CHOICE',
-    choices: JSON.stringify(makeChoices(`${run.id}-dogfight-choices-${nextRound}`, nextRound)),
-    shopItems: '[]',
-    classRewardChoices: '[]',
-  }
+function nextDogfightPhaseData(run: Run, nextRound: number) {
+  return buildNextPhaseData(run, nextRound, `${run.id}-dogfight-round-${nextRound}-${run.wins}-${run.losses}`)
 }
 
 async function autoChoosePendingRunStep(tx: Tx, run: Run & { items: Prisma.ItemInstanceGetPayload<object>[] }) {
@@ -271,12 +248,13 @@ async function autoChoosePendingRunStep(tx: Tx, run: Run & { items: Prisma.ItemI
     }
     const slot = findSlot(toGameItems(run.items), defId, 'BAG')
     const def = itemDef(defId)
+    const pendingEnchantChoices = parseJson<EnchantmentChoice[]>(run.enchantChoices, [])
     return tx.run.update({
       where: { id: run.id },
       data: {
-        phase: 'CHOICE',
+        phase: pendingEnchantChoices.length > 0 ? 'ENCHANT_CHOICE' : 'CHOICE',
         classRewardChoices: '[]',
-        choices: JSON.stringify(makeChoices(`${run.id}-dogfight-class-${run.round}`, run.round)),
+        choices: pendingEnchantChoices.length > 0 ? '[]' : JSON.stringify(makeChoices(`${run.id}-dogfight-class-${run.round}`, run.round)),
         ...(slot ? { items: { create: { defId, quality: normalizeQuality(def.defaultQuality), area: 'BAG', x: slot.x, y: slot.y } } } : {}),
       },
       include: { items: true },
@@ -297,12 +275,31 @@ async function autoChoosePendingRunStep(tx: Tx, run: Run & { items: Prisma.ItemI
     })
   }
 
+  if (run.phase === 'ENCHANT_CHOICE') {
+    const choices = parseJson<EnchantmentChoice[]>(run.enchantChoices, [])
+    const choice = choices[0]
+    const target = toGameItems(run.items).find((item) => !item.enchant)
+    if (!choice || !target) {
+      return tx.run.update({
+        where: { id: run.id },
+        data: phaseDataAfterEnchant(run),
+        include: { items: true },
+      })
+    }
+    await tx.itemInstance.update({ where: { id: target.id }, data: { enchant: JSON.stringify(choice.enchant) } })
+    return tx.run.update({
+      where: { id: run.id },
+      data: phaseDataAfterEnchant(run),
+      include: { items: true },
+    })
+  }
+
   return run
 }
 
 async function normalizeRunForDogfightBattle(tx: Tx, run: Run & { items: Prisma.ItemInstanceGetPayload<object>[] }) {
   let current = run
-  while (['CHOICE', 'CLASS_REWARD', 'RELIC_CHOICE'].includes(current.phase)) {
+  while (['CHOICE', 'CLASS_REWARD', 'ENCHANT_CHOICE', 'RELIC_CHOICE'].includes(current.phase)) {
     current = await autoChoosePendingRunStep(tx, current)
   }
   return current
@@ -489,7 +486,7 @@ async function settleShopToBattle(tx: Tx, roomId: string, force = false) {
     const eliminated = losses >= DOGFIGHT_LOSS_LIMIT
     const roundIncome = eliminated ? 0 : 5 + nextRound * 2
     const gold = participant.run.gold + participantResult.goldCompensation + roundIncome
-    const phaseData = eliminated ? { phase: 'COMPLETE' } : nextPhaseData(participant.run, nextRound)
+    const phaseData = eliminated ? { phase: 'COMPLETE' } : nextDogfightPhaseData({ ...participant.run, losses }, nextRound)
     const postBattleReward = eliminated
       ? null
       : postBattleLargeItemReward(toGameItems(participant.run.items), `${participant.runId}-dogfight-post-battle-${nextRound}-${wins}-${losses}`)
