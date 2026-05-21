@@ -707,6 +707,7 @@ input {
   grid-template-columns: 64px minmax(0, 1fr);
   gap: 12px;
   align-items: center;
+  min-width: 0;
 }
 .relic-tip-icon {
   width: 64px;
@@ -721,10 +722,12 @@ input {
 .relic-tip-identity h3 {
   font-size: 18px;
   line-height: 1.2;
+  overflow-wrap: anywhere;
 }
-.rule-term-wrap { position: relative; display: inline-block; }
+.rule-term-wrap { position: relative; display: inline-block; max-width: 100%; vertical-align: baseline; }
 .rule-term {
   display: inline;
+  max-width: 100%;
   padding: 0;
   border: 0;
   background: transparent;
@@ -732,6 +735,7 @@ input {
   font: inherit;
   font-weight: 950;
   text-decoration: underline;
+  overflow-wrap: anywhere;
   cursor: pointer;
 }
 .rule-tip {
@@ -740,6 +744,7 @@ input {
   bottom: calc(100% + 8px);
   z-index: 40;
   width: min(260px, 80vw);
+  max-width: calc(100vw - 32px);
   display: grid;
   gap: 4px;
   padding: 10px;
@@ -750,6 +755,8 @@ input {
   color: var(--ink);
   text-align: left;
   line-height: 1.35;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 .rule-tip small { color: #6b5d53; }
 .grid-panel { display: grid; gap: 10px; min-width: 0; max-width: 100%; min-height: 0; }
@@ -1037,6 +1044,8 @@ input {
   top: var(--tip-y);
   z-index: 20;
   width: min(380px, calc(100vw - 28px));
+  min-width: 0;
+  max-width: calc(100vw - 28px);
   max-height: min(440px, calc(100dvh - 28px));
   display: grid;
   gap: 12px;
@@ -1048,6 +1057,7 @@ input {
   border: 1px solid var(--line);
   border-radius: 18px;
   box-shadow: 0 24px 70px rgba(37, 48, 71, .24);
+  overflow-wrap: anywhere;
 }
 .floating-tip.paper-card {
   overflow: auto;
@@ -1084,9 +1094,12 @@ input {
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
+  min-width: 0;
+  max-width: 100%;
 }
 .tip-tag {
   min-width: 72px;
+  max-width: 100%;
   min-height: 31px;
   display: inline-flex;
   align-items: center;
@@ -1097,26 +1110,37 @@ input {
   background: var(--paper-2);
   font-size: 15px;
   font-weight: 950;
+  line-height: 1.15;
+  text-align: center;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 .tip-tags .size-badge {
   min-width: 72px;
+  max-width: 100%;
   min-height: 31px;
   height: auto;
   padding: 4px 12px;
   border: 2px solid var(--ink);
   border-radius: 7px;
   font-size: 15px;
+  line-height: 1.15;
+  text-align: center;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 .tip-body {
   display: grid;
   grid-template-columns: 120px 1fr;
   gap: 16px;
   align-items: center;
+  min-width: 0;
 }
 .tip-identity {
   display: grid;
   justify-items: center;
   gap: 8px;
+  min-width: 0;
 }
 .tip-icon-frame {
   width: 104px;
@@ -1144,6 +1168,7 @@ input {
   text-align: center;
   font-size: 18px;
   line-height: 1.2;
+  overflow-wrap: anywhere;
 }
 .tip-grid-preview {
   min-height: 62px;
@@ -1151,6 +1176,7 @@ input {
   justify-items: center;
   align-content: center;
   gap: 8px;
+  min-width: 0;
   padding: 10px;
   border: 2px solid var(--ink);
   border-radius: 9px;
@@ -1194,7 +1220,8 @@ input {
 .tip-description {
   min-height: 78px;
   display: grid;
-  place-items: center;
+  justify-items: center;
+  align-content: center;
   margin: 0;
   padding: 14px;
   border: 2px solid var(--ink);
@@ -1203,7 +1230,10 @@ input {
   color: var(--ink);
   font-size: 17px;
   font-weight: 900;
+  line-height: 1.45;
   text-align: center;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 .tip-price {
   display: inline-flex;
