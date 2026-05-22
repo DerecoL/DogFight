@@ -1269,6 +1269,63 @@ describeWithDatabase('run API', () => {
     expect(await prisma.dogfightRoom.findUnique({ where: { id: firstRoom.id } })).toBeNull()
   })
 
+  it('deletes stale waiting dogfight rooms before listing rooms', async () => {
+    const viewer = request.agent(app.server)
+    await app.ready()
+
+    const owner = await prisma.user.create({
+      data: { account: `dogfight-stale-waiting-${Date.now()}`, passwordHash: 'test' },
+    })
+    const oldDate = new Date(Date.now() - 20 * 60_000)
+    const room = await prisma.dogfightRoom.create({
+      data: {
+        hostUserId: owner.id,
+        status: 'WAITING',
+        phase: 'LOBBY',
+        createdAt: oldDate,
+        updatedAt: oldDate,
+        participants: { create: { userId: owner.id, nickname: 'stale-host', kind: 'PLAYER', isHost: true } },
+      },
+    })
+
+    await viewer.post('/api/auth/register').send({ email: `dogfight-stale-viewer${Date.now()}@dog.test`, password: 'dogdice' }).expect(200)
+    const listed = await viewer.get('/api/dogfight/rooms').expect(200)
+
+    expect(listed.body.rooms.map((entry: { id: string }) => entry.id)).not.toContain(room.id)
+    expect(await prisma.dogfightRoom.findUnique({ where: { id: room.id } })).toBeNull()
+  })
+
+  it('forces very old active dogfight rooms to finish before listing rooms', async () => {
+    const viewer = request.agent(app.server)
+    const host = request.agent(app.server)
+    const guest = request.agent(app.server)
+    await app.ready()
+
+    await host.post('/api/auth/register').send({ email: `dogfight-old-active-host${Date.now()}@dog.test`, password: 'dogdice' }).expect(200)
+    const created = await host.post('/api/dogfight/rooms').send({}).expect(200)
+    const roomId = created.body.room.id
+    await guest.post('/api/auth/register').send({ email: `dogfight-old-active-guest${Date.now()}@dog.test`, password: 'dogdice' }).expect(200)
+    await guest.post(`/api/dogfight/rooms/${roomId}/join`).send({}).expect(200)
+    await host.post(`/api/dogfight/rooms/${roomId}/start`).send({}).expect(200)
+
+    const oldDate = new Date(Date.now() - 45 * 60_000)
+    await prisma.dogfightRoom.update({
+      where: { id: roomId },
+      data: {
+        createdAt: oldDate,
+        updatedAt: oldDate,
+        phaseDeadline: new Date(Date.now() - 1_000),
+      },
+    })
+
+    await viewer.post('/api/auth/register').send({ email: `dogfight-old-active-viewer${Date.now()}@dog.test`, password: 'dogdice' }).expect(200)
+    const listed = await viewer.get('/api/dogfight/rooms').expect(200)
+
+    expect(listed.body.rooms.map((entry: { id: string }) => entry.id)).not.toContain(roomId)
+    await expect(prisma.dogfightRoom.findUniqueOrThrow({ where: { id: roomId } }))
+      .resolves.toMatchObject({ status: 'COMPLETE', phase: 'COMPLETE' })
+  })
+
   it('advances expired active dogfight rooms before listing rooms', async () => {
     const agent = request.agent(app.server)
     await app.ready()

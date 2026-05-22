@@ -104,13 +104,15 @@ describe('offline dog builder', () => {
 
   it('keeps the first two rounds limited to bronze starter training gear', () => {
     for (const round of [0, 1]) {
-      const fighter = buildOfflineFighter({ dogType: 'SHIBA', round, wins: 0, losses: 0 })
+      for (const dogType of ['SHIBA', 'SAMOYED', 'MUTT', 'BULLY', 'EMPEROR'] as DogType[]) {
+        const fighter = buildOfflineFighter({ dogType, round, wins: 0, losses: 0 })
 
-      expect(fighter.items).toHaveLength(3)
-      expect(fighter.items.every((item) => item.defId.startsWith('starter-'))).toBe(true)
-      expect(fighter.items.every((item) => item.quality === 'BRONZE')).toBe(true)
-      expect(fighter.relics ?? []).toHaveLength(0)
-      assertLegalEquipment(fighter.items)
+        expect(fighter.items).toHaveLength(3)
+        expect(fighter.items.every((item) => item.defId.startsWith('starter-'))).toBe(true)
+        expect(fighter.items.every((item) => item.quality === 'BRONZE')).toBe(true)
+        expect(fighter.relics ?? []).toHaveLength(0)
+        assertLegalEquipment(fighter.items)
+      }
     }
   })
 

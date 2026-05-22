@@ -17,6 +17,9 @@ const DOGFIGHT_SHOP_MS = 30_000
 const DOGFIGHT_BATTLE_MS = 25_000
 const DOGFIGHT_TRAINING_ROUNDS = 3
 const DOGFIGHT_LOSS_LIMIT = 5
+const DOGFIGHT_WAITING_ROOM_TTL_MS = 10 * 60_000
+const DOGFIGHT_ACTIVE_ROOM_TTL_MS = 30 * 60_000
+const DOGFIGHT_FORCE_COMPLETE_MAX_STEPS = 80
 const DOG_TYPES: DogType[] = ['SHIBA', 'SAMOYED', 'MUTT', 'BULLY', 'EMPEROR']
 
 const dogChoiceSchema = z.object({
@@ -570,6 +573,59 @@ async function advanceDogfightRoomIfNeeded(roomId: string) {
   })
 }
 
+async function forceCompleteDogfightRoom(tx: Tx, roomId: string) {
+  for (let step = 0; step < DOGFIGHT_FORCE_COMPLETE_MAX_STEPS; step += 1) {
+    const room = await tx.dogfightRoom.findUnique({ where: { id: roomId }, include: dogfightRoomInclude })
+    if (!room || room.status !== 'ACTIVE') return
+    await enterShopIfDogSelectionComplete(tx, roomId, true)
+    await settleShopToBattle(tx, roomId, true)
+    await enterNextShopAfterBattle(tx, roomId, true)
+  }
+
+  const room = await tx.dogfightRoom.findUnique({ where: { id: roomId }, include: dogfightRoomInclude })
+  if (!room || room.status !== 'ACTIVE') return
+  const alive = sortedParticipants(room).filter((participant) => !participant.eliminated)
+  await tx.dogfightRoom.update({
+    where: { id: roomId },
+    data: {
+      status: 'COMPLETE',
+      phase: 'COMPLETE',
+      phaseDeadline: null,
+      readyDeadline: null,
+      winnerParticipantId: alive[0]?.id ?? null,
+    },
+  })
+  if (alive[0]?.runId) {
+    await tx.run.update({ where: { id: alive[0].runId }, data: { status: 'DOGFIGHT_COMPLETE', phase: 'COMPLETE' } })
+  }
+}
+
+async function cleanupStaleDogfightRoomsForLobby() {
+  const waitingCutoff = new Date(Date.now() - DOGFIGHT_WAITING_ROOM_TTL_MS)
+  await prisma.$transaction(async (tx) => {
+    const staleWaitingRooms = await tx.dogfightRoom.findMany({
+      where: { status: 'WAITING', createdAt: { lte: waitingCutoff } },
+      select: { id: true },
+      take: 200,
+    })
+    if (staleWaitingRooms.length > 0) {
+      await tx.dogfightRoom.deleteMany({ where: { id: { in: staleWaitingRooms.map((room) => room.id) } } })
+    }
+  })
+
+  const activeCutoff = new Date(Date.now() - DOGFIGHT_ACTIVE_ROOM_TTL_MS)
+  const staleActiveRooms = await prisma.dogfightRoom.findMany({
+    where: { status: 'ACTIVE', createdAt: { lte: activeCutoff } },
+    select: { id: true },
+    take: 20,
+  })
+  for (const room of staleActiveRooms) {
+    await prisma.$transaction(async (tx) => {
+      await forceCompleteDogfightRoom(tx, room.id)
+    })
+  }
+}
+
 async function advanceExpiredDogfightRoomsForLobby() {
   const expiredRooms = await prisma.dogfightRoom.findMany({
     where: {
@@ -821,6 +877,7 @@ function battleForParticipant(result: BattleResult, side: 'A' | 'B') {
 export function registerDogfightRoutes(app: FastifyInstance, requireUser: RequireUser) {
   app.get('/api/dogfight/rooms', async (request) => {
     const userId = requireUser(request.userId)
+    await cleanupStaleDogfightRoomsForLobby()
     await advanceExpiredDogfightRoomsForLobby()
     await prisma.$transaction(async (tx) => {
       await cleanupDuplicateWaitingRoomsForLobby(tx)
@@ -860,6 +917,8 @@ export function registerDogfightRoutes(app: FastifyInstance, requireUser: Requir
 
   app.post('/api/dogfight/match', async (request, reply) => {
     const userId = requireUser(request.userId)
+    await cleanupStaleDogfightRoomsForLobby()
+    await advanceExpiredDogfightRoomsForLobby()
     await prisma.$transaction(async (tx) => {
       await cleanupDuplicateWaitingRoomsForLobby(tx)
       await cleanupDuplicateWaitingRoomsForUser(tx, userId)

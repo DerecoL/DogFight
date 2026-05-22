@@ -130,7 +130,8 @@ function uniqueById<T extends { id: string }>(defs: T[]) {
 }
 
 function starterDefs(profile: OfflineBuildProfile, round: number) {
-  const dice = round <= 1 ? profile.keepStarterDice.slice(0, 3) : profile.keepStarterDice.slice(0, 2)
+  const targetCount = round <= 1 ? 3 : 2
+  const dice = [...new Set([...profile.keepStarterDice, ...profile.preferredDice, 1, 2, 3, 4, 5, 6])].slice(0, targetCount)
   return dice.map((n) => itemDef(`starter-${n}`))
 }
 
