@@ -2035,12 +2035,13 @@ function DogfightRoomView({ room, onRoomChange, onLeave }: { room: DogfightRoom;
             <span className="resource-pill gold"><Coins size={16} /> 金币 {run.gold}</span>
             <span className="resource-pill win"><Trophy size={16} /> {run.wins}胜 {run.losses}败</span>
             <span className="resource-pill round"><RefreshCcw size={16} /> 第 {run.round} 回合</span>
-            {currentMember && <span className={`resource-pill ${currentMember.ready ? 'safe' : 'round'}`}>{currentMember.ready ? '已准备' : '调整中'}</span>}
+            {currentMember && <span className={`resource-pill ${currentMember.ready ? 'safe' : 'round'}`}>{currentMember.ready ? (room.phase === 'BATTLE' ? '已完成' : '已准备') : (room.phase === 'BATTLE' ? '回放中' : '调整中')}</span>}
           </div>
         )}
         {currentMember && <span className="resource-pill safe"><Shield size={16} /> 剩余存活 {dogfightLives(currentMember)}</span>}
         {room.isHost && room.status === 'WAITING' && <button className="primary action-button" onClick={startRoom}>开始房间</button>}
         {run && room.phase === 'SHOP' && !currentMember?.ready && !currentMember?.eliminated && <button className="primary action-button" onClick={readyRoom}>完成本回合</button>}
+        {run && room.phase === 'BATTLE' && !currentMember?.ready && !currentMember?.eliminated && <button className="primary action-button" onClick={readyRoom}>完成本回合</button>}
       </div>
 
       <div className="dogfight-room-columns">
@@ -2067,7 +2068,7 @@ function DogfightRoomView({ room, onRoomChange, onLeave }: { room: DogfightRoom;
 
         <main className="dogfight-play-area">
           {battle && battleRun ? (
-            <BattleView run={battleRun} battle={battle} currentEvent={battle.events[eventIndex]} eventIndex={eventIndex} speed={speed} score={0} onSpeed={setSpeed} onContinue={() => dismissDogfightBattleReplay()} onRestart={() => dismissDogfightBattleReplay()} />
+            <BattleView run={battleRun} battle={battle} currentEvent={battle.events[eventIndex]} eventIndex={eventIndex} speed={speed} score={0} onSpeed={setSpeed} onContinue={() => finishDogfightBattleReplay()} onRestart={() => dismissDogfightBattleReplay()} />
           ) : room.phase === 'DOG_SELECT' && !run ? (
             <section className="dogfight-dog-select sketch-panel">
               <div className="section-title">
