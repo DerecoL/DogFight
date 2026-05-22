@@ -1222,6 +1222,28 @@ describeWithDatabase('run API', () => {
     expect(nextRoom.body.room.status).toBe('WAITING')
   })
 
+  it('starts expired waiting dogfight rooms automatically before listing rooms', async () => {
+    const host = request.agent(app.server)
+    const viewer = request.agent(app.server)
+    await app.ready()
+
+    await host.post('/api/auth/register').send({ email: `dogfight-auto-start-host${Date.now()}@dog.test`, password: 'dogdice' }).expect(200)
+    const created = await host.post('/api/dogfight/rooms').send({}).expect(200)
+    const roomId = created.body.room.id
+    await prisma.dogfightRoom.update({
+      where: { id: roomId },
+      data: { phaseDeadline: new Date(Date.now() - 1_000) },
+    })
+
+    await viewer.post('/api/auth/register').send({ email: `dogfight-auto-start-viewer${Date.now()}@dog.test`, password: 'dogdice' }).expect(200)
+    const listed = await viewer.get('/api/dogfight/rooms').expect(200)
+
+    const room = listed.body.rooms.find((entry: { id: string }) => entry.id === roomId)
+    expect(room).toMatchObject({ status: 'ACTIVE', phase: 'DOG_SELECT', memberCount: 1, aliveCount: 8 })
+    await expect(prisma.dogfightRoom.findUniqueOrThrow({ where: { id: roomId }, include: { participants: true } }))
+      .resolves.toMatchObject({ status: 'ACTIVE', phase: 'DOG_SELECT', participants: expect.arrayContaining([expect.objectContaining({ kind: 'BOT' })]) })
+  })
+
   it('cleans duplicate waiting dogfight rooms for the same player before listing rooms', async () => {
     const agent = request.agent(app.server)
     await app.ready()

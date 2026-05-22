@@ -12,6 +12,7 @@ import type { BattleEvent, BattleResult, DogType, EnchantmentChoice, FighterSnap
 import { applyRelicChoice, initialItems, makeChoices, makeRelicChoices, makeShop, nextPhaseData as buildNextPhaseData, parseJson, phaseDataAfterEnchant, postBattleLargeItemReward, publicRun, relicsFromRun, seedGhost, snapshotFromRun, toGameItems } from './state'
 
 const DOGFIGHT_TARGET_PLAYERS = 8
+const DOGFIGHT_LOBBY_MS = 15_000
 const DOGFIGHT_DOG_SELECT_MS = 15_000
 const DOGFIGHT_SHOP_MS = 30_000
 const DOGFIGHT_BATTLE_MS = 25_000
@@ -626,6 +627,29 @@ async function cleanupStaleDogfightRoomsForLobby() {
   }
 }
 
+async function advanceExpiredWaitingDogfightRoomsForLobby() {
+  const cutoff = new Date(Date.now() - DOGFIGHT_LOBBY_MS)
+  const expiredRooms = await prisma.dogfightRoom.findMany({
+    where: {
+      status: 'WAITING',
+      phase: 'LOBBY',
+      OR: [
+        { phaseDeadline: { lte: new Date() } },
+        { phaseDeadline: null, createdAt: { lte: cutoff } },
+      ],
+    },
+    include: dogfightRoomInclude,
+    take: 50,
+  })
+  for (const room of expiredRooms) {
+    if (room.participants.some((participant) => participant.kind !== 'BOT' && participant.userId)) {
+      await fillBotsAndStart(room)
+    } else {
+      await prisma.dogfightRoom.delete({ where: { id: room.id } })
+    }
+  }
+}
+
 async function advanceExpiredDogfightRoomsForLobby() {
   const expiredRooms = await prisma.dogfightRoom.findMany({
     where: {
@@ -650,6 +674,7 @@ async function createRoomForUser(userId: string) {
         maxPlayers: DOGFIGHT_TARGET_PLAYERS,
         targetPlayerCount: DOGFIGHT_TARGET_PLAYERS,
         phase: 'LOBBY',
+        phaseDeadline: deadlineFromNow(DOGFIGHT_LOBBY_MS),
       },
     })
     await tx.dogfightParticipant.create({
@@ -878,6 +903,7 @@ export function registerDogfightRoutes(app: FastifyInstance, requireUser: Requir
   app.get('/api/dogfight/rooms', async (request) => {
     const userId = requireUser(request.userId)
     await cleanupStaleDogfightRoomsForLobby()
+    await advanceExpiredWaitingDogfightRoomsForLobby()
     await advanceExpiredDogfightRoomsForLobby()
     await prisma.$transaction(async (tx) => {
       await cleanupDuplicateWaitingRoomsForLobby(tx)
@@ -918,6 +944,7 @@ export function registerDogfightRoutes(app: FastifyInstance, requireUser: Requir
   app.post('/api/dogfight/match', async (request, reply) => {
     const userId = requireUser(request.userId)
     await cleanupStaleDogfightRoomsForLobby()
+    await advanceExpiredWaitingDogfightRoomsForLobby()
     await advanceExpiredDogfightRoomsForLobby()
     await prisma.$transaction(async (tx) => {
       await cleanupDuplicateWaitingRoomsForLobby(tx)
