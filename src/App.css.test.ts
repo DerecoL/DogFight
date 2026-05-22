@@ -168,6 +168,8 @@ describe('equipment layout scale', () => {
     expect(cssRule('.offer-row')).toContain('align-items: stretch')
     expect(cssRule('.paper-shop-card')).toContain('transform-origin')
     expect(cssRule('.paper-shop-card:hover .shop-item-icon')).toContain('rotate')
+    expect(cssRule('.shop-card-owned')).toContain('border-color')
+    expect(cssRule('.owned-badge')).toContain('position: absolute')
     expect(cssRule('.paper-inventory .slot-grid::before')).toContain('radial-gradient')
     expect(cssRule('.paper-inventory .grid-heading h3::after')).toContain('content: ""')
     expect(cssRule('.paper-dog-card .dog-art-frame')).toContain('position: relative')

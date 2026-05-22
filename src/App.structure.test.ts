@@ -479,6 +479,13 @@ describe('selection screen structure', () => {
     expect(app).toContain('status-poison')
   })
 
+  it('marks shop offers that match equipment the player already owns', () => {
+    expect(app).toContain('function shopOfferOwnedCount')
+    expect(app).toContain('ownedCount={shopOfferOwnedCount(run, offer)}')
+    expect(app).toContain('shop-card-owned')
+    expect(app).toContain('owned-badge')
+  })
+
   it('exposes stable hooks for the battle vfx causality pass', () => {
     expect(app).toContain("from './feedback'")
     expect(app).toContain('createBattlePresentation')

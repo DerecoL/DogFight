@@ -795,6 +795,10 @@ function canUpgradeDrop(source: Item | undefined, target: Item | undefined) {
   return quality !== 'DIAMOND' && source.defId === target.defId && normalizeQuality(target.quality) === quality
 }
 
+function shopOfferOwnedCount(run: Run, offer: ShopOffer) {
+  return run.items.filter((item) => item.defId === offer.defId).length
+}
+
 function parseSlotId(id: string) {
   const [area, x, y] = id.split(':')
   if ((area !== 'EQUIPMENT' && area !== 'BAG') || x == null || y == null) return null
@@ -2923,7 +2927,7 @@ function ShopShelf({ run, selectedOfferId, draggingItemId, onInspectOffer, onRer
       </div>
       <div className="offer-row">
         {run.shopItems.map((offer) => (
-          <ShopCard key={offer.offerId} offer={offer} selected={selectedOfferId === offer.offerId} onClick={(element) => onInspectOffer(offer.offerId, element)} />
+          <ShopCard key={offer.offerId} offer={offer} selected={selectedOfferId === offer.offerId} ownedCount={shopOfferOwnedCount(run, offer)} onClick={(element) => onInspectOffer(offer.offerId, element)} />
         ))}
       </div>
       <button className="primary action-button match-button" onClick={onMatch}>
@@ -2943,12 +2947,14 @@ function SellDropZone({ active }: { active: boolean }) {
   )
 }
 
-function ShopCard({ offer, selected, onClick }: { offer: ShopOffer; selected: boolean; onClick: (element: HTMLElement) => void }) {
+function ShopCard({ offer, selected, ownedCount, onClick }: { offer: ShopOffer; selected: boolean; ownedCount: number; onClick: (element: HTMLElement) => void }) {
   const def = offer.def
   const quality = normalizeQuality(offer.quality)
+  const owned = ownedCount > 0
   return (
-    <button className={`shop-card paper-shop-card paper-card ${qualityClass(offer.quality)} ${selected ? 'selected' : ''}`} onClick={(event) => onClick(event.currentTarget)}>
+    <button className={`shop-card paper-shop-card paper-card ${qualityClass(offer.quality)} ${owned ? 'shop-card-owned' : ''} ${selected ? 'selected' : ''}`} onClick={(event) => onClick(event.currentTarget)}>
       <span className="quality-chip shop-quality-chip">{qualityLabel[quality]}</span>
+      {owned && <span className="owned-badge" aria-label={`已拥有 ${ownedCount} 件同名装备`}>已拥有 x{ownedCount}</span>}
       {def && <img className="shop-item-icon" src={itemIcon(def)} alt="" />}
       <div className="shop-card-main">
         <span className={`size-badge ${def ? itemTone(def) : 'utility'}`}>{def?.size ?? '?'}格</span>
