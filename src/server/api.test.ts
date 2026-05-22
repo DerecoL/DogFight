@@ -1498,8 +1498,9 @@ describeWithDatabase('run API', () => {
     const ownBattle = await agents[2].get(`/api/dogfight/battles/${ownBattleId}`).expect(200)
     expect(ownBattle.body.battle.result.playerSnapshot.dogType).toBe('EMPEROR')
 
-    await prisma.dogfightRoom.update({ where: { id: roomId }, data: { phaseDeadline: new Date(Date.now() - 1_000) } })
-    const nextShop = await agents[0].get(`/api/dogfight/rooms/${roomId}`).expect(200)
+    await agents[0].post(`/api/dogfight/rooms/${roomId}/ready`).send({}).expect(200)
+    await agents[1].post(`/api/dogfight/rooms/${roomId}/ready`).send({}).expect(200)
+    const nextShop = await agents[2].post(`/api/dogfight/rooms/${roomId}/ready`).send({}).expect(200)
     expect(nextShop.body.room).toMatchObject({ phase: 'SHOP', currentRound: 1 })
 
     await prisma.dogfightRoom.update({ where: { id: roomId }, data: { currentRound: 3, phase: 'SHOP', phaseDeadline: new Date(Date.now() - 1_000) } })

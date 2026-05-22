@@ -595,15 +595,16 @@ async function settleShopToBattle(tx: Tx, roomId: string, force = false) {
 async function enterNextShopAfterBattle(tx: Tx, roomId: string, force = false) {
   const room = await tx.dogfightRoom.findUnique({ where: { id: roomId }, include: dogfightRoomInclude })
   if (!room || room.status !== 'ACTIVE' || roomPhase(room) !== 'BATTLE') return
-  const activePlayers = room.participants.filter((participant) => participant.kind !== 'BOT' && !participant.eliminated)
-  const allPlayersFinished = activePlayers.every((participant) => participant.ready)
-  if (!force && !allPlayersFinished) return
-
   const alive = room.participants.filter((participant) => !participant.eliminated)
   if (alive.length <= 1) {
     await tx.dogfightRoom.update({ where: { id: room.id }, data: { status: 'COMPLETE', phase: 'COMPLETE', phaseDeadline: null, readyDeadline: null, winnerParticipantId: alive[0]?.id ?? null } })
     return
   }
+
+  const activePlayers = room.participants.filter((participant) => participant.kind !== 'BOT' && !participant.eliminated)
+  const allPlayersFinished = activePlayers.every((participant) => participant.ready)
+  if (!force && !allPlayersFinished) return
+
   await tx.dogfightParticipant.updateMany({ where: { roomId }, data: { ready: false } })
   await tx.dogfightRoom.update({
     where: { id: room.id },
