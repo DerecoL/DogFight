@@ -1839,6 +1839,8 @@ function DogfightRoomView({ room, onRoomChange, onLeave }: { room: DogfightRoom;
   const [tipAnchor, setTipAnchor] = useState<TipAnchor | null>(null)
   const [draggingItemId, setDraggingItemId] = useState<string | null>(null)
   const [battle, setBattle] = useState<Battle | null>(null)
+  const [battleId, setBattleId] = useState<string | null>(null)
+  const [dismissedAutoBattleId, setDismissedAutoBattleId] = useState<string | null>(null)
   const [eventIndex, setEventIndex] = useState(0)
   const [speed, setSpeed] = useState(1)
   const [error, setError] = useState('')
@@ -1889,26 +1891,50 @@ function DogfightRoomView({ room, onRoomChange, onLeave }: { room: DogfightRoom;
   const readyRoom = () => runAction(() => api<DogfightRoomResponse>(`/dogfight/rooms/${room.id}/ready`, { method: 'POST' }))
   const chooseDog = (choice: { dogType: DogType; luckyNumber?: number }) => runAction(() => api<DogfightRoomResponse>(`/dogfight/rooms/${room.id}/dog-choice`, { method: 'POST', body: JSON.stringify(choice) }))
 
-  const loadBattle = async (battleId: string) => {
+  const loadBattle = async (battleId: string, options: { auto?: boolean } = {}) => {
     setError('')
+    if (!options.auto) setDismissedAutoBattleId(null)
     try {
       const data = await api<DogfightBattleResponse>(`/dogfight/battles/${battleId}`)
       setBattle(data.battle.result)
+      setBattleId(data.battle.id)
       setEventIndex(0)
     } catch (err) {
       setError(err instanceof Error ? err.message : '战报读取失败')
     }
   }
 
+  const dismissDogfightBattleReplay = () => {
+    if (battleId) setDismissedAutoBattleId(battleId)
+    setBattle(null)
+    setBattleId(null)
+  }
+
+  const finishDogfightBattleReplay = () => {
+    const shouldMarkFinished = room.phase === 'BATTLE'
+      && Boolean(run)
+      && Boolean(currentMember)
+      && !currentMember?.ready
+      && !currentMember?.eliminated
+      && battleId === currentMember?.currentBattleId
+    dismissDogfightBattleReplay()
+    if (shouldMarkFinished) void readyRoom()
+  }
+
   useEffect(() => {
     if (battle || room.phase !== 'BATTLE') return
     const battleId = currentMember?.currentBattleId ?? sortedDogfightMembers(room.members).find((member) => member.currentBattleId)?.currentBattleId
     if (!battleId) return
+    if (dismissedAutoBattleId === battleId) return
     const timer = window.setTimeout(() => {
-      void loadBattle(battleId)
+      void loadBattle(battleId, { auto: true })
     }, 0)
     return () => window.clearTimeout(timer)
-  }, [battle, currentMember?.currentBattleId, room.phase, room.members])
+  }, [battle, currentMember?.currentBattleId, dismissedAutoBattleId, room.phase, room.members])
+
+  useEffect(() => {
+    if (room.phase !== 'BATTLE') setDismissedAutoBattleId(null)
+  }, [room.phase])
 
   const moveItem = (itemId: string, area: Area, x: number, y: number) => {
     if (!run || currentMember?.ready) return
@@ -2041,7 +2067,7 @@ function DogfightRoomView({ room, onRoomChange, onLeave }: { room: DogfightRoom;
 
         <main className="dogfight-play-area">
           {battle && battleRun ? (
-            <BattleView run={battleRun} battle={battle} currentEvent={battle.events[eventIndex]} eventIndex={eventIndex} speed={speed} score={0} onSpeed={setSpeed} onContinue={() => setBattle(null)} onRestart={() => setBattle(null)} />
+            <BattleView run={battleRun} battle={battle} currentEvent={battle.events[eventIndex]} eventIndex={eventIndex} speed={speed} score={0} onSpeed={setSpeed} onContinue={() => dismissDogfightBattleReplay()} onRestart={() => dismissDogfightBattleReplay()} />
           ) : room.phase === 'DOG_SELECT' && !run ? (
             <section className="dogfight-dog-select sketch-panel">
               <div className="section-title">

@@ -230,6 +230,12 @@ describe('selection screen structure', () => {
     expect(app).toContain("run.phase === 'BATTLE' && isFinished")
   })
 
+  it('does not automatically reopen a dismissed dogfight battle replay', () => {
+    expect(app).toContain('dismissedAutoBattleId')
+    expect(app).toContain('if (dismissedAutoBattleId === battleId) return')
+    expect(app).toContain("onContinue={() => dismissDogfightBattleReplay()}")
+  })
+
   it('offers active runs a confirmed forfeit settlement action outside battle playback', () => {
     expect(app).toContain('function ForfeitRunAction')
     expect(app).toContain('window.confirm')

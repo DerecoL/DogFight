@@ -1429,6 +1429,40 @@ describeWithDatabase('run API', () => {
     expect(await prisma.run.findMany({ where: { id: { in: botRunIds } } })).toEqual([])
   })
 
+  it('starts the next shop timer only after all active players finish the battle round', async () => {
+    const agents = [request.agent(app.server), request.agent(app.server), request.agent(app.server)]
+    await app.ready()
+
+    for (const [index, agent] of agents.entries()) {
+      await agent.post('/api/auth/register').send({ email: `dogfight-shop-timer-${index}-${Date.now()}@dog.test`, password: 'dogdice' }).expect(200)
+    }
+
+    const created = await agents[0].post('/api/dogfight/rooms').send({}).expect(200)
+    const roomId = created.body.room.id
+    await agents[1].post(`/api/dogfight/rooms/${roomId}/join`).send({}).expect(200)
+    await agents[2].post(`/api/dogfight/rooms/${roomId}/join`).send({}).expect(200)
+    await agents[0].post(`/api/dogfight/rooms/${roomId}/start`).send({}).expect(200)
+
+    await agents[0].post(`/api/dogfight/rooms/${roomId}/dog-choice`).send({ dogType: 'SHIBA' }).expect(200)
+    await agents[1].post(`/api/dogfight/rooms/${roomId}/dog-choice`).send({ dogType: 'SAMOYED' }).expect(200)
+    await agents[2].post(`/api/dogfight/rooms/${roomId}/dog-choice`).send({ dogType: 'MUTT' }).expect(200)
+
+    await agents[0].post(`/api/dogfight/rooms/${roomId}/ready`).send({}).expect(200)
+    await agents[1].post(`/api/dogfight/rooms/${roomId}/ready`).send({}).expect(200)
+    const battleRound = await agents[2].post(`/api/dogfight/rooms/${roomId}/ready`).send({}).expect(200)
+    expect(battleRound.body.room).toMatchObject({ phase: 'BATTLE', currentRound: 0, phaseDeadline: null })
+
+    const firstFinished = await agents[0].post(`/api/dogfight/rooms/${roomId}/ready`).send({}).expect(200)
+    expect(firstFinished.body.room).toMatchObject({ phase: 'BATTLE', currentRound: 0, phaseDeadline: null })
+
+    const secondFinished = await agents[1].post(`/api/dogfight/rooms/${roomId}/ready`).send({}).expect(200)
+    expect(secondFinished.body.room).toMatchObject({ phase: 'BATTLE', currentRound: 0, phaseDeadline: null })
+
+    const nextShop = await agents[2].post(`/api/dogfight/rooms/${roomId}/ready`).send({}).expect(200)
+    expect(nextShop.body.room).toMatchObject({ phase: 'SHOP', currentRound: 1 })
+    expect(Date.parse(nextShop.body.room.phaseDeadline)).toBeGreaterThan(Date.now())
+  })
+
   it('advances synchronized dogfight phases with dog choices, shop ready, battle viewing, and player-ranked members', async () => {
     const agents = [request.agent(app.server), request.agent(app.server), request.agent(app.server)]
     await app.ready()

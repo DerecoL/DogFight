@@ -15,7 +15,6 @@ const DOGFIGHT_TARGET_PLAYERS = 8
 const DOGFIGHT_LOBBY_MS = 15_000
 const DOGFIGHT_DOG_SELECT_MS = 15_000
 const DOGFIGHT_SHOP_MS = 30_000
-const DOGFIGHT_BATTLE_MS = 25_000
 const DOGFIGHT_TRAINING_ROUNDS = 3
 const DOGFIGHT_LOSS_LIMIT = 5
 const DOGFIGHT_WAITING_ROOM_TTL_MS = 10 * 60_000
@@ -119,6 +118,20 @@ function currentBattleIdFor(room: DogfightRoomWithDetails, participantId: string
   return battle?.id ?? null
 }
 
+function currentBattleResultDelta(room: DogfightRoomWithDetails, participantId: string): PendingResult {
+  if (roomPhase(room) !== 'BATTLE') return { wins: 0, losses: 0, goldCompensation: 0 }
+  const battle = room.battles.find((entry) =>
+    entry.round === room.currentRound
+    && (entry.participantAId === participantId || entry.participantBId === participantId)
+  )
+  if (!battle) return { wins: 0, losses: 0, goldCompensation: 0 }
+  const won = battle.winnerParticipantId === participantId
+    || (battle.opponentKind === 'OFFLINE' && battle.participantAId === participantId && battle.winnerSide === 'player')
+  return won
+    ? { wins: 1, losses: 0, goldCompensation: 0 }
+    : { wins: 0, losses: 1, goldCompensation: 5 }
+}
+
 function memberRunValues(participant: DogfightParticipantWithRun) {
   return {
     dogType: participant.run?.dogType as DogType | undefined ?? null,
@@ -131,12 +144,42 @@ function memberRunValues(participant: DogfightParticipantWithRun) {
   }
 }
 
+function visibleMemberRunValues(room: DogfightRoomWithDetails, participant: DogfightParticipantWithRun) {
+  const values = memberRunValues(participant)
+  const delta = currentBattleResultDelta(room, participant.id)
+  if (delta.wins === 0 && delta.losses === 0) return values
+  const nextRound = room.currentRound + 1
+  const roundIncome = participant.eliminated ? 0 : 5 + nextRound * 2
+  return {
+    ...values,
+    wins: Math.max(0, values.wins - delta.wins),
+    losses: Math.max(0, values.losses - delta.losses),
+    round: room.currentRound,
+    gold: Math.max(0, values.gold - delta.goldCompensation - roundIncome),
+    phase: 'BATTLE' as const,
+    status: 'DOGFIGHT_ACTIVE',
+  }
+}
+
+function visibleParticipantState(room: DogfightRoomWithDetails, participant: DogfightParticipantWithRun) {
+  const values = visibleMemberRunValues(room, participant)
+  const currentDelta = currentBattleResultDelta(room, participant.id)
+  const hiddenCurrentElimination = currentDelta.losses > 0 && participant.eliminated && values.losses < DOGFIGHT_LOSS_LIMIT
+  return {
+    eliminated: hiddenCurrentElimination ? false : participant.eliminated,
+    eliminatedRound: hiddenCurrentElimination ? null : participant.eliminatedRound,
+    placement: hiddenCurrentElimination ? null : participant.placement,
+  }
+}
+
 function sortedParticipants(room: DogfightRoomWithDetails) {
   return room.participants.slice().sort((left, right) => {
-    const leftValues = memberRunValues(left)
-    const rightValues = memberRunValues(right)
-    const leftLives = left.eliminated ? 0 : Math.max(0, DOGFIGHT_LOSS_LIMIT - leftValues.losses)
-    const rightLives = right.eliminated ? 0 : Math.max(0, DOGFIGHT_LOSS_LIMIT - rightValues.losses)
+    const leftValues = visibleMemberRunValues(room, left)
+    const rightValues = visibleMemberRunValues(room, right)
+    const leftState = visibleParticipantState(room, left)
+    const rightState = visibleParticipantState(room, right)
+    const leftLives = leftState.eliminated ? 0 : Math.max(0, DOGFIGHT_LOSS_LIMIT - leftValues.losses)
+    const rightLives = rightState.eliminated ? 0 : Math.max(0, DOGFIGHT_LOSS_LIMIT - rightValues.losses)
     return rightLives - leftLives
       || rightValues.wins - leftValues.wins
       || (left.kind === right.kind ? 0 : left.kind === 'PLAYER' ? -1 : 1)
@@ -144,10 +187,11 @@ function sortedParticipants(room: DogfightRoomWithDetails) {
   })
 }
 
-function publicDogfightRoom(room: DogfightRoomWithDetails, userId: string) {
+export function publicDogfightRoom(room: DogfightRoomWithDetails, userId: string) {
   const currentParticipant = room.participants.find((participant) => participant.userId === userId) ?? null
   const members = sortedParticipants(room).map((participant) => {
-    const runValues = memberRunValues(participant)
+    const runValues = visibleMemberRunValues(room, participant)
+    const visibleState = visibleParticipantState(room, participant)
     return {
       id: participant.id,
       userId: participant.userId,
@@ -156,9 +200,9 @@ function publicDogfightRoom(room: DogfightRoomWithDetails, userId: string) {
       nickname: participant.nickname,
       isHost: participant.isHost,
       ready: participant.ready,
-      eliminated: participant.eliminated,
-      eliminatedRound: participant.eliminatedRound,
-      placement: participant.placement,
+      eliminated: visibleState.eliminated,
+      eliminatedRound: visibleState.eliminatedRound,
+      placement: visibleState.placement,
       currentBattleId: currentBattleIdFor(room, participant.id),
       ...runValues,
     }
@@ -166,6 +210,7 @@ function publicDogfightRoom(room: DogfightRoomWithDetails, userId: string) {
   const currentRunMember = currentParticipant
     ? members.find((member) => member.id === currentParticipant.id) ?? null
     : null
+  const currentRunValues = currentParticipant ? visibleMemberRunValues(room, currentParticipant) : null
 
   return {
     id: room.id,
@@ -182,17 +227,20 @@ function publicDogfightRoom(room: DogfightRoomWithDetails, userId: string) {
     spectator: !currentParticipant,
     members,
     currentRunMember,
-    currentRun: currentParticipant?.run ? publicRun(currentParticipant.run) : null,
-    battles: room.battles.map((battle) => ({
-      id: battle.id,
-      round: battle.round,
-      participantAId: battle.participantAId,
-      participantBId: battle.participantBId,
-      opponentKind: battle.opponentKind,
-      winnerSide: battle.winnerSide,
-      winnerParticipantId: battle.winnerParticipantId,
-      createdAt: battle.createdAt.toISOString(),
-    })),
+    currentRun: currentParticipant?.run ? { ...publicRun(currentParticipant.run), ...currentRunValues } : null,
+    battles: room.battles.map((battle) => {
+      const hideCurrentResult = roomPhase(room) === 'BATTLE' && battle.round === room.currentRound
+      return {
+        id: battle.id,
+        round: battle.round,
+        participantAId: battle.participantAId,
+        participantBId: battle.participantBId,
+        opponentKind: battle.opponentKind,
+        winnerSide: hideCurrentResult ? null : battle.winnerSide,
+        winnerParticipantId: hideCurrentResult ? null : battle.winnerParticipantId,
+        createdAt: battle.createdAt.toISOString(),
+      }
+    }),
   }
 }
 
@@ -531,7 +579,7 @@ async function settleShopToBattle(tx: Tx, roomId: string, force = false) {
     data: {
       status: complete ? 'COMPLETE' : 'ACTIVE',
       phase: complete ? 'COMPLETE' : 'BATTLE',
-      phaseDeadline: complete ? null : deadlineFromNow(DOGFIGHT_BATTLE_MS),
+      phaseDeadline: null,
       readyDeadline: null,
       winnerParticipantId,
     },
@@ -547,14 +595,16 @@ async function settleShopToBattle(tx: Tx, roomId: string, force = false) {
 async function enterNextShopAfterBattle(tx: Tx, roomId: string, force = false) {
   const room = await tx.dogfightRoom.findUnique({ where: { id: roomId }, include: dogfightRoomInclude })
   if (!room || room.status !== 'ACTIVE' || roomPhase(room) !== 'BATTLE') return
-  const deadlinePassed = Boolean(room.phaseDeadline && room.phaseDeadline.getTime() <= Date.now())
-  if (!force && !deadlinePassed) return
+  const activePlayers = room.participants.filter((participant) => participant.kind !== 'BOT' && !participant.eliminated)
+  const allPlayersFinished = activePlayers.every((participant) => participant.ready)
+  if (!force && !allPlayersFinished) return
 
   const alive = room.participants.filter((participant) => !participant.eliminated)
   if (alive.length <= 1) {
     await tx.dogfightRoom.update({ where: { id: room.id }, data: { status: 'COMPLETE', phase: 'COMPLETE', phaseDeadline: null, readyDeadline: null, winnerParticipantId: alive[0]?.id ?? null } })
     return
   }
+  await tx.dogfightParticipant.updateMany({ where: { roomId }, data: { ready: false } })
   await tx.dogfightRoom.update({
     where: { id: room.id },
     data: {
@@ -1024,7 +1074,8 @@ export function registerDogfightRoutes(app: FastifyInstance, requireUser: Requir
     const { roomId } = roomParamsSchema.parse(request.params)
     const room = await prisma.dogfightRoom.findUnique({ where: { id: roomId }, include: dogfightRoomInclude })
     if (!room) return reply.code(404).send({ error: 'Dogfight room not found' })
-    if (room.status !== 'ACTIVE' || roomPhase(room) !== 'SHOP') return reply.code(400).send({ error: 'Dogfight room is not in shop phase' })
+    const phase = roomPhase(room)
+    if (room.status !== 'ACTIVE' || !['SHOP', 'BATTLE'].includes(phase)) return reply.code(400).send({ error: 'Dogfight room is not in a ready phase' })
     const participant = room.participants.find((entry) => entry.userId === userId)
     if (!participant) return reply.code(403).send({ error: 'Spectators cannot ready up' })
     if (participant.eliminated) return reply.code(400).send({ error: 'Eliminated players cannot ready up' })
