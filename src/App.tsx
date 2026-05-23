@@ -72,6 +72,7 @@ type LadderTier = 'BRONZE' | 'SILVER' | 'GOLD' | 'PLATINUM' | 'DIAMOND' | 'MASTE
 type VisualThemeId = 'dogPark' | 'backAlley' | 'royalKennel'
 
 const BOOM_COUNTER_TRIGGER_THRESHOLD = 50
+const HANDDRAWN_FONT_STACK = '"Comic Sans MS", "Microsoft YaHei", "KaiTi", "Kaiti SC", "DFKai-SB", cursive, sans-serif'
 
 type ItemDef = {
   id: string
@@ -4259,7 +4260,7 @@ function drawHandwrittenBattleNumber(context: CanvasRenderingContext2D, event: B
   const label = fx.kind === 'weak' ? '弱' : fx.kind === 'freeze' ? '冻' : fx.kind === 'miss' ? '抵消' : `${fx.prefix}${event.amount}`
   context.save()
   context.globalAlpha = Math.max(0, 1 - t)
-  context.font = '950 36px Inter, Microsoft YaHei, sans-serif'
+  context.font = `950 40px ${HANDDRAWN_FONT_STACK}`
   context.textAlign = 'center'
   context.lineWidth = 7
   context.strokeStyle = 'rgba(255, 250, 241, .92)'

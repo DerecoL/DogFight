@@ -65,6 +65,19 @@ describe('equipment layout scale', () => {
     expect(cssRule('.forfeit-run-action')).toContain('margin: 4px auto 0')
   })
 
+  it('keeps the forfeit settlement copy readable over illustrated backgrounds', () => {
+    expect(cssRule('.forfeit-run-action')).toContain('background: rgba(255, 250, 241, .94)')
+    expect(cssRule('.forfeit-run-action')).toContain('color: var(--ink)')
+    expect(cssRule('.forfeit-run-action')).toContain('border: 3px solid var(--ink)')
+    expect(cssRule('.forfeit-run-action strong')).toContain('color: var(--ink)')
+    expect(cssRule('.forfeit-run-action strong')).toContain('font-size: 24px')
+    expect(cssRule('.forfeit-run-action strong')).toContain('font-weight: 950')
+    expect(cssRule('.forfeit-run-action span')).toContain('color: rgba(61, 45, 37, .86)')
+    expect(cssRule('.forfeit-run-action span')).toContain('font-size: 15px')
+    expect(cssRule('.forfeit-run-action span')).toContain('font-weight: 900')
+    expect(cssRule('.forfeit-run-action span')).not.toContain('color: var(--muted)')
+  })
+
   it('keeps the left relic rail narrow and the right bag grid wide', () => {
     expect(cssRule('.bag-relic-row')).toContain('grid-template-columns: 220px minmax(0, 1fr)')
   })
@@ -87,6 +100,15 @@ describe('equipment layout scale', () => {
   it('uses the provided hand-drawn cream UI structure', () => {
     expect(css).toContain('--page: #fff4e4')
     expect(css).toContain('--ink: #3d2d25')
+    expect(cssRule(':root')).toContain('--handdrawn-font')
+    expect(cssRule(':root')).toContain('"Comic Sans MS"')
+    expect(cssRule(':root')).toContain('"Microsoft YaHei"')
+    expect(cssRule('body')).toContain('font-family: var(--handdrawn-font)')
+    expect(cssRule('body')).toContain('font-size: 17px')
+    expect(cssRule('body')).toContain('font-weight: 700')
+    expect(cssRule('h1')).toContain('font-size: 24px')
+    expect(app).toContain('const HANDDRAWN_FONT_STACK')
+    expect(app).toContain('context.font = `950 40px ${HANDDRAWN_FONT_STACK}`')
     expect(css).toContain('border: 3px solid var(--ink)')
     expect(css).not.toContain('linear-gradient(135deg, #ffe2ae')
     expect(app).not.toContain('<PageNav')
@@ -387,6 +409,21 @@ describe('equipment layout scale', () => {
     expect(cssRule('.inventory-board.visual-theme-surface::before')).toContain('background-image')
     expect(cssRule('.reward-panel.visual-theme-surface::before')).toContain('background-image')
     expect(cssRule('.handdrawn-result.visual-theme-surface::before')).toContain('background-image')
+  })
+
+  it('uses the dog brawl town illustration as the readable full-page background', () => {
+    expect(existsSync(new URL('../public/assets/backgrounds/dog-brawl-town.png', import.meta.url))).toBe(true)
+    expect(css).toContain('/assets/backgrounds/dog-brawl-town.png')
+    expect(cssRule(':root')).toContain('--app-illustration-bg')
+    expect(cssRule('.auth-shell')).toContain('var(--app-illustration-bg)')
+    expect(cssRule('.app-shell')).toContain('var(--app-illustration-bg)')
+    expect(cssRule('.app-shell')).toContain('background-size: cover')
+    expect(cssRule('.app-shell')).toContain('background-position: center')
+    expect(cssRule('.app-shell::before')).toContain('background')
+    expect(cssRule('.app-shell::before')).toContain('rgba(255, 250, 241, .34)')
+    expect(cssRule('.app-shell > *')).toContain('z-index: 1')
+    expect(cssRule('.topbar')).toContain('rgba(255, 250, 241, .78)')
+    expect(cssRule('.screen-content')).toContain('position: relative')
   })
 
   it('upgrades full-flow feedback to high-impact but bounded visual effects', () => {

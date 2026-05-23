@@ -94,6 +94,8 @@
     5px 7px 0 rgba(61, 45, 37, .2),
     0 18px 34px rgba(112, 72, 30, .14),
     inset 0 1px 0 rgba(255, 255, 255, .68);
+  --handdrawn-font: "Comic Sans MS", "Microsoft YaHei", "KaiTi", "Kaiti SC", "DFKai-SB", cursive, sans-serif;
+  --app-illustration-bg: url("/assets/backgrounds/dog-brawl-town.png");
   --slot-w: 96px;
   --slot-h: 108px;
   --board-slot-h: 240px;
@@ -113,21 +115,29 @@ body {
   background: var(--page);
   background-image: var(--paper-fiber), var(--table-wash);
   background-attachment: fixed;
-  font-family: Inter, ui-sans-serif, system-ui, "Microsoft YaHei", sans-serif;
+  font-family: var(--handdrawn-font);
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.45;
 }
 button, input { font: inherit; }
 button { border: 0; cursor: pointer; }
 button:disabled { cursor: not-allowed; opacity: .55; }
 h1, h2, h3, p { margin: 0; }
 h1, h2, h3 { color: var(--ink); }
-h1 { font-size: 22px; letter-spacing: 0; }
-h2 { font-size: 19px; }
-h3 { font-size: 16px; }
+h1 { font-size: 24px; letter-spacing: 0; }
+h2 { font-size: 21px; }
+h3 { font-size: 18px; }
 p, small { color: var(--muted); }
 
-.auth-shell, .app-shell {
+.auth-shell {
   min-height: 100vh;
-  background: radial-gradient(ellipse at 50% 0%, rgba(255, 250, 241, .22), transparent 42%);
+  background:
+    radial-gradient(ellipse at 50% 0%, rgba(255, 250, 241, .44), transparent 42%),
+    linear-gradient(180deg, rgba(255, 250, 241, .38), rgba(255, 244, 228, .2)),
+    var(--app-illustration-bg);
+  background-size: cover;
+  background-position: center;
 }
 .auth-shell { display: grid; place-items: center; padding: 24px; }
 .auth-panel {
@@ -245,17 +255,39 @@ input {
 }
 
 .app-shell {
+  position: relative;
+  min-height: 100vh;
   padding: 18px;
   display: grid;
   gap: 16px;
   background:
-    radial-gradient(ellipse at 50% 0%, rgba(255, 250, 241, .36), transparent 38%),
-    radial-gradient(ellipse at 50% 100%, rgba(232, 188, 132, .16), transparent 34%);
+    radial-gradient(ellipse at 50% 0%, rgba(255, 250, 241, .4), transparent 38%),
+    linear-gradient(180deg, rgba(255, 250, 241, .34), rgba(255, 244, 228, .18)),
+    var(--app-illustration-bg);
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
+}
+
+.app-shell::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  background:
+    radial-gradient(ellipse at 50% 18%, rgba(255, 250, 241, .34), transparent 42%),
+    linear-gradient(180deg, rgba(255, 250, 241, .22), rgba(255, 244, 228, .08));
+  pointer-events: none;
+}
+
+.app-shell > * {
+  position: relative;
+  z-index: 1;
 }
 .topbar {
   justify-content: space-between;
   padding: 14px 16px;
-  background: var(--hud-paper), rgba(255, 250, 241, .92);
+  background: var(--hud-paper), rgba(255, 250, 241, .78);
   border: 1px solid var(--line);
   border-radius: 18px;
   box-shadow: 0 12px 34px rgba(112, 72, 30, .10);
@@ -2099,6 +2131,10 @@ input {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  border: 3px solid var(--ink);
+  background: rgba(255, 250, 241, .94);
+  color: var(--ink);
+  box-shadow: 5px 6px 0 rgba(61, 45, 37, .2), 0 14px 28px rgba(112, 72, 30, .14);
 }
 
 .forfeit-run-action div {
@@ -2106,10 +2142,18 @@ input {
   gap: 4px;
 }
 
+.forfeit-run-action strong {
+  color: var(--ink);
+  font-size: 24px;
+  font-weight: 950;
+  line-height: 1.08;
+}
+
 .forfeit-run-action span {
-  color: var(--muted);
-  font-size: 13px;
-  line-height: 1.35;
+  color: rgba(61, 45, 37, .86);
+  font-size: 15px;
+  line-height: 1.42;
+  font-weight: 900;
 }
 
 .forfeit-run-action .danger-button {
@@ -2134,9 +2178,7 @@ input {
 .battle-log-shell.open .battle-log { height: 260px; }
 
 /* Screenshot-driven board-game skin */
-.auth-shell,
-.app-shell {
-  background: var(--page);
+.auth-shell {
   color: var(--ink);
 }
 
@@ -2158,6 +2200,7 @@ input {
 }
 
 .screen-content {
+  position: relative;
   width: min(1920px, calc(100vw - 48px));
   min-width: 0;
   margin: 12px auto 0;
