@@ -201,6 +201,7 @@ function battlePresentationTarget(event: BattleEventLike | null | undefined, kin
 export function battlePresentationTargetSide(event?: BattleEventLike | null, kind = battlePresentationKind(event)): 'player' | 'opponent' | null {
   if (!event) return null
   if (event.target === 'player' || event.target === 'opponent') return event.target
+  if (event.target === 'none') return null
   const actor = normalizeSide(event.actor)
   if (kind === 'utility' && isPositiveStatusUtilityEvent(event) && (actor === 'player' || actor === 'opponent')) return actor
   if ((kind === 'heal' || kind === 'shield' || kind === 'thorns') && (actor === 'player' || actor === 'opponent')) return actor

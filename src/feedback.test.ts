@@ -146,6 +146,17 @@ describe('feedback presentation mapping', () => {
     expect(presentation.target).toEqual({ anchor: 'status-negative', side: 'opponent' })
   })
 
+  it('does not send canceled targetless disabled item events to the opponent status row', () => {
+    const presentation = createBattlePresentation({
+      ...baseEvent,
+      effectType: 'UTILITY',
+      target: 'none',
+      text: '巨型骨棒 被【失效】抵消',
+    })
+
+    expect(presentation.target).toEqual({ anchor: 'screen', side: 'system' })
+  })
+
   it('targets self positive utility statuses at the actor status anchors', () => {
     const presentation = createBattlePresentation({
       ...baseEvent,
