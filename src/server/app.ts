@@ -336,7 +336,15 @@ export function buildApp() {
 
   registerDogfightRoutes(app, requireUser)
 
-  app.get('/api/health', async () => ({ ok: true }))
+  app.get('/api/health', async (_, reply) => {
+    const timestamp = new Date().toISOString()
+    try {
+      await prisma.$queryRaw`SELECT 1`
+      return { ok: true, database: 'ok', timestamp }
+    } catch {
+      return reply.code(503).send({ ok: false, database: 'unavailable', timestamp })
+    }
+  })
 
   app.post('/api/auth/register', async (request, reply) => {
     const body = authBodySchema.parse(request.body)

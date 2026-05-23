@@ -85,6 +85,14 @@ jobs:
           cd "$TEMP_DEPLOY_PATH"
           docker compose --env-file .env.production config >/dev/null
 
+          if [ -f "$DEPLOY_PATH/deploy/backup-postgres.sh" ] && [ -f "$DEPLOY_PATH/.env.production" ]; then
+            cd "$DEPLOY_PATH"
+            export BACKUP_DIR="$DEPLOY_PATH/backups"
+            BACKUP_REASON=predeploy sh deploy/backup-postgres.sh
+          else
+            echo "Skipping predeploy backup because the existing deployment is not initialized yet."
+          fi
+
           find "$DEPLOY_PATH" -mindepth 1 -maxdepth 1 ! -name backups ! -name .env.production -exec rm -rf {} +
           cp -a "$TEMP_DEPLOY_PATH"/. "$DEPLOY_PATH"/
           rm -rf "$TEMP_DEPLOY_PATH" "$REMOTE_PACKAGE"

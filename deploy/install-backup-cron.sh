@@ -10,7 +10,8 @@ if [ "$(id -u)" -ne 0 ]; then
 fi
 
 cat > "$CRON_FILE" <<EOF
-17 3 * * * root cd $DEPLOY_PATH && BACKUP_DIR=$DEPLOY_PATH/backups sh deploy/backup-postgres.sh
+17 * * * * root cd $DEPLOY_PATH && BACKUP_DIR=$DEPLOY_PATH/backups sh deploy/backup-postgres.sh
+23 3 * * * root cd $DEPLOY_PATH && BACKUP_DIR=$DEPLOY_PATH/backups OFFSITE_BACKUP=1 sh deploy/backup-postgres.sh
 EOF
 
 chmod 0644 "$CRON_FILE"

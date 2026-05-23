@@ -9,7 +9,8 @@
 - PostgreSQL 持久化数据卷：`postgres_data`。
 - Prisma PostgreSQL schema 和迁移脚本。
 - `.env.example` 生产环境变量模板。
-- PostgreSQL 手动备份脚本和每日 cron 安装脚本。
+- PostgreSQL 手动备份脚本、恢复脚本和定时 cron 安装脚本。
+- `/api/health` 会检查 PostgreSQL，数据库不可用时返回 `503`。
 - 部署结构测试：`src/deployment.structure.test.ts`。
 
 ## 需要补齐的真实配置
@@ -26,7 +27,10 @@
 - [ ] 生产数据库密码：生成强密码，并同时写入 `POSTGRES_PASSWORD` 和 `DATABASE_URL`。
 - [ ] JWT 密钥：生成长随机 `JWT_SECRET`，不要复用开发环境值。
 - [ ] `PRODUCTION_ENV`：把完整 `.env.production` 内容保存到 GitHub Secret。
-- [ ] 备份保留策略：当前默认保留 7 天，需要确认是否改为 14 天、30 天或异地备份。
+- [ ] 腾讯云 COS bucket：用于每日异地备份，建议配置 30 天生命周期。
+- [ ] COS 凭据：把 `COS_BUCKET`、`COS_REGION`、`COS_SECRET_ID`、`COS_SECRET_KEY` 写入 `PRODUCTION_ENV`。
+- [ ] 告警 Webhook：可选，把 `ALERT_WEBHOOK_URL` 写入 `PRODUCTION_ENV`。
+- [ ] 服务器安装 COSCLI：异地备份依赖 `coscli` 上传文件到腾讯云 COS。
 
 ## 执行顺序
 
@@ -39,9 +43,11 @@
 7. 在 GitHub repository secrets 中配置 `SERVER_HOST`、`SERVER_USER`、`SERVER_SSH_KEY`、`DEPLOY_PATH`、`DEPLOY_REPO_TOKEN`、`PRODUCTION_ENV`。
 8. 手动触发 GitHub Actions `Deploy` workflow。
 9. 在服务器执行 `docker compose --env-file .env.production ps`，确认 `postgres`、`api`、`caddy` 正常。
-10. 请求 `https://真实域名/api/health`，确认 API 健康检查可访问。
-11. 执行一次手动备份，确认 `/opt/dogfight/backups` 生成 SQL 文件。
-12. 再安装每日备份 cron。
+10. 请求 `https://真实域名/api/health`，确认 API 和 PostgreSQL 健康检查可访问。
+11. 执行一次手动备份，确认 `/opt/dogfight/backups` 生成 `.sql.gz` 文件。
+12. 执行一次手动异地备份，确认 COS bucket 中出现备份文件。
+13. 恢复到临时数据库或测试服务器，确认备份文件可用。
+14. 再安装定时备份 cron。
 
 ## 生产数据安全规则
 
@@ -49,4 +55,5 @@
 - 不要在生产服务器执行会删除 Docker volume 的清理命令，尤其是针对 `postgres_data` 的删除。
 - 部署更新使用 `docker compose up -d --build`；不要用会重建并删除 volume 的命令。
 - 恢复数据库前先在测试环境验证备份文件可用。
-- 修改备份保留天数前，先确认服务器磁盘容量和数据恢复目标。
+- 修改本机备份保留小时数前，先确认服务器磁盘容量和数据恢复目标。
+- 修改异地备份保留天数前，同步检查 COS 生命周期规则。
