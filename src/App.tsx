@@ -2503,7 +2503,7 @@ function LadderHome({ onStart }: { onStart: (choice: { dogType: DogType; luckyNu
                   <img className="dog-avatar" src={dogAssets[dog]} alt="" />
                 </span>
                 <strong>{dogNames[dog]}</strong>
-                <small>{dogTraits[dog]}</small>
+                <small><RuleText text={dogTraits[dog]} /></small>
               </button>
             ) : (
               <div className="dog-card placeholder paper-card paper-dog-card" key={`ladder-dog-placeholder-${index}`} aria-hidden="true" />
@@ -2514,7 +2514,7 @@ function LadderHome({ onStart }: { onStart: (choice: { dogType: DogType; luckyNu
               <img className="dog-avatar large" src={dogAssets[selectedDog]} alt="" />
             </span>
             <h2>{dogNames[selectedDog]}</h2>
-            <p>{dogStrategies[selectedDog]}</p>
+            <p><RuleText text={dogStrategies[selectedDog]} /></p>
             {selectedDog === 'EMPEROR' && (
               <div className="lucky-number-picker">
                 <strong>幸运数字</strong>
@@ -2578,7 +2578,7 @@ function DogSelect({ onPick }: { onPick: (choice: { dogType: DogType; luckyNumbe
                 <img className="dog-avatar" src={dogAssets[dog]} alt="" />
               </span>
               <strong>{dogNames[dog]}</strong>
-              <small>{dogTraits[dog]}</small>
+              <small><RuleText text={dogTraits[dog]} /></small>
               <span className="tag-row">{dogTags[dog].map((tag) => <b key={tag}>{tag}</b>)}</span>
             </button>
           ) : (
@@ -2592,11 +2592,11 @@ function DogSelect({ onPick }: { onPick: (choice: { dogType: DogType; luckyNumbe
           <h2>{dogNames[selectedDog]}</h2>
           <div className="detail-box">
             <strong>被动特性</strong>
-            <p>{dogTraits[selectedDog]}</p>
+            <p><RuleText text={dogTraits[selectedDog]} /></p>
           </div>
           <div className="detail-box">
             <strong>策略说明</strong>
-            <p>{dogStrategies[selectedDog]}</p>
+            <p><RuleText text={dogStrategies[selectedDog]} /></p>
           </div>
           <div className="tag-row">
             {dogTags[selectedDog].map((tag) => <b key={tag}>{tag}</b>)}
@@ -2684,14 +2684,14 @@ function TopBar({ run, musicEnabled, musicBlocked, onToggleMusic, onOpenLobby, o
 
 function DogTraitSummary({ run }: { run: Run }) {
   const trait = run.dogType === 'EMPEROR' && run.luckyNumber
-    ? `${dogTraits[run.dogType]}（天命 ${run.luckyNumber}）`
+    ? `${dogTraits[run.dogType]}（【天命数字】 ${run.luckyNumber}）`
     : dogTraits[run.dogType]
   return (
     <span className="dog-trait-summary" title={`${dogNames[run.dogType]}：${trait}`}>
       <img src={dogAssets[run.dogType]} alt="" />
       <span>当前狗狗</span>
       <strong>{dogNames[run.dogType]}</strong>
-      <p>{trait}</p>
+      <p><RuleText text={trait} /></p>
     </span>
   )
 }
@@ -2751,7 +2751,7 @@ function ShopChoiceSelect({ choices, onPick }: { choices: ShopType[]; onPick: (s
           <button key={choice} className={`choice paper-card sticker-card ${selectedChoice === choice ? 'selected' : ''}`} onClick={() => setSelectedChoice(choice)}>
             <span className="choice-icon">{shopChoiceIcon(choice)}</span>
             <strong>{shopNames[choice]}</strong>
-            <span>{shopDescriptions[choice]}</span>
+            <span><RuleText text={shopDescriptions[choice]} /></span>
           </button>
         ) : (
           <div className="choice placeholder paper-card sticker-card" key={`choice-placeholder-${index}`} aria-hidden="true" />
