@@ -5,6 +5,7 @@ import { canPlace, findSlot, triggerOrder } from './game/grid'
 import { createRng } from './game/rng'
 import { createChoices, createShop, itemPurchaseValue, itemSellValue } from './game/shop'
 import type { FighterSnapshot, GameItem, RelicInstance } from './game/types'
+import { makeNewRunShop } from './state'
 
 function baseItems(): GameItem[] {
   return [1, 2, 3, 4, 5, 6].map((n, index) => ({ id: `i${n}`, defId: `starter-${n}`, quality: 'BRONZE' as const, area: 'EQUIPMENT' as const, x: index, y: 0 }))
@@ -86,6 +87,15 @@ describe('grid placement', () => {
 })
 
 describe('shop generation', () => {
+  it('uses a per-run seed for the initial shop even for the same user', () => {
+    const signature = (offers: ReturnType<typeof makeNewRunShop>) =>
+      offers.map(({ defId, price, discount, quality }) => ({ defId, price, discount, quality }))
+
+    expect(signature(makeNewRunShop('same-user', 'first-run'))).not.toEqual(
+      signature(makeNewRunShop('same-user', 'second-run')),
+    )
+  })
+
   it('creates five filtered offers with progressive-compatible prices', () => {
     const offers = createShop('LARGE', createRng('shop-test'))
     expect(offers).toHaveLength(5)
@@ -264,7 +274,7 @@ describe('dog and item definitions', () => {
     expect(itemDef('patting-bear')).toMatchObject({
       name: '拍拍熊',
       size: 2,
-      price: 20,
+      price: 10,
       dice: [1, 6],
       tags: ['wound', 'attack'],
       effect: { type: 'UTILITY', amount: 1, qualityBase: 'SILVER' },
@@ -274,13 +284,15 @@ describe('dog and item definitions', () => {
 
     expect(itemDef('poisoned-dog-fang')).toMatchObject({
       size: 2,
-      price: 15,
+      price: 7.5,
       dice: [],
       tags: ['poison', 'attack', 'passive'],
       effect: { type: 'UTILITY', amount: 2, qualityBase: 'GOLD' },
       advancedEffect: 'POISON_ON_ATTACK_HIT',
       defaultQuality: 'SILVER',
     })
+    expect(itemPurchaseValue(itemDef('patting-bear'))).toBe(20)
+    expect(itemPurchaseValue(itemDef('poisoned-dog-fang'))).toBe(15)
 
     expect(shopPool('GENERAL').map((item) => item.id)).toEqual(expect.arrayContaining([
       'v4-blood-contract-fang',

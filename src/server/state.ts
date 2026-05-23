@@ -263,6 +263,10 @@ export function makeShop(type: ShopType, seed: string, round = 0) {
   return createShop(type, createRng(seed), round)
 }
 
+export function makeNewRunShop(userId: string, nonce: string = randomUUID()) {
+  return makeShop('GENERAL', `${userId}-new-shop-${nonce}`, 0)
+}
+
 type QualityBearingItem = { quality?: string | null }
 
 export function makeChoices<T extends QualityBearingItem>(seed: string, round = 0, items: readonly T[] = []) {

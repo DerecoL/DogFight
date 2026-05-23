@@ -177,12 +177,12 @@ export const ITEM_DEFS: ItemDef[] = [
     advancedEffect: 'PURGE_ENEMY_BUFFS',
     defaultQuality: 'SILVER',
   }),
-  slotItem('patting-bear', '拍拍熊', 2, 20, [1, 6], ['wound', 'attack'], { type: 'UTILITY', amount: 1, qualityBase: 'SILVER' }, {
+  slotItem('patting-bear', '拍拍熊', 2, 10, [1, 6], ['wound', 'attack'], { type: 'UTILITY', amount: 1, qualityBase: 'SILVER' }, {
     description: '每次触发对敌人叠加 1 层【伤口】；【伤口】使受到的直接攻击伤害 +1，可叠加，不影响【中毒】、【荆棘】等非直接攻击伤害。',
     advancedEffect: 'APPLY_WOUND',
     defaultQuality: 'SILVER',
   }),
-  slotItem('poisoned-dog-fang', '淬毒狗牙', 2, 15, [], ['poison', 'attack', 'passive'], { type: 'UTILITY', amount: 2, qualityBase: 'GOLD' }, {
+  slotItem('poisoned-dog-fang', '淬毒狗牙', 2, 7.5, [], ['poison', 'attack', 'passive'], { type: 'UTILITY', amount: 2, qualityBase: 'GOLD' }, {
     description: '无需触发。每次攻击命中时，对敌人施加 1 层【中毒】。',
     advancedEffect: 'POISON_ON_ATTACK_HIT',
     defaultQuality: 'SILVER',
