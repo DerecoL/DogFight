@@ -42,6 +42,7 @@ import {
   battlePresentationTargetSide,
   createBattlePresentation,
   createUiFeedbackEvent,
+  type FeedbackAnchor,
   type PresentationEvent,
   type PresentationKind,
   type UiFeedbackEvent,
@@ -152,6 +153,11 @@ type BattleEvent = {
 }
 type BattleVfxKind = PresentationKind
 type BattleVfxStyle = { kind: BattleVfxKind; color: string; accent: string; prefix: string; particleCount: number }
+type BattleVfxAnchorAttrs = {
+  'data-vfx-anchor': FeedbackAnchor
+  'data-vfx-side': 'player' | 'opponent' | 'system'
+  'data-vfx-item-id'?: string
+}
 type Battle = {
   winner: string
   duration: number
@@ -800,6 +806,14 @@ function battleVfxKind(event?: BattleEvent): BattleVfxKind {
 
 function battleVfxTargetSide(event?: BattleEvent): 'player' | 'opponent' | null {
   return battlePresentationTargetSide(event, battleVfxKind(event))
+}
+
+function battleVfxAnchorAttrs(anchor: FeedbackAnchor, side: 'player' | 'opponent' | 'system', itemId?: string): BattleVfxAnchorAttrs {
+  return {
+    'data-vfx-anchor': anchor,
+    'data-vfx-side': side,
+    ...(itemId ? { 'data-vfx-item-id': itemId } : {}),
+  }
 }
 
 const battleVfxStyles: Record<BattleVfxKind, BattleVfxStyle> = {
@@ -3869,6 +3883,7 @@ function BattleView({ run, battle, currentEvent, eventIndex, speed, score, sound
         </div>
       </div>
 
+      <BattleFxStage event={event} presentation={presentation} speed={speed} />
       <BattleEquipmentRow owner="opponent" snapshot={opponentSnapshot} events={events} displayIndex={displayIndex} activeEvent={event} onInspect={(item, element) => setBattleTip({ item, owner: 'opponent', anchor: getFloatingTipPosition(element) })} />
       <BattleStage
         player={playerSnapshot}
@@ -3876,7 +3891,6 @@ function BattleView({ run, battle, currentEvent, eventIndex, speed, score, sound
         event={event}
         presentation={presentation}
         lastRoll={lastRollEvent}
-        speed={speed}
         finished={isFinished}
         winner={playback?.winner}
         visualTheme={visualTheme}
@@ -3958,6 +3972,7 @@ function BattleEquipmentRow({ owner, snapshot, events, displayIndex, activeEvent
             type="button"
             key={item.id}
             className={`battle-item item-card paper-item-card ${itemTone(item.def)} ${qualityClass(item.quality)} ${activeItemId === item.id ? `active battle-item-trigger vfx-trigger-${activeVfxKind}` : ''} ${boomCounterState ? 'boom-counter' : ''} ${boomCounterState?.popping ? 'boom-counter-pop' : ''} ${triggerCountPopping ? 'trigger-count-pop' : ''}`}
+            {...battleVfxAnchorAttrs('equipment-row', owner, item.id)}
             data-vfx-kind={battleVfxKind(activeEvent)}
             style={{
               gridColumn: `${item.x + 1} / span ${item.def.width}`,
@@ -3990,7 +4005,7 @@ function BattleEquipmentRow({ owner, snapshot, events, displayIndex, activeEvent
   )
 }
 
-function BattleStage({ player, opponent, event, presentation, lastRoll, speed, finished, winner, visualTheme }: { player: BattleSnapshot; opponent: BattleSnapshot; event?: BattleEvent; presentation: PresentationEvent | null; lastRoll?: BattleEvent; speed: number; finished: boolean; winner?: string; visualTheme: VisualThemeId }) {
+function BattleStage({ player, opponent, event, presentation, lastRoll, finished, winner, visualTheme }: { player: BattleSnapshot; opponent: BattleSnapshot; event?: BattleEvent; presentation: PresentationEvent | null; lastRoll?: BattleEvent; finished: boolean; winner?: string; visualTheme: VisualThemeId }) {
   const [statusTip, setStatusTip] = useState<StatusTipState | null>(null)
   const inspectStatus = (status: BattleStatusEntry, side: 'player' | 'opponent', polarity: 'positive' | 'negative', element: HTMLElement) => {
     setStatusTip({ status, side, polarity, anchor: getFloatingTipPosition(element) })
@@ -4005,7 +4020,6 @@ function BattleStage({ player, opponent, event, presentation, lastRoll, speed, f
   const activePresentationKind = presentation?.kind ?? 'none'
   return (
     <div className={`battle-stage handdrawn-stage visual-theme-surface visual-theme-${visualTheme}`} data-visual-theme={visualTheme} style={visualThemeStyle(visualTheme)} data-tutorial-anchor="battle-stage" data-presentation-kind={activePresentationKind}>
-      <BattleFxStage event={event} presentation={presentation} speed={speed} />
       <BattleDog
         side="opponent"
         snapshot={opponent}
@@ -4055,8 +4069,8 @@ function BattleDog({ side, snapshot, hp, maxHp, shield, event, finished, winner,
   const poisonPreviewPercent = maxHp > 0 ? ((poisonStatus?.tickDamage ?? 0) / maxHp) * 100 : 0
   const poisonPreviewLeft = Math.max(0, Math.min(100, hpPercent - poisonPreviewPercent))
   return (
-    <div className={`battle-dog ${side} ${isActor ? 'attacking' : ''} ${isTarget && event?.effectType !== 'HEAL' ? 'hit' : ''} ${healing ? 'healing' : ''} ${isVfxTarget ? `vfx-target-${battleVfxKind(event)}` : ''} ${shieldValue > 0 ? 'status-shield' : ''} ${poisonStatus ? 'poisoned status-poison' : ''} ${won ? 'winner' : ''} ${lost ? 'loser' : ''}`}>
-      <div className="hp">
+    <div className={`battle-dog ${side} ${isActor ? 'attacking' : ''} ${isTarget && event?.effectType !== 'HEAL' ? 'hit' : ''} ${healing ? 'healing' : ''} ${isVfxTarget ? `vfx-target-${battleVfxKind(event)}` : ''} ${shieldValue > 0 ? 'status-shield' : ''} ${poisonStatus ? 'poisoned status-poison' : ''} ${won ? 'winner' : ''} ${lost ? 'loser' : ''}`} data-vfx-side={side}>
+      <div className="hp" {...battleVfxAnchorAttrs('hp', side)}>
         <span><HeartPulse size={16} /> {snapshot.name}</span>
         <StatusEffectRow tone="positive" side={side} statuses={positiveStatuses} onStatusInspect={onStatusInspect} activeStatusKey={activeStatusKey} />
         <div className="hp-bar">
@@ -4073,7 +4087,7 @@ function BattleDog({ side, snapshot, hp, maxHp, shield, event, finished, winner,
           </div>
         )}
       </div>
-      <img className="battle-dog-img" src={dogAssets[snapshot.dogType]} alt="" />
+      <img className="battle-dog-img" src={dogAssets[snapshot.dogType]} alt="" {...battleVfxAnchorAttrs('dog-avatar', side)} />
       <strong>{dogNames[snapshot.dogType]}</strong>
     </div>
   )
@@ -4083,7 +4097,7 @@ function StatusEffectRow({ tone, side, statuses, onStatusInspect, activeStatusKe
   const visible = statuses.slice(0, 3)
   const hidden = statuses.length - visible.length
   return (
-    <div className={`status-effects ${tone}`}>
+    <div className={`status-effects ${tone}`} {...battleVfxAnchorAttrs(tone === 'positive' ? 'status-positive' : 'status-negative', side)}>
       {visible.map((status) => {
         const isActive = activeStatusKey === statusTipKey(status, side, tone)
         return (

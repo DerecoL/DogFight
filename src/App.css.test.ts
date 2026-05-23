@@ -245,7 +245,9 @@ describe('equipment layout scale', () => {
   })
 
   it('adds battle vfx causality styling for triggers, targets, and handwritten feedback', () => {
+    expect(cssRule('.visual-battle')).toContain('position: relative')
     expect(cssRule('.battle-fx-stage')).toContain('position: absolute')
+    expect(cssRule('.battle-fx-stage')).toContain('inset: 0')
     expect(cssRule('.battle-feedback-burst')).toContain('animation')
     expect(cssRule('.battle-log p.active-feedback')).toContain('background')
     expect(cssRule('.feedback-layer')).toContain('pointer-events: none')
