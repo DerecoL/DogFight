@@ -346,9 +346,9 @@ describe('selection screen structure', () => {
 
   it('hides full-range trigger dice on direct-trigger item surfaces', () => {
     expect(app).toContain("import { triggerDiceLabel } from './item-trigger-display'")
-    expect(app).toContain('const triggerDice = triggerDiceLabel(item.def)')
+    expect(app).toContain('triggerDiceLabel(item.def, relics)')
     expect(app).toContain('{triggerDice && <small><Dice5 size={12} /> {triggerDice}</small>}')
-    expect(app).toContain('const tipTriggerDice = triggerDiceLabel(def)')
+    expect(app).toContain('const tipTriggerDice = triggerDiceLabel(def, item ? (relicsOverride ?? run.relics) : [])')
     expect(app).toContain('{tipTriggerDice && (')
     expect(app).not.toContain('<small><Dice5 size={12} /> {item.def.dice.join')
   })

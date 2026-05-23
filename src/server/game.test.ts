@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { resolveWinnerByHealthPercent, simulateBattle } from './game/battle'
-import { CLASS_REWARD_DEFS, DOGS, RELIC_DEFS, TERM_DEFS, itemDef, itemDefForQuality, shopPool } from './game/data'
+import { CLASS_REWARD_DEFS, DOGS, RELIC_DEFS, TERM_DEFS, itemDef, itemDefForQuality, relicDefForQuality, shopPool } from './game/data'
 import { canPlace, findSlot, triggerOrder } from './game/grid'
 import { createRng } from './game/rng'
 import { createShop, itemPurchaseValue, itemSellValue } from './game/shop'
@@ -140,6 +140,15 @@ describe('shop generation', () => {
     expect(itemPurchaseValue(bloodFang, 'DIAMOND')).toBe(96)
     expect(itemSellValue(bloodFang, 'DIAMOND')).toBe(48)
   })
+
+  it('adds per-instance sell bonuses on top of base sell value', () => {
+    const silverIngot = itemDef('dog-silver-ingot')
+
+    expect(itemPurchaseValue(silverIngot, 'BRONZE')).toBe(1)
+    expect(itemSellValue(silverIngot, 'BRONZE')).toBe(0)
+    expect(itemSellValue(silverIngot, 'BRONZE', 3)).toBe(3)
+    expect(itemSellValue(silverIngot, 'SILVER', 6)).toBe(7)
+  })
 })
 
 describe('dog and item definitions', () => {
@@ -231,19 +240,52 @@ describe('dog and item definitions', () => {
       advancedEffect: 'PURGE_ENEMY_BUFFS',
       defaultQuality: 'SILVER',
     })
+    expect(itemDef('patting-bear')).toMatchObject({
+      name: '拍拍熊',
+      size: 2,
+      price: 20,
+      dice: [1, 6],
+      tags: ['wound', 'attack'],
+      effect: { type: 'UTILITY', amount: 1, qualityBase: 'SILVER' },
+      advancedEffect: 'APPLY_WOUND',
+      defaultQuality: 'SILVER',
+    })
 
     expect(shopPool('GENERAL').map((item) => item.id)).toEqual(expect.arrayContaining([
       'v4-blood-contract-fang',
       'v4-boom-counter',
       'v4-growing-chew-sword',
       'v4-reverse-fur-comb',
+      'patting-bear',
     ]))
     expect(shopPool('MEDIUM').map((item) => item.id)).toEqual(expect.arrayContaining([
       'v4-blood-contract-fang',
       'v4-boom-counter',
       'v4-growing-chew-sword',
+      'patting-bear',
     ]))
     expect(shopPool('SMALL').map((item) => item.id)).toContain('v4-reverse-fur-comb')
+  })
+
+  it('defines carrot and tissue as trigger point remapping relics', () => {
+    expect(RELIC_DEFS).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: 'carrot',
+        name: '胡萝卜',
+        unlockRound: 3,
+        defaultQuality: 'SILVER',
+        effect: 'SHIFT_TRIGGER_DICE_UP',
+      }),
+      expect.objectContaining({
+        id: 'tissue',
+        name: '纸巾',
+        unlockRound: 3,
+        defaultQuality: 'SILVER',
+        effect: 'SHIFT_TRIGGER_DICE_DOWN',
+      }),
+    ]))
+    expect(relicDefForQuality('carrot', 'SILVER').description).toContain('6 会变成 1')
+    expect(relicDefForQuality('tissue', 'SILVER').description).toContain('1 会变成 6')
   })
 
   it('uses quality-scaled descriptions for base-quality archetype equipment', () => {
@@ -344,6 +386,47 @@ describe('battle simulation', () => {
       sourceHpDelta: -10,
     })
     expect(thorn?.text).toContain('反弹 10 点伤害')
+  })
+
+  it('lets wound increase direct attack damage only', () => {
+    const player: FighterSnapshot = {
+      name: 'P',
+      dogType: 'BULLY',
+      wins: 0,
+      losses: 0,
+      round: 10,
+      items: [
+        { id: 'bear', defId: 'patting-bear', quality: 'SILVER', area: 'EQUIPMENT', x: 0, y: 0 },
+        { id: 'bite', defId: 'starter-1', quality: 'BRONZE', area: 'EQUIPMENT', x: 2, y: 0 },
+        { id: 'poison', defId: 'shiba-poison', quality: 'DIAMOND', area: 'EQUIPMENT', x: 3, y: 0 },
+      ],
+    }
+    const opponent: FighterSnapshot = {
+      name: 'O',
+      dogType: 'BULLY',
+      wins: 0,
+      losses: 0,
+      round: 10,
+      items: [
+        { id: 'enemy-bear', defId: 'patting-bear', quality: 'SILVER', area: 'EQUIPMENT', x: 0, y: 0 },
+      ],
+      relics: [openingThornsRelic],
+    }
+
+    const result = simulateBattle(player, opponent, 'wound-direct-only')
+    const wound = result.events.find((event) => event.itemId === 'bear' && event.text.includes('【伤口】'))
+    const boostedAttack = result.events.find((event) => event.itemId === 'bite' && event.target === 'opponent' && event.targetHpDelta === -6)
+    const poisonTick = result.events.find((event) => event.kind === 'POISON' && event.target === 'opponent')
+    const thorn = result.events.find((event) =>
+      event.text.includes('【荆棘】反弹')
+      && event.target === 'player'
+      && event.playerStatuses?.negative.some((status) => status.type === 'wound')
+    )
+
+    expect(wound?.opponentStatuses?.negative).toContainEqual(expect.objectContaining({ type: 'wound', stacks: 1 }))
+    expect(boostedAttack).toMatchObject({ amount: 6, targetHpDelta: -6 })
+    expect(poisonTick).toMatchObject({ amount: 6 })
+    expect(thorn).toMatchObject({ amount: 10, sourceHpDelta: -10 })
   })
 
   it('night patrol light upgrade increases adjacent trigger count', () => {
@@ -1620,6 +1703,50 @@ describe('battle simulation', () => {
     const mapped = result.events.find((event) => event.kind === 'ITEM' && event.defId === 'lucky-paw' && event.text.includes('点金手·左'))
 
     expect(mapped).toMatchObject({ roll: 3, amount: 9, targetHpDelta: -9 })
+  })
+
+  it('makes carrot shift equipped trigger dice up with wraparound', () => {
+    const player: FighterSnapshot = {
+      name: 'P',
+      dogType: 'BULLY',
+      wins: 0,
+      losses: 0,
+      round: 4,
+      relics: [{ id: 'carrot', relicId: 'carrot', quality: 'SILVER', slot: 0 }],
+      items: [
+        { id: 'paw', defId: 'lucky-paw', quality: 'BRONZE', area: 'EQUIPMENT', x: 0, y: 0 },
+      ],
+    }
+    const opponent: FighterSnapshot = { name: 'O', dogType: 'BULLY', wins: 0, losses: 0, round: 4, items: [] }
+    const shifted = simulateBattle(player, opponent, 'shift-11')
+    const original = simulateBattle(player, opponent, 'shift-9')
+    const shiftedRoll = shifted.events.find((event) => event.kind === 'ROLL' && event.actor === 'player')
+    const originalRoll = original.events.find((event) => event.kind === 'ROLL' && event.actor === 'player')
+
+    expect(shifted.events.find((event) => event.time === shiftedRoll?.time && event.kind === 'ITEM' && event.itemId === 'paw')).toMatchObject({ roll: 1, amount: 12 })
+    expect(original.events.find((event) => event.time === originalRoll?.time && event.kind === 'ITEM' && event.itemId === 'paw')).toBeUndefined()
+  })
+
+  it('makes tissue shift equipped trigger dice down with wraparound', () => {
+    const player: FighterSnapshot = {
+      name: 'P',
+      dogType: 'BULLY',
+      wins: 0,
+      losses: 0,
+      round: 4,
+      relics: [{ id: 'tissue', relicId: 'tissue', quality: 'SILVER', slot: 0 }],
+      items: [
+        { id: 'bite', defId: 'starter-1', quality: 'BRONZE', area: 'EQUIPMENT', x: 0, y: 0 },
+      ],
+    }
+    const opponent: FighterSnapshot = { name: 'O', dogType: 'BULLY', wins: 0, losses: 0, round: 4, items: [] }
+    const shifted = simulateBattle(player, opponent, 'shift-9')
+    const original = simulateBattle(player, opponent, 'shift-11')
+    const shiftedRoll = shifted.events.find((event) => event.kind === 'ROLL' && event.actor === 'player')
+    const originalRoll = original.events.find((event) => event.kind === 'ROLL' && event.actor === 'player')
+
+    expect(shifted.events.find((event) => event.time === shiftedRoll?.time && event.kind === 'ITEM' && event.itemId === 'bite')).toMatchObject({ roll: 6, amount: 5 })
+    expect(original.events.find((event) => event.time === originalRoll?.time && event.kind === 'ITEM' && event.itemId === 'bite')).toBeUndefined()
   })
 
   it('lets half-die relics restrict rolls while reducing equipment effects', () => {

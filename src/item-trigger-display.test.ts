@@ -16,6 +16,21 @@ describe('item trigger dice display', () => {
   it('keeps normal face-triggered items visible', () => {
     expect(triggerDiceLabel(item([4, 5, 6]))).toBe('4/5/6')
   })
+
+  it('shifts visible trigger dice up when carrot is active', () => {
+    expect(triggerDiceLabel(item([4, 5, 6]), [{ def: { effect: 'SHIFT_TRIGGER_DICE_UP' } }])).toBe('1/5/6')
+  })
+
+  it('shifts visible trigger dice down when tissue is active', () => {
+    expect(triggerDiceLabel(item([1, 2, 3]), [{ def: { effect: 'SHIFT_TRIGGER_DICE_DOWN' } }])).toBe('1/2/6')
+  })
+
+  it('applies carrot then tissue when both remapping relics are active', () => {
+    expect(triggerDiceLabel(item([1, 6]), [
+      { def: { effect: 'SHIFT_TRIGGER_DICE_UP' } },
+      { def: { effect: 'SHIFT_TRIGGER_DICE_DOWN' } },
+    ])).toBe('1/6')
+  })
 })
 
 describe('battle item trigger count display', () => {

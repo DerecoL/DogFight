@@ -102,12 +102,12 @@ type Enchantment =
   | { kind: 'BUFF_NEIGHBOR_EFFECT'; target: EnchantmentTarget; effect: EnchantmentBaseEffect; amount: number; label: string }
   | { kind: 'GRANT_NEIGHBOR_EFFECT'; target: EnchantmentTarget; effect: EnchantmentGrantEffect; amount: number; label: string }
 type EnchantmentChoice = { id: string; description: string; enchant: Enchantment }
-type Item = { id: string; defId: string; quality: ItemQuality; area: Area; x: number; y: number; def: ItemDef; enchant?: Enchantment | null }
+type Item = { id: string; defId: string; quality: ItemQuality; area: Area; x: number; y: number; def: ItemDef; enchant?: Enchantment | null; sellBonus?: number }
 type BattleActor = 'player' | 'opponent' | 'system'
 type BattleTarget = 'player' | 'opponent' | 'both' | 'none'
 type BattleSnapshot = { name: string; dogType: DogType; luckyNumber?: number | null; wins: number; losses: number; round: number; items: Item[]; relics?: Relic[] }
 type BattleStatusEntry = {
-  type: 'shield' | 'thorns' | 'extraRoll' | 'fury' | 'poison' | 'weak' | 'freeze' | 'disabled' | string
+  type: 'shield' | 'thorns' | 'extraRoll' | 'fury' | 'poison' | 'weak' | 'wound' | 'freeze' | 'disabled' | string
   label: string
   tone: 'positive' | 'negative'
   amount?: number
@@ -537,6 +537,9 @@ const itemIcons: Record<string, string> = {
   'guard-vest': '/assets/items/guard-vest.svg',
   'giant-bone': '/assets/items/giant-bone.svg',
   'dog-house': '/assets/items/dog-house.svg',
+  'dog-gold-ingot': '/assets/items/dog-gold-ingot.svg',
+  'dog-silver-ingot': '/assets/items/dog-silver-ingot.svg',
+  'patting-bear': '/assets/items/patting-bear.svg',
   'v3-broken-canine': '/assets/items/v3-broken-canine.svg',
   'v3-chew-scratch-post': '/assets/items/v3-chew-scratch-post.svg',
   'v3-cone-collar': '/assets/items/v3-cone-collar.svg',
@@ -592,6 +595,8 @@ const relicIcons: Record<string, string> = {
   'midas-right': '/assets/relics/midas-right.svg',
   'half-die-left': '/assets/relics/half-die-left.svg',
   'half-die-right': '/assets/relics/half-die-right.svg',
+  'carrot': '/assets/relics/carrot.svg',
+  'tissue': '/assets/relics/tissue.svg',
   'v3-two-sided-gold-tag': '/assets/relics/v3-two-sided-gold-tag.svg',
   'v3-balanced-food-bowl': '/assets/relics/v3-balanced-food-bowl.svg',
   'v3-lucky-foxtail': '/assets/relics/v3-lucky-foxtail.svg',
@@ -714,6 +719,12 @@ const statusTipDetails: Record<string, { polarity: '正面效果' | '负面效�
     description: '【虚弱】会让下次攻击伤害降低，层数表示还可消耗多少次。',
     source: '常见来源：削弱、压制和控制类效果。',
   },
+  wound: {
+    polarity: '负面效果',
+    timing: '受到直接攻击时生效',
+    description: '【伤口】会让受到的直接攻击伤害提高，层数越高，被攻击时额外受到的伤害越高。',
+    source: '常见来源：拍拍熊。',
+  },
   freeze: {
     polarity: '负面效果',
     timing: '行动或触发前检查',
@@ -800,6 +811,7 @@ function effectText(def: ItemDef, quality: ItemQuality = 'BRONZE') {
   if (def.advancedEffect === 'BOOM_COUNTER') return `【爆鸣计数】达到 30 后造成 ${amount} 伤害`
   if (def.advancedEffect === 'GROWTH_DAMAGE') return `造成 ${amount} 伤害，后续伤害提升`
   if (def.advancedEffect === 'PURGE_ENEMY_BUFFS') return '清除敌方增益并恢复生命'
+  if (def.advancedEffect === 'APPLY_WOUND') return `叠加 ${amount} 层【伤口】`
   if (def.effect.type === 'HEAL') return `回复 ${amount} 生命`
   if (def.effect.type === 'DAMAGE' || def.effect.type === 'DAMAGE_SELF_SHIELD') return `造成 ${amount} 伤害`
   if (def.effect.type === 'UTILITY') {
@@ -867,7 +879,7 @@ function purchaseValueForItem(def: ItemDef, quality: ItemQuality = normalizeQual
 }
 
 function sellValueForItem(item: Item) {
-  return Math.floor(purchaseValueForItem(item.def, item.quality) / 2)
+  return Math.floor(purchaseValueForItem(item.def, item.quality) / 2) + (item.sellBonus ?? 0)
 }
 
 function maxHealthForRound(round: number) {
@@ -913,6 +925,7 @@ function effectToneText(def: ItemDef) {
   if (def.advancedEffect === 'BOOM_COUNTER') return '爆鸣计数'
   if (def.advancedEffect === 'GROWTH_DAMAGE') return '后续伤害'
   if (def.advancedEffect === 'PURGE_ENEMY_BUFFS') return '清除'
+  if (def.advancedEffect === 'APPLY_WOUND') return '伤口'
   if (def.effect.type === 'HEAL') return '回复'
   if (def.effect.type === 'UTILITY') {
     if (def.tags.includes('shield')) return '护盾'
@@ -1526,7 +1539,7 @@ export default function App() {
             <FloatingTip run={run} item={selectedItem} offer={null} anchor={tipAnchor} onClose={closeShopTip} onBuy={null} onSell={null} onUpgrade={selectedItem && canUpgradeItem(selectedItem, run.items) ? () => upgradeItem(selectedItem.id) : null} />
           </section>
           <DragOverlay dropAnimation={null} zIndex={1000}>
-            <DraggingItemOverlay item={draggingItem} />
+            <DraggingItemOverlay item={draggingItem} relics={run.relics} />
           </DragOverlay>
         </DndContext>
       )}
@@ -1589,7 +1602,7 @@ export default function App() {
             />
           </section>
           <DragOverlay dropAnimation={null} zIndex={1000}>
-            <DraggingItemOverlay item={draggingItem} />
+            <DraggingItemOverlay item={draggingItem} relics={run.relics} />
           </DragOverlay>
         </DndContext>
       )}
@@ -1625,7 +1638,7 @@ export default function App() {
             </button>
           </section>
           <DragOverlay dropAnimation={null} zIndex={1000}>
-            <DraggingItemOverlay item={draggingItem} />
+            <DraggingItemOverlay item={draggingItem} relics={run.relics} />
           </DragOverlay>
         </DndContext>
       )}
@@ -1955,7 +1968,7 @@ function HistoryRunDetails({ entry, inspectedItem, tipAnchor, onInspectItem, onC
         <div className="battle-slot-grid" style={{ gridTemplateColumns: `repeat(${equipmentSlotCount(entry.relics)}, minmax(0, 1fr))` }}>
           {Array.from({ length: equipmentSlotCount(entry.relics) }).map((_, x) => <i key={x} className="battle-slot" style={{ gridColumn: x + 1, gridRow: 1 }} />)}
           {equipment.map((item) => {
-            const triggerDice = triggerDiceLabel(item.def)
+            const triggerDice = triggerDiceLabel(item.def, entry.relics)
             return (
             <button
               type="button"
@@ -2398,7 +2411,7 @@ function DogfightRoomView({ room, onRoomChange, onLeave, soundEnabled }: { room:
                 onCloseTip={closeTip}
               />
               <DragOverlay dropAnimation={null} zIndex={1000}>
-                <DraggingItemOverlay item={draggingItem} />
+                <DraggingItemOverlay item={draggingItem} relics={run.relics} />
               </DragOverlay>
             </DndContext>
           ) : (
@@ -2691,7 +2704,7 @@ function ApexSnapshotDetails({ entry }: { entry: ApexEntry }) {
         <div className="battle-slot-grid" style={{ gridTemplateColumns: 'repeat(12, minmax(0, 1fr))' }}>
           {Array.from({ length: 12 }).map((_, x) => <i key={x} className="battle-slot" style={{ gridColumn: x + 1, gridRow: 1 }} />)}
           {equipment.map((item) => {
-            const triggerDice = triggerDiceLabel(item.def)
+            const triggerDice = triggerDiceLabel(item.def, entry.relics)
             return (
             <button
               type="button"
@@ -3320,10 +3333,10 @@ function InventoryBoard({ run, selectedItemId, draggingItemId, onSellRelic, onSe
   const visualTheme = visualThemeForRound(run.round)
   return (
     <section className={`inventory-board expanded paper-inventory visual-theme-surface visual-theme-${visualTheme}`} data-visual-theme={visualTheme} style={visualThemeStyle(visualTheme)}>
-      <GridPanel title="装备栏" subtitle={`${equipmentSlots} 格单行，从左向右触发`} icon={<Grid3X3 size={18} />} area="EQUIPMENT" tutorialAnchor="equipment-board" w={equipmentSlots} h={1} items={run.items} selectedItemId={selectedItemId} draggingItemId={draggingItemId} onSelectItem={onSelectItem} onSlotClick={onSlotClick} />
+      <GridPanel title="装备栏" subtitle={`${equipmentSlots} 格单行，从左向右触发`} icon={<Grid3X3 size={18} />} area="EQUIPMENT" tutorialAnchor="equipment-board" w={equipmentSlots} h={1} items={run.items} relics={run.relics ?? []} selectedItemId={selectedItemId} draggingItemId={draggingItemId} onSelectItem={onSelectItem} onSlotClick={onSlotClick} />
       <div className="bag-relic-row">
         <RelicRail relics={run.relics ?? []} onSellRelic={onSellRelic ?? null} />
-        <GridPanel title="背包" subtitle={`${BASE_EQUIPMENT_SLOT_COUNT} 格单行，战斗中默认不生效`} icon={<Backpack size={18} />} area="BAG" tutorialAnchor="bag-board" w={BASE_EQUIPMENT_SLOT_COUNT} h={1} items={run.items} selectedItemId={selectedItemId} draggingItemId={draggingItemId} onSelectItem={onSelectItem} onSlotClick={onSlotClick} />
+        <GridPanel title="背包" subtitle={`${BASE_EQUIPMENT_SLOT_COUNT} 格单行，战斗中默认不生效`} icon={<Backpack size={18} />} area="BAG" tutorialAnchor="bag-board" w={BASE_EQUIPMENT_SLOT_COUNT} h={1} items={run.items} relics={run.relics ?? []} selectedItemId={selectedItemId} draggingItemId={draggingItemId} onSelectItem={onSelectItem} onSlotClick={onSlotClick} />
       </div>
     </section>
   )
@@ -3406,7 +3419,7 @@ function RelicFloatingTip({ relic, anchor, onClose, onSell }: { relic: Relic | n
   )
 }
 
-function GridPanel({ title, subtitle, icon, area, tutorialAnchor, w, h, items, selectedItemId, draggingItemId, onSelectItem, onSlotClick }: { title: string; subtitle: string; icon: React.ReactNode; area: Area; tutorialAnchor?: string; w: number; h: number; items: Item[]; selectedItemId: string | null; draggingItemId: string | null; onSelectItem: (itemId: string, element: HTMLElement) => void; onSlotClick: (area: Area, x: number, y: number) => void }) {
+function GridPanel({ title, subtitle, icon, area, tutorialAnchor, w, h, items, relics = [], selectedItemId, draggingItemId, onSelectItem, onSlotClick }: { title: string; subtitle: string; icon: React.ReactNode; area: Area; tutorialAnchor?: string; w: number; h: number; items: Item[]; relics?: Relic[]; selectedItemId: string | null; draggingItemId: string | null; onSelectItem: (itemId: string, element: HTMLElement) => void; onSlotClick: (area: Area, x: number, y: number) => void }) {
   return (
     <div className="grid-panel" data-tutorial-anchor={tutorialAnchor}>
       <div className="grid-heading">
@@ -3420,7 +3433,7 @@ function GridPanel({ title, subtitle, icon, area, tutorialAnchor, w, h, items, s
           return <Slot key={`${area}:${x}:${y}`} id={`${area}:${x}:${y}`} x={x} y={y} title={`${title} ${x + 1}-${y + 1}`} onClick={() => onSlotClick(area, x, y)} />
         })}
         {items.filter((item) => item.area === area).map((item) => (
-          <DraggableItem key={item.id} item={item} selected={selectedItemId === item.id} dragging={draggingItemId === item.id} upgradeable={canUpgradeItem(item, items)} onSelect={(element) => onSelectItem(item.id, element)} />
+          <DraggableItem key={item.id} item={item} relics={relics} selected={selectedItemId === item.id} dragging={draggingItemId === item.id} upgradeable={canUpgradeItem(item, items)} onSelect={(element) => onSelectItem(item.id, element)} />
         ))}
       </div>
     </div>
@@ -3432,7 +3445,7 @@ function Slot({ id, x, y, title, onClick }: { id: string; x: number; y: number; 
   return <button ref={setNodeRef} style={{ gridColumn: x + 1, gridRow: y + 1 }} className={`slot ${isOver ? 'over' : ''}`} onClick={onClick} aria-label={title} title={title} />
 }
 
-function DraggableItem({ item, selected, dragging, upgradeable, onSelect }: { item: Item; selected: boolean; dragging: boolean; upgradeable: boolean; onSelect: (element: HTMLElement) => void }) {
+function DraggableItem({ item, relics, selected, dragging, upgradeable, onSelect }: { item: Item; relics: Relic[]; selected: boolean; dragging: boolean; upgradeable: boolean; onSelect: (element: HTMLElement) => void }) {
   const { attributes, listeners, setNodeRef: setDraggableNodeRef } = useDraggable({ id: item.id })
   const { isOver, setNodeRef: setDropNodeRef } = useDroppable({ id: `UPGRADE_ITEM:${item.id}` })
   const setNodeRef = (node: HTMLElement | null) => {
@@ -3443,7 +3456,7 @@ function DraggableItem({ item, selected, dragging, upgradeable, onSelect }: { it
     gridColumn: `${item.x + 1} / span ${item.def.width}`,
     gridRow: `${item.y + 1} / span ${item.def.height}`,
   }
-  const triggerDice = triggerDiceLabel(item.def)
+  const triggerDice = triggerDiceLabel(item.def, relics)
   return (
     <button
       ref={setNodeRef}
@@ -3457,13 +3470,13 @@ function DraggableItem({ item, selected, dragging, upgradeable, onSelect }: { it
       {...listeners}
       {...attributes}
     >
-      <ItemCardContent item={item} upgradeable={upgradeable} />
+      <ItemCardContent item={item} relics={relics} upgradeable={upgradeable} />
     </button>
   )
 }
 
-function ItemCardContent({ item, upgradeable = false }: { item: Item; upgradeable?: boolean }) {
-  const triggerDice = triggerDiceLabel(item.def)
+function ItemCardContent({ item, relics = [], upgradeable = false }: { item: Item; relics?: Relic[]; upgradeable?: boolean }) {
+  const triggerDice = triggerDiceLabel(item.def, relics)
   return (
     <>
       <span className="quality-chip">{qualityLabel[normalizeQuality(item.quality)]}</span>
@@ -3479,19 +3492,19 @@ function ItemCardContent({ item, upgradeable = false }: { item: Item; upgradeabl
   )
 }
 
-function DraggingItemOverlay({ item }: { item: Item | null }) {
+function DraggingItemOverlay({ item, relics = [] }: { item: Item | null; relics?: Relic[] }) {
   if (!item) return null
   return (
     <div
       className={`drag-overlay-item item-card paper-item-card ${itemTone(item.def)} ${qualityClass(item.quality)}`}
       style={{ width: `calc(${item.def.width} * var(--slot-w))`, height: `calc(${item.def.height} * var(--board-slot-h))` }}
     >
-      <ItemCardContent item={item} />
+      <ItemCardContent item={item} relics={relics} />
     </div>
   )
 }
 
-function FloatingTip({ run, item, offer, anchor, descriptionOverride, onClose, onBuy, onSell, onUpgrade }: { run: Run; item: Item | null; offer: ShopOffer | null; anchor: TipAnchor | null; descriptionOverride?: string | null; onClose: () => void; onBuy: (() => void) | null; onSell: (() => void) | null; onUpgrade: (() => void) | null }) {
+function FloatingTip({ run, item, offer, anchor, descriptionOverride, relicsOverride, onClose, onBuy, onSell, onUpgrade }: { run: Run; item: Item | null; offer: ShopOffer | null; anchor: TipAnchor | null; descriptionOverride?: string | null; relicsOverride?: Relic[] | null; onClose: () => void; onBuy: (() => void) | null; onSell: (() => void) | null; onUpgrade: (() => void) | null }) {
   const def = item?.def ?? offer?.def
   useOutsideTipDismiss(Boolean(def), onClose)
   if (!def) return null
@@ -3500,7 +3513,7 @@ function FloatingTip({ run, item, offer, anchor, descriptionOverride, onClose, o
   const canAfford = !offer || run.gold >= offer.price
   const sellValue = item ? sellValueForItem(item) : null
   const style = anchor ? { '--tip-x': `${anchor.x}px`, '--tip-y': `${anchor.y}px` } as React.CSSProperties : undefined
-  const tipTriggerDice = triggerDiceLabel(def)
+  const tipTriggerDice = triggerDiceLabel(def, item ? (relicsOverride ?? run.relics) : [])
   return (
     <aside className="floating-tip paper-card" style={style}>
       <div className="tip-tags">
@@ -3679,6 +3692,7 @@ function BattleView({ run, battle, currentEvent, eventIndex, speed, score, sound
           offer={null}
           anchor={battleTip.anchor}
           descriptionOverride={growthDamageTextForBattleItem(battleTip.item, battleTip.owner, events, displayIndex)}
+          relicsOverride={battleTip.owner === 'player' ? playerSnapshot.relics ?? [] : opponentSnapshot.relics ?? []}
           onClose={() => setBattleTip(null)}
           onBuy={null}
           onSell={null}
@@ -3739,7 +3753,7 @@ function BattleEquipmentRow({ owner, snapshot, events, displayIndex, activeEvent
         {items.map((item) => {
           const growthText = growthDamageTextForBattleItem(item, owner, events, displayIndex)
           const boomCounterState = boomCounterStateForBattleItem(item, owner, events, displayIndex, activeEvent)
-          const triggerDice = triggerDiceLabel(item.def)
+          const triggerDice = triggerDiceLabel(item.def, snapshot.relics ?? [])
           const triggerCountLabel = itemTriggerCountLabel(events, owner, item.id, displayIndex)
           const triggerCountPopping = activeItemId === item.id
           return (

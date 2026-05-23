@@ -64,6 +64,7 @@ model ItemInstance {
   x         Int
   y         Int
   enchant   String?
+  sellBonus Int      @default(0)
   createdAt DateTime @default(now())
   run       Run      @relation(fields: [runId], references: [id], onDelete: Cascade)
 }

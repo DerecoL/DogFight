@@ -18,7 +18,7 @@ import { simulateBattle } from './game/battle'
 import { calculateLadderResult, ladderTierForScore, ladderTierLabels, ladderTiers, LADDER_SEASON_ID, type LadderTier } from './game/ladder'
 import { STARTING_GOLD, isTrainingMatchRound, selectCasualGhostSnapshot, selectLadderGhostSnapshot, targetLadderOpponentWinsRange, targetOpponentWins } from './game/matchmaking'
 import type { BattleResult, DogType, EnchantmentChoice, FighterSnapshot, GameItem, RelicInstance, ShopOffer, ShopType } from './game/types'
-import { applyRelicChoice, createFinishedBattleRecord, initialItems, makeChoices, makeRelicChoices, makeShop, nextPhaseData, parseJson, phaseDataAfterEnchant, postBattleLargeItemReward, publicLadderSettlement, publicRun, publicRunHistory, relicsFromRun, removeRelicByInstanceId, seedGhost, snapshotFromRun, toGameItems } from './state'
+import { applyRelicChoice, createFinishedBattleRecord, initialItems, makeChoices, makeRelicChoices, makeShop, nextPhaseData, parseJson, phaseDataAfterEnchant, postBattleLargeItemReward, postBattleSellBonusItemIds, publicLadderSettlement, publicRun, publicRunHistory, relicsFromRun, removeRelicByInstanceId, seedGhost, snapshotFromRun, toGameItems } from './state'
 
 type PrismaTransaction = Prisma.TransactionClient
 type ApexSourceRun = {
@@ -661,7 +661,7 @@ export function buildApp() {
     const item = run.items.find((entry) => entry.id === body.itemId)
     if (!item) return reply.code(404).send({ error: '道具不存在' })
     const def = itemDef(item.defId)
-    const sellValue = itemSellValue(def, item.quality)
+    const sellValue = itemSellValue(def, item.quality, item.sellBonus)
     await prisma.itemInstance.delete({ where: { id: item.id } })
     const updated = await prisma.run.update({ where: { id: run.id }, data: { gold: run.gold + sellValue }, include: { items: true } })
     return { run: publicRun(updated) }
@@ -686,7 +686,7 @@ export function buildApp() {
     if (upgradeTarget && upgradedQuality) {
       const enchant = upgradeEnchant(upgradeTarget.enchant, moving.enchant)
       await prisma.$transaction([
-        prisma.itemInstance.update({ where: { id: upgradeTarget.id }, data: { quality: upgradedQuality, enchant: enchant ? JSON.stringify(enchant) : null } }),
+        prisma.itemInstance.update({ where: { id: upgradeTarget.id }, data: { quality: upgradedQuality, enchant: enchant ? JSON.stringify(enchant) : null, sellBonus: (upgradeTarget.sellBonus ?? 0) + (movingSource?.sellBonus ?? 0) } }),
         prisma.itemInstance.delete({ where: { id: item.id } }),
       ])
       const updated = await prisma.run.findUniqueOrThrow({ where: { id: run.id }, include: { items: true } })
@@ -741,7 +741,7 @@ export function buildApp() {
     const enchant = upgradeEnchant(target.enchant, consumed.enchant)
 
     await prisma.$transaction([
-      prisma.itemInstance.update({ where: { id: target.id }, data: { quality: upgradedQuality, enchant: enchant ? JSON.stringify(enchant) : null } }),
+      prisma.itemInstance.update({ where: { id: target.id }, data: { quality: upgradedQuality, enchant: enchant ? JSON.stringify(enchant) : null, sellBonus: (target.sellBonus ?? 0) + (consumed.sellBonus ?? 0) } }),
       prisma.itemInstance.delete({ where: { id: consumed.id } }),
     ])
     const updated = await prisma.run.findUniqueOrThrow({ where: { id: run.id }, include: { items: true } })
@@ -962,6 +962,11 @@ export function buildApp() {
     const status = wins >= 12 || losses >= 5 ? 'COMPLETE' : 'ACTIVE'
     const nextRound = run.round + 1
     const roundIncome = 5 + nextRound * 2
+    const currentItems = toGameItems(run.items)
+    const sellBonusItemIds = postBattleSellBonusItemIds(currentItems)
+    const postBattleReward = status === 'ACTIVE'
+      ? postBattleLargeItemReward(currentItems, `${run.id}-post-battle-${nextRound}-${wins}-${losses}`)
+      : null
     const phaseData = status === 'COMPLETE'
       ? { phase: 'COMPLETE', enchantChoices: '[]' }
       : nextPhaseData({ id: run.id, dogType: run.dogType, losses, enchantThirdLossGranted: run.enchantThirdLossGranted }, nextRound, `${run.id}-finish-${nextRound}-${wins}-${losses}`)
@@ -977,11 +982,14 @@ export function buildApp() {
       relicChoices: '[]',
       ...phaseData,
     }
-    const postBattleReward = status === 'ACTIVE'
-      ? postBattleLargeItemReward(toGameItems(run.items), `${run.id}-post-battle-${nextRound}-${wins}-${losses}`)
-      : null
-    if (postBattleReward) {
-      Object.assign(updateData, { items: { create: postBattleReward } })
+    const itemUpdates = {
+      ...(postBattleReward ? { create: postBattleReward } : {}),
+      ...(sellBonusItemIds.length > 0
+        ? { updateMany: { where: { id: { in: sellBonusItemIds } }, data: { sellBonus: { increment: 3 } } } }
+        : {}),
+    }
+    if (Object.keys(itemUpdates).length > 0) {
+      Object.assign(updateData, { items: itemUpdates })
     }
     const updated = await prisma.run.update({ where: { id: run.id }, data: updateData, include: { items: true, ladderSettlement: true } })
     if (status === 'COMPLETE' && run.mode === 'LADDER') {

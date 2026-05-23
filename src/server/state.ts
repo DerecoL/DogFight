@@ -33,6 +33,7 @@ export function toGameItems(items: ItemInstance[]): GameItem[] {
     x: item.x,
     y: item.y,
     enchant: parseOptionalJson<Enchantment | null>(item.enchant, null),
+    sellBonus: item.sellBonus,
   }))
 }
 
@@ -118,7 +119,7 @@ export function publicRun(run: Run & { items: ItemInstance[]; ladderSettlement?:
   }
 }
 
-type RunHistoryItemSource = Pick<ItemInstance, 'id' | 'runId' | 'defId' | 'quality' | 'area' | 'x' | 'y'> & { enchant?: string | null }
+type RunHistoryItemSource = Pick<ItemInstance, 'id' | 'runId' | 'defId' | 'quality' | 'area' | 'x' | 'y'> & { enchant?: string | null; sellBonus?: number }
 type RunHistorySource = Pick<Run, 'id' | 'mode' | 'dogType' | 'luckyNumber' | 'wins' | 'losses' | 'round' | 'status' | 'phase' | 'createdAt' | 'updatedAt'> & {
   relics?: string
   items?: RunHistoryItemSource[]
@@ -163,7 +164,7 @@ function toHistoryEntry(run: RunHistorySource): PublicRunHistoryEntry {
     status: run.status,
     phase: run.phase as Phase,
     items: (run.items ?? [])
-      .map((item) => ({ id: item.id, defId: item.defId, quality: normalizeQuality(item.quality), area: item.area as GameItem['area'], x: item.x, y: item.y, enchant: parseOptionalJson<Enchantment | null>(item.enchant, null) }))
+      .map((item) => ({ id: item.id, defId: item.defId, quality: normalizeQuality(item.quality), area: item.area as GameItem['area'], x: item.x, y: item.y, enchant: parseOptionalJson<Enchantment | null>(item.enchant, null), sellBonus: item.sellBonus ?? 0 }))
       .map((item) => ({ ...item, def: itemDefForQuality(item.defId, item.quality) })),
     relics: publicRelics({ relics: run.relics ?? '[]' }),
     createdAt: run.createdAt.toISOString(),
@@ -376,6 +377,17 @@ export function postBattleLargeItemReward(items: GameItem[], seed: string) {
     x: slot.x,
     y: slot.y,
   }
+}
+
+export function postBattleSellBonusItemIds(items: GameItem[]) {
+  return items
+    .filter((item) => {
+      const effect = itemDef(item.defId).advancedEffect
+      if (effect === 'POST_BATTLE_EQUIPPED_SELL_BONUS') return item.area === 'EQUIPMENT'
+      if (effect === 'POST_BATTLE_CARRIED_SELL_BONUS') return item.area === 'EQUIPMENT' || item.area === 'BAG'
+      return false
+    })
+    .map((item) => item.id)
 }
 
 export function createFinishedBattleRecord(result: BattleResult, wins: number, losses: number): BattleResult {

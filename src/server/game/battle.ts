@@ -80,6 +80,7 @@ type BattleSideState = {
   shield: number
   thorns: number
   weak: number
+  wound: number
   poison: number
   maxHp: number
   rollCount: number
@@ -115,6 +116,7 @@ function createSideState(maxHp: number): BattleSideState {
     shield: 0,
     thorns: 0,
     weak: 0,
+    wound: 0,
     poison: 0,
     maxHp,
     rollCount: 0,
@@ -210,10 +212,33 @@ function extraEnchantDice(enchant?: Enchantment | null) {
   return enchant?.kind === 'EXTRA_DICE' ? enchant.dice : []
 }
 
+function shiftDieUp(die: number) {
+  return die >= 6 ? 1 : die + 1
+}
+
+function shiftDieDown(die: number) {
+  return die <= 1 ? 6 : die - 1
+}
+
+function triggerDiceContext(actor: FighterSnapshot, item: GameItem) {
+  const def = itemDef(item.defId)
+  let dice = [...def.dice, ...extraEnchantDice(item.enchant)]
+  const notes: string[] = []
+  if (hasRelic(actor, 'SHIFT_TRIGGER_DICE_UP')) {
+    dice = dice.map(shiftDieUp)
+    notes.push('（胡萝卜改点）')
+  }
+  if (hasRelic(actor, 'SHIFT_TRIGGER_DICE_DOWN')) {
+    dice = dice.map(shiftDieDown)
+    notes.push('（纸巾改点）')
+  }
+  return { dice: [...new Set(dice)], note: notes.join('') }
+}
+
 function matchingContext(actor: FighterSnapshot, item: GameItem, roll: number, forcedItemDice: Record<string, number> = {}) {
   const def = itemDef(item.defId)
   if (def.advancedEffect === 'GRANT_LIFESTEAL_ADJACENT') return { matches: false, scale: 1, note: '', triggeredBySize: false }
-  const triggerDice = [...def.dice, ...extraEnchantDice(item.enchant)]
+  const triggerDice = triggerDiceContext(actor, item)
   const forcedDie = forcedItemDice[item.id]
   if (forcedDie != null) return { matches: roll === forcedDie, scale: 1, note: roll === forcedDie ? '（圣旨改点）' : '', triggeredBySize: false }
 
@@ -221,14 +246,14 @@ function matchingContext(actor: FighterSnapshot, item: GameItem, roll: number, f
     return { matches: roll === actor.luckyNumber, scale: 1, note: roll === actor.luckyNumber ? '（垂帘听政）' : '', triggeredBySize: false }
   }
 
-  if (triggerDice.includes(roll)) return { matches: true, scale: 1, note: item.enchant?.kind === 'EXTRA_DICE' && !def.dice.includes(roll) ? '（附魔改点）' : '', triggeredBySize: false }
+  if (triggerDice.dice.includes(roll)) return { matches: true, scale: 1, note: triggerDice.note || (item.enchant?.kind === 'EXTRA_DICE' && !def.dice.includes(roll) ? '（附魔改点）' : ''), triggeredBySize: false }
 
   const bigToSmall = relicWithEffect(actor, 'MIRROR_BIG_TO_SMALL')
-  if (bigToSmall && roll <= 3 && triggerDice.includes(roll + 3)) {
+  if (bigToSmall && roll <= 3 && triggerDice.dice.includes(roll + 3)) {
     return { matches: true, scale: relicEffectScale(bigToSmall.relicId, bigToSmall.quality), note: '（点金手·左映射）', triggeredBySize: false }
   }
   const smallToBig = relicWithEffect(actor, 'MIRROR_SMALL_TO_BIG')
-  if (smallToBig && roll >= 4 && triggerDice.includes(roll - 3)) {
+  if (smallToBig && roll >= 4 && triggerDice.dice.includes(roll - 3)) {
     return { matches: true, scale: relicEffectScale(smallToBig.relicId, smallToBig.quality), note: '（点金手·右映射）', triggeredBySize: false }
   }
   if (triggerOrder(actor.items).some((item) => itemDef(item.defId).advancedEffect === 'TRIGGER_BY_SIZE') && def.size === roll) {
@@ -335,6 +360,7 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
       negative: [
         ...(state[side].poison > 0 ? [{ type: 'poison' as const, label: '中毒', tone: 'negative' as const, stacks: state[side].poison, nextTickIn: 1, tickDamage: poisonTickDamage(side) }] : []),
         ...(state[side].weak > 0 ? [{ type: 'weak' as const, label: '虚弱', tone: 'negative' as const, stacks: state[side].weak }] : []),
+        ...(state[side].wound > 0 ? [{ type: 'wound' as const, label: '伤口', tone: 'negative' as const, stacks: state[side].wound }] : []),
         ...(frozenRemaining > 0 ? [{ type: 'freeze' as const, label: '冻结', tone: 'negative' as const, remaining: roundBattleTime(frozenRemaining) }] : []),
         ...(disabledCount > 0 ? [{ type: 'disabled' as const, label: '失效', tone: 'negative' as const, amount: disabledCount }] : []),
       ],
@@ -372,6 +398,11 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
     return { before, after, delta: after - before }
   }
 
+  const applyAttackDamage = (target: Side, amount: number, shieldDamage = amount) => {
+    const woundBonus = state[target].wound
+    return applyDamage(target, amount + woundBonus, shieldDamage + woundBonus)
+  }
+
   const applyDirectHealthDamage = (target: Side, amount: number) => {
     const before = getHp(target)
     const after = Math.max(0, before - amount)
@@ -406,6 +437,13 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
     const applied = statusAmountAfterShieldMitigation(target, targetFighter, amount)
     if (applied <= 0) return 0
     state[target].weak += applied
+    return applied
+  }
+
+  const addWound = (target: Side, amount: number) => {
+    const applied = Math.max(0, amount)
+    if (applied <= 0) return 0
+    state[target].wound += applied
     return applied
   }
 
@@ -669,7 +707,8 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
 
     if (!sacrificeReplacesSmallEffect && (def.effect.type === 'DAMAGE' || def.effect.type === 'DAMAGE_SELF_SHIELD')) {
       const before = getHp(targetSide)
-      const result = applyDamage(targetSide, amount, advanced === 'DOUBLE_SHIELD_DAMAGE' ? amount * 2 : amount)
+      const shieldDamage = advanced === 'DOUBLE_SHIELD_DAMAGE' ? amount * 2 : amount
+      const result = applyAttackDamage(targetSide, amount, shieldDamage)
       const weakScale = actorState.weak > 0 ? 0.5 : 1
       if (actorState.weak > 0) actorState.weak -= 1
       if (weakScale < 1 && result.delta < 0) {
@@ -835,6 +874,12 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
         triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'POISON', amount: targetState.poison, target: targetSide, sourceHp: getHp(actorSide), targetHp: getHp(targetSide), sourceHpDelta: 0, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 叠加 ${appliedPoison} 层【中毒】` })
       }
     }
+    if (!sacrificeReplacesSmallEffect && advanced === 'APPLY_WOUND') {
+      const appliedWound = addWound(targetSide, amount)
+      if (appliedWound > 0) {
+        triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'UTILITY', amount: targetState.wound, target: targetSide, sourceHp: getHp(actorSide), targetHp: getHp(targetSide), sourceHpDelta: 0, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 叠加 ${appliedWound} 层【伤口】` })
+      }
+    }
     if (!sacrificeReplacesSmallEffect && advanced === 'POISON_AND_DISABLE_RIGHTMOST') {
       const appliedPoison = addPoison(targetSide, targetFighter, amount)
       if (appliedPoison > 0) {
@@ -903,6 +948,7 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
     if (!sacrificeReplacesSmallEffect && advanced === 'CLEANSE_ON_LUCKY' && actor.luckyNumber === roll) {
       actorState.poison = 0
       actorState.weak = 0
+      actorState.wound = 0
       triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'UTILITY', amount: 0, target: actorSide, sourceHp: getHp(actorSide), targetHp: getHp(targetSide), sourceHpDelta: 0, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 【净化】所有负面状态` })
     }
 
@@ -953,8 +999,9 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
     if (!sacrificeReplacesSmallEffect && enchant && enchant.kind !== 'EXTRA_DICE') {
       if (enchant.kind === 'BASE_EFFECT') {
         if (enchant.effect === 'DAMAGE') {
-          const result = applyDamage(targetSide, enchant.amount)
-          triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'DAMAGE', amount: enchant.amount, target: targetSide, sourceHp: getHp(actorSide), targetHp: result.after, sourceHpDelta: 0, targetHpDelta: result.delta, roll, text: `${itemName(def, quality)} 附魔造成 ${enchant.amount} 点伤害` })
+          const result = applyAttackDamage(targetSide, enchant.amount)
+          const attackAmount = enchant.amount + targetState.wound
+          triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'DAMAGE', amount: attackAmount, target: targetSide, sourceHp: getHp(actorSide), targetHp: result.after, sourceHpDelta: 0, targetHpDelta: result.delta, roll, text: `${itemName(def, quality)} 附魔造成 ${attackAmount} 点伤害` })
         } else if (enchant.effect === 'HEAL' && !recoveryBlocked) {
           const result = applyHeal(actorSide, enchant.amount)
           triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'HEAL', amount: enchant.amount, target: actorSide, sourceHp: result.after, targetHp: getHp(targetSide), sourceHpDelta: result.delta, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 附魔回复 ${enchant.amount} 点生命` })

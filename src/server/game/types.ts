@@ -14,6 +14,7 @@ export type AdvancedEffect =
   | 'POISON_ON_ROLL'
   | 'GAIN_THORNS'
   | 'APPLY_WEAK'
+  | 'APPLY_WOUND'
   | 'APPLY_WEAK_20_ON_HIT'
   | 'GAIN_FURY_ON_ATTACK'
   | 'AVALANCHE'
@@ -55,6 +56,8 @@ export type AdvancedEffect =
   | 'BOOM_COUNTER'
   | 'GROWTH_DAMAGE'
   | 'PURGE_ENEMY_BUFFS'
+  | 'POST_BATTLE_EQUIPPED_SELL_BONUS'
+  | 'POST_BATTLE_CARRIED_SELL_BONUS'
 
 export type ItemDef = {
   id: string
@@ -86,6 +89,7 @@ export type GameItem = {
   x: number
   y: number
   enchant?: Enchantment | null
+  sellBonus?: number
 }
 
 export type EnchantmentTarget = 'LEFT' | 'RIGHT' | 'ADJACENT'
@@ -127,6 +131,8 @@ export type RelicEffect =
   | 'OPENING_THORNS'
   | 'HUSKY_ENGINE'
   | 'EXTRA_EQUIPMENT_REDUCED_EFFECT'
+  | 'SHIFT_TRIGGER_DICE_UP'
+  | 'SHIFT_TRIGGER_DICE_DOWN'
 
 export type RelicDef = {
   id: string
@@ -165,7 +171,7 @@ export type BattleFighterSnapshot = Omit<FighterSnapshot, 'items'> & {
   relics?: BattleRelicSnapshot[]
 }
 
-export type BattleStatusType = 'thorns' | 'extraRoll' | 'fury' | 'poison' | 'weak' | 'freeze' | 'disabled'
+export type BattleStatusType = 'thorns' | 'extraRoll' | 'fury' | 'poison' | 'weak' | 'wound' | 'freeze' | 'disabled'
 
 export type BattleStatusEntry = {
   type: BattleStatusType

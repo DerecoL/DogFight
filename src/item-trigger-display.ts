@@ -3,6 +3,12 @@ type TriggerDisplayItem = {
   advancedEffect?: string
 }
 
+type TriggerDisplayRelic = {
+  def?: {
+    effect?: string
+  }
+}
+
 type TriggerCountEvent = {
   actor?: string
   kind?: string
@@ -34,9 +40,20 @@ const nonSelfTriggeredEffects = new Set([
   'BOOM_COUNTER',
 ])
 
-export function triggerDiceLabel(item: TriggerDisplayItem) {
+function shiftDieUp(die: number) {
+  return die >= 6 ? 1 : die + 1
+}
+
+function shiftDieDown(die: number) {
+  return die <= 1 ? 6 : die - 1
+}
+
+export function triggerDiceLabel(item: TriggerDisplayItem, relics: TriggerDisplayRelic[] = []) {
   if (item.advancedEffect && nonSelfTriggeredEffects.has(item.advancedEffect)) return null
-  return [...new Set(item.dice)].sort((left, right) => left - right).join('/')
+  let dice = item.dice
+  if (relics.some((relic) => relic.def?.effect === 'SHIFT_TRIGGER_DICE_UP')) dice = dice.map(shiftDieUp)
+  if (relics.some((relic) => relic.def?.effect === 'SHIFT_TRIGGER_DICE_DOWN')) dice = dice.map(shiftDieDown)
+  return [...new Set(dice)].sort((left, right) => left - right).join('/')
 }
 
 export function itemTriggerCount(events: TriggerCountEvent[], owner: string, itemId: string, displayIndex: number) {

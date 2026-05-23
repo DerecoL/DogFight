@@ -72,6 +72,16 @@ export const ITEM_DEFS: ItemDef[] = [
     description: '恢复 12 点生命值，并偷取敌方 1 层增益（优先【荆棘】，其次【加速】；【护盾】不会被偷取）。',
     advancedEffect: 'STEAL_ENEMY_BUFF',
   }),
+  slotItem('dog-gold-ingot', '狗狗金元宝', 1, 2, [], ['economy', 'sell'], { type: 'UTILITY', amount: 0 }, {
+    description: '无需触发。放在装备栏时，参战结束后出售价格 +3。',
+    advancedEffect: 'POST_BATTLE_EQUIPPED_SELL_BONUS',
+    defaultQuality: 'BRONZE',
+  }),
+  slotItem('dog-silver-ingot', '狗狗银元宝', 1, 1, [], ['economy', 'sell'], { type: 'UTILITY', amount: 0 }, {
+    description: '无需触发。放在装备栏或背包时，参战结束后出售价格 +3。',
+    advancedEffect: 'POST_BATTLE_CARRIED_SELL_BONUS',
+    defaultQuality: 'BRONZE',
+  }),
   slotItem('v3-broken-canine', '断裂的犬齿', 1, 3, [1, 2], ['small', 'weak'], { type: 'DAMAGE', amount: 3 }, {
     description: '造成 3 点伤害。若目标处于【虚弱】，额外造成 4 点【真实伤害】。',
     advancedEffect: 'TARGET_WEAK_BONUS_DAMAGE',
@@ -166,6 +176,11 @@ export const ITEM_DEFS: ItemDef[] = [
     advancedEffect: 'PURGE_ENEMY_BUFFS',
     defaultQuality: 'SILVER',
   }),
+  slotItem('patting-bear', '拍拍熊', 2, 20, [1, 6], ['wound', 'attack'], { type: 'UTILITY', amount: 1, qualityBase: 'SILVER' }, {
+    description: '每次触发对敌人叠加 1 层【伤口】；【伤口】使受到的直接攻击伤害 +1，可叠加，不影响【中毒】、【荆棘】等非直接攻击伤害。',
+    advancedEffect: 'APPLY_WOUND',
+    defaultQuality: 'SILVER',
+  }),
 ]
 
 export const CLASS_REWARD_DEFS: ItemDef[] = [
@@ -210,6 +225,8 @@ export const RELIC_DEFS: RelicDef[] = [
   { id: 'midas-right', name: '点金手·右', unlockRound: 3, defaultQuality: 'SILVER', tags: ['small'], effect: 'MIRROR_SMALL_TO_BIG', description: '你场上所有绑定在 1~3 点数的道具，现在在掷出对应加3的【大点】时也会触发，但效果降低 50%' },
   { id: 'half-die-left', name: '半截骰·左', unlockRound: 3, defaultQuality: 'SILVER', tags: ['big'], effect: 'ONLY_BIG_HALF_EFFECT', description: '你只能投掷出【大点】，但所有装备效果降低50%' },
   { id: 'half-die-right', name: '半截骰·右', unlockRound: 3, defaultQuality: 'SILVER', tags: ['small'], effect: 'ONLY_SMALL_HALF_EFFECT', description: '你只能投掷出【小点】，但所有装备效果降低50%' },
+  { id: 'carrot', name: '胡萝卜', unlockRound: 3, defaultQuality: 'SILVER', tags: ['trigger', 'shift'], effect: 'SHIFT_TRIGGER_DICE_UP', description: '你场上所有装备的触发点数 +1，6 会变成 1。' },
+  { id: 'tissue', name: '纸巾', unlockRound: 3, defaultQuality: 'SILVER', tags: ['trigger', 'shift'], effect: 'SHIFT_TRIGGER_DICE_DOWN', description: '你场上所有装备的触发点数 -1，1 会变成 6。' },
   { id: 'v3-two-sided-gold-tag', name: '两面金狗牌', unlockRound: 3, defaultQuality: 'SILVER', tags: ['extreme'], effect: 'EXTREME_ROLL_BIAS', description: '你的投掷结果出现【极值】（1和6）的概率绝对值提升 30%。' },
   { id: 'v3-balanced-food-bowl', name: '平衡狗粮盆', unlockRound: 3, defaultQuality: 'SILVER', tags: ['middle'], effect: 'MIDDLE_ROLL_BIAS', description: '你的投掷结果出现 3 和 4 的概率绝对值提升 30%。' },
   { id: 'v3-lucky-foxtail', name: '幸运狗尾草', unlockRound: 3, defaultQuality: 'GOLD', tags: ['pity', 'large'], effect: 'EMPTY_ROLL_LARGE_SAFETY', description: '当你连续 2 次投掷“空过”时，第 3 次投掷必定为你随机触发一件【大型物品】（若没有则触发【中型物品】）。' },
@@ -288,9 +305,12 @@ export function itemDescription(itemId: string, quality?: string | null) {
     const healPerLayer = qualityAmountFrom(5, currentQuality, 'SILVER')
     return `【净化】敌方最多 ${purgeLimit} 层正面增益；每实际清除 1 层，自己恢复 ${healPerLayer} 点生命。优先清除【荆棘】、【加速】层数，再按每 8 点【护盾】折算 1 层。`
   }
+  if (advanced === 'POST_BATTLE_EQUIPPED_SELL_BONUS') return '无需触发。放在装备栏时，参战结束后出售价格 +3。'
+  if (advanced === 'POST_BATTLE_CARRIED_SELL_BONUS') return '无需触发。放在装备栏或背包时，参战结束后出售价格 +3。'
   if (advanced === 'POISON_ON_ROLL') return `${baseEffect}每次投掷都会对敌人叠加 ${SHIBA_POISON_ON_ROLL_AMOUNT} 层【中毒】（不随品质提升）。`
   if (advanced === 'GAIN_THORNS') return `${baseEffect}每次触发有 50% 概率获得 ${one} 层【荆棘】。`
   if (advanced === 'APPLY_WEAK') return `${baseEffect}每次触发有 50% 概率给敌人施加 ${one} 层【虚弱】。`
+  if (advanced === 'APPLY_WOUND') return `对敌人叠加 ${amount} 层【伤口】；目标受到的直接攻击伤害 +${amount}。`
   if (advanced === 'MAX_HP_ON_EXTRA_ROLL') return `每当系统触发职业特性的【额外投掷】时，永久使你最大生命值 +${one}。`
   if (advanced === 'SHIELD_ON_NON_LUCKY') return `非【天命数字】时获得 ${qualityAmount(5, currentQuality)} 点【护盾】。`
   if (advanced === 'AVALANCHE') return `每当掷出【小点】时，积攒 1 层【雪崩】。5 层【雪崩】时会清空层数同时对敌人造成 ${qualityAmount(50, currentQuality)} 点伤害。每次【雪崩】后下次【雪崩】伤害加倍。`
@@ -377,6 +397,8 @@ export function relicDescription(relicId: string, quality?: string | null) {
     OPENING_THORNS: `战斗开始时，你直接获得 ${relicOpeningThorns(relicId, currentQuality)} 层【荆棘】。`,
     HUSKY_ENGINE: def.description,
     EXTRA_EQUIPMENT_REDUCED_EFFECT: '你可以突破背包限制，将第 13 个装备放入战斗区。',
+    SHIFT_TRIGGER_DICE_UP: '你场上所有装备的触发点数 +1，6 会变成 1。',
+    SHIFT_TRIGGER_DICE_DOWN: '你场上所有装备的触发点数 -1，1 会变成 6。',
   }
   return descriptions[def.effect]
 }

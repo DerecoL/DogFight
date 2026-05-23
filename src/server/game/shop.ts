@@ -20,8 +20,8 @@ export function itemPurchaseValue(def: ItemDef, quality: ItemQuality = normalize
   return Math.floor(def.price * QUALITY_VALUE_MULTIPLIER[currentQuality])
 }
 
-export function itemSellValue(def: ItemDef, quality?: ItemQuality | string | null) {
-  return Math.floor(itemPurchaseValue(def, normalizeQuality(quality ?? def.defaultQuality)) / 2)
+export function itemSellValue(def: ItemDef, quality?: ItemQuality | string | null, sellBonus = 0) {
+  return Math.floor(itemPurchaseValue(def, normalizeQuality(quality ?? def.defaultQuality)) / 2) + Math.max(0, Math.floor(sellBonus))
 }
 
 export function createShop(type: ShopType, rng: () => number, round = 0): ShopOffer[] {

@@ -9,7 +9,7 @@ import { buildOfflineFighter, offlineFighterName } from './game/offline-builder'
 import { normalizeQuality } from './game/quality'
 import { simulateBattle } from './game/battle'
 import type { BattleEvent, BattleResult, DogType, EnchantmentChoice, FighterSnapshot, GameItem, ShopType } from './game/types'
-import { applyRelicChoice, initialItems, makeChoices, makeRelicChoices, makeShop, nextPhaseData as buildNextPhaseData, parseJson, phaseDataAfterEnchant, postBattleLargeItemReward, publicRun, relicsFromRun, seedGhost, snapshotFromRun, toGameItems } from './state'
+import { applyRelicChoice, initialItems, makeChoices, makeRelicChoices, makeShop, nextPhaseData as buildNextPhaseData, parseJson, phaseDataAfterEnchant, postBattleLargeItemReward, postBattleSellBonusItemIds, publicRun, relicsFromRun, seedGhost, snapshotFromRun, toGameItems } from './state'
 
 const DOGFIGHT_TARGET_PLAYERS = 8
 const DOGFIGHT_LOBBY_MS = 15_000
@@ -539,9 +539,17 @@ async function settleShopToBattle(tx: Tx, roomId: string, force = false) {
     const roundIncome = eliminated ? 0 : 5 + nextRound * 2
     const gold = participant.run.gold + participantResult.goldCompensation + roundIncome
     const phaseData = eliminated ? { phase: 'COMPLETE' } : nextDogfightPhaseData({ ...participant.run, losses }, nextRound)
+    const currentItems = toGameItems(participant.run.items)
+    const sellBonusItemIds = postBattleSellBonusItemIds(currentItems)
     const postBattleReward = eliminated
       ? null
-      : postBattleLargeItemReward(toGameItems(participant.run.items), `${participant.runId}-dogfight-post-battle-${nextRound}-${wins}-${losses}`)
+      : postBattleLargeItemReward(currentItems, `${participant.runId}-dogfight-post-battle-${nextRound}-${wins}-${losses}`)
+    const itemUpdates = {
+      ...(postBattleReward ? { create: postBattleReward } : {}),
+      ...(sellBonusItemIds.length > 0
+        ? { updateMany: { where: { id: { in: sellBonusItemIds } }, data: { sellBonus: { increment: 3 } } } }
+        : {}),
+    }
 
     if (!eliminated) survivingIds.push(participant.id)
 
@@ -557,7 +565,7 @@ async function settleShopToBattle(tx: Tx, roomId: string, force = false) {
         lastBattle: null,
         refreshCost: 1,
         relicChoices: '[]',
-        ...(postBattleReward ? { items: { create: postBattleReward } } : {}),
+        ...(Object.keys(itemUpdates).length > 0 ? { items: itemUpdates } : {}),
         ...phaseData,
       },
     })

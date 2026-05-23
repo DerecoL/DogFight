@@ -1667,7 +1667,7 @@ input {
 .trigger-count-stamp {
   position: absolute;
   left: 50%;
-  bottom: 8px;
+  bottom: 3px;
   z-index: 5;
   display: inline-flex;
   align-items: center;
