@@ -4232,8 +4232,7 @@ input {
 
 .casual-tutorial-guide {
   position: fixed;
-  right: 22px;
-  bottom: 22px;
+  inset: auto 22px 22px auto;
   z-index: 30;
   width: min(360px, calc(100vw - 32px));
   pointer-events: none;

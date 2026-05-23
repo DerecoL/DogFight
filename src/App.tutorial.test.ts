@@ -10,7 +10,7 @@ describe('casual tutorial guide', () => {
     expect(app).toContain("type CasualTutorialStatus = 'idle' | 'active' | 'completed' | 'skipped' | 'replaying'")
     expect(app).toContain('type CasualTutorialState = { status: CasualTutorialStatus; stepId: CasualTutorialStepId }')
     expect(app).toContain("const casualTutorialStoragePrefix = 'dogfight:tutorial:casual-core:'")
-    expect(app).toContain('casualTutorialStorageKey(user.id)')
+    expect(app).toContain('function casualTutorialStorageKey(userId: string)')
     expect(app).toContain('saveCasualTutorialState(user.id, nextState)')
   })
 
@@ -33,8 +33,6 @@ describe('casual tutorial guide', () => {
       'dog-select',
       'shop-offers',
       'shop-buy',
-      'equipment-board',
-      'bag-board',
       'match-button',
       'battle-start',
       'battle-stage',
@@ -42,6 +40,9 @@ describe('casual tutorial guide', () => {
     ]) {
       expect(app).toContain(`data-tutorial-anchor="${anchor}"`)
     }
+    expect(app).toContain('tutorialAnchor="equipment-board"')
+    expect(app).toContain('tutorialAnchor="bag-board"')
+    expect(app).toContain('data-tutorial-anchor={tutorialAnchor}')
   })
 
   it('advances the tutorial from real gameplay state instead of hard locking controls', () => {

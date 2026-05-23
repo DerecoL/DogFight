@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
 const css = readFileSync(new URL('./App.css', import.meta.url), 'utf8')
@@ -295,5 +295,41 @@ describe('equipment layout scale', () => {
     expect(cssRule('.status-floating-tip')).toContain('width: min(320px, calc(100vw - 28px))')
     expect(cssRule('.status-tip-title')).toContain('display: flex')
     expect(cssRule('.status-tip-description')).toContain('line-height: 1.55')
+  })
+
+  it('adds stable storybook visual themes across battle, shop, inventory, rewards, and results', () => {
+    for (const fileName of ['storybook-dog-park.webp', 'storybook-back-alley.webp', 'storybook-royal-kennel.webp']) {
+      expect(existsSync(new URL(`../public/assets/backgrounds/${fileName}`, import.meta.url))).toBe(true)
+      expect(app).toContain(`/assets/backgrounds/${fileName}`)
+      expect(css).toContain(`/assets/backgrounds/${fileName}`)
+    }
+
+    expect(app).toContain("type VisualThemeId = 'dogPark' | 'backAlley' | 'royalKennel'")
+    expect(app).toContain('function visualThemeForRound(round: number): VisualThemeId')
+    expect(app).toContain('visualThemeForRound(run.round)')
+    expect(app).toContain('data-visual-theme={visualTheme}')
+    expect(app).toContain('visual-theme-${visualTheme}')
+    expect(cssRule('.visual-theme-surface')).toContain('--theme-bg')
+    expect(cssRule('.visual-theme-surface::before')).toContain('background-image')
+    expect(cssRule('.battle-stage.visual-theme-surface::before')).toContain('background-image')
+    expect(cssRule('.shop-shelf.visual-theme-surface::before')).toContain('background-image')
+    expect(cssRule('.inventory-board.visual-theme-surface::before')).toContain('background-image')
+    expect(cssRule('.reward-panel.visual-theme-surface::before')).toContain('background-image')
+    expect(cssRule('.handdrawn-result.visual-theme-surface::before')).toContain('background-image')
+  })
+
+  it('upgrades full-flow feedback to high-impact but bounded visual effects', () => {
+    expect(app).toContain('high-impact-vfx')
+    expect(cssRule('.high-impact-vfx .battle-feedback-burst')).toContain('animation')
+    expect(cssRule('.high-impact-vfx .battle-item-trigger')).toContain('highImpactTrigger')
+    expect(cssRule('.battle-dog.vfx-target-damage::after')).toContain('highImpactHitFlash')
+    expect(cssRule('.ui-feedback-toast[data-feedback-kind="buy-success"]')).toContain('highImpactRewardPop')
+    expect(cssRule('.ui-feedback-toast[data-feedback-kind="place-failed"]')).toContain('highImpactRejectShake')
+    expect(cssRule('.reward-choice.selected::after')).toContain('content')
+    expect(css).toContain('@keyframes highImpactTrailPulse')
+    expect(css).toContain('@keyframes highImpactHitFlash')
+    expect(css).toContain('@keyframes highImpactRewardPop')
+    expect(css).toContain('@keyframes highImpactRejectShake')
+    expect(cssRule('@media (prefers-reduced-motion: reduce)')).toContain('.visual-theme-surface::before')
   })
 })
