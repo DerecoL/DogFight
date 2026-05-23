@@ -26,11 +26,22 @@ describe('offline dog builder', () => {
 
     expect(second).toEqual(first)
     expect(first.round).toBe(6)
-    expect(first.name).toBe('种子狗狗 R6')
+    expect(first.name).toBeTruthy()
+    expect(first.name).not.toMatch(/机器人|Bot|种子/)
     expect(first.items.some((item) => itemDef(item.defId).kind === 'CLASS_EQUIPMENT')).toBe(true)
     expect(first.items.some((item) => !itemDef(item.defId).tags.includes('starter'))).toBe(true)
     expect(first.relics?.length).toBeGreaterThan(0)
     assertLegalEquipment(first.items)
+  })
+
+  it('uses the seed to create a wider pool of offline dog identities', () => {
+    const fighters = Array.from({ length: 12 }, (_, index) =>
+      buildOfflineFighter({ round: 6, wins: 5, losses: 1, seed: `offline-pool-${index}` }),
+    )
+
+    expect(new Set(fighters.map((fighter) => fighter.name)).size).toBeGreaterThanOrEqual(8)
+    expect(new Set(fighters.map((fighter) => fighter.dogType)).size).toBeGreaterThanOrEqual(3)
+    expect(fighters.every((fighter) => !/机器人|Bot|种子/.test(fighter.name))).toBe(true)
   })
 
   it('creates dog-specific build identities instead of one fixed item sequence', () => {
@@ -93,20 +104,23 @@ describe('offline dog builder', () => {
 
   it('keeps the first two rounds limited to bronze starter training gear', () => {
     for (const round of [0, 1]) {
-      const fighter = buildOfflineFighter({ dogType: 'SHIBA', round, wins: 0, losses: 0 })
+      for (const dogType of ['SHIBA', 'SAMOYED', 'MUTT', 'BULLY', 'EMPEROR'] as DogType[]) {
+        const fighter = buildOfflineFighter({ dogType, round, wins: 0, losses: 0 })
 
-      expect(fighter.items).toHaveLength(3)
-      expect(fighter.items.every((item) => item.defId.startsWith('starter-'))).toBe(true)
-      expect(fighter.items.every((item) => item.quality === 'BRONZE')).toBe(true)
-      expect(fighter.relics ?? []).toHaveLength(0)
-      assertLegalEquipment(fighter.items)
+        expect(fighter.items).toHaveLength(3)
+        expect(fighter.items.every((item) => item.defId.startsWith('starter-'))).toBe(true)
+        expect(fighter.items.every((item) => item.quality === 'BRONZE')).toBe(true)
+        expect(fighter.relics ?? []).toHaveLength(0)
+        assertLegalEquipment(fighter.items)
+      }
     }
   })
 
   it('routes seedGhost through the offline builder fallback', () => {
-    const ghost = seedGhost(6, 5, 1)
+    const ghost = seedGhost(6, 5, 1, 'seed-ghost-route')
 
-    expect(ghost.name).toBe('种子狗狗 R6')
+    expect(ghost.name).toBeTruthy()
+    expect(ghost.name).not.toMatch(/机器人|Bot|种子/)
     expect(ghost.items.some((item) => itemDef(item.defId).kind === 'CLASS_EQUIPMENT')).toBe(true)
     expect(ghost.relics?.length).toBeGreaterThan(0)
     assertLegalEquipment(ghost.items)

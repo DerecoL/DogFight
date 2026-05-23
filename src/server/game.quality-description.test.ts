@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ALL_ITEM_DEFS, growthDamageBase, growthDamageStep, itemDefForQuality } from './game/data'
+import { ALL_ITEM_DEFS, growthDamageBase, growthDamageStep, itemDefForQuality, relicDefForQuality, relicEquipmentEffectScale } from './game/data'
 import { ITEM_QUALITIES, qualityAmountFrom } from './game/quality'
 
 function numbers(defId: string, quality: 'GOLD' | 'DIAMOND') {
@@ -7,6 +7,14 @@ function numbers(defId: string, quality: 'GOLD' | 'DIAMOND') {
 }
 
 describe('quality-adjusted item descriptions', () => {
+  it('keeps fourth-dimensional kennel from reducing equipment effects', () => {
+    const description = relicDefForQuality('v3-fourth-dimensional-kennel', 'DIAMOND').description
+
+    expect(relicEquipmentEffectScale('v3-fourth-dimensional-kennel', 'DIAMOND')).toBe(1)
+    expect(description).not.toContain('降低')
+    expect(description).not.toContain('15%')
+  })
+
   it('shows upgraded blood mad fang damage in item details', () => {
     expect(numbers('v3-blood-mad-fang', 'GOLD')).toContain('14')
     expect(numbers('v3-blood-mad-fang', 'DIAMOND')).toContain('20')

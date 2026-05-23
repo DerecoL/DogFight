@@ -23,6 +23,38 @@ type OfflineBuildProfile = {
 }
 
 const DOG_TYPES: DogType[] = ['SHIBA', 'SAMOYED', 'MUTT', 'BULLY', 'EMPEROR']
+const OFFLINE_NAME_PREFIXES = [
+  '阿麦',
+  '老周',
+  '小满',
+  '七七',
+  '阿航',
+  '南风',
+  '小路',
+  '阿澈',
+  '半夏',
+  '林川',
+  '小树',
+  '阿砚',
+  '三木',
+  '晴子',
+  '小北',
+  '阿岚',
+]
+const OFFLINE_NAME_SUFFIXES = [
+  '的饭盆',
+  '在巡街',
+  '守着夜市',
+  '刚洗完澡',
+  '爱捡球',
+  '在等开饭',
+  '藏了骨头',
+  '不想睡',
+  '路过擂台',
+  '今天很凶',
+  '戴着红绳',
+  '带了零食',
+]
 
 const PROFILES: Record<DogType, OfflineBuildProfile> = {
   SHIBA: {
@@ -67,8 +99,8 @@ const PROFILES: Record<DogType, OfflineBuildProfile> = {
   },
 }
 
-function dogTypeFor(input: OfflineBuildInput) {
-  return input.dogType ?? DOG_TYPES[(input.round + input.wins + input.losses) % DOG_TYPES.length]
+function dogTypeFor(input: OfflineBuildInput, rng: () => number) {
+  return input.dogType ?? DOG_TYPES[Math.floor(rng() * DOG_TYPES.length)]
 }
 
 function upgradeQuality(base: ItemQuality, steps: number) {
@@ -98,7 +130,8 @@ function uniqueById<T extends { id: string }>(defs: T[]) {
 }
 
 function starterDefs(profile: OfflineBuildProfile, round: number) {
-  const dice = round <= 1 ? profile.keepStarterDice.slice(0, 3) : profile.keepStarterDice.slice(0, 2)
+  const targetCount = round <= 1 ? 3 : 2
+  const dice = [...new Set([...profile.keepStarterDice, ...profile.preferredDice, 1, 2, 3, 4, 5, 6])].slice(0, targetCount)
   return dice.map((n) => itemDef(`starter-${n}`))
 }
 
@@ -119,10 +152,23 @@ function classRewardDefs(dogType: DogType, profile: OfflineBuildProfile, round: 
   })[0])
 }
 
-function shopDefs(profile: OfflineBuildProfile, round: number) {
+function shopDefs(profile: OfflineBuildProfile, round: number, rng: () => number) {
   if (isTrainingMatchRound(round)) return []
-  const pools = profile.shopPreference.flatMap((shopType) => shopPool(shopType, round))
-  return uniqueById(pools).slice(0, Math.max(2, round + 1))
+  const preferred = profile.shopPreference.flatMap((shopType) => shopPool(shopType, round))
+  const fallback = (['GENERAL', 'LARGE', 'MEDIUM', 'SMALL', 'SMALL_DICE', 'BIG_DICE'] as ShopType[])
+    .flatMap((shopType) => shopPool(shopType, round))
+  return uniqueById([...preferred, ...fallback])
+    .map((def) => ({ def, score: scoreDef(def, profile, rng) }))
+    .sort((left, right) => right.score - left.score)
+    .slice(0, Math.max(2, round + 1))
+    .map((entry) => entry.def)
+}
+
+export function offlineFighterName(seed: string) {
+  const rng = createRng(seed)
+  const prefix = OFFLINE_NAME_PREFIXES[Math.floor(rng() * OFFLINE_NAME_PREFIXES.length)]
+  const suffix = OFFLINE_NAME_SUFFIXES[Math.floor(rng() * OFFLINE_NAME_SUFFIXES.length)]
+  return `${prefix}${suffix}`
 }
 
 function qualityFor(def: ItemDef, input: OfflineBuildInput) {
@@ -185,19 +231,20 @@ function buildRelics(profile: OfflineBuildProfile, input: OfflineBuildInput, rng
 }
 
 export function buildOfflineFighter(input: OfflineBuildInput): FighterSnapshot {
-  const dogType = dogTypeFor(input)
+  const seed = input.seed ?? `offline-${input.round}-${input.wins}-${input.losses}`
+  const rng = createRng(seed)
+  const dogType = dogTypeFor(input, rng)
   const profile = PROFILES[dogType]
-  const rng = createRng(input.seed ?? `offline-${dogType}-${input.round}-${input.wins}-${input.losses}`)
   const luckyNumber = dogType === 'EMPEROR' ? Math.floor(rng() * 6) + 1 : null
 
   const defs = [
     ...starterDefs(profile, input.round),
     ...classRewardDefs(dogType, profile, input.round),
-    ...shopDefs(profile, input.round),
+    ...shopDefs(profile, input.round, rng),
   ]
 
   return {
-    name: `种子狗狗 R${input.round}`,
+    name: offlineFighterName(`${seed}-name`),
     dogType,
     luckyNumber,
     wins: input.wins,

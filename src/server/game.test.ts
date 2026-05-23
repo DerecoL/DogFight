@@ -18,6 +18,20 @@ function repeatedEquipment(defId: string, count: number, quality: GameItem['qual
   return Array.from({ length: count }, (_, index) => equipment(`${defId}-${index}`, defId, index * 2, quality))
 }
 
+function boomCounterTestItems(quality: GameItem['quality']): GameItem[] {
+  return [
+    { id: 'counter', defId: 'v4-boom-counter', quality, area: 'EQUIPMENT', x: 0, y: 0 },
+    ...Array.from({ length: 11 }, (_, index) => ({
+      id: `extreme-${index}`,
+      defId: 'v3-chew-scratch-post',
+      quality: 'BRONZE' as const,
+      area: 'EQUIPMENT' as const,
+      x: index + 1,
+      y: 0,
+    })),
+  ]
+}
+
 function lateGameFighter(name: string, dogType: FighterSnapshot['dogType'], items: GameItem[]): FighterSnapshot {
   return { name, dogType, wins: 0, losses: 0, round: 6, items }
 }
@@ -193,7 +207,7 @@ describe('dog and item definitions', () => {
     expect(itemDef('v4-boom-counter')).toMatchObject({
       size: 2,
       price: 14,
-      dice: [1, 2, 3, 4, 5, 6],
+      dice: [1, 6],
       tags: ['counter', 'trigger', 'damage'],
       effect: { type: 'UTILITY', amount: 300, qualityBase: 'GOLD' },
       advancedEffect: 'BOOM_COUNTER',
@@ -293,6 +307,33 @@ describe('battle simulation', () => {
       sourceHpDelta: -10,
     })
     expect(thorn?.text).toContain('反弹 10 点伤害')
+  })
+
+  it('night patrol light upgrade increases adjacent trigger count', () => {
+    const fighterWithLight = (quality: GameItem['quality']): FighterSnapshot => ({
+      name: 'P',
+      dogType: 'BULLY',
+      wins: 0,
+      losses: 0,
+      round: 6,
+      items: [
+        { id: 'neighbor', defId: 'starter-6', quality: 'BRONZE', area: 'EQUIPMENT', x: 0, y: 0 },
+        { id: 'lamp', defId: 'v3-night-patrol-light', quality, area: 'EQUIPMENT', x: 1, y: 0 },
+      ],
+    })
+    const opponent: FighterSnapshot = { name: 'O', dogType: 'BULLY', wins: 0, losses: 0, round: 6, items: [] }
+    const adjacentTriggersAtFirstRoll = (quality: GameItem['quality']) => {
+      const result = simulateBattle(fighterWithLight(quality), opponent, 'night-light-0')
+      return result.events.filter((event) =>
+        event.time === 1
+        && event.kind === 'ITEM'
+        && event.actor === 'player'
+        && event.itemId === 'neighbor'
+      )
+    }
+
+    expect(adjacentTriggersAtFirstRoll('GOLD')).toHaveLength(1)
+    expect(adjacentTriggersAtFirstRoll('DIAMOND')).toHaveLength(2)
   })
 
   it('reverse fur comb silver purges enemy thorns first and heals by removed layers', () => {
@@ -797,9 +838,7 @@ describe('battle simulation', () => {
       wins: 0,
       losses: 0,
       round: 10,
-      items: [
-        { id: 'counter', defId: 'v4-boom-counter', quality: 'GOLD', area: 'EQUIPMENT', x: 0, y: 0 },
-      ],
+      items: boomCounterTestItems('GOLD'),
     }
     const opponent: FighterSnapshot = { name: 'O', dogType: 'SHIBA', wins: 0, losses: 0, round: 10, items: [] }
     const result = simulateBattle(player, opponent, 'boom-counter-gold')
@@ -816,8 +855,11 @@ describe('battle simulation', () => {
       amount: 300,
       target: 'opponent',
       targetHpDelta: -300,
-      time: 30,
+      boomCounterValue: 0,
+      boomCounterMax: 30,
     })
+    const explosionIndex = result.events.indexOf(explosion!)
+    expect(result.events.slice(0, explosionIndex + 1).filter((event) => event.boomCounterChanged && event.itemId === 'counter').length).toBe(30)
   })
 
   it('diamond boom counter keeps threshold 30 and damage 450', () => {
@@ -827,9 +869,7 @@ describe('battle simulation', () => {
       wins: 0,
       losses: 0,
       round: 11,
-      items: [
-        { id: 'counter', defId: 'v4-boom-counter', quality: 'DIAMOND', area: 'EQUIPMENT', x: 0, y: 0 },
-      ],
+      items: boomCounterTestItems('DIAMOND'),
     }
     const opponent: FighterSnapshot = { name: 'O', dogType: 'SHIBA', wins: 0, losses: 0, round: 11, items: [] }
     const result = simulateBattle(player, opponent, 'boom-counter-diamond')
@@ -844,7 +884,45 @@ describe('battle simulation', () => {
       quality: 'DIAMOND',
       amount: 450,
       targetHpDelta: -450,
-      time: 30,
+      boomCounterValue: 0,
+      boomCounterMax: 30,
+    })
+    const explosionIndex = result.events.indexOf(explosion!)
+    expect(result.events.slice(0, explosionIndex + 1).filter((event) => event.boomCounterChanged && event.itemId === 'counter').length).toBe(30)
+  })
+
+  it('tracks each boom counter item instance independently', () => {
+    const player: FighterSnapshot = {
+      name: 'P',
+      dogType: 'SHIBA',
+      wins: 0,
+      losses: 0,
+      round: 100,
+      items: [
+        { id: 'gold-counter', defId: 'v4-boom-counter', quality: 'GOLD', area: 'EQUIPMENT', x: 0, y: 0 },
+        { id: 'diamond-counter', defId: 'v4-boom-counter', quality: 'DIAMOND', area: 'EQUIPMENT', x: 2, y: 0 },
+        ...Array.from({ length: 10 }, (_, index) => ({
+          id: `extreme-${index}`,
+          defId: 'v3-chew-scratch-post',
+          quality: 'BRONZE' as const,
+          area: 'EQUIPMENT' as const,
+          x: index + 4,
+          y: 0,
+        })),
+      ],
+    }
+    const opponent: FighterSnapshot = { name: 'O', dogType: 'SHIBA', wins: 0, losses: 0, round: 100, items: [] }
+    const result = simulateBattle(player, opponent, 'two-boom-counters')
+
+    expect(result.events.find((event) => event.itemId === 'gold-counter' && event.effectType === 'DAMAGE')).toMatchObject({
+      amount: 300,
+      quality: 'GOLD',
+      boomCounterValue: 0,
+    })
+    expect(result.events.find((event) => event.itemId === 'diamond-counter' && event.effectType === 'DAMAGE')).toMatchObject({
+      amount: 450,
+      quality: 'DIAMOND',
+      boomCounterValue: 0,
     })
   })
 
@@ -992,6 +1070,91 @@ describe('battle simulation', () => {
     })
     expect(result.playerSnapshot.items[0]).toMatchObject({ id: 'left-copy', def: { id: 'starter-1' } })
     expect(result.opponentSnapshot.items).toEqual([])
+  })
+
+  it('lets enchantments add concrete trigger dice to an item instance', () => {
+    const player: FighterSnapshot = {
+      name: 'P',
+      dogType: 'MUTT',
+      wins: 0,
+      losses: 0,
+      round: 0,
+      items: [
+        {
+          id: 'enchanted-six',
+          defId: 'starter-6',
+          quality: 'BRONZE',
+          area: 'EQUIPMENT',
+          x: 0,
+          y: 0,
+          enchant: { kind: 'EXTRA_DICE', dice: [1, 2, 3, 4, 5], label: '1/2/3/4/5点也触发' },
+        },
+      ],
+    }
+    const opponent: FighterSnapshot = { name: 'O', dogType: 'MUTT', wins: 0, losses: 0, round: 0, items: [] }
+
+    const result = simulateBattle(player, opponent, 'enchant-extra-dice')
+    const damage = result.events.find((event) => event.kind === 'ITEM' && event.itemId === 'enchanted-six')
+
+    expect(damage).toMatchObject({ effectType: 'DAMAGE', amount: 5, target: 'opponent' })
+    expect(result.playerSnapshot.items[0].enchant).toMatchObject({ kind: 'EXTRA_DICE', dice: [1, 2, 3, 4, 5] })
+  })
+
+  it('applies flat enchantment effects without scaling them by item quality', () => {
+    const player: FighterSnapshot = {
+      name: 'P',
+      dogType: 'MUTT',
+      wins: 0,
+      losses: 0,
+      round: 0,
+      items: [
+        {
+          id: 'shield-enchanted',
+          defId: 'mutt-old-collar',
+          quality: 'DIAMOND',
+          area: 'EQUIPMENT',
+          x: 0,
+          y: 0,
+          enchant: { kind: 'BASE_EFFECT', effect: 'SHIELD', amount: 11, label: '触发时获得11护盾' },
+        },
+      ],
+    }
+    const opponent: FighterSnapshot = { name: 'O', dogType: 'MUTT', wins: 0, losses: 0, round: 0, items: [] }
+
+    const result = simulateBattle(player, opponent, 'enchant-flat-shield')
+    const shield = result.events.find((event) => event.kind === 'ITEM' && event.itemId === 'shield-enchanted' && event.text.includes('附魔'))
+
+    expect(shield).toMatchObject({ effectType: 'UTILITY', amount: 11, target: 'player' })
+  })
+
+  it('lets a trigger enchantment queue its neighboring item', () => {
+    const player: FighterSnapshot = {
+      name: 'P',
+      dogType: 'MUTT',
+      wins: 0,
+      losses: 0,
+      round: 0,
+      items: [
+        {
+          id: 'trigger-source',
+          defId: 'mutt-old-collar',
+          quality: 'GOLD',
+          area: 'EQUIPMENT',
+          x: 0,
+          y: 0,
+          enchant: { kind: 'TRIGGER_NEIGHBOR', target: 'RIGHT', label: '触发右侧装备' },
+        },
+        { id: 'right-item', defId: 'starter-6', quality: 'BRONZE', area: 'EQUIPMENT', x: 1, y: 0 },
+      ],
+    }
+    const opponent: FighterSnapshot = { name: 'O', dogType: 'MUTT', wins: 0, losses: 0, round: 0, items: [] }
+
+    const result = simulateBattle(player, opponent, 'enchant-trigger-right')
+    const sourceIndex = result.events.findIndex((event) => event.kind === 'ITEM' && event.itemId === 'trigger-source')
+    const rightIndex = result.events.findIndex((event, index) => index > sourceIndex && event.kind === 'ITEM' && event.itemId === 'right-item')
+
+    expect(sourceIndex).toBeGreaterThanOrEqual(0)
+    expect(rightIndex).toBeGreaterThan(sourceIndex)
   })
 
   it('lets small bite sometimes inflict weak after dealing damage', () => {

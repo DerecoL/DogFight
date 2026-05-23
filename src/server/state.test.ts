@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createFinishedBattleRecord, postBattleLargeItemReward, publicRelics, publicRunHistory } from './state'
+import { createFinishedBattleRecord, nextPhaseData, postBattleLargeItemReward, publicRelics, publicRunHistory } from './state'
 
 describe('public run relic data', () => {
   it('returns quality-adjusted relic descriptions for upgraded relics', () => {
@@ -63,6 +63,48 @@ describe('finished battle records', () => {
     expect(record.playerSnapshot.losses).toBe(1)
     expect(record.opponentSnapshot.wins).toBe(2)
     expect(record.opponentSnapshot.losses).toBe(1)
+  })
+})
+
+describe('post-battle phase flow', () => {
+  it('runs class reward before a pending enchant shop and then returns to enchant choice after class reward', () => {
+    const phase = nextPhaseData({
+      id: 'run-1',
+      dogType: 'SHIBA',
+      losses: 3,
+      enchantThirdLossGranted: false,
+    }, 3, 'phase-seed')
+
+    expect(phase.phase).toBe('CLASS_REWARD')
+    expect(JSON.parse(phase.classRewardChoices)).toEqual([
+      'shiba-speed-katana',
+      'shiba-great-katana',
+      'shiba-swallow-katana',
+    ])
+    expect(JSON.parse(phase.enchantChoices)).toHaveLength(3)
+    expect(phase.enchantThirdLossGranted).toBe(true)
+  })
+
+  it('triggers the third-loss enchant shop once and records that it was granted', () => {
+    const phase = nextPhaseData({
+      id: 'run-2',
+      dogType: 'MUTT',
+      losses: 3,
+      enchantThirdLossGranted: false,
+    }, 5, 'third-loss-seed')
+
+    expect(phase.phase).toBe('ENCHANT_CHOICE')
+    expect(JSON.parse(phase.enchantChoices)).toHaveLength(3)
+    expect(phase.enchantThirdLossGranted).toBe(true)
+
+    const later = nextPhaseData({
+      id: 'run-2',
+      dogType: 'MUTT',
+      losses: 3,
+      enchantThirdLossGranted: true,
+    }, 5, 'third-loss-seed')
+    expect(later.phase).not.toBe('ENCHANT_CHOICE')
+    expect(later.enchantThirdLossGranted).toBeUndefined()
   })
 })
 

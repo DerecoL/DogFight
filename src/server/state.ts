@@ -1,12 +1,13 @@
 import { randomUUID } from 'node:crypto'
 import type { ItemInstance, LadderSettlement, Run } from '@prisma/client'
 import { CLASS_REWARD_DEFS, RELIC_DEFS, itemDef, itemDefForQuality, relicDef, relicDefForQuality, shopPool } from './game/data'
+import { createEnchantChoices } from './game/enchant'
 import { buildOfflineFighter } from './game/offline-builder'
 import { findSlot } from './game/grid'
 import { nextQuality, normalizeQuality } from './game/quality'
 import { createRng } from './game/rng'
 import { createChoices, createShop } from './game/shop'
-import type { BattleResult, DogType, FighterSnapshot, GameItem, ItemQuality, Phase, RelicInstance, ShopOffer, ShopType } from './game/types'
+import type { BattleResult, DogType, Enchantment, EnchantmentChoice, FighterSnapshot, GameItem, ItemQuality, Phase, RelicInstance, ShopOffer, ShopType } from './game/types'
 
 type RunMode = 'CASUAL' | 'LADDER'
 
@@ -18,8 +19,21 @@ export function parseJson<T>(value: string, fallback: T): T {
   }
 }
 
+export function parseOptionalJson<T>(value: string | null | undefined, fallback: T): T {
+  if (!value) return fallback
+  return parseJson(value, fallback)
+}
+
 export function toGameItems(items: ItemInstance[]): GameItem[] {
-  return items.map((item) => ({ id: item.id, defId: item.defId, quality: normalizeQuality(item.quality), area: item.area as GameItem['area'], x: item.x, y: item.y }))
+  return items.map((item) => ({
+    id: item.id,
+    defId: item.defId,
+    quality: normalizeQuality(item.quality),
+    area: item.area as GameItem['area'],
+    x: item.x,
+    y: item.y,
+    enchant: parseOptionalJson<Enchantment | null>(item.enchant, null),
+  }))
 }
 
 export function normalizeRelics(relics: RelicInstance[]): RelicInstance[] {
@@ -86,6 +100,7 @@ export function publicRun(run: Run & { items: ItemInstance[]; ladderSettlement?:
       return { ...offer, quality, def: itemDefForQuality(offer.defId, quality) }
     }),
     choices: parseJson<ShopType[]>(run.choices, []),
+    enchantChoices: parseJson<EnchantmentChoice[]>(run.enchantChoices, []),
     classRewardChoices: parseJson<string[]>(run.classRewardChoices, []).map((defId) => {
       const quality = normalizeQuality(itemDef(defId).defaultQuality)
       return { defId, def: itemDefForQuality(defId, quality), quality }
@@ -103,7 +118,7 @@ export function publicRun(run: Run & { items: ItemInstance[]; ladderSettlement?:
   }
 }
 
-type RunHistoryItemSource = Pick<ItemInstance, 'id' | 'runId' | 'defId' | 'quality' | 'area' | 'x' | 'y'>
+type RunHistoryItemSource = Pick<ItemInstance, 'id' | 'runId' | 'defId' | 'quality' | 'area' | 'x' | 'y'> & { enchant?: string | null }
 type RunHistorySource = Pick<Run, 'id' | 'mode' | 'dogType' | 'luckyNumber' | 'wins' | 'losses' | 'round' | 'status' | 'phase' | 'createdAt' | 'updatedAt'> & {
   relics?: string
   items?: RunHistoryItemSource[]
@@ -148,7 +163,7 @@ function toHistoryEntry(run: RunHistorySource): PublicRunHistoryEntry {
     status: run.status,
     phase: run.phase as Phase,
     items: (run.items ?? [])
-      .map((item) => ({ id: item.id, defId: item.defId, quality: normalizeQuality(item.quality), area: item.area as GameItem['area'], x: item.x, y: item.y }))
+      .map((item) => ({ id: item.id, defId: item.defId, quality: normalizeQuality(item.quality), area: item.area as GameItem['area'], x: item.x, y: item.y, enchant: parseOptionalJson<Enchantment | null>(item.enchant, null) }))
       .map((item) => ({ ...item, def: itemDefForQuality(item.defId, item.quality) })),
     relics: publicRelics({ relics: run.relics ?? '[]' }),
     createdAt: run.createdAt.toISOString(),
@@ -246,6 +261,91 @@ export function makeRelicChoices(run: Pick<Run, 'relics'>, seed: string) {
   return createRelicChoices(relicsFromRun(run), createRng(seed))
 }
 
+function shouldCreateEnchantChoices(run: Pick<Run, 'losses' | 'enchantThirdLossGranted'>, nextRound: number, seed: string) {
+  if (run.losses >= 3 && !run.enchantThirdLossGranted) return { trigger: true, thirdLossGranted: true }
+  if (nextRound >= 4 && createRng(`${seed}-enchant-roll`)() < 0.1) return { trigger: true, thirdLossGranted: false }
+  return { trigger: false, thirdLossGranted: false }
+}
+
+type NextPhaseRun = Pick<Run, 'id' | 'dogType' | 'losses' | 'enchantThirdLossGranted'>
+type NextPhaseData = {
+  phase: Phase
+  classRewardChoices: string
+  choices: string
+  shopItems: string
+  shopType?: ShopType
+  enchantChoices: string
+  enchantThirdLossGranted?: boolean
+}
+
+export function nextPhaseData(run: NextPhaseRun, nextRound: number, seed = `${run.id}-round-${nextRound}`): NextPhaseData {
+  const nextClassRewards = classRewardChoices(run.dogType as DogType, nextRound)
+  const enchant = shouldCreateEnchantChoices(run, nextRound, seed)
+  const enchantChoices = enchant.trigger
+    ? JSON.stringify(createEnchantChoices(`${seed}-enchant-${nextRound}`, nextRound))
+    : '[]'
+  const enchantData = enchant.trigger
+    ? {
+      enchantChoices,
+      ...(enchant.thirdLossGranted ? { enchantThirdLossGranted: true } : {}),
+    }
+    : { enchantChoices: '[]' }
+
+  if (nextClassRewards.length > 0) {
+    return {
+      phase: 'CLASS_REWARD',
+      classRewardChoices: JSON.stringify(nextClassRewards),
+      choices: '[]',
+      shopItems: '[]',
+      ...enchantData,
+    }
+  }
+  if (enchant.trigger) {
+    return {
+      phase: 'ENCHANT_CHOICE',
+      classRewardChoices: '[]',
+      choices: '[]',
+      shopItems: '[]',
+      ...enchantData,
+    }
+  }
+  if (nextRound <= 2) {
+    return {
+      phase: 'SHOP',
+      shopType: 'GENERAL',
+      shopItems: JSON.stringify(makeShop('GENERAL', `${run.id}-round-${nextRound}`, nextRound)),
+      choices: '[]',
+      classRewardChoices: '[]',
+      enchantChoices: '[]',
+    }
+  }
+  return {
+    phase: 'CHOICE',
+    choices: JSON.stringify(makeChoices(`${run.id}-choices-${nextRound}`, nextRound)),
+    shopItems: '[]',
+    classRewardChoices: '[]',
+    enchantChoices: '[]',
+  }
+}
+
+export function phaseDataAfterEnchant(run: Pick<Run, 'id' | 'round'>) {
+  if (run.round <= 2) {
+    return {
+      phase: 'SHOP',
+      shopType: 'GENERAL',
+      shopItems: JSON.stringify(makeShop('GENERAL', `${run.id}-post-enchant-${run.round}`, run.round)),
+      choices: '[]',
+      enchantChoices: '[]',
+    }
+  }
+  return {
+    phase: 'CHOICE',
+    choices: JSON.stringify(makeChoices(`${run.id}-post-enchant-${run.round}`, run.round)),
+    shopItems: '[]',
+    enchantChoices: '[]',
+  }
+}
+
 export function snapshotFromRun(run: Run & { items: ItemInstance[] }, name = '玩家'): FighterSnapshot {
   return {
     name,
@@ -289,6 +389,6 @@ export function createFinishedBattleRecord(result: BattleResult, wins: number, l
   }
 }
 
-export function seedGhost(round: number, wins: number, losses: number): FighterSnapshot {
-  return buildOfflineFighter({ round, wins, losses })
+export function seedGhost(round: number, wins: number, losses: number, seed?: string): FighterSnapshot {
+  return buildOfflineFighter({ round, wins, losses, seed })
 }

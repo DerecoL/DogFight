@@ -230,6 +230,13 @@ describe('selection screen structure', () => {
     expect(app).toContain("run.phase === 'BATTLE' && isFinished")
   })
 
+  it('does not automatically reopen a dismissed dogfight battle replay', () => {
+    expect(app).toContain('dismissedAutoBattleId')
+    expect(app).toContain('if (dismissedAutoBattleId === battleId) return')
+    expect(app).toContain('finishDogfightBattleReplay')
+    expect(app).toContain("onContinue={() => finishDogfightBattleReplay()}")
+  })
+
   it('offers active runs a confirmed forfeit settlement action outside battle playback', () => {
     expect(app).toContain('function ForfeitRunAction')
     expect(app).toContain('window.confirm')
@@ -479,7 +486,22 @@ describe('selection screen structure', () => {
     expect(app).toContain('status-poison')
   })
 
+  it('marks shop offers that match equipment the player already owns', () => {
+    expect(app).toContain('function shopOfferOwnedCount')
+    expect(app).toContain('ownedCount={shopOfferOwnedCount(run, offer)}')
+    expect(app).toContain('shop-card-owned')
+    expect(app).toContain('owned-badge')
+  })
+
   it('exposes stable hooks for the battle vfx causality pass', () => {
+    expect(app).toContain("from './feedback'")
+    expect(app).toContain('createBattlePresentation')
+    expect(app).toContain('function BattleFxStage')
+    expect(app).toContain('presentation={presentation}')
+    expect(app).toContain('activePresentationKind')
+    expect(app).toContain('uiFeedbacks')
+    expect(app).toContain('pushUiFeedback')
+    expect(app).toContain('feedback-layer')
     expect(app).toContain('function battleVfxKind')
     expect(app).toContain('function battleVfxTargetSide')
     expect(app).toContain('battle-item-trigger')
@@ -491,5 +513,13 @@ describe('selection screen structure', () => {
     expect(app).toContain("kind: 'shield'")
     expect(app).toContain("kind: 'weak'")
     expect(app).toContain("kind: 'freeze'")
+  })
+
+  it('exposes boom counter accumulation hooks on battle equipment cards', () => {
+    expect(app).toContain('function boomCounterStateForBattleItem')
+    expect(app).toContain('boom-counter')
+    expect(app).toContain('boom-counter-pop')
+    expect(app).toContain('boomCounterState?.count')
+    expect(app).toContain('style={{ width: `${boomCounterState.progress}%` }}')
   })
 })

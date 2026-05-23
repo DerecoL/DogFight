@@ -39,6 +39,8 @@ model Run {
   shopItems   String   @default("[]")
   choices     String   @default("[]")
   classRewardChoices String @default("[]")
+  enchantChoices String  @default("[]")
+  enchantThirdLossGranted Boolean @default(false)
   relicChoices String   @default("[]")
   relics      String   @default("[]")
   refreshCost Int      @default(1)
@@ -61,6 +63,7 @@ model ItemInstance {
   area      String
   x         Int
   y         Int
+  enchant   String?
   createdAt DateTime @default(now())
   run       Run      @relation(fields: [runId], references: [id], onDelete: Cascade)
 }
