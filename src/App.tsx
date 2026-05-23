@@ -807,14 +807,7 @@ function battleEquipmentItems(snapshot: BattleSnapshot) {
 }
 
 function adjacentBattleItems(snapshot: BattleSnapshot, source: Item) {
-  const sourceLeft = source.x
-  const sourceRight = source.x + source.def.width
-  return battleEquipmentItems(snapshot).filter((item) => {
-    if (item.id === source.id) return false
-    const itemLeft = item.x
-    const itemRight = item.x + item.def.width
-    return itemRight === sourceLeft || itemLeft === sourceRight || Math.abs(item.x - source.x) <= source.def.width
-  })
+  return battleEquipmentItems(snapshot).filter((item) => item.id !== source.id && Math.abs(item.x - source.x) <= source.def.width)
 }
 
 function touchingAdjacentBattleItems(snapshot: BattleSnapshot, source: Item) {
@@ -870,6 +863,15 @@ function targetEquipmentItemsForBattleEvent(event: BattleEvent, player: BattleSn
   }
 
   return { owner: null, itemIds: [] }
+}
+
+function battlePresentationWithEquipmentTarget(presentation: PresentationEvent | null, targetEquipment: { owner: 'player' | 'opponent' | null; itemIds: string[] }): PresentationEvent | null {
+  const targetItemId = targetEquipment.itemIds[0]
+  if (!presentation || !targetEquipment.owner || !targetItemId) return presentation
+  return {
+    ...presentation,
+    target: { anchor: 'equipment-row', side: targetEquipment.owner, id: targetItemId },
+  }
 }
 
 function battleVfxKind(event?: BattleEvent): BattleVfxKind {
@@ -3916,7 +3918,6 @@ function BattleView({ run, battle, currentEvent, eventIndex, speed, score, sound
   const events = playback?.events ?? []
   const displayIndex = battle ? eventIndex : Math.max(0, events.length - 1)
   const event = currentEvent ?? events[Math.min(displayIndex, Math.max(0, events.length - 1))]
-  const presentation = event ? createBattlePresentation(event) : null
   const playerSnapshot = playback?.playerSnapshot ?? {
     name: '你的狗狗',
     dogType: run.dogType,
@@ -3938,6 +3939,7 @@ function BattleView({ run, battle, currentEvent, eventIndex, speed, score, sound
   const lastRollEvent = events.slice(0, displayIndex + 1).reverse().find((entry) => entry.kind === 'ROLL')
   const isFinished = Boolean(playback && (!battle || eventIndex >= events.length - 1))
   const targetEquipment = event && playback ? targetEquipmentItemsForBattleEvent(event, playerSnapshot, opponentSnapshot) : { owner: null, itemIds: [] }
+  const presentation = battlePresentationWithEquipmentTarget(event ? createBattlePresentation(event) : null, targetEquipment)
 
   useEffect(() => {
     if (!presentation) return

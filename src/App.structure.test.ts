@@ -613,6 +613,7 @@ describe('selection screen structure', () => {
 
   it('infers target equipment cards for equipment-affecting battle events', () => {
     expect(app).toContain('function targetEquipmentItemsForBattleEvent')
+    expect(app).toContain('function battlePresentationWithEquipmentTarget')
     expect(app).toContain('function adjacentBattleItems')
     expect(app).toContain('function rightmostBattleItem')
     expect(app).toContain("event.text.includes('最右侧装备')")
@@ -623,6 +624,8 @@ describe('selection screen structure', () => {
     expect(app).toContain("event.text.includes('相邻')")
     expect(app).toContain('targetItemIds.includes(item.id)')
     expect(app).toContain('battle-item-vfx-target')
+    expect(app).toContain("target: { anchor: 'equipment-row'")
+    expect(app).toContain('item.id !== source.id && Math.abs(item.x - source.x) <= source.def.width')
   })
 
   it('draws battle vfx as meteor trails with glow, tail, sparks, and impact flash', () => {
