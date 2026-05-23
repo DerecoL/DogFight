@@ -406,6 +406,21 @@ describe('equipment layout scale', () => {
     expect(cssRule('@media (prefers-reduced-motion: reduce)')).toContain('.visual-theme-surface::before')
   })
 
+  it('adds meteor-quality battle equipment vfx styling and reduced-motion fallbacks', () => {
+    expect(cssRule('.visual-battle')).toContain('overflow: hidden')
+    expect(cssRule('.battle-fx-stage')).toContain('z-index: 8')
+    expect(cssRule('.battle-item-vfx-target')).toContain('meteorTargetPulse')
+    expect(cssRule('.battle-item-vfx-target::after')).toContain('meteorTargetSweep')
+    expect(cssRule('.battle-item-trigger')).toContain('meteorSourcePulse')
+    expect(cssRule('.battle-dog.vfx-target-shield .hp::after')).toContain('meteorImpactGlow')
+    expect(cssRule('.battle-dog.vfx-target-heal .hp::after')).toContain('meteorImpactGlow')
+    expect(css).toContain('@keyframes meteorSourcePulse')
+    expect(css).toContain('@keyframes meteorTargetPulse')
+    expect(css).toContain('@keyframes meteorTargetSweep')
+    expect(css).toContain('@keyframes meteorImpactGlow')
+    expect(cssRule('@media (prefers-reduced-motion: reduce)')).toContain('.battle-item-vfx-target')
+  })
+
   it('adds ornate border, manuscript, hud, and paper-bounce polish for the refined handdrawn direction', () => {
     expect(cssRule(':root')).toContain('--ornament-ink')
     expect(cssRule(':root')).toContain('--ornament-ink: rgba(')
