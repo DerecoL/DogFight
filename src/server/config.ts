@@ -6,8 +6,9 @@ export type ServerConfig = {
 
 const DEVELOPMENT_JWT_SECRET = 'dog-dice-dev-secret'
 const POSTGRESQL_URL_PATTERN = /^postgres(?:ql)?:\/\//
+type DatabaseTestEnv = Partial<Pick<NodeJS.ProcessEnv, 'TEST_DATABASE_URL' | 'DATABASE_URL'>>
 
-export function shouldRunDestructiveDatabaseTests(env: Pick<NodeJS.ProcessEnv, 'TEST_DATABASE_URL'> = process.env) {
+export function shouldRunDestructiveDatabaseTests(env: DatabaseTestEnv = process.env) {
   return POSTGRESQL_URL_PATTERN.test(env.TEST_DATABASE_URL || '')
 }
 
