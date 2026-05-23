@@ -140,6 +140,7 @@ type BattleEvent = {
   statusChanged?: string[]
   roll?: number
   itemId?: string
+  targetItemId?: string
   defId?: string
   itemTriggerCount?: number
   boomCounterItemId?: string
@@ -799,6 +800,54 @@ function equipmentSlotCount(relics?: Relic[]) {
 
 function itemTriggerDisplay(item: Item) {
   return { ...item.def, triggerDiceOverride: item.triggerDiceOverride }
+}
+
+function battleEquipmentItems(snapshot: BattleSnapshot) {
+  return snapshot.items.filter((item) => item.area === 'EQUIPMENT').sort((left, right) => left.x - right.x || left.y - right.y)
+}
+
+function adjacentBattleItems(snapshot: BattleSnapshot, source: Item) {
+  const sourceLeft = source.x
+  const sourceRight = source.x + source.def.width
+  return battleEquipmentItems(snapshot).filter((item) => {
+    if (item.id === source.id) return false
+    const itemLeft = item.x
+    const itemRight = item.x + item.def.width
+    return itemRight === sourceLeft || itemLeft === sourceRight || Math.abs(item.x - source.x) <= source.def.width
+  })
+}
+
+function rightmostBattleItem(snapshot: BattleSnapshot) {
+  return battleEquipmentItems(snapshot).at(-1) ?? null
+}
+
+function targetEquipmentItemsForBattleEvent(event: BattleEvent, player: BattleSnapshot, opponent: BattleSnapshot): { owner: 'player' | 'opponent' | null; itemIds: string[] } {
+  if (event.kind !== 'ITEM' || !event.itemId) return { owner: null, itemIds: [] }
+  const actorSnapshot = event.actor === 'player' ? player : event.actor === 'opponent' ? opponent : null
+  const targetOwner = event.target === 'player' || event.target === 'opponent'
+    ? event.target
+    : event.actor === 'player'
+      ? 'opponent'
+      : event.actor === 'opponent'
+        ? 'player'
+        : null
+  const targetSnapshot = targetOwner === 'player' ? player : targetOwner === 'opponent' ? opponent : null
+  const sourceItem = actorSnapshot?.items.find((item) => item.id === event.itemId) ?? null
+  const advancedEffect = sourceItem?.def.advancedEffect
+
+  if (event.targetItemId && targetOwner) return { owner: targetOwner, itemIds: [event.targetItemId] }
+
+  if (targetSnapshot && event.text.includes('最右侧装备')) {
+    const rightmost = rightmostBattleItem(targetSnapshot)
+    return rightmost ? { owner: targetOwner, itemIds: [rightmost.id] } : { owner: null, itemIds: [] }
+  }
+
+  if (actorSnapshot && sourceItem && (advancedEffect === 'TRIGGER_ADJACENT' || event.text.includes('相邻'))) {
+    const owner = event.actor === 'player' || event.actor === 'opponent' ? event.actor : null
+    return { owner, itemIds: adjacentBattleItems(actorSnapshot, sourceItem).map((item) => item.id) }
+  }
+
+  return { owner: null, itemIds: [] }
 }
 
 function battleVfxKind(event?: BattleEvent): BattleVfxKind {
@@ -3866,6 +3915,7 @@ function BattleView({ run, battle, currentEvent, eventIndex, speed, score, sound
   }
   const lastRollEvent = events.slice(0, displayIndex + 1).reverse().find((entry) => entry.kind === 'ROLL')
   const isFinished = Boolean(playback && (!battle || eventIndex >= events.length - 1))
+  const targetEquipment = event && playback ? targetEquipmentItemsForBattleEvent(event, playerSnapshot, opponentSnapshot) : { owner: null, itemIds: [] }
 
   useEffect(() => {
     if (!presentation) return
@@ -3885,7 +3935,7 @@ function BattleView({ run, battle, currentEvent, eventIndex, speed, score, sound
       </div>
 
       <BattleFxStage event={event} presentation={presentation} speed={speed} />
-      <BattleEquipmentRow owner="opponent" snapshot={opponentSnapshot} events={events} displayIndex={displayIndex} activeEvent={event} onInspect={(item, element) => setBattleTip({ item, owner: 'opponent', anchor: getFloatingTipPosition(element) })} />
+      <BattleEquipmentRow owner="opponent" snapshot={opponentSnapshot} events={events} displayIndex={displayIndex} activeEvent={event} targetItemIds={targetEquipment.owner === 'opponent' ? targetEquipment.itemIds : []} onInspect={(item, element) => setBattleTip({ item, owner: 'opponent', anchor: getFloatingTipPosition(element) })} />
       <BattleStage
         player={playerSnapshot}
         opponent={opponentSnapshot}
@@ -3896,7 +3946,7 @@ function BattleView({ run, battle, currentEvent, eventIndex, speed, score, sound
         winner={playback?.winner}
         visualTheme={visualTheme}
       />
-      <BattleEquipmentRow owner="player" snapshot={playerSnapshot} events={events} displayIndex={displayIndex} activeEvent={event} onInspect={(item, element) => setBattleTip({ item, owner: 'player', anchor: getFloatingTipPosition(element) })} />
+      <BattleEquipmentRow owner="player" snapshot={playerSnapshot} events={events} displayIndex={displayIndex} activeEvent={event} targetItemIds={targetEquipment.owner === 'player' ? targetEquipment.itemIds : []} onInspect={(item, element) => setBattleTip({ item, owner: 'player', anchor: getFloatingTipPosition(element) })} />
       {battleTip && (
         <FloatingTip
           run={run}
@@ -3949,7 +3999,7 @@ function LadderSettlementSummary({ settlement }: { settlement: LadderSettlement 
   )
 }
 
-function BattleEquipmentRow({ owner, snapshot, events, displayIndex, activeEvent, onInspect }: { owner: 'player' | 'opponent'; snapshot: BattleSnapshot; events: BattleEvent[]; displayIndex: number; activeEvent?: BattleEvent; onInspect: (item: Item, element: HTMLElement) => void }) {
+function BattleEquipmentRow({ owner, snapshot, events, displayIndex, activeEvent, targetItemIds = [], onInspect }: { owner: 'player' | 'opponent'; snapshot: BattleSnapshot; events: BattleEvent[]; displayIndex: number; activeEvent?: BattleEvent; targetItemIds?: string[]; onInspect: (item: Item, element: HTMLElement) => void }) {
   const items = snapshot.items.filter((item) => item.area === 'EQUIPMENT')
   const activeItemId = activeEvent?.actor === owner && activeEvent.kind === 'ITEM' ? activeEvent.itemId : null
   const activeVfxKind = battleVfxKind(activeEvent)
@@ -3972,7 +4022,7 @@ function BattleEquipmentRow({ owner, snapshot, events, displayIndex, activeEvent
           <button
             type="button"
             key={item.id}
-            className={`battle-item item-card paper-item-card ${itemTone(item.def)} ${qualityClass(item.quality)} ${activeItemId === item.id ? `active battle-item-trigger vfx-trigger-${activeVfxKind}` : ''} ${boomCounterState ? 'boom-counter' : ''} ${boomCounterState?.popping ? 'boom-counter-pop' : ''} ${triggerCountPopping ? 'trigger-count-pop' : ''}`}
+            className={`battle-item item-card paper-item-card ${itemTone(item.def)} ${qualityClass(item.quality)} ${activeItemId === item.id ? `active battle-item-trigger vfx-trigger-${activeVfxKind}` : ''} ${targetItemIds.includes(item.id) ? 'battle-item-vfx-target' : ''} ${boomCounterState ? 'boom-counter' : ''} ${boomCounterState?.popping ? 'boom-counter-pop' : ''} ${triggerCountPopping ? 'trigger-count-pop' : ''}`}
             {...battleVfxAnchorAttrs('equipment-row', owner, item.id)}
             data-vfx-kind={battleVfxKind(activeEvent)}
             style={{

@@ -68,6 +68,7 @@ type BattleEventLike = {
   kind?: string
   text?: string
   itemId?: string
+  targetItemId?: string
   effectType?: string
   amount?: number
   target?: 'player' | 'opponent' | 'both' | 'none' | string
@@ -192,6 +193,7 @@ function battlePresentationTarget(event: BattleEventLike | null | undefined, kin
   if (kind === 'roll') return { anchor: 'dice', side: normalizeSide(event?.actor) }
   const targetSide = battlePresentationTargetSide(event, kind)
   if (!targetSide) return { anchor: 'screen', side: 'system' }
+  if (event?.targetItemId) return { anchor: 'equipment-row', side: targetSide, id: event.targetItemId }
   if (kind === 'heal' || kind === 'shield') return { anchor: 'hp', side: targetSide }
   if (kind === 'poison' || kind === 'weak' || kind === 'freeze') return { anchor: 'status-negative', side: targetSide }
   if (kind === 'thorns') return { anchor: 'status-positive', side: targetSide }

@@ -182,6 +182,18 @@ describe('feedback presentation mapping', () => {
     expect(presentation.target).toEqual({ anchor: 'status-positive', side: 'player' })
   })
 
+  it('targets explicit equipment-affecting utility events at equipment cards', () => {
+    const presentation = createBattlePresentation({
+      ...baseEvent,
+      effectType: 'UTILITY',
+      target: 'opponent',
+      targetItemId: 'enemy-item-3',
+      text: '毒爪 使敌方最右侧装备【失效】一次',
+    })
+
+    expect(presentation.target).toEqual({ anchor: 'equipment-row', side: 'opponent', id: 'enemy-item-3' })
+  })
+
   it('collapses motion-heavy timeline steps when reduced motion is requested', () => {
     const presentation = createBattlePresentation({
       ...baseEvent,

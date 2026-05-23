@@ -611,6 +611,17 @@ describe('selection screen structure', () => {
     expect(app).toContain("kind: 'freeze'")
   })
 
+  it('infers target equipment cards for equipment-affecting battle events', () => {
+    expect(app).toContain('function targetEquipmentItemsForBattleEvent')
+    expect(app).toContain('function adjacentBattleItems')
+    expect(app).toContain('function rightmostBattleItem')
+    expect(app).toContain("event.text.includes('最右侧装备')")
+    expect(app).toContain("advancedEffect === 'TRIGGER_ADJACENT'")
+    expect(app).toContain("event.text.includes('相邻')")
+    expect(app).toContain('targetItemIds.includes(item.id)')
+    expect(app).toContain('battle-item-vfx-target')
+  })
+
   it('exposes boom counter accumulation hooks on battle equipment cards', () => {
     expect(app).toContain('function boomCounterStateForBattleItem')
     expect(app).toContain('boom-counter')
