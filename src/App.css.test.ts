@@ -15,6 +15,12 @@ function cssRule(selector: string) {
   return match?.[1] ?? ''
 }
 
+function cssVariableValue(name: string) {
+  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const match = css.match(new RegExp(`${escaped}:\\s*([\\s\\S]*?);\\s*--`, 's'))
+  return match?.[1] ?? ''
+}
+
 describe('equipment layout scale', () => {
   it('keeps equipment and bag slots large enough to be the core play surface', () => {
     expect(cssVariablePx('--slot-w')).toBeGreaterThanOrEqual(84)
@@ -396,5 +402,55 @@ describe('equipment layout scale', () => {
     expect(css).toContain('@keyframes highImpactRewardPop')
     expect(css).toContain('@keyframes highImpactRejectShake')
     expect(cssRule('@media (prefers-reduced-motion: reduce)')).toContain('.visual-theme-surface::before')
+  })
+
+  it('adds ornate border, manuscript, hud, and paper-bounce polish for the refined handdrawn direction', () => {
+    expect(cssRule(':root')).toContain('--ornament-ink')
+    expect(cssRule(':root')).toContain('--ornament-ink: rgba(')
+    expect(cssRule(':root')).toContain('--ornament-ink-soft')
+    expect(cssRule(':root')).toContain('--pencil-mark')
+    expect(cssRule(':root')).toContain('--paper-bounce-distance')
+    expect(cssRule(':root')).toContain('--edge-ornament-size')
+    expect(cssRule('.paper-card::before')).toContain('var(--ornament-corner)')
+    expect(cssRule('.paper-card::after')).toContain('var(--paper-grain)')
+    expect(cssRule('.choice.selected, .reward-choice.selected, .shop-card.selected')).toContain('paperSelectBounce')
+    expect(cssRule('.topbar')).toContain('var(--hud-paper)')
+    expect(cssRule('.topbar::after')).toContain('var(--ornament-scroll)')
+    expect(cssRule('.screen-heading.centered::before')).toContain('var(--banner-ribbon)')
+    expect(cssRule('.screen-heading.centered::before')).toContain('height: 13px')
+    expect(cssRule('.screen-heading.centered::before')).not.toContain('clip-path')
+    expect(cssRule('.resource-pill::after, .dog-trait-summary::after, .speed-row button::after')).toContain('var(--pencil-mark)')
+    expect(cssRule('.shop-shelf::after, .inventory-board::after, .battle-stage::after, .reward-panel::after')).toContain('var(--manuscript-lines)')
+    expect(cssRule('.shop-shelf::after, .inventory-board::after, .battle-stage::after, .reward-panel::after')).toContain('opacity: .12')
+    expect(cssRule('.paper-card::before')).toContain('opacity: .72')
+    expect(cssRule('.action-button:active, .primary:active, .secondary:active, .danger-button:active, .icon-button:active, .reroll-button:active, .log-toggle:active')).toContain('var(--paper-bounce-distance)')
+    expect(cssRule('.shop-card-unaffordable:active, .action-button:disabled:active')).toContain('invalidSketchShake')
+    expect(cssVariableValue('--ornament-corner')).not.toContain('linear-gradient')
+    expect(css).toContain('@keyframes paperSelectBounce')
+    expect(css).toContain('@keyframes inkRedraw')
+    expect(css).toContain('@keyframes invalidSketchShake')
+  })
+
+  it('keeps nested rule tips from retriggering generic selected paper-card scale motion', () => {
+    expect(cssRule('.paper-card.selected, .choice.selected, .reward-choice.selected, .shop-card.selected')).toBe('')
+    expect(cssRule('.choice.selected, .reward-choice.selected, .shop-card.selected')).toContain('paperSelectBounce')
+  })
+
+  it('enhances item quality borders with frame-only material and shimmer effects', () => {
+    expect(cssRule('.item-card')).toContain('--quality-frame-width: 3px')
+    expect(cssRule('.item-card')).toContain('border: var(--quality-frame-width) solid')
+    expect(cssRule('.item-card::before')).toContain('inset: 0')
+    expect(cssRule('.item-card::before')).toContain('padding: var(--quality-frame-width)')
+    expect(cssRule('.item-card::before')).toContain('mask-composite: exclude')
+    expect(cssRule('.item-card::after')).toContain('inset: 0')
+    expect(cssRule('.item-card::after')).toContain('animation: qualityBorderShimmer')
+    expect(cssRule('.item-card.quality-gold')).toContain('--quality-frame-width: 5px')
+    expect(cssRule('.item-card.quality-gold')).toContain('--quality-frame-material')
+    expect(cssRule('.item-card.quality-diamond')).toContain('--quality-frame-width: 5px')
+    expect(cssRule('.item-card.quality-diamond')).toContain('--quality-frame-material')
+    expect(cssRule('.item-card.quality-gold::after, .item-card.quality-diamond::after')).toContain('opacity')
+    expect(cssRule('.item-card.quality-bronze::after, .item-card.quality-silver::after')).toContain('animation: none')
+    expect(css).toContain('@keyframes qualityBorderShimmer')
+    expect(cssRule('@media (prefers-reduced-motion: reduce)')).toContain('.item-card::after')
   })
 })

@@ -79,6 +79,12 @@ describe('item detail tooltip interactions', () => {
     expect(cssRule('.relic-tip-identity h3')).toContain('overflow-wrap: anywhere')
   })
 
+  it('raises the whole paper card that owns an opened rule tip above neighboring panels', () => {
+    expect(cssRule('.paper-card:has(.rule-tip)')).toContain('z-index: 1300')
+    expect(cssRule('.paper-card:has(.rule-tip)')).toContain('overflow: visible')
+    expect(cssRule('.rule-tip')).toContain('z-index: 1301')
+  })
+
   it('lets battle status chips open compact rule tips', () => {
     expect(app).toContain('type StatusTipState')
     expect(app).toContain('const statusTipDetails')
