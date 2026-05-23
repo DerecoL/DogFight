@@ -817,6 +817,17 @@ function adjacentBattleItems(snapshot: BattleSnapshot, source: Item) {
   })
 }
 
+function touchingAdjacentBattleItems(snapshot: BattleSnapshot, source: Item) {
+  const sourceLeft = source.x
+  const sourceRight = source.x + source.def.width
+  return battleEquipmentItems(snapshot).filter((item) => {
+    if (item.id === source.id) return false
+    const itemLeft = item.x
+    const itemRight = item.x + item.def.width
+    return itemRight === sourceLeft || itemLeft === sourceRight
+  })
+}
+
 function leftAdjacentBattleItems(snapshot: BattleSnapshot, source: Item) {
   const sourceLeft = source.x
   return battleEquipmentItems(snapshot).filter((item) => item.id !== source.id && item.x + item.def.width === sourceLeft)
@@ -849,7 +860,7 @@ function targetEquipmentItemsForBattleEvent(event: BattleEvent, player: BattleSn
 
   if (actorSnapshot && sourceItem && advancedEffect === 'GRANT_LIFESTEAL_ADJACENT') {
     const owner = event.actor === 'player' || event.actor === 'opponent' ? event.actor : null
-    const targets = normalizeQuality(sourceItem.quality) === 'DIAMOND' ? adjacentBattleItems(actorSnapshot, sourceItem) : leftAdjacentBattleItems(actorSnapshot, sourceItem)
+    const targets = normalizeQuality(sourceItem.quality) === 'DIAMOND' ? touchingAdjacentBattleItems(actorSnapshot, sourceItem) : leftAdjacentBattleItems(actorSnapshot, sourceItem)
     return { owner, itemIds: targets.map((item) => item.id) }
   }
 

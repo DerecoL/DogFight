@@ -618,6 +618,7 @@ describe('selection screen structure', () => {
     expect(app).toContain("event.text.includes('最右侧装备')")
     expect(app).toContain("advancedEffect === 'TRIGGER_ADJACENT'")
     expect(app).toContain("advancedEffect === 'GRANT_LIFESTEAL_ADJACENT'")
+    expect(app).toContain('touchingAdjacentBattleItems')
     expect(app).toContain('leftAdjacentBattleItems')
     expect(app).toContain("event.text.includes('相邻')")
     expect(app).toContain('targetItemIds.includes(item.id)')
