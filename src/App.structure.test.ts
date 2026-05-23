@@ -600,6 +600,8 @@ describe('selection screen structure', () => {
     expect(app).toContain("battleVfxAnchorAttrs('dog-avatar', side)")
     expect(app).toContain("battleVfxAnchorAttrs('hp', side)")
     expect(app).toContain("battleVfxAnchorAttrs(tone === 'positive' ? 'status-positive' : 'status-negative', side)")
+    expect(app).toContain('resolveBattleFxPoints')
+    expect(app).toContain('queryBattleFxAnchor')
     expect(app).toContain('vfx-target-${battleVfxKind(event)}')
     expect(app).toContain('createBattleFxStyle(event)')
     expect(app).toContain('drawBattleFxTrail')

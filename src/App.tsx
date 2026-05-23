@@ -56,6 +56,7 @@ import {
 import { resolveSlotPlacement } from './placement'
 import { itemTriggerCountLabel } from './item-trigger-display'
 import { triggerDiceLabel } from './item-trigger-display'
+import { queryBattleFxAnchor, resolveBattleFxPoints } from './battle-vfx-coordinates'
 import { TERM_DEFS } from './shared/rule-terms'
 import './App.css'
 
@@ -4173,13 +4174,15 @@ function BattleDice({ event, lastRoll }: { event?: BattleEvent; lastRoll?: Battl
 }
 
 function BattleFxStage({ event, presentation, speed }: { event?: BattleEvent; presentation: PresentationEvent | null; speed: number }) {
+  const stageRef = useRef<HTMLDivElement | null>(null)
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const reducedMotion = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
   const timeline = presentation ? buildFxTimeline(presentation, Boolean(reducedMotion)) : []
 
   useEffect(() => {
+    const stage = stageRef.current
     const canvas = canvasRef.current
-    if (!canvas || !event) return
+    if (!stage || !canvas || !event || !presentation) return
     const context = canvas.getContext('2d')
     if (!context) return
 
@@ -4193,21 +4196,17 @@ function BattleFxStage({ event, presentation, speed }: { event?: BattleEvent; pr
     }
     let rect = resize()
     const fx = createBattleFxStyle(event)
-    const targetSide = battleVfxTargetSide(event)
-    const targetX = targetSide === 'player' ? rect.width * 0.74 : targetSide === 'opponent' ? rect.width * 0.26 : rect.width * 0.5
-    const actorX = event.actor === 'player' ? rect.width * 0.74 : event.actor === 'opponent' ? rect.width * 0.26 : rect.width * 0.5
-    const centerY = rect.height * 0.5
-    const particles = createBattleParticles(event, fx, targetX, centerY)
     const started = performance.now()
     const duration = Math.max(320, 860 / speed)
     let frame = 0
 
     const draw = (now: number) => {
       rect = resize()
+      const points = resolveBattleFxPoints(stage, presentation, (anchor) => queryBattleFxAnchor(stage.parentElement ?? stage, anchor))
       const t = Math.min(1, (now - started) / duration)
       context.clearRect(0, 0, rect.width, rect.height)
-      drawBattleFxTrail(context, actorX, targetX, centerY, t, fx)
-      for (const particle of particles) {
+      drawBattleFxTrail(context, points.source.x, points.target.x, points.source.y, points.target.y, t, fx)
+      for (const particle of createBattleParticles(event, fx, points.target.x, points.target.y)) {
         const x = particle.x + particle.vx * t
         const y = particle.y + particle.vy * t
         context.globalAlpha = Math.max(0, 1 - t) * particle.alpha
@@ -4225,16 +4224,16 @@ function BattleFxStage({ event, presentation, speed }: { event?: BattleEvent; pr
           context.fill()
         }
       }
-      drawHandwrittenBattleNumber(context, event, fx, targetX, centerY, t)
+      drawHandwrittenBattleNumber(context, event, fx, points.target.x, points.target.y, t)
       context.globalAlpha = 1
       if (t < 1) frame = window.requestAnimationFrame(draw)
     }
     frame = window.requestAnimationFrame(draw)
     return () => window.cancelAnimationFrame(frame)
-  }, [event, speed])
+  }, [event, presentation, speed])
 
   return (
-    <div className="battle-fx-stage" data-vfx-kind={battleVfxKind(event)} data-timeline={timeline.map((step) => step.phase).join(' ')}>
+    <div ref={stageRef} className="battle-fx-stage" data-vfx-kind={battleVfxKind(event)} data-timeline={timeline.map((step) => step.phase).join(' ')}>
       <canvas ref={canvasRef} className="battle-fx-canvas handdrawn-fx-canvas" data-vfx-kind={battleVfxKind(event)} aria-hidden="true" />
       {presentation && presentation.kind !== 'none' && (
         <span className={`battle-feedback-burst ${presentation.kind}`} aria-hidden="true">
@@ -4245,10 +4244,11 @@ function BattleFxStage({ event, presentation, speed }: { event?: BattleEvent; pr
   )
 }
 
-function drawBattleFxTrail(context: CanvasRenderingContext2D, actorX: number, targetX: number, centerY: number, t: number, fx: BattleVfxStyle) {
-  if (fx.kind === 'none' || fx.kind === 'roll' || actorX === targetX) return
+function drawBattleFxTrail(context: CanvasRenderingContext2D, actorX: number, targetX: number, actorY: number, targetY: number, t: number, fx: BattleVfxStyle) {
+  if (fx.kind === 'none' || fx.kind === 'roll') return
   const progress = Math.min(1, t * 1.35)
   const currentX = actorX + (targetX - actorX) * progress
+  const currentY = actorY + (targetY - actorY) * progress
   const lift = fx.kind === 'heal' || fx.kind === 'shield' ? -42 : -26
   context.save()
   context.globalAlpha = Math.max(0, .92 - t * .6)
@@ -4257,13 +4257,13 @@ function drawBattleFxTrail(context: CanvasRenderingContext2D, actorX: number, ta
   context.lineCap = 'round'
   context.setLineDash([14, 7])
   context.beginPath()
-  context.moveTo(actorX, centerY + 4)
-  context.quadraticCurveTo((actorX + targetX) / 2, centerY + lift, currentX, centerY)
+  context.moveTo(actorX, actorY + 4)
+  context.quadraticCurveTo((actorX + targetX) / 2, Math.min(actorY, targetY) + lift, currentX, currentY)
   context.stroke()
   context.setLineDash([])
   context.fillStyle = fx.accent
   context.beginPath()
-  context.arc(currentX, centerY - 4, 11 + 6 * (1 - t), 0, Math.PI * 2)
+  context.arc(currentX, currentY - 4, 11 + 6 * (1 - t), 0, Math.PI * 2)
   context.fill()
   context.restore()
 }
