@@ -4274,19 +4274,19 @@ function BattleFxStage({ event, presentation, speed }: { event?: BattleEvent; pr
     const started = performance.now()
     const duration = Math.max(320, 860 / speed)
     let frame = 0
-    let particles = createBattleParticles(event, fx, rect.width * 0.5, rect.height * 0.5)
+    let particles = createMeteorSparkParticles(event, fx, rect.width * 0.5, rect.height * 0.5)
     let particlesReady = false
 
     const draw = (now: number) => {
       rect = resize()
       const points = resolveBattleFxPoints(stage, presentation, (anchor) => anchor === presentation.source ? sourceElement : targetElement)
       if (!particlesReady) {
-        particles = createBattleParticles(event, fx, points.target.x, points.target.y)
+        particles = createMeteorSparkParticles(event, fx, points.target.x, points.target.y)
         particlesReady = true
       }
       const t = Math.min(1, (now - started) / duration)
       context.clearRect(0, 0, rect.width, rect.height)
-      drawBattleFxTrail(context, points.source.x, points.target.x, points.source.y, points.target.y, t, fx)
+      drawMeteorBattleFxTrail(context, points.source.x, points.source.y, points.target.x, points.target.y, t, fx)
       for (const particle of particles) {
         const x = particle.x + particle.vx * t
         const y = particle.y + particle.vy * t
@@ -4305,6 +4305,7 @@ function BattleFxStage({ event, presentation, speed }: { event?: BattleEvent; pr
           context.fill()
         }
       }
+      drawMeteorImpactFlash(context, points.target.x, points.target.y, t, fx)
       drawHandwrittenBattleNumber(context, event, fx, points.target.x, points.target.y, t)
       context.globalAlpha = 1
       if (t < 1) frame = window.requestAnimationFrame(draw)
@@ -4325,27 +4326,91 @@ function BattleFxStage({ event, presentation, speed }: { event?: BattleEvent; pr
   )
 }
 
-function drawBattleFxTrail(context: CanvasRenderingContext2D, actorX: number, targetX: number, actorY: number, targetY: number, t: number, fx: BattleVfxStyle) {
+function drawMeteorBattleFxTrail(context: CanvasRenderingContext2D, actorX: number, actorY: number, targetX: number, targetY: number, t: number, fx: BattleVfxStyle) {
   if (fx.kind === 'none' || fx.kind === 'roll') return
-  const progress = Math.min(1, t * 1.35)
-  const currentX = actorX + (targetX - actorX) * progress
-  const currentY = actorY + (targetY - actorY) * progress
-  const lift = fx.kind === 'heal' || fx.kind === 'shield' ? -42 : -26
+  const progress = Math.min(1, t * 1.22)
+  const lift = fx.kind === 'heal' || fx.kind === 'shield' ? -72 : -54
+  const controlX = (actorX + targetX) * 0.5
+  const controlY = Math.min(actorY, targetY) + lift
+  const currentX = quadraticPoint(actorX, controlX, targetX, progress)
+  const currentY = quadraticPoint(actorY, controlY, targetY, progress)
+  const meteorPulse = 1 + Math.sin(t * Math.PI * 6) * 0.08
+  const tailLayers = [
+    { width: 24, alpha: 0.14, lag: 0.36, color: fx.color },
+    { width: 15, alpha: 0.28, lag: 0.24, color: fx.accent },
+    { width: 7, alpha: 0.82, lag: 0.11, color: '#fff8e8' },
+  ]
   context.save()
-  context.globalAlpha = Math.max(0, .92 - t * .6)
-  context.strokeStyle = fx.color
-  context.lineWidth = 7
   context.lineCap = 'round'
-  context.setLineDash([14, 7])
+  context.lineJoin = 'round'
+  for (const layer of tailLayers) {
+    const tailProgress = Math.max(0, progress - layer.lag)
+    const tailX = quadraticPoint(actorX, controlX, targetX, tailProgress)
+    const tailY = quadraticPoint(actorY, controlY, targetY, tailProgress)
+    const gradient = context.createLinearGradient(tailX, tailY, currentX, currentY)
+    gradient.addColorStop(0, 'rgba(255, 255, 255, 0)')
+    gradient.addColorStop(0.45, layer.color)
+    gradient.addColorStop(1, '#ffffff')
+    context.globalAlpha = Math.max(0, layer.alpha * (1 - t * 0.24))
+    context.strokeStyle = gradient
+    context.lineWidth = layer.width
+    context.shadowColor = layer.color
+    context.shadowBlur = 18 + layer.width
+    context.beginPath()
+    context.moveTo(tailX, tailY)
+    context.quadraticCurveTo(
+      quadraticPoint(actorX, controlX, targetX, Math.max(0, progress - layer.lag * 0.45)),
+      quadraticPoint(actorY, controlY, targetY, Math.max(0, progress - layer.lag * 0.45)),
+      currentX,
+      currentY,
+    )
+    context.stroke()
+  }
+  const aura = context.createRadialGradient(currentX, currentY, 2, currentX, currentY, 28 * meteorPulse)
+  aura.addColorStop(0, 'rgba(255, 255, 255, .98)')
+  aura.addColorStop(0.22, fx.accent)
+  aura.addColorStop(0.58, fx.color)
+  aura.addColorStop(1, 'rgba(255, 255, 255, 0)')
+  context.globalAlpha = Math.max(0, 0.96 - t * 0.32)
+  context.fillStyle = aura
+  context.shadowColor = fx.accent
+  context.shadowBlur = 28
   context.beginPath()
-  context.moveTo(actorX, actorY + 4)
-  context.quadraticCurveTo((actorX + targetX) / 2, Math.min(actorY, targetY) + lift, currentX, currentY)
-  context.stroke()
-  context.setLineDash([])
-  context.fillStyle = fx.accent
-  context.beginPath()
-  context.arc(currentX, currentY - 4, 11 + 6 * (1 - t), 0, Math.PI * 2)
+  context.arc(currentX, currentY, 26 * meteorPulse, 0, Math.PI * 2)
   context.fill()
+  context.fillStyle = '#ffffff'
+  context.shadowBlur = 12
+  context.beginPath()
+  context.arc(currentX, currentY, 5.5 * meteorPulse, 0, Math.PI * 2)
+  context.fill()
+  context.restore()
+}
+
+function drawMeteorImpactFlash(context: CanvasRenderingContext2D, targetX: number, targetY: number, t: number, fx: BattleVfxStyle) {
+  if (fx.kind === 'none' || fx.kind === 'roll' || t < 0.52) return
+  const impactT = Math.min(1, (t - 0.52) / 0.48)
+  const radius = 20 + impactT * 54
+  const alpha = Math.max(0, 1 - impactT)
+  const gradient = context.createRadialGradient(targetX, targetY, 2, targetX, targetY, radius)
+  gradient.addColorStop(0, 'rgba(255, 255, 255, .95)')
+  gradient.addColorStop(0.22, fx.accent)
+  gradient.addColorStop(0.56, fx.color)
+  gradient.addColorStop(1, 'rgba(255, 255, 255, 0)')
+  context.save()
+  context.globalAlpha = alpha * 0.62
+  context.fillStyle = gradient
+  context.shadowColor = fx.accent
+  context.shadowBlur = 32
+  context.beginPath()
+  context.arc(targetX, targetY, radius, 0, Math.PI * 2)
+  context.fill()
+  context.globalAlpha = alpha * 0.76
+  context.strokeStyle = fx.accent
+  context.lineWidth = 3
+  context.setLineDash([10, 8])
+  context.beginPath()
+  context.arc(targetX, targetY, radius * 0.72, 0, Math.PI * 2)
+  context.stroke()
   context.restore()
 }
 
@@ -4367,26 +4432,31 @@ function drawHandwrittenBattleNumber(context: CanvasRenderingContext2D, event: B
   context.restore()
 }
 
-function createBattleParticles(event: BattleEvent, fx: BattleVfxStyle, x: number, y: number) {
+function createMeteorSparkParticles(event: BattleEvent, fx: BattleVfxStyle, x: number, y: number) {
   const particles: Array<{ x: number; y: number; vx: number; vy: number; size: number; grow: number; alpha: number; color: string; kind: 'dot' | 'slash' }> = []
-  const palette = [fx.color, fx.accent, event.kind === 'ROLL' ? '#ffffff' : '#fff4e4']
-  const count = fx.particleCount
+  const palette = ['#ffffff', fx.accent, fx.color, event.kind === 'ROLL' ? '#ffffff' : '#fff4e4']
+  const count = fx.particleCount + 7
   for (let index = 0; index < count; index += 1) {
     const angle = (Math.PI * 2 * index) / count
-    const distance = 42 + (index % 5) * 15
+    const distance = 54 + (index % 7) * 18
     particles.push({
       x: x + Math.cos(angle) * 16,
       y: y + Math.sin(angle) * 10,
       vx: Math.cos(angle) * distance,
       vy: Math.sin(angle) * distance - (index % 3) * 10,
-      size: fx.kind === 'poison' ? 10 + (index % 5) : fx.kind === 'freeze' ? 6 + (index % 4) : 4 + (index % 5),
-      grow: fx.kind === 'poison' ? 20 : fx.kind === 'heal' || fx.kind === 'shield' ? 14 : 7,
-      alpha: fx.kind === 'poison' ? 0.42 : fx.kind === 'miss' ? 0.58 : 0.9,
+      size: fx.kind === 'poison' ? 9 + (index % 5) : fx.kind === 'freeze' ? 6 + (index % 4) : 3 + (index % 5),
+      grow: fx.kind === 'poison' ? 24 : fx.kind === 'heal' || fx.kind === 'shield' ? 17 : 10,
+      alpha: fx.kind === 'poison' ? 0.52 : fx.kind === 'miss' ? 0.68 : 0.96,
       color: palette[index % palette.length],
       kind: fx.kind === 'damage' && index % 4 === 0 ? 'slash' : 'dot',
     })
   }
   return particles
+}
+
+function quadraticPoint(start: number, control: number, end: number, t: number) {
+  const inverse = 1 - t
+  return inverse * inverse * start + 2 * inverse * t * control + t * t * end
 }
 
 function CollapsedBattleLog({ events, eventIndex, open, onToggle }: { events: BattleEvent[]; eventIndex: number; open: boolean; onToggle: () => void }) {

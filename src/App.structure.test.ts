@@ -604,7 +604,7 @@ describe('selection screen structure', () => {
     expect(app).toContain('queryBattleFxAnchor')
     expect(app).toContain('vfx-target-${battleVfxKind(event)}')
     expect(app).toContain('createBattleFxStyle(event)')
-    expect(app).toContain('drawBattleFxTrail')
+    expect(app).toContain('drawMeteorBattleFxTrail')
     expect(app).toContain('drawHandwrittenBattleNumber')
     expect(app).toContain("kind: 'shield'")
     expect(app).toContain("kind: 'weak'")
@@ -623,6 +623,16 @@ describe('selection screen structure', () => {
     expect(app).toContain("event.text.includes('相邻')")
     expect(app).toContain('targetItemIds.includes(item.id)')
     expect(app).toContain('battle-item-vfx-target')
+  })
+
+  it('draws battle vfx as meteor trails with glow, tail, sparks, and impact flash', () => {
+    expect(app).toContain('function drawMeteorBattleFxTrail')
+    expect(app).toContain('function drawMeteorImpactFlash')
+    expect(app).toContain('function createMeteorSparkParticles')
+    expect(app).toContain('const tailLayers = [')
+    expect(app).toContain('context.shadowBlur')
+    expect(app).toContain('context.createRadialGradient')
+    expect(app).toContain('meteorPulse')
   })
 
   it('exposes boom counter accumulation hooks on battle equipment cards', () => {
