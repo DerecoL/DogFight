@@ -628,7 +628,6 @@ const qualityPriceMultiplier: Record<ItemQuality, number> = {
   DIAMOND: 8,
 }
 const DOG_SELECTION_SLOT_COUNT = 8
-const SHOP_CHOICE_SLOT_COUNT = 8
 const BASE_EQUIPMENT_SLOT_COUNT = 12
 const EXTRA_EQUIPMENT_SLOT_COUNT = 13
 const BASE_MAX_HP = 100
@@ -663,6 +662,7 @@ const ladderTierLabel: Record<LadderTier, string> = {
 }
 const dogOptions: DogType[] = ['SHIBA', 'SAMOYED', 'MUTT', 'BULLY', 'EMPEROR']
 const shopChoiceOrder: ShopType[] = ['GENERAL', 'LARGE', 'MEDIUM', 'SMALL', 'SMALL_DICE', 'BIG_DICE', 'RELIC', 'UPGRADE', 'POTION']
+const SHOP_CHOICE_SLOT_COUNT = shopChoiceOrder.length
 const dogStrategies: Record<DogType, string> = {
   SHIBA: '适合新手，专注于持续输出伤害',
   SAMOYED: '适合押【大点】构筑，爆发窗口更集中',
@@ -3215,10 +3215,7 @@ function IconButton({ children, title, onClick, disabled }: { children: React.Re
 
 function ShopChoiceSelect({ choices, onPick }: { choices: ShopType[]; onPick: (shopType: ShopType) => void }) {
   const [selectedChoice, setSelectedChoice] = useState<ShopType | null>(choices[0] ?? null)
-  const slots = Array.from({ length: SHOP_CHOICE_SLOT_COUNT }, (_, index) => {
-    const shopType = shopChoiceOrder[index]
-    return choices.includes(shopType) ? shopType : null
-  })
+  const slots = Array.from({ length: SHOP_CHOICE_SLOT_COUNT }, (_, index) => choices[index] ?? null)
   return (
     <section className="shop-choice-screen">
       <div className="screen-heading centered">

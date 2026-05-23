@@ -178,8 +178,8 @@ describe('selection screen structure', () => {
     expect(app).toContain("BULLY: '/assets/dogs/bully.webp'")
   })
 
-  it('keeps shop choices in an eight-slot board and pads missing choices with blanks', () => {
-    expect(app).toContain('SHOP_CHOICE_SLOT_COUNT = 8')
+  it('keeps shop choices in a fixed board and pads missing choices with blanks', () => {
+    expect(app).toContain('SHOP_CHOICE_SLOT_COUNT = shopChoiceOrder.length')
     expect(app).toContain('choice placeholder')
     expect(app).toContain('ShopChoiceSelect')
     expect(app).toContain('role="button" tabIndex={0} className={`choice paper-card sticker-card ${selectedChoice === choice ? \'selected\' : \'\'}`}')
@@ -189,6 +189,16 @@ describe('selection screen structure', () => {
     expect(app).not.toContain('<button key={choice} className={`choice paper-card sticker-card')
     expect(css).toContain('grid-template-columns: repeat(3, minmax(240px, 1fr))')
     expect(css).toContain('.choice.placeholder')
+  })
+
+  it('allocates a shop choice slot for every shop type including potion', () => {
+    expect(app).toContain('SHOP_CHOICE_SLOT_COUNT = shopChoiceOrder.length')
+    expect(app).toContain("const shopChoiceOrder: ShopType[] = ['GENERAL', 'LARGE', 'MEDIUM', 'SMALL', 'SMALL_DICE', 'BIG_DICE', 'RELIC', 'UPGRADE', 'POTION']")
+  })
+
+  it('places normal three shop choices into the first three slots', () => {
+    expect(app).toContain('const slots = Array.from({ length: SHOP_CHOICE_SLOT_COUNT }, (_, index) => choices[index] ?? null)')
+    expect(app).not.toContain('const shopType = shopChoiceOrder[index]')
   })
 
   it('wires the free upgrade shop into choices and item selection', () => {
