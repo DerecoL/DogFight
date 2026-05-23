@@ -18,7 +18,8 @@ export function resolveBattleFxPoints(
 
 export function queryBattleFxAnchor(root: ParentNode, anchor: FxAnchor): HTMLElement | null {
   const itemSelector = anchor.id ? `[data-vfx-item-id="${cssEscape(anchor.id)}"]` : ''
-  const selector = `[data-vfx-anchor="${anchor.anchor}"][data-vfx-side="${anchor.side}"]${itemSelector}`
+  const domAnchor = anchor.anchor === 'item' ? 'equipment-row' : anchor.anchor
+  const selector = `[data-vfx-anchor="${domAnchor}"][data-vfx-side="${anchor.side}"]${itemSelector}`
   return root.querySelector<HTMLElement>(selector)
 }
 

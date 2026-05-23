@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { resolveBattleFxPoints } from './battle-vfx-coordinates'
+import { queryBattleFxAnchor, resolveBattleFxPoints } from './battle-vfx-coordinates'
 import type { FxAnchor, PresentationEvent } from './feedback'
 
 function rect(left: number, top: number, width: number, height: number): DOMRect {
@@ -35,6 +35,19 @@ function presentation(source: FxAnchor, target: FxAnchor): PresentationEvent {
 }
 
 describe('battle vfx coordinate resolution', () => {
+  it('resolves item source anchors from equipment row DOM cards by item id', () => {
+    const item = { tag: 'item' } as unknown as HTMLElement
+    const root = {
+      querySelector: (selector: string) => {
+        return selector === '[data-vfx-anchor="equipment-row"][data-vfx-side="player"][data-vfx-item-id="item-1"]'
+          ? item
+          : null
+      },
+    } as ParentNode
+
+    expect(queryBattleFxAnchor(root, { anchor: 'item', side: 'player', id: 'item-1' })).toBe(item)
+  })
+
   it('resolves source and target centers relative to the panel', () => {
     const panel = elementWithRect(rect(100, 50, 400, 300))
     const item = elementWithRect(rect(160, 90, 80, 40))

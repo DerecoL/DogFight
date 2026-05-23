@@ -4196,17 +4196,26 @@ function BattleFxStage({ event, presentation, speed }: { event?: BattleEvent; pr
     }
     let rect = resize()
     const fx = createBattleFxStyle(event)
+    const anchorRoot = stage.parentElement ?? stage
+    const sourceElement = queryBattleFxAnchor(anchorRoot, presentation.source)
+    const targetElement = queryBattleFxAnchor(anchorRoot, presentation.target)
     const started = performance.now()
     const duration = Math.max(320, 860 / speed)
     let frame = 0
+    let particles = createBattleParticles(event, fx, rect.width * 0.5, rect.height * 0.5)
+    let particlesReady = false
 
     const draw = (now: number) => {
       rect = resize()
-      const points = resolveBattleFxPoints(stage, presentation, (anchor) => queryBattleFxAnchor(stage.parentElement ?? stage, anchor))
+      const points = resolveBattleFxPoints(stage, presentation, (anchor) => anchor === presentation.source ? sourceElement : targetElement)
+      if (!particlesReady) {
+        particles = createBattleParticles(event, fx, points.target.x, points.target.y)
+        particlesReady = true
+      }
       const t = Math.min(1, (now - started) / duration)
       context.clearRect(0, 0, rect.width, rect.height)
       drawBattleFxTrail(context, points.source.x, points.target.x, points.source.y, points.target.y, t, fx)
-      for (const particle of createBattleParticles(event, fx, points.target.x, points.target.y)) {
+      for (const particle of particles) {
         const x = particle.x + particle.vx * t
         const y = particle.y + particle.vy * t
         context.globalAlpha = Math.max(0, 1 - t) * particle.alpha
