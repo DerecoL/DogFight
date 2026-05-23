@@ -170,7 +170,7 @@ describe('equipment layout scale', () => {
     expect(cssRule('.battle-equipment-row .relic-rail')).toContain('width: 188px')
     expect(cssRule('.battle-equipment-row .relic-slot-grid')).toContain('grid-template-columns: repeat(3, 52px)')
     expect(cssRule('.battle-equipment-row .relic-slot-grid')).toContain('grid-template-rows: repeat(2, 52px)')
-    expect(cssRule('.battle-item')).toContain('min-height: 118px')
+    expect(cssRule('.battle-item')).toContain('min-height: 142px')
     expect(cssRule('.battle-item .item-icon')).toContain('width: 42px')
     expect(cssRule('.battle-item .item-icon')).toContain('height: 42px')
     expect(cssRule('.battle-stage .battle-dog')).toContain('grid-template-columns: minmax(170px, 260px) auto')
@@ -250,7 +250,7 @@ describe('equipment layout scale', () => {
     expect(cssRule('.battle-item-trigger::after')).toContain('content: ""')
     expect(app).toContain('itemTriggerCountLabel(events, owner, item.id, displayIndex)')
     expect(app).toContain('className={`trigger-count-stamp')
-    expect(cssRule('.trigger-count-stamp')).toContain('bottom: 5px')
+    expect(cssRule('.trigger-count-stamp')).toContain('bottom: 8px')
     expect(cssRule('.battle-item.trigger-count-pop .trigger-count-stamp')).toContain('animation')
     expect(css).toContain('@keyframes triggerCountStampPop')
     expect(cssRule('.battle-dog.vfx-target-damage .battle-dog-img')).toContain('filter')
@@ -263,6 +263,15 @@ describe('equipment layout scale', () => {
     expect(css).toContain('@keyframes vfxDamageJolt')
   })
 
+  it('keeps battle equipment cards tall enough for trigger counts to avoid item text', () => {
+    expect(cssRule('.battle-equipment-row')).toContain('--slot-h: 142px')
+    expect(cssRule('.battle-item')).toContain('min-height: 142px')
+    expect(cssRule('.battle-item')).toContain('padding-bottom: 34px')
+    expect(cssRule('.trigger-count-stamp')).toContain('bottom: 8px')
+    expect(css).toContain('.battle-equipment-row { --slot-w: 58px; --slot-h: 104px; }')
+    expect(css).toContain('.battle-item { min-height: 104px; }')
+  })
+
   it('keeps explanatory copy separated from nearby headings', () => {
     for (const selector of ['.auth-panel .brand-block > div', '.section-title > div', '.battle-status']) {
       const rule = cssRule(selector)
@@ -270,6 +279,22 @@ describe('equipment layout scale', () => {
       expect(rule).toContain(selector === '.battle-status' ? 'gap: 4px' : 'gap: 6px')
     }
     expect(cssRule('.battle-toolbar p')).not.toContain('margin-top')
+  })
+
+  it('keeps rule text as an inline flow inside cards and tips', () => {
+    expect(cssRule('.rule-term-wrap')).toContain('display: inline')
+    expect(cssRule('.rule-term')).toContain('display: inline')
+    expect(cssRule('.rule-term')).toContain('white-space: nowrap')
+    expect(cssRule('.rule-term')).toContain('overflow-wrap: normal')
+    expect(css).not.toContain('.choice > span:last-of-type')
+
+    for (const selector of ['.choice-copy, .card-copy', '.shop-card .effect-line', '.item-effect', '.tip-description']) {
+      const rule = cssRule(selector)
+      expect(rule).toContain('min-width: 0')
+      expect(rule).toContain('line-height')
+      expect(rule).toContain('word-break: normal')
+      expect(rule).toContain('overflow-wrap: break-word')
+    }
   })
 
   it('keeps game headings and hints readable when the system prefers dark mode', () => {
@@ -317,6 +342,12 @@ describe('equipment layout scale', () => {
     expect(css).toContain('.dogfight-room-card {')
     expect(css).toContain('grid-template-columns: 1fr')
   })
+
+  it('stacks choice cards on narrow screens so card copy is not clipped', () => {
+    expect(css).toContain('@media (max-width: 760px)')
+    expect(css).toContain('.choice-grid { grid-template-columns: 1fr; }')
+  })
+
   it('styles clickable battle status chips and their compact tips without resizing rows', () => {
     expect(cssRule('.status-chip')).toContain('appearance: none')
     expect(cssRule('.status-chip')).toContain('cursor: pointer')

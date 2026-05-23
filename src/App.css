@@ -249,9 +249,9 @@ input {
   overflow: hidden;
   color: #667085;
   font-size: 12px;
-  line-height: 1.2;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.25;
+  word-break: normal;
+  overflow-wrap: break-word;
 }
 .resource-pill {
   display: inline-grid;
@@ -403,7 +403,8 @@ input {
 }
 .ceremony-reward-chip strong {
   font-size: 15px;
-  overflow-wrap: anywhere;
+  word-break: normal;
+  overflow-wrap: break-word;
 }
 .ceremony-reward-chip small {
   color: rgba(61, 45, 37, .72);
@@ -568,6 +569,13 @@ input {
   gap: 5px;
 }
 .effect-line { color: #667085; font-size: 13px; }
+.shop-card .effect-line {
+  min-width: 0;
+  display: block;
+  line-height: 1.35;
+  word-break: normal;
+  overflow-wrap: break-word;
+}
 .price-tag {
   min-height: 22px;
   padding: 3px 7px;
@@ -776,7 +784,7 @@ input {
   line-height: 1.2;
   overflow-wrap: anywhere;
 }
-.rule-term-wrap { position: relative; display: inline-block; max-width: 100%; vertical-align: baseline; }
+.rule-term-wrap { position: relative; display: inline; max-width: 100%; vertical-align: baseline; }
 .rule-term {
   display: inline;
   max-width: 100%;
@@ -787,7 +795,9 @@ input {
   font: inherit;
   font-weight: 950;
   text-decoration: underline;
-  overflow-wrap: anywhere;
+  white-space: nowrap;
+  word-break: normal;
+  overflow-wrap: normal;
   cursor: pointer;
 }
 .rule-tip {
@@ -879,13 +889,17 @@ input {
 }
 .item-effect {
   width: 100%;
+  min-width: 0;
+  display: block;
   justify-content: center;
   padding: 2px 3px;
   border-radius: 5px;
   background: rgba(255, 250, 241, .42);
   font-size: 10px;
-  line-height: 1.1;
-  overflow-wrap: anywhere;
+  line-height: 1.35;
+  text-align: center;
+  word-break: normal;
+  overflow-wrap: break-word;
 }
 .item-effect.enchant-text {
   background: rgba(239, 246, 255, .78);
@@ -1122,7 +1136,8 @@ input {
   border: 1px solid var(--line);
   border-radius: 18px;
   box-shadow: 0 24px 70px rgba(37, 48, 71, .24);
-  overflow-wrap: anywhere;
+  word-break: normal;
+  overflow-wrap: break-word;
 }
 .floating-tip.paper-card {
   overflow: auto;
@@ -1284,9 +1299,8 @@ input {
 }
 .tip-description {
   min-height: 78px;
-  display: grid;
-  justify-items: center;
-  align-content: center;
+  display: block;
+  min-width: 0;
   margin: 0;
   padding: 14px;
   border: 2px solid var(--ink);
@@ -1297,8 +1311,8 @@ input {
   font-weight: 900;
   line-height: 1.45;
   text-align: center;
-  overflow-wrap: anywhere;
-  word-break: break-word;
+  word-break: normal;
+  overflow-wrap: break-word;
 }
 .tip-price {
   display: inline-flex;
@@ -1530,7 +1544,7 @@ input {
   align-items: stretch;
   min-width: 0;
   overflow-x: visible;
-  --slot-h: 118px;
+  --slot-h: 142px;
 }
 .battle-row-title {
   grid-column: 1 / -1;
@@ -1567,8 +1581,8 @@ input {
 .battle-item {
   width: 100%;
   height: var(--slot-h);
-  min-height: 118px;
-  padding-bottom: 26px;
+  min-height: 142px;
+  padding-bottom: 34px;
   cursor: pointer;
   text-align: center;
 }
@@ -1598,13 +1612,13 @@ input {
   animation: paperShimmer .72s ease-out 1;
 }
 .battle-item.boom-counter {
-  padding-bottom: 43px;
+  padding-bottom: 52px;
 }
 .boom-counter-meter {
   position: absolute;
   left: 7px;
   right: 7px;
-  bottom: 23px;
+  bottom: 29px;
   height: 14px;
   display: grid;
   place-items: center;
@@ -1653,7 +1667,7 @@ input {
 .trigger-count-stamp {
   position: absolute;
   left: 50%;
-  bottom: 5px;
+  bottom: 8px;
   z-index: 5;
   min-width: 34px;
   padding: 2px 9px 3px;
@@ -3198,6 +3212,7 @@ input {
   min-height: 150px;
   justify-items: center;
   text-align: center;
+  cursor: pointer;
 }
 
 .dog-card {
@@ -3209,6 +3224,16 @@ input {
 
 .dog-card small {
   align-self: start;
+}
+
+.choice-copy, .card-copy {
+  align-self: stretch;
+  display: block;
+  min-width: 0;
+  line-height: 1.42;
+  text-align: center;
+  word-break: normal;
+  overflow-wrap: break-word;
 }
 
 .dog-card .tag-row {
@@ -3369,13 +3394,6 @@ input {
   align-content: stretch;
   gap: 8px;
   padding: 14px;
-}
-
-.choice > span:last-of-type {
-  align-self: stretch;
-  display: grid;
-  place-items: center;
-  min-width: 0;
 }
 
 .choice-icon {
@@ -4602,6 +4620,7 @@ input {
   .history-page-header { grid-template-columns: minmax(0, 1fr) auto; }
   .history-page-best { grid-column: 1 / -1; justify-items: start; text-align: left; }
   .offer-row { grid-template-columns: 1fr; }
+  .choice-grid { grid-template-columns: 1fr; }
   .battle-hud { grid-template-columns: 1fr; }
   .visual-battle { gap: 6px; padding: 8px; }
   .battle-toolbar { grid-template-columns: 1fr; align-items: flex-start; }
@@ -4621,12 +4640,12 @@ input {
   .battle-stage .battle-dog .hp { grid-row: auto; }
   .battle-dog-img { width: 92px; height: 92px; }
   .battle-stage .battle-dog-img { width: 92px; height: 92px; }
-  .battle-equipment-row { --slot-w: 58px; --slot-h: 82px; }
+  .battle-equipment-row { --slot-w: 58px; --slot-h: 104px; }
   .battle-equipment-row { grid-template-columns: 1fr; }
   .battle-equipment-row .relic-rail { grid-column: 1; grid-row: 3; width: 100%; }
   .battle-equipment-row .relic-slot-grid { grid-template-columns: repeat(6, 44px); grid-template-rows: 44px; justify-content: start; overflow-x: auto; }
   .battle-equipment-row .relic-slot { width: 44px; height: 44px; }
-  .battle-item { min-height: 82px; }
+  .battle-item { min-height: 104px; }
   .floating-tip { right: auto; bottom: auto; width: min(380px, calc(100vw - 28px)); }
   .tip-body { grid-template-columns: 1fr; }
   .slot-grid { gap: 5px; padding: 10px; }

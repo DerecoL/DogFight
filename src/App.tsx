@@ -993,8 +993,8 @@ function RuleText({ text }: { text: string }) {
         const entry = ruleTerms[term]
         if (!entry) return <strong key={`${term}-${index}`}>【{term}】</strong>
         return (
-          <span className="rule-term-wrap" key={`${term}-${index}`}>
-            <button type="button" className="rule-term" onClick={(event) => { event.stopPropagation(); setOpenTerm(openTerm === term ? null : term) }}>【{term}】</button>
+          <span className="rule-term-wrap" key={`${term}-${index}`} onClick={(event) => event.stopPropagation()}>
+            <button type="button" className="rule-term" onClick={(event) => { event.stopPropagation(); setOpenTerm(openTerm === term ? null : term) }} onKeyDown={(event) => event.stopPropagation()}>【{term}】</button>
             {openTerm === term && (
               <span className="rule-tip paper-card" role="tooltip">
                 <b>{term}</b>
@@ -2805,13 +2805,13 @@ function LadderHome({ onStart }: { onStart: (choice: { dogType: DogType; luckyNu
         <div className="dog-select compact">
           <div className="dog-card-grid">
             {slots.map((dog, index) => dog ? (
-              <button className={`dog-card paper-card paper-dog-card ${selectedDog === dog ? 'selected' : ''}`} key={dog} onClick={() => setSelectedDog(dog)}>
+              <div key={dog} role="button" tabIndex={0} className={`dog-card paper-card paper-dog-card ${selectedDog === dog ? 'selected' : ''}`} onClick={() => setSelectedDog(dog)} onKeyDown={(event) => handleChoiceCardKeyDown(event, () => setSelectedDog(dog))}>
                 <span className="dog-art-frame">
                   <img className="dog-avatar" src={dogAssets[dog]} alt="" />
                 </span>
                 <strong>{dogNames[dog]}</strong>
-                <small><RuleText text={dogTraits[dog]} /></small>
-              </button>
+                <small className="card-copy"><RuleText text={dogTraits[dog]} /></small>
+              </div>
             ) : (
               <div className="dog-card placeholder paper-card paper-dog-card" key={`ladder-dog-placeholder-${index}`} aria-hidden="true" />
             ))}
@@ -2880,14 +2880,14 @@ function DogSelect({ onPick }: { onPick: (choice: { dogType: DogType; luckyNumbe
       <div className="dog-select">
         <div className="dog-card-grid">
           {slots.map((dog, index) => dog ? (
-            <button className={`dog-card paper-card paper-dog-card ${selectedDog === dog ? 'selected' : ''}`} key={dog} onClick={() => setSelectedDog(dog)}>
+            <div key={dog} role="button" tabIndex={0} className={`dog-card paper-card paper-dog-card ${selectedDog === dog ? 'selected' : ''}`} onClick={() => setSelectedDog(dog)} onKeyDown={(event) => handleChoiceCardKeyDown(event, () => setSelectedDog(dog))}>
               <span className="dog-art-frame">
                 <img className="dog-avatar" src={dogAssets[dog]} alt="" />
               </span>
               <strong>{dogNames[dog]}</strong>
-              <small><RuleText text={dogTraits[dog]} /></small>
+              <small className="card-copy"><RuleText text={dogTraits[dog]} /></small>
               <span className="tag-row">{dogTags[dog].map((tag) => <b key={tag}>{tag}</b>)}</span>
-            </button>
+            </div>
           ) : (
             <div className="dog-card placeholder paper-card paper-dog-card" key={`dog-placeholder-${index}`} aria-hidden="true" />
           ))}
@@ -3058,11 +3058,11 @@ function ShopChoiceSelect({ choices, onPick }: { choices: ShopType[]; onPick: (s
       </div>
       <div className="choice-grid">
         {slots.map((choice, index) => choice ? (
-          <button key={choice} className={`choice paper-card sticker-card ${selectedChoice === choice ? 'selected' : ''}`} onClick={() => setSelectedChoice(choice)}>
+          <div key={choice} role="button" tabIndex={0} className={`choice paper-card sticker-card ${selectedChoice === choice ? 'selected' : ''}`} onClick={() => setSelectedChoice(choice)} onKeyDown={(event) => handleChoiceCardKeyDown(event, () => setSelectedChoice(choice))}>
             <span className="choice-icon">{shopChoiceIcon(choice)}</span>
             <strong>{shopNames[choice]}</strong>
-            <span><RuleText text={shopDescriptions[choice]} /></span>
-          </button>
+            <span className="choice-copy"><RuleText text={shopDescriptions[choice]} /></span>
+          </div>
         ) : (
           <div className="choice placeholder paper-card sticker-card" key={`choice-placeholder-${index}`} aria-hidden="true" />
         ))}
@@ -3156,7 +3156,7 @@ function ClassRewardSelect({ choices, visualTheme, onPick }: { choices: ClassRew
             <strong>{choice.def.name}</strong>
             <span className={`tip-tag ${qualityClass(choice.quality)}`}>{qualityLabel[choice.quality]}</span>
             <span>{choice.def.size}格{triggerDice ? ` · ${triggerDice}` : ''}</span>
-            <span><RuleText text={choice.def.description ?? effectText(choice.def, choice.quality)} /></span>
+            <span className="choice-copy"><RuleText text={choice.def.description ?? effectText(choice.def, choice.quality)} /></span>
           </div>
           )
         })}
@@ -3214,7 +3214,7 @@ function EnchantChoiceSelect({ choices, selectedId, visualTheme, onSelect }: { c
             <Sparkles size={28} />
             <strong>{choice.enchant.label}</strong>
             <span className="tip-tag">免费</span>
-            <span><RuleText text={choice.description} /></span>
+            <span className="choice-copy"><RuleText text={choice.description} /></span>
           </div>
         ))}
       </div>
@@ -3237,7 +3237,7 @@ function RelicChoiceSelect({ choices, visualTheme, onPick }: { choices: RelicCho
             <RelicGlyph relic={choice} size={44} />
             <strong>{choice.def.name}</strong>
             <span className={`tip-tag ${qualityClass(choice.quality)}`}>{qualityLabel[choice.quality]}</span>
-            <span><RuleText text={choice.def.description} /></span>
+            <span className="choice-copy"><RuleText text={choice.def.description} /></span>
           </div>
         ))}
       </div>

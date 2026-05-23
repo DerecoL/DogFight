@@ -59,7 +59,8 @@ describe('item detail tooltip interactions', () => {
 
   it('keeps tip copy readable when names, tags, or rule terms wrap', () => {
     expect(cssRule('.floating-tip')).toContain('min-width: 0')
-    expect(cssRule('.floating-tip')).toContain('overflow-wrap: anywhere')
+    expect(cssRule('.floating-tip')).toContain('word-break: normal')
+    expect(cssRule('.floating-tip')).toContain('overflow-wrap: break-word')
     expect(cssRule('.tip-tags')).toContain('min-width: 0')
     expect(cssRule('.tip-tag')).toContain('max-width: 100%')
     expect(cssRule('.tip-tag')).toContain('white-space: normal')
@@ -67,9 +68,10 @@ describe('item detail tooltip interactions', () => {
     expect(cssRule('.tip-tags .size-badge')).toContain('white-space: normal')
     expect(cssRule('.tip-body')).toContain('min-width: 0')
     expect(cssRule('.tip-identity h3')).toContain('overflow-wrap: anywhere')
-    expect(cssRule('.tip-description')).toContain('justify-items: center')
+    expect(cssRule('.tip-description')).toContain('display: block')
+    expect(cssRule('.tip-description')).toContain('word-break: normal')
     expect(cssRule('.tip-description')).toContain('line-height: 1.45')
-    expect(cssRule('.tip-description')).toContain('overflow-wrap: anywhere')
+    expect(cssRule('.tip-description')).toContain('overflow-wrap: break-word')
     expect(cssRule('.rule-term-wrap')).toContain('max-width: 100%')
     expect(cssRule('.rule-tip')).toContain('max-width: calc(100vw - 32px)')
     expect(cssRule('.rule-tip')).toContain('overflow-wrap: anywhere')
