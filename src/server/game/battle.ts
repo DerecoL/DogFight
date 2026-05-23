@@ -14,6 +14,7 @@ import {
   growthDamageStep,
   itemDefForQuality,
   THORNS_DAMAGE_PER_STACK,
+  nightPatrolLightTriggerCount,
 } from './data'
 import { triggerOrder } from './grid'
 import { normalizeQuality, qualityAmount, qualityAmountFrom, QUALITY_LABELS } from './quality'
@@ -24,6 +25,10 @@ import type {
   BattleResult,
   BattleStatusRows,
   DogType,
+  Enchantment,
+  EnchantmentBaseEffect,
+  EnchantmentGrantEffect,
+  EnchantmentTarget,
   FighterSnapshot,
   GameItem,
   ItemDef,
@@ -60,6 +65,10 @@ type ItemTrigger = {
   targetHpDelta: number
   text: string
   roll?: number
+  boomCounterItemId?: string
+  boomCounterValue?: number
+  boomCounterMax?: number
+  boomCounterChanged?: boolean
 }
 
 type TriggerQueueEntry = {
@@ -85,10 +94,12 @@ type BattleSideState = {
   adjacentDamageBonus: Record<string, number>
   growthDamageByItemId: Record<string, number>
   lifestealItemIds: string[]
+  itemEffectBonus: Record<string, Partial<Record<EnchantmentBaseEffect, number>>>
+  itemGrantedEffects: Record<string, { effect: EnchantmentGrantEffect; amount: number }[]>
   forcedItemDice: Record<string, number>
   shibaSpeedStacks: number
   furyStacks: number
-  boomCounter: number
+  boomCountersByItemId: Record<string, number>
 }
 
 function maxHealthForRound(round: number) {
@@ -117,10 +128,12 @@ function createSideState(maxHp: number): BattleSideState {
     adjacentDamageBonus: {},
     growthDamageByItemId: {},
     lifestealItemIds: [],
+    itemEffectBonus: {},
+    itemGrantedEffects: {},
     forcedItemDice: {},
     shibaSpeedStacks: 0,
     furyStacks: 0,
-    boomCounter: 0,
+    boomCountersByItemId: {},
   }
 }
 
@@ -191,8 +204,13 @@ function isAdjacentToEffect(actor: FighterSnapshot, item: GameItem, effect: stri
   return equippedItemsWithEffect(actor, effect).some((source) => adjacentItems(actor, source).some((adjacent) => adjacent.id === item.id))
 }
 
+function extraEnchantDice(enchant?: Enchantment | null) {
+  return enchant?.kind === 'EXTRA_DICE' ? enchant.dice : []
+}
+
 function matchingContext(actor: FighterSnapshot, item: GameItem, roll: number, forcedItemDice: Record<string, number> = {}) {
   const def = itemDef(item.defId)
+  const triggerDice = [...def.dice, ...extraEnchantDice(item.enchant)]
   const forcedDie = forcedItemDice[item.id]
   if (forcedDie != null) return { matches: roll === forcedDie, scale: 1, note: roll === forcedDie ? '（圣旨改点）' : '', triggeredBySize: false }
 
@@ -200,14 +218,14 @@ function matchingContext(actor: FighterSnapshot, item: GameItem, roll: number, f
     return { matches: roll === actor.luckyNumber, scale: 1, note: roll === actor.luckyNumber ? '（垂帘听政）' : '', triggeredBySize: false }
   }
 
-  if (def.dice.includes(roll)) return { matches: true, scale: 1, note: '', triggeredBySize: false }
+  if (triggerDice.includes(roll)) return { matches: true, scale: 1, note: item.enchant?.kind === 'EXTRA_DICE' && !def.dice.includes(roll) ? '（附魔改点）' : '', triggeredBySize: false }
 
   const bigToSmall = relicWithEffect(actor, 'MIRROR_BIG_TO_SMALL')
-  if (bigToSmall && roll <= 3 && def.dice.includes(roll + 3)) {
+  if (bigToSmall && roll <= 3 && triggerDice.includes(roll + 3)) {
     return { matches: true, scale: relicEffectScale(bigToSmall.relicId, bigToSmall.quality), note: '（点金手·左映射）', triggeredBySize: false }
   }
   const smallToBig = relicWithEffect(actor, 'MIRROR_SMALL_TO_BIG')
-  if (smallToBig && roll >= 4 && def.dice.includes(roll - 3)) {
+  if (smallToBig && roll >= 4 && triggerDice.includes(roll - 3)) {
     return { matches: true, scale: relicEffectScale(smallToBig.relicId, smallToBig.quality), note: '（点金手·右映射）', triggeredBySize: false }
   }
   if (triggerOrder(actor.items).some((item) => itemDef(item.defId).advancedEffect === 'TRIGGER_BY_SIZE') && def.size === roll) {
@@ -256,8 +274,24 @@ function bloodContractAdjacentItems(actor: FighterSnapshot, item: GameItem, qual
   })
 }
 
+function neighborItems(actor: FighterSnapshot, item: GameItem, target: EnchantmentTarget) {
+  if (target === 'ADJACENT') return adjacentItems(actor, item)
+  const ordered = triggerOrder(actor.items)
+  const index = ordered.findIndex((candidate) => candidate.id === item.id)
+  if (index < 0) return []
+  const neighbor = target === 'LEFT' ? ordered[index - 1] : ordered[index + 1]
+  return neighbor ? [neighbor] : []
+}
+
 function queueItems(queue: TriggerQueueEntry[], items: GameItem[], allowExtraRollFanout = true) {
   queue.push(...items.map((item) => ({ item, allowExtraRollFanout })))
+}
+
+function itemBaseEffectKind(def: ItemDef): EnchantmentBaseEffect | null {
+  if (def.effect.type === 'DAMAGE' || def.effect.type === 'DAMAGE_SELF_SHIELD') return 'DAMAGE'
+  if (def.effect.type === 'HEAL') return 'HEAL'
+  if (def.advancedEffect === 'GAIN_SHIELD' || def.advancedEffect === 'GAIN_SHIELD_THORNS' || def.advancedEffect === 'SHIELD_ON_NON_LUCKY' || def.advancedEffect === 'SHIELD_IMMUNITY') return 'SHIELD'
+  return null
 }
 
 function itemName(def: ItemDef, quality: ItemQuality) {
@@ -490,29 +524,58 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
       return triggers
     }
 
-    const boomCounterItem = equippedItemsWithEffect(actor, 'BOOM_COUNTER')[0]
-    if (!sacrificeReplacesSmallEffect && boomCounterItem) {
-      actorState.boomCounter += 1
-      if (actorState.boomCounter >= 30) {
-        actorState.boomCounter = 0
-        const boomQuality = normalizeQuality(boomCounterItem.quality)
-        const boomDef = itemDef(boomCounterItem.defId)
-        const damage = qualityAmountFrom(boomDef.effect.amount, boomQuality, boomDef.effect.qualityBase)
-        const result = applyDirectHealthDamage(targetSide, damage)
-        triggers.push({
-          itemId: boomCounterItem.id,
-          defId: boomCounterItem.defId,
-          quality: boomQuality,
-          effectType: 'DAMAGE',
-          amount: result.before - result.after,
-          target: targetSide,
-          sourceHp: getHp(actorSide),
-          targetHp: result.after,
-          sourceHpDelta: 0,
-          targetHpDelta: result.delta,
-          roll,
-          text: `${itemName(boomDef, boomQuality)} 爆鸣计数达到 30，造成 ${result.before - result.after} 点直接伤害`,
-        })
+    const boomCounterItems = equippedItemsWithEffect(actor, 'BOOM_COUNTER')
+    if (!sacrificeReplacesSmallEffect) {
+      for (const boomCounterItem of boomCounterItems) {
+        const nextCount = (actorState.boomCountersByItemId[boomCounterItem.id] ?? 0) + 1
+        actorState.boomCountersByItemId[boomCounterItem.id] = nextCount
+        const boomCounterSignal = {
+          boomCounterItemId: boomCounterItem.id,
+          boomCounterValue: nextCount,
+          boomCounterMax: 30,
+          boomCounterChanged: true,
+        }
+        if (nextCount >= 30) {
+          actorState.boomCountersByItemId[boomCounterItem.id] = 0
+          boomCounterSignal.boomCounterValue = 0
+          const boomQuality = normalizeQuality(boomCounterItem.quality)
+          const boomDef = itemDef(boomCounterItem.defId)
+          const damage = qualityAmountFrom(boomDef.effect.amount, boomQuality, boomDef.effect.qualityBase)
+          const result = applyDirectHealthDamage(targetSide, damage)
+          triggers.push({
+            itemId: boomCounterItem.id,
+            defId: boomCounterItem.defId,
+            quality: boomQuality,
+            effectType: 'DAMAGE',
+            amount: result.before - result.after,
+            target: targetSide,
+            sourceHp: getHp(actorSide),
+            targetHp: result.after,
+            sourceHpDelta: 0,
+            targetHpDelta: result.delta,
+            roll,
+            ...boomCounterSignal,
+            text: `${itemName(boomDef, boomQuality)} 爆鸣计数达到 30，造成 ${result.before - result.after} 点直接伤害`,
+          })
+        } else {
+          const boomQuality = normalizeQuality(boomCounterItem.quality)
+          const boomDef = itemDef(boomCounterItem.defId)
+          triggers.push({
+            itemId: boomCounterItem.id,
+            defId: boomCounterItem.defId,
+            quality: boomQuality,
+            effectType: 'UTILITY',
+            amount: 1,
+            target: actorSide,
+            sourceHp: getHp(actorSide),
+            targetHp: getHp(targetSide),
+            sourceHpDelta: 0,
+            targetHpDelta: 0,
+            roll,
+            ...boomCounterSignal,
+            text: `${itemName(boomDef, boomQuality)} 爆鸣计数 +${nextCount}/30`,
+          })
+        }
       }
     }
 
@@ -537,6 +600,24 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
       })
     }
 
+    const grantedEffects = actorState.itemGrantedEffects[item.id] ?? []
+    if (grantedEffects.length > 0) delete actorState.itemGrantedEffects[item.id]
+    for (const grant of grantedEffects) {
+      if (grant.effect === 'THORNS') {
+        actorState.thorns += grant.amount
+        triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'UTILITY', amount: grant.amount, target: actorSide, sourceHp: getHp(actorSide), targetHp: getHp(targetSide), sourceHpDelta: 0, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 的附魔赐予 ${grant.amount} 层【荆棘】` })
+      }
+      if (grant.effect === 'CLEANSE') {
+        let cleansed = 0
+        while (cleansed < grant.amount && (actorState.poison > 0 || actorState.weak > 0)) {
+          if (actorState.poison > 0) actorState.poison -= 1
+          else actorState.weak -= 1
+          cleansed += 1
+        }
+        triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'UTILITY', amount: cleansed, target: actorSide, sourceHp: getHp(actorSide), targetHp: getHp(targetSide), sourceHpDelta: 0, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 的附魔净化 ${cleansed} 层负面状态` })
+      }
+    }
+
     const bullyDoubled = actor.dogType === 'BULLY' && isLarge(def, actor) && rng() < BULLY_LARGE_EFFECT_CHANCE
     const bullyQuad = bullyDoubled && triggerOrder(actor.items).some((entry) => itemDef(entry.defId).advancedEffect === 'BULLY_QUADRUPLE_CHANCE') && rng() < 0.2
     const emperorTraitDisabled = hasEquippedEffect(actor, 'ADJACENT_USES_LUCKY') || hasEquippedEffect(actor, 'ONLY_LUCKY_DOUBLE')
@@ -559,6 +640,12 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
       ? baseAmount * extraRollDamageScale
       : baseAmount
     let amount = roundScaled(scaledBaseAmount, scale * globalEffectScale(actor))
+    const baseEffectKind = itemBaseEffectKind(def)
+    const effectBonus = baseEffectKind ? actorState.itemEffectBonus[item.id]?.[baseEffectKind] ?? 0 : 0
+    if (effectBonus > 0 && baseEffectKind) {
+      amount += effectBonus
+      delete actorState.itemEffectBonus[item.id]?.[baseEffectKind]
+    }
     const damageBonus = actorState.adjacentDamageBonus[item.id] ?? 0
     if (damageBonus > 0 && (def.effect.type === 'DAMAGE' || def.effect.type === 'DAMAGE_SELF_SHIELD')) {
       amount += damageBonus
@@ -662,8 +749,10 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
           triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'UTILITY', amount: targetState.weak, target: targetSide, sourceHp: getHp(actorSide), targetHp: getHp(targetSide), sourceHpDelta: 0, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 施加 ${appliedWeak} 层【虚弱】` })
         }
       }
-      if (!recoveryBlocked && (advanced === 'LIFESTEAL' || actorState.lifestealItemIds.includes(item.id)) && after < before) {
-        const healed = applyHeal(actorSide, before - after)
+      const grantedLifesteal = grantedEffects.find((grant) => grant.effect === 'LIFESTEAL')
+      if (!recoveryBlocked && (advanced === 'LIFESTEAL' || actorState.lifestealItemIds.includes(item.id) || grantedLifesteal) && after < before) {
+        const healAmount = grantedLifesteal ? Math.min(before - after, grantedLifesteal.amount) : before - after
+        const healed = applyHeal(actorSide, healAmount)
         triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'HEAL', amount: before - after, target: actorSide, sourceHp: healed.after, targetHp: getHp(targetSide), sourceHpDelta: healed.delta, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 吸取 ${before - after} 点生命` })
       }
       if (advanced === 'GROWTH_DAMAGE') {
@@ -808,7 +897,11 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
     if (!sacrificeReplacesSmallEffect && advanced === 'ADJACENT_DAMAGE_BONUS') {
       for (const adjacent of adjacentItems(actor, item)) actorState.adjacentDamageBonus[adjacent.id] = (actorState.adjacentDamageBonus[adjacent.id] ?? 0) + qualityAmount(4, quality)
     }
-    if (!sacrificeReplacesSmallEffect && (advanced === 'TRIGGER_ADJACENT' || advanced === 'ADJACENT_TEMP_TRIGGER' || (advanced === 'ADJACENT_ON_EXTRA_ROLL' && extra))) {
+    if (!sacrificeReplacesSmallEffect && advanced === 'ADJACENT_TEMP_TRIGGER') {
+      const adjacent = adjacentItems(actor, item)
+      for (let i = 0; i < nightPatrolLightTriggerCount(quality); i += 1) queueItems(queue, adjacent)
+    }
+    if (!sacrificeReplacesSmallEffect && (advanced === 'TRIGGER_ADJACENT' || (advanced === 'ADJACENT_ON_EXTRA_ROLL' && extra))) {
       queueItems(queue, adjacentItems(actor, item))
     }
     if (!sacrificeReplacesSmallEffect && advanced === 'TRIGGER_MINUS_THREE' && roll >= 4) {
@@ -842,6 +935,53 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
 
     if (!sacrificeReplacesSmallEffect && advanced === 'SHIBA_SPEED') {
       actorState.shibaSpeedStacks = Math.min(5, actorState.shibaSpeedStacks + 1)
+    }
+
+    const enchant = item.enchant
+    if (!sacrificeReplacesSmallEffect && enchant && enchant.kind !== 'EXTRA_DICE') {
+      if (enchant.kind === 'BASE_EFFECT') {
+        if (enchant.effect === 'DAMAGE') {
+          const result = applyDamage(targetSide, enchant.amount)
+          triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'DAMAGE', amount: enchant.amount, target: targetSide, sourceHp: getHp(actorSide), targetHp: result.after, sourceHpDelta: 0, targetHpDelta: result.delta, roll, text: `${itemName(def, quality)} 附魔造成 ${enchant.amount} 点伤害` })
+        } else if (enchant.effect === 'HEAL' && !recoveryBlocked) {
+          const result = applyHeal(actorSide, enchant.amount)
+          triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'HEAL', amount: enchant.amount, target: actorSide, sourceHp: result.after, targetHp: getHp(targetSide), sourceHpDelta: result.delta, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 附魔回复 ${enchant.amount} 点生命` })
+        } else if (enchant.effect === 'SHIELD' && !recoveryBlocked) {
+          applyShield(actorSide, enchant.amount)
+          triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'UTILITY', amount: enchant.amount, target: actorSide, sourceHp: getHp(actorSide), targetHp: getHp(targetSide), sourceHpDelta: 0, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 附魔获得 ${enchant.amount} 点护盾` })
+        }
+      }
+      if (enchant.kind === 'SPECIAL') {
+        if (enchant.effect === 'THORNS') {
+          actorState.thorns += enchant.amount
+          triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'UTILITY', amount: enchant.amount, target: actorSide, sourceHp: getHp(actorSide), targetHp: getHp(targetSide), sourceHpDelta: 0, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 附魔获得 ${enchant.amount} 层【荆棘】` })
+        } else if (enchant.effect === 'FURY') {
+          actorState.furyStacks += enchant.amount
+          triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'UTILITY', amount: enchant.amount, target: actorSide, sourceHp: getHp(actorSide), targetHp: getHp(targetSide), sourceHpDelta: 0, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 附魔触发 ${enchant.amount} 层【激昂】` })
+        } else if (enchant.effect === 'POISON') {
+          const applied = addPoison(targetSide, targetFighter, enchant.amount)
+          triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'POISON', amount: applied, target: targetSide, sourceHp: getHp(actorSide), targetHp: getHp(targetSide), sourceHpDelta: 0, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 附魔施加 ${applied} 层【中毒】` })
+        } else {
+          const applied = addWeak(targetSide, targetFighter, enchant.amount)
+          triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'UTILITY', amount: applied, target: targetSide, sourceHp: getHp(actorSide), targetHp: getHp(targetSide), sourceHpDelta: 0, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 附魔施加 ${applied} 层【虚弱】` })
+        }
+      }
+      if (enchant.kind === 'TRIGGER_NEIGHBOR') {
+        queueItems(queue, neighborItems(actor, item, enchant.target))
+      }
+      if (enchant.kind === 'BUFF_NEIGHBOR_EFFECT') {
+        for (const targetItem of neighborItems(actor, item, enchant.target)) {
+          if (itemBaseEffectKind(itemDef(targetItem.defId)) !== enchant.effect) continue
+          actorState.itemEffectBonus[targetItem.id] = actorState.itemEffectBonus[targetItem.id] ?? {}
+          actorState.itemEffectBonus[targetItem.id][enchant.effect] = (actorState.itemEffectBonus[targetItem.id][enchant.effect] ?? 0) + enchant.amount
+        }
+      }
+      if (enchant.kind === 'GRANT_NEIGHBOR_EFFECT') {
+        for (const targetItem of neighborItems(actor, item, enchant.target)) {
+          actorState.itemGrantedEffects[targetItem.id] = actorState.itemGrantedEffects[targetItem.id] ?? []
+          actorState.itemGrantedEffects[targetItem.id].push({ effect: enchant.effect, amount: enchant.amount })
+        }
+      }
     }
 
     if (processed.count >= TRIGGER_QUEUE_CAP && !processed.capped) {
@@ -929,6 +1069,10 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
           itemId: trigger.itemId,
           defId: trigger.defId,
           quality: trigger.quality,
+          boomCounterItemId: trigger.boomCounterItemId,
+          boomCounterValue: trigger.boomCounterValue,
+          boomCounterMax: trigger.boomCounterMax,
+          boomCounterChanged: trigger.boomCounterChanged,
           effectType: trigger.effectType,
           amount: trigger.amount,
           target: trigger.target,

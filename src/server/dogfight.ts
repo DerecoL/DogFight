@@ -5,18 +5,21 @@ import { prisma } from './db'
 import { itemDef } from './game/data'
 import { findSlot } from './game/grid'
 import { STARTING_GOLD } from './game/matchmaking'
-import { buildOfflineFighter } from './game/offline-builder'
+import { buildOfflineFighter, offlineFighterName } from './game/offline-builder'
 import { normalizeQuality } from './game/quality'
 import { simulateBattle } from './game/battle'
-import type { BattleEvent, BattleResult, DogType, FighterSnapshot, GameItem, ShopType } from './game/types'
-import { applyRelicChoice, classRewardChoices, initialItems, makeChoices, makeRelicChoices, makeShop, parseJson, postBattleLargeItemReward, publicRun, relicsFromRun, seedGhost, snapshotFromRun, toGameItems } from './state'
+import type { BattleEvent, BattleResult, DogType, EnchantmentChoice, FighterSnapshot, GameItem, ShopType } from './game/types'
+import { applyRelicChoice, initialItems, makeChoices, makeRelicChoices, makeShop, nextPhaseData as buildNextPhaseData, parseJson, phaseDataAfterEnchant, postBattleLargeItemReward, publicRun, relicsFromRun, seedGhost, snapshotFromRun, toGameItems } from './state'
 
 const DOGFIGHT_TARGET_PLAYERS = 8
+const DOGFIGHT_LOBBY_MS = 15_000
 const DOGFIGHT_DOG_SELECT_MS = 15_000
 const DOGFIGHT_SHOP_MS = 30_000
-const DOGFIGHT_BATTLE_MS = 25_000
 const DOGFIGHT_TRAINING_ROUNDS = 3
 const DOGFIGHT_LOSS_LIMIT = 5
+const DOGFIGHT_WAITING_ROOM_TTL_MS = 10 * 60_000
+const DOGFIGHT_ACTIVE_ROOM_TTL_MS = 30 * 60_000
+const DOGFIGHT_FORCE_COMPLETE_MAX_STEPS = 80
 const DOG_TYPES: DogType[] = ['SHIBA', 'SAMOYED', 'MUTT', 'BULLY', 'EMPEROR']
 
 const dogChoiceSchema = z.object({
@@ -115,6 +118,20 @@ function currentBattleIdFor(room: DogfightRoomWithDetails, participantId: string
   return battle?.id ?? null
 }
 
+function currentBattleResultDelta(room: DogfightRoomWithDetails, participantId: string): PendingResult {
+  if (roomPhase(room) !== 'BATTLE') return { wins: 0, losses: 0, goldCompensation: 0 }
+  const battle = room.battles.find((entry) =>
+    entry.round === room.currentRound
+    && (entry.participantAId === participantId || entry.participantBId === participantId)
+  )
+  if (!battle) return { wins: 0, losses: 0, goldCompensation: 0 }
+  const won = battle.winnerParticipantId === participantId
+    || (battle.opponentKind === 'OFFLINE' && battle.participantAId === participantId && battle.winnerSide === 'player')
+  return won
+    ? { wins: 1, losses: 0, goldCompensation: 0 }
+    : { wins: 0, losses: 1, goldCompensation: 5 }
+}
+
 function memberRunValues(participant: DogfightParticipantWithRun) {
   return {
     dogType: participant.run?.dogType as DogType | undefined ?? null,
@@ -127,12 +144,42 @@ function memberRunValues(participant: DogfightParticipantWithRun) {
   }
 }
 
+function visibleMemberRunValues(room: DogfightRoomWithDetails, participant: DogfightParticipantWithRun) {
+  const values = memberRunValues(participant)
+  const delta = currentBattleResultDelta(room, participant.id)
+  if (delta.wins === 0 && delta.losses === 0) return values
+  const nextRound = room.currentRound + 1
+  const roundIncome = participant.eliminated ? 0 : 5 + nextRound * 2
+  return {
+    ...values,
+    wins: Math.max(0, values.wins - delta.wins),
+    losses: Math.max(0, values.losses - delta.losses),
+    round: room.currentRound,
+    gold: Math.max(0, values.gold - delta.goldCompensation - roundIncome),
+    phase: 'BATTLE' as const,
+    status: 'DOGFIGHT_ACTIVE',
+  }
+}
+
+function visibleParticipantState(room: DogfightRoomWithDetails, participant: DogfightParticipantWithRun) {
+  const values = visibleMemberRunValues(room, participant)
+  const currentDelta = currentBattleResultDelta(room, participant.id)
+  const hiddenCurrentElimination = currentDelta.losses > 0 && participant.eliminated && values.losses < DOGFIGHT_LOSS_LIMIT
+  return {
+    eliminated: hiddenCurrentElimination ? false : participant.eliminated,
+    eliminatedRound: hiddenCurrentElimination ? null : participant.eliminatedRound,
+    placement: hiddenCurrentElimination ? null : participant.placement,
+  }
+}
+
 function sortedParticipants(room: DogfightRoomWithDetails) {
   return room.participants.slice().sort((left, right) => {
-    const leftValues = memberRunValues(left)
-    const rightValues = memberRunValues(right)
-    const leftLives = left.eliminated ? 0 : Math.max(0, DOGFIGHT_LOSS_LIMIT - leftValues.losses)
-    const rightLives = right.eliminated ? 0 : Math.max(0, DOGFIGHT_LOSS_LIMIT - rightValues.losses)
+    const leftValues = visibleMemberRunValues(room, left)
+    const rightValues = visibleMemberRunValues(room, right)
+    const leftState = visibleParticipantState(room, left)
+    const rightState = visibleParticipantState(room, right)
+    const leftLives = leftState.eliminated ? 0 : Math.max(0, DOGFIGHT_LOSS_LIMIT - leftValues.losses)
+    const rightLives = rightState.eliminated ? 0 : Math.max(0, DOGFIGHT_LOSS_LIMIT - rightValues.losses)
     return rightLives - leftLives
       || rightValues.wins - leftValues.wins
       || (left.kind === right.kind ? 0 : left.kind === 'PLAYER' ? -1 : 1)
@@ -140,10 +187,11 @@ function sortedParticipants(room: DogfightRoomWithDetails) {
   })
 }
 
-function publicDogfightRoom(room: DogfightRoomWithDetails, userId: string) {
+export function publicDogfightRoom(room: DogfightRoomWithDetails, userId: string) {
   const currentParticipant = room.participants.find((participant) => participant.userId === userId) ?? null
   const members = sortedParticipants(room).map((participant) => {
-    const runValues = memberRunValues(participant)
+    const runValues = visibleMemberRunValues(room, participant)
+    const visibleState = visibleParticipantState(room, participant)
     return {
       id: participant.id,
       userId: participant.userId,
@@ -152,9 +200,9 @@ function publicDogfightRoom(room: DogfightRoomWithDetails, userId: string) {
       nickname: participant.nickname,
       isHost: participant.isHost,
       ready: participant.ready,
-      eliminated: participant.eliminated,
-      eliminatedRound: participant.eliminatedRound,
-      placement: participant.placement,
+      eliminated: visibleState.eliminated,
+      eliminatedRound: visibleState.eliminatedRound,
+      placement: visibleState.placement,
       currentBattleId: currentBattleIdFor(room, participant.id),
       ...runValues,
     }
@@ -162,6 +210,7 @@ function publicDogfightRoom(room: DogfightRoomWithDetails, userId: string) {
   const currentRunMember = currentParticipant
     ? members.find((member) => member.id === currentParticipant.id) ?? null
     : null
+  const currentRunValues = currentParticipant ? visibleMemberRunValues(room, currentParticipant) : null
 
   return {
     id: room.id,
@@ -178,17 +227,20 @@ function publicDogfightRoom(room: DogfightRoomWithDetails, userId: string) {
     spectator: !currentParticipant,
     members,
     currentRunMember,
-    currentRun: currentParticipant?.run ? publicRun(currentParticipant.run) : null,
-    battles: room.battles.map((battle) => ({
-      id: battle.id,
-      round: battle.round,
-      participantAId: battle.participantAId,
-      participantBId: battle.participantBId,
-      opponentKind: battle.opponentKind,
-      winnerSide: battle.winnerSide,
-      winnerParticipantId: battle.winnerParticipantId,
-      createdAt: battle.createdAt.toISOString(),
-    })),
+    currentRun: currentParticipant?.run ? { ...publicRun(currentParticipant.run), ...currentRunValues } : null,
+    battles: room.battles.map((battle) => {
+      const hideCurrentResult = roomPhase(room) === 'BATTLE' && battle.round === room.currentRound
+      return {
+        id: battle.id,
+        round: battle.round,
+        participantAId: battle.participantAId,
+        participantBId: battle.participantBId,
+        opponentKind: battle.opponentKind,
+        winnerSide: hideCurrentResult ? null : battle.winnerSide,
+        winnerParticipantId: hideCurrentResult ? null : battle.winnerParticipantId,
+        createdAt: battle.createdAt.toISOString(),
+      }
+    }),
   }
 }
 
@@ -217,31 +269,8 @@ function responseFor(room: DogfightRoomWithDetails, userId: string) {
   return { room: publicDogfightRoom(room, userId) }
 }
 
-function nextPhaseData(run: Run, nextRound: number) {
-  const nextClassRewards = classRewardChoices(run.dogType as DogType, nextRound)
-  if (nextClassRewards.length > 0) {
-    return {
-      phase: 'CLASS_REWARD',
-      classRewardChoices: JSON.stringify(nextClassRewards),
-      choices: '[]',
-      shopItems: '[]',
-    }
-  }
-  if (nextRound <= 2) {
-    return {
-      phase: 'SHOP',
-      shopType: 'GENERAL',
-      shopItems: JSON.stringify(makeShop('GENERAL', `${run.id}-dogfight-round-${nextRound}`, nextRound)),
-      choices: '[]',
-      classRewardChoices: '[]',
-    }
-  }
-  return {
-    phase: 'CHOICE',
-    choices: JSON.stringify(makeChoices(`${run.id}-dogfight-choices-${nextRound}`, nextRound)),
-    shopItems: '[]',
-    classRewardChoices: '[]',
-  }
+function nextDogfightPhaseData(run: Run, nextRound: number) {
+  return buildNextPhaseData(run, nextRound, `${run.id}-dogfight-round-${nextRound}-${run.wins}-${run.losses}`)
 }
 
 async function autoChoosePendingRunStep(tx: Tx, run: Run & { items: Prisma.ItemInstanceGetPayload<object>[] }) {
@@ -271,12 +300,13 @@ async function autoChoosePendingRunStep(tx: Tx, run: Run & { items: Prisma.ItemI
     }
     const slot = findSlot(toGameItems(run.items), defId, 'BAG')
     const def = itemDef(defId)
+    const pendingEnchantChoices = parseJson<EnchantmentChoice[]>(run.enchantChoices, [])
     return tx.run.update({
       where: { id: run.id },
       data: {
-        phase: 'CHOICE',
+        phase: pendingEnchantChoices.length > 0 ? 'ENCHANT_CHOICE' : 'CHOICE',
         classRewardChoices: '[]',
-        choices: JSON.stringify(makeChoices(`${run.id}-dogfight-class-${run.round}`, run.round)),
+        choices: pendingEnchantChoices.length > 0 ? '[]' : JSON.stringify(makeChoices(`${run.id}-dogfight-class-${run.round}`, run.round)),
         ...(slot ? { items: { create: { defId, quality: normalizeQuality(def.defaultQuality), area: 'BAG', x: slot.x, y: slot.y } } } : {}),
       },
       include: { items: true },
@@ -297,12 +327,31 @@ async function autoChoosePendingRunStep(tx: Tx, run: Run & { items: Prisma.ItemI
     })
   }
 
+  if (run.phase === 'ENCHANT_CHOICE') {
+    const choices = parseJson<EnchantmentChoice[]>(run.enchantChoices, [])
+    const choice = choices[0]
+    const target = toGameItems(run.items).find((item) => !item.enchant)
+    if (!choice || !target) {
+      return tx.run.update({
+        where: { id: run.id },
+        data: phaseDataAfterEnchant(run),
+        include: { items: true },
+      })
+    }
+    await tx.itemInstance.update({ where: { id: target.id }, data: { enchant: JSON.stringify(choice.enchant) } })
+    return tx.run.update({
+      where: { id: run.id },
+      data: phaseDataAfterEnchant(run),
+      include: { items: true },
+    })
+  }
+
   return run
 }
 
 async function normalizeRunForDogfightBattle(tx: Tx, run: Run & { items: Prisma.ItemInstanceGetPayload<object>[] }) {
   let current = run
-  while (['CHOICE', 'CLASS_REWARD', 'RELIC_CHOICE'].includes(current.phase)) {
+  while (['CHOICE', 'CLASS_REWARD', 'ENCHANT_CHOICE', 'RELIC_CHOICE'].includes(current.phase)) {
     current = await autoChoosePendingRunStep(tx, current)
   }
   return current
@@ -460,7 +509,7 @@ async function settleShopToBattle(tx: Tx, roomId: string, force = false) {
 
   if (refreshed.currentRound < DOGFIGHT_TRAINING_ROUNDS) {
     for (const participant of activeParticipants) {
-      const opponent = seedGhost(refreshed.currentRound, participant.run.wins, participant.run.losses)
+      const opponent = seedGhost(refreshed.currentRound, participant.run.wins, participant.run.losses, `${refreshed.id}-${refreshed.currentRound}-${participant.id}-training`)
       await createDogfightBattle(tx, refreshed, participant, null, opponent, pending)
     }
   } else {
@@ -473,7 +522,7 @@ async function settleShopToBattle(tx: Tx, roomId: string, force = false) {
       const participantB = shuffled[index + 1] ?? null
       const opponent = participantB
         ? snapshotFromRun(participantB.run, participantB.nickname)
-        : seedGhost(refreshed.currentRound, participantA.run.wins, participantA.run.losses)
+        : seedGhost(refreshed.currentRound, participantA.run.wins, participantA.run.losses, `${refreshed.id}-${refreshed.currentRound}-${participantA.id}-bye`)
       await createDogfightBattle(tx, refreshed, participantA, participantB, opponent, pending)
     }
   }
@@ -489,7 +538,7 @@ async function settleShopToBattle(tx: Tx, roomId: string, force = false) {
     const eliminated = losses >= DOGFIGHT_LOSS_LIMIT
     const roundIncome = eliminated ? 0 : 5 + nextRound * 2
     const gold = participant.run.gold + participantResult.goldCompensation + roundIncome
-    const phaseData = eliminated ? { phase: 'COMPLETE' } : nextPhaseData(participant.run, nextRound)
+    const phaseData = eliminated ? { phase: 'COMPLETE' } : nextDogfightPhaseData({ ...participant.run, losses }, nextRound)
     const postBattleReward = eliminated
       ? null
       : postBattleLargeItemReward(toGameItems(participant.run.items), `${participant.runId}-dogfight-post-battle-${nextRound}-${wins}-${losses}`)
@@ -530,7 +579,7 @@ async function settleShopToBattle(tx: Tx, roomId: string, force = false) {
     data: {
       status: complete ? 'COMPLETE' : 'ACTIVE',
       phase: complete ? 'COMPLETE' : 'BATTLE',
-      phaseDeadline: complete ? null : deadlineFromNow(DOGFIGHT_BATTLE_MS),
+      phaseDeadline: null,
       readyDeadline: null,
       winnerParticipantId,
     },
@@ -546,14 +595,17 @@ async function settleShopToBattle(tx: Tx, roomId: string, force = false) {
 async function enterNextShopAfterBattle(tx: Tx, roomId: string, force = false) {
   const room = await tx.dogfightRoom.findUnique({ where: { id: roomId }, include: dogfightRoomInclude })
   if (!room || room.status !== 'ACTIVE' || roomPhase(room) !== 'BATTLE') return
-  const deadlinePassed = Boolean(room.phaseDeadline && room.phaseDeadline.getTime() <= Date.now())
-  if (!force && !deadlinePassed) return
-
   const alive = room.participants.filter((participant) => !participant.eliminated)
   if (alive.length <= 1) {
     await tx.dogfightRoom.update({ where: { id: room.id }, data: { status: 'COMPLETE', phase: 'COMPLETE', phaseDeadline: null, readyDeadline: null, winnerParticipantId: alive[0]?.id ?? null } })
     return
   }
+
+  const activePlayers = room.participants.filter((participant) => participant.kind !== 'BOT' && !participant.eliminated)
+  const allPlayersFinished = activePlayers.every((participant) => participant.ready)
+  if (!force && !allPlayersFinished) return
+
+  await tx.dogfightParticipant.updateMany({ where: { roomId }, data: { ready: false } })
   await tx.dogfightRoom.update({
     where: { id: room.id },
     data: {
@@ -573,6 +625,96 @@ async function advanceDogfightRoomIfNeeded(roomId: string) {
   })
 }
 
+async function forceCompleteDogfightRoom(tx: Tx, roomId: string) {
+  for (let step = 0; step < DOGFIGHT_FORCE_COMPLETE_MAX_STEPS; step += 1) {
+    const room = await tx.dogfightRoom.findUnique({ where: { id: roomId }, include: dogfightRoomInclude })
+    if (!room || room.status !== 'ACTIVE') return
+    await enterShopIfDogSelectionComplete(tx, roomId, true)
+    await settleShopToBattle(tx, roomId, true)
+    await enterNextShopAfterBattle(tx, roomId, true)
+  }
+
+  const room = await tx.dogfightRoom.findUnique({ where: { id: roomId }, include: dogfightRoomInclude })
+  if (!room || room.status !== 'ACTIVE') return
+  const alive = sortedParticipants(room).filter((participant) => !participant.eliminated)
+  await tx.dogfightRoom.update({
+    where: { id: roomId },
+    data: {
+      status: 'COMPLETE',
+      phase: 'COMPLETE',
+      phaseDeadline: null,
+      readyDeadline: null,
+      winnerParticipantId: alive[0]?.id ?? null,
+    },
+  })
+  if (alive[0]?.runId) {
+    await tx.run.update({ where: { id: alive[0].runId }, data: { status: 'DOGFIGHT_COMPLETE', phase: 'COMPLETE' } })
+  }
+}
+
+async function cleanupStaleDogfightRoomsForLobby() {
+  const waitingCutoff = new Date(Date.now() - DOGFIGHT_WAITING_ROOM_TTL_MS)
+  await prisma.$transaction(async (tx) => {
+    const staleWaitingRooms = await tx.dogfightRoom.findMany({
+      where: { status: 'WAITING', createdAt: { lte: waitingCutoff } },
+      select: { id: true },
+      take: 200,
+    })
+    if (staleWaitingRooms.length > 0) {
+      await tx.dogfightRoom.deleteMany({ where: { id: { in: staleWaitingRooms.map((room) => room.id) } } })
+    }
+  })
+
+  const activeCutoff = new Date(Date.now() - DOGFIGHT_ACTIVE_ROOM_TTL_MS)
+  const staleActiveRooms = await prisma.dogfightRoom.findMany({
+    where: { status: 'ACTIVE', createdAt: { lte: activeCutoff } },
+    select: { id: true },
+    take: 20,
+  })
+  for (const room of staleActiveRooms) {
+    await prisma.$transaction(async (tx) => {
+      await forceCompleteDogfightRoom(tx, room.id)
+    })
+  }
+}
+
+async function advanceExpiredWaitingDogfightRoomsForLobby() {
+  const cutoff = new Date(Date.now() - DOGFIGHT_LOBBY_MS)
+  const expiredRooms = await prisma.dogfightRoom.findMany({
+    where: {
+      status: 'WAITING',
+      phase: 'LOBBY',
+      OR: [
+        { phaseDeadline: { lte: new Date() } },
+        { phaseDeadline: null, createdAt: { lte: cutoff } },
+      ],
+    },
+    include: dogfightRoomInclude,
+    take: 50,
+  })
+  for (const room of expiredRooms) {
+    if (room.participants.some((participant) => participant.kind !== 'BOT' && participant.userId)) {
+      await fillBotsAndStart(room)
+    } else {
+      await prisma.dogfightRoom.delete({ where: { id: room.id } })
+    }
+  }
+}
+
+async function advanceExpiredDogfightRoomsForLobby() {
+  const expiredRooms = await prisma.dogfightRoom.findMany({
+    where: {
+      status: 'ACTIVE',
+      phaseDeadline: { lte: new Date() },
+    },
+    select: { id: true },
+    take: 50,
+  })
+  for (const room of expiredRooms) {
+    await advanceDogfightRoomIfNeeded(room.id)
+  }
+}
+
 async function createRoomForUser(userId: string) {
   const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } })
   const name = playerName(user)
@@ -583,6 +725,7 @@ async function createRoomForUser(userId: string) {
         maxPlayers: DOGFIGHT_TARGET_PLAYERS,
         targetPlayerCount: DOGFIGHT_TARGET_PLAYERS,
         phase: 'LOBBY',
+        phaseDeadline: deadlineFromNow(DOGFIGHT_LOBBY_MS),
       },
     })
     await tx.dogfightParticipant.create({
@@ -595,6 +738,7 @@ async function createRoomForUser(userId: string) {
         isHost: true,
       },
     })
+    await cleanupDuplicateWaitingRoomsForUser(tx, userId, createdRoom.id)
     return createdRoom
   })
   return loadDogfightRoom(room.id)
@@ -659,6 +803,57 @@ async function deleteRoomIfNoHumanPlayers(tx: Tx, roomId: string) {
   return true
 }
 
+async function cleanupDuplicateWaitingRoomsForUser(tx: Tx, userId: string, keepRoomId?: string) {
+  const memberships = await tx.dogfightParticipant.findMany({
+    where: {
+      userId,
+      room: { is: { status: 'WAITING', phase: 'LOBBY' } },
+    },
+    include: { room: true },
+  })
+  const ordered = memberships
+    .slice()
+    .sort((left, right) =>
+      right.room.updatedAt.getTime() - left.room.updatedAt.getTime()
+      || right.createdAt.getTime() - left.createdAt.getTime()
+    )
+  const retainedRoomId = keepRoomId ?? ordered[0]?.roomId ?? null
+
+  for (const participant of ordered) {
+    if (participant.roomId === retainedRoomId) continue
+    await tx.dogfightParticipant.delete({ where: { id: participant.id } })
+    await deleteRoomIfNoHumanPlayers(tx, participant.roomId)
+  }
+}
+
+async function cleanupDuplicateWaitingRoomsForLobby(tx: Tx) {
+  const participants = await tx.dogfightParticipant.findMany({
+    where: {
+      userId: { not: null },
+      room: { is: { status: 'WAITING', phase: 'LOBBY' } },
+    },
+    include: { room: true },
+  })
+  const byUser = new Map<string, typeof participants>()
+  for (const participant of participants) {
+    if (!participant.userId) continue
+    byUser.set(participant.userId, [...(byUser.get(participant.userId) ?? []), participant])
+  }
+
+  for (const memberships of byUser.values()) {
+    const ordered = memberships
+      .slice()
+      .sort((left, right) =>
+        right.room.updatedAt.getTime() - left.room.updatedAt.getTime()
+        || right.createdAt.getTime() - left.createdAt.getTime()
+      )
+    for (const participant of ordered.slice(1)) {
+      await tx.dogfightParticipant.delete({ where: { id: participant.id } })
+      await deleteRoomIfNoHumanPlayers(tx, participant.roomId)
+    }
+  }
+}
+
 async function leaveRoomForUser(roomId: string, userId: string) {
   return prisma.$transaction(async (tx) => {
     const room = await tx.dogfightRoom.findUnique({ where: { id: roomId }, include: { participants: true } })
@@ -682,8 +877,15 @@ async function fillBotsAndStart(room: DogfightRoomWithDetails) {
   await prisma.$transaction(async (tx) => {
     const fresh = await tx.dogfightRoom.findUniqueOrThrow({ where: { id: room.id }, include: dogfightRoomInclude })
     const botSlots = Math.max(0, fresh.targetPlayerCount - fresh.participants.length)
+    const usedNames = new Set(fresh.participants.map((participant) => participant.nickname))
     for (let index = 0; index < botSlots; index += 1) {
-      const nickname = `斗狗机器人 ${index + 1}`
+      let nickname = offlineFighterName(`${fresh.id}-bot-${index}`)
+      let attempt = 1
+      while (usedNames.has(nickname)) {
+        nickname = offlineFighterName(`${fresh.id}-bot-${index}-${attempt}`)
+        attempt += 1
+      }
+      usedNames.add(nickname)
       const participant = await tx.dogfightParticipant.create({
         data: {
           roomId: fresh.id,
@@ -751,6 +953,13 @@ function battleForParticipant(result: BattleResult, side: 'A' | 'B') {
 export function registerDogfightRoutes(app: FastifyInstance, requireUser: RequireUser) {
   app.get('/api/dogfight/rooms', async (request) => {
     const userId = requireUser(request.userId)
+    await cleanupStaleDogfightRoomsForLobby()
+    await advanceExpiredWaitingDogfightRoomsForLobby()
+    await advanceExpiredDogfightRoomsForLobby()
+    await prisma.$transaction(async (tx) => {
+      await cleanupDuplicateWaitingRoomsForLobby(tx)
+      await cleanupDuplicateWaitingRoomsForUser(tx, userId)
+    })
     const rooms = await prisma.dogfightRoom.findMany({
       where: { status: { in: ['WAITING', 'ACTIVE'] } },
       orderBy: [{ status: 'asc' }, { updatedAt: 'desc' }],
@@ -785,6 +994,13 @@ export function registerDogfightRoutes(app: FastifyInstance, requireUser: Requir
 
   app.post('/api/dogfight/match', async (request, reply) => {
     const userId = requireUser(request.userId)
+    await cleanupStaleDogfightRoomsForLobby()
+    await advanceExpiredWaitingDogfightRoomsForLobby()
+    await advanceExpiredDogfightRoomsForLobby()
+    await prisma.$transaction(async (tx) => {
+      await cleanupDuplicateWaitingRoomsForLobby(tx)
+      await cleanupDuplicateWaitingRoomsForUser(tx, userId)
+    })
     const rooms = await prisma.dogfightRoom.findMany({
       where: { status: 'WAITING', phase: 'LOBBY' },
       orderBy: { createdAt: 'asc' },
@@ -859,7 +1075,8 @@ export function registerDogfightRoutes(app: FastifyInstance, requireUser: Requir
     const { roomId } = roomParamsSchema.parse(request.params)
     const room = await prisma.dogfightRoom.findUnique({ where: { id: roomId }, include: dogfightRoomInclude })
     if (!room) return reply.code(404).send({ error: 'Dogfight room not found' })
-    if (room.status !== 'ACTIVE' || roomPhase(room) !== 'SHOP') return reply.code(400).send({ error: 'Dogfight room is not in shop phase' })
+    const phase = roomPhase(room)
+    if (room.status !== 'ACTIVE' || !['SHOP', 'BATTLE'].includes(phase)) return reply.code(400).send({ error: 'Dogfight room is not in a ready phase' })
     const participant = room.participants.find((entry) => entry.userId === userId)
     if (!participant) return reply.code(403).send({ error: 'Spectators cannot ready up' })
     if (participant.eliminated) return reply.code(400).send({ error: 'Eliminated players cannot ready up' })

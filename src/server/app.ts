@@ -12,13 +12,13 @@ import { publicErrorMessage } from './errors'
 import { buildApexSeedEntries, dailyApexBoardKey, resolveApexChallenge, type ApexBoardType, type ApexChallengeReport, type ApexOpponent } from './game/apex'
 import { itemDef, itemDefForQuality, relicDef, relicDefForQuality } from './game/data'
 import { canPlace, findSlot, type PlacementOptions } from './game/grid'
-import { canUpgradePair, nextQuality, normalizeQuality } from './game/quality'
+import { canUpgradePair, nextQuality, normalizeQuality, upgradeEnchant } from './game/quality'
 import { itemSellValue } from './game/shop'
 import { simulateBattle } from './game/battle'
 import { calculateLadderResult, ladderTierForScore, ladderTierLabels, ladderTiers, LADDER_SEASON_ID, type LadderTier } from './game/ladder'
 import { STARTING_GOLD, isTrainingMatchRound, selectCasualGhostSnapshot, selectLadderGhostSnapshot, targetLadderOpponentWinsRange, targetOpponentWins } from './game/matchmaking'
-import type { BattleResult, DogType, FighterSnapshot, GameItem, RelicInstance, ShopOffer, ShopType } from './game/types'
-import { applyRelicChoice, classRewardChoices, createFinishedBattleRecord, initialItems, makeChoices, makeRelicChoices, makeShop, parseJson, postBattleLargeItemReward, publicLadderSettlement, publicRun, publicRunHistory, relicsFromRun, removeRelicByInstanceId, seedGhost, snapshotFromRun, toGameItems } from './state'
+import type { BattleResult, DogType, EnchantmentChoice, FighterSnapshot, GameItem, RelicInstance, ShopOffer, ShopType } from './game/types'
+import { applyRelicChoice, createFinishedBattleRecord, initialItems, makeChoices, makeRelicChoices, makeShop, nextPhaseData, parseJson, phaseDataAfterEnchant, postBattleLargeItemReward, publicLadderSettlement, publicRun, publicRunHistory, relicsFromRun, removeRelicByInstanceId, seedGhost, snapshotFromRun, toGameItems } from './state'
 
 type PrismaTransaction = Prisma.TransactionClient
 type ApexSourceRun = {
@@ -110,7 +110,7 @@ export function buildApp() {
     relics: parseJson(entry.relics, []),
   })
 
-  const publicApexEntry = (entry: ApexEntry) => ({
+  const publicApexEntry = (entry: ApexEntry, currentUserId?: string) => ({
     id: entry.id,
     sourceRunId: entry.sourceRunId,
     boardType: entry.boardType as ApexBoardType,
@@ -124,6 +124,7 @@ export function buildApp() {
     rank: entry.rank,
     challengeWins: entry.challengeWins,
     isSeed: entry.isSeed,
+    isMine: Boolean(currentUserId && entry.userId === currentUserId),
     createdAt: entry.createdAt,
     items: parseJson<GameItem[]>(entry.items, []).map((item) => ({ ...item, def: itemDefForQuality(item.defId, item.quality) })),
     relics: parseJson<RelicInstance[]>(entry.relics, []).map((relic) => ({ ...relic, def: relicDefForQuality(relic.relicId, relic.quality) })),
@@ -497,8 +498,8 @@ export function buildApp() {
       dailyBoardKey,
       dailyResetHour: 5,
       leaderboards: {
-        overall: overallLeaderboard.map(publicApexEntry),
-        daily: dailyLeaderboard.map(publicApexEntry),
+        overall: overallLeaderboard.map((entry) => publicApexEntry(entry, userId)),
+        daily: dailyLeaderboard.map((entry) => publicApexEntry(entry, userId)),
       },
       candidates: candidates.map(publicRun),
     }
@@ -547,8 +548,8 @@ export function buildApp() {
 
     return {
       entries: {
-        overall: publicApexEntry(entries.overall),
-        daily: publicApexEntry(entries.daily),
+        overall: publicApexEntry(entries.overall, userId),
+        daily: publicApexEntry(entries.daily, userId),
       },
       reports: {
         overall: overallReport,
@@ -557,8 +558,8 @@ export function buildApp() {
       dailyBoardKey,
       dailyResetHour: 5,
       leaderboards: {
-        overall: updatedOverallLeaderboard.map(publicApexEntry),
-        daily: updatedDailyLeaderboard.map(publicApexEntry),
+        overall: updatedOverallLeaderboard.map((entry) => publicApexEntry(entry, userId)),
+        daily: updatedDailyLeaderboard.map((entry) => publicApexEntry(entry, userId)),
       },
     }
   })
@@ -653,18 +654,20 @@ export function buildApp() {
     const body = z.object({ itemId: z.string(), area: z.enum(['EQUIPMENT', 'BAG']), x: z.number().int(), y: z.number().int() }).parse(request.body)
     const run = await prisma.run.findFirstOrThrow({ where: { id: runId, userId }, include: { items: true } })
     if (await isReadyDogfightRunLocked(run.id)) return reply.code(400).send({ error: '本回合已完成，等待其他玩家' })
-    if (!['SHOP', 'MATCH', 'CLASS_REWARD', 'PREP'].includes(run.phase)) return reply.code(400).send({ error: '当前不能调整装备' })
+    if (!['SHOP', 'MATCH', 'CLASS_REWARD', 'ENCHANT_CHOICE', 'PREP'].includes(run.phase)) return reply.code(400).send({ error: '当前不能调整装备' })
     const item = run.items.find((entry) => entry.id === body.itemId)
     if (!item) return reply.code(404).send({ error: '道具不存在' })
     const gameItems = toGameItems(run.items)
-    const moving = { id: item.id, defId: item.defId, quality: normalizeQuality(item.quality), area: body.area, x: body.x, y: body.y }
+    const movingSource = gameItems.find((entry) => entry.id === item.id)
+    const moving = { ...(movingSource ?? { id: item.id, defId: item.defId, quality: normalizeQuality(item.quality), area: item.area as GameItem['area'], x: item.x, y: item.y }), area: body.area, x: body.x, y: body.y }
     const placementOptions = placementOptionsForRun(run)
     const coveredForUpgrade = overlappingItems(gameItems, moving, body.area, body.x, body.y)
     const upgradeTarget = coveredForUpgrade.length === 1 ? coveredForUpgrade[0] : null
     const upgradedQuality = upgradeTarget && canUpgradePair(moving, upgradeTarget) ? nextQuality(upgradeTarget.quality) : null
     if (upgradeTarget && upgradedQuality) {
+      const enchant = upgradeEnchant(upgradeTarget.enchant, moving.enchant)
       await prisma.$transaction([
-        prisma.itemInstance.update({ where: { id: upgradeTarget.id }, data: { quality: upgradedQuality } }),
+        prisma.itemInstance.update({ where: { id: upgradeTarget.id }, data: { quality: upgradedQuality, enchant: enchant ? JSON.stringify(enchant) : null } }),
         prisma.itemInstance.delete({ where: { id: item.id } }),
       ])
       const updated = await prisma.run.findUniqueOrThrow({ where: { id: run.id }, include: { items: true } })
@@ -701,7 +704,7 @@ export function buildApp() {
     const run = await prisma.run.findFirst({ where: { id: runId, userId }, include: { items: true } })
     if (!run) return reply.code(404).send({ error: '跑局不存在' })
     if (await isReadyDogfightRunLocked(run.id)) return reply.code(400).send({ error: '本回合已完成，等待其他玩家' })
-    if (!['SHOP', 'MATCH', 'CLASS_REWARD', 'PREP'].includes(run.phase)) return reply.code(400).send({ error: '当前不能升级道具' })
+    if (!['SHOP', 'MATCH', 'CLASS_REWARD', 'ENCHANT_CHOICE', 'PREP'].includes(run.phase)) return reply.code(400).send({ error: '当前不能升级道具' })
 
     const gameItems = toGameItems(run.items)
     const source = gameItems.find((entry) => entry.id === body.itemId)
@@ -718,8 +721,10 @@ export function buildApp() {
     const upgradedQuality = nextQuality(target.quality)
     if (!upgradedQuality) return reply.code(400).send({ error: '钻石品质已满级' })
 
+    const enchant = upgradeEnchant(target.enchant, consumed.enchant)
+
     await prisma.$transaction([
-      prisma.itemInstance.update({ where: { id: target.id }, data: { quality: upgradedQuality } }),
+      prisma.itemInstance.update({ where: { id: target.id }, data: { quality: upgradedQuality, enchant: enchant ? JSON.stringify(enchant) : null } }),
       prisma.itemInstance.delete({ where: { id: consumed.id } }),
     ])
     const updated = await prisma.run.findUniqueOrThrow({ where: { id: run.id }, include: { items: true } })
@@ -765,16 +770,42 @@ export function buildApp() {
     const def = itemDef(body.defId)
     const slot = findSlot(toGameItems(run.items), body.defId, 'BAG')
     if (!slot) return reply.code(400).send({ error: '背包空间不足，请先整理' })
+    const pendingEnchantChoices = parseJson<EnchantmentChoice[]>(run.enchantChoices, [])
     const updated = await prisma.run.update({
       where: { id: run.id },
       data: {
-        phase: 'CHOICE',
+        phase: pendingEnchantChoices.length > 0 ? 'ENCHANT_CHOICE' : 'CHOICE',
         classRewardChoices: '[]',
-        choices: JSON.stringify(makeChoices(`${run.id}-choices-${run.round}`, run.round)),
+        choices: pendingEnchantChoices.length > 0 ? '[]' : JSON.stringify(makeChoices(`${run.id}-choices-${run.round}`, run.round)),
         items: { create: { defId: body.defId, quality: normalizeQuality(def.defaultQuality), area: 'BAG', x: slot.x, y: slot.y } },
       },
       include: { items: true },
     })
+    return { run: publicRun(updated) }
+  })
+
+  app.post('/api/runs/:runId/enchant/select', async (request, reply) => {
+    const userId = requireUser(request.userId)
+    const { runId } = z.object({ runId: z.string() }).parse(request.params)
+    const body = z.object({ enchantId: z.string(), itemId: z.string() }).parse(request.body)
+    const run = await prisma.run.findFirstOrThrow({ where: { id: runId, userId }, include: { items: true, ladderSettlement: true } })
+    if (await isReadyDogfightRunLocked(run.id)) return reply.code(400).send({ error: '本回合已完成，等待其他玩家' })
+    if (run.phase !== 'ENCHANT_CHOICE') return reply.code(400).send({ error: '当前不在附魔商店' })
+    const choices = parseJson<EnchantmentChoice[]>(run.enchantChoices, [])
+    const choice = choices.find((entry) => entry.id === body.enchantId)
+    if (!choice) return reply.code(400).send({ error: '无效附魔' })
+    const item = run.items.find((entry) => entry.id === body.itemId)
+    if (!item) return reply.code(404).send({ error: '道具不存在' })
+    if (item.enchant) return reply.code(400).send({ error: '该装备已经拥有附魔' })
+
+    const [, updated] = await prisma.$transaction([
+      prisma.itemInstance.update({ where: { id: item.id }, data: { enchant: JSON.stringify(choice.enchant) } }),
+      prisma.run.update({
+        where: { id: run.id },
+        data: phaseDataAfterEnchant(run),
+        include: { items: true, ladderSettlement: true },
+      }),
+    ])
     return { run: publicRun(updated) }
   })
 
@@ -802,7 +833,7 @@ export function buildApp() {
     const body = z.object({ relicId: z.string() }).parse(request.body)
     const run = await prisma.run.findFirstOrThrow({ where: { id: runId, userId }, include: { items: true } })
     if (await isReadyDogfightRunLocked(run.id)) return reply.code(400).send({ error: 'Round is already ready and locked' })
-    if (!['SHOP', 'MATCH', 'CLASS_REWARD', 'PREP'].includes(run.phase)) return reply.code(400).send({ error: 'Cannot sell relics in the current phase' })
+    if (!['SHOP', 'MATCH', 'CLASS_REWARD', 'ENCHANT_CHOICE', 'PREP'].includes(run.phase)) return reply.code(400).send({ error: 'Cannot sell relics in the current phase' })
     const remainingRelics = removeRelicByInstanceId(relicsFromRun(run), body.relicId)
     if (!remainingRelics) return reply.code(404).send({ error: 'Relic not found' })
     const updated = await prisma.run.update({
@@ -819,6 +850,9 @@ export function buildApp() {
     const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } })
     const playerName = user.nickname ?? '玩家'
     const run = await prisma.run.findFirstOrThrow({ where: { id: runId, userId }, include: { items: true } })
+    const previousOpponent = parseJson<(FighterSnapshot & { ghostId?: string | null }) | null>(run.matchedGhost || '', null)
+    const previousGhostId = typeof previousOpponent?.ghostId === 'string' ? previousOpponent.ghostId : null
+    const selectionSeed = `${run.id}-${run.round}-${run.wins}-${run.losses}-${Date.now()}`
     await prisma.ghostSnapshot.create({
       data: {
         runId: run.id,
@@ -859,14 +893,17 @@ export function buildApp() {
         orderBy: { createdAt: 'desc' },
         take: 50,
       })
+    const rematchCandidates = previousGhostId
+      ? ghostCandidates?.filter((candidate) => candidate.id !== previousGhostId)
+      : ghostCandidates
     const ghost = ghostCandidates
       ? runMode === 'LADDER'
-        ? selectLadderGhostSnapshot(ghostCandidates, { preferredWins: opponentWins, seed: `${run.id}-${run.round}-${run.wins}-${run.losses}` })
-        : selectCasualGhostSnapshot(ghostCandidates, { wins: run.wins, seed: `${run.id}-${run.round}-${run.wins}-${run.losses}` })
+        ? selectLadderGhostSnapshot(rematchCandidates ?? [], { preferredWins: opponentWins, seed: selectionSeed })
+        : selectCasualGhostSnapshot(rematchCandidates ?? [], { wins: run.wins, seed: selectionSeed })
       : null
     const opponent = ghost
       ? { name: ghost.name, dogType: ghost.dogType as DogType, luckyNumber: ghost.luckyNumber, wins: ghost.wins, losses: ghost.losses, round: ghost.round, items: parseJson(ghost.items, []), relics: parseJson(ghost.relics, []) }
-      : seedGhost(run.round, opponentWins, run.losses)
+      : seedGhost(run.round, opponentWins, run.losses, `${selectionSeed}-offline`)
     const updated = await prisma.run.update({
       where: { id: run.id },
       data: { phase: 'MATCH', matchedGhost: JSON.stringify({ ...opponent, ghostId: ghost?.id ?? null }) },
@@ -907,32 +944,21 @@ export function buildApp() {
     const battleRecord = createFinishedBattleRecord(result, wins, losses)
     const status = wins >= 12 || losses >= 5 ? 'COMPLETE' : 'ACTIVE'
     const nextRound = run.round + 1
-    const nextClassRewards = classRewardChoices(run.dogType as DogType, nextRound)
-    const phase = status === 'COMPLETE'
-      ? 'COMPLETE'
-      : nextClassRewards.length > 0
-        ? 'CLASS_REWARD'
-        : nextRound <= 2
-          ? 'SHOP'
-          : 'CHOICE'
     const roundIncome = 5 + nextRound * 2
+    const phaseData = status === 'COMPLETE'
+      ? { phase: 'COMPLETE', enchantChoices: '[]' }
+      : nextPhaseData({ id: run.id, dogType: run.dogType, losses, enchantThirdLossGranted: run.enchantThirdLossGranted }, nextRound, `${run.id}-finish-${nextRound}-${wins}-${losses}`)
     const updateData = {
       wins,
       losses,
       round: nextRound,
       gold: run.gold + roundIncome,
       status,
-      phase,
       lastBattle: JSON.stringify(battleRecord),
       matchedGhost: null,
       refreshCost: 1,
-      classRewardChoices: phase === 'CLASS_REWARD' ? JSON.stringify(nextClassRewards) : '[]',
       relicChoices: '[]',
-      ...(phase === 'SHOP'
-        ? { shopType: 'GENERAL', shopItems: JSON.stringify(makeShop('GENERAL', `${run.id}-round-${nextRound}`, nextRound)), choices: '[]' }
-        : phase === 'CHOICE'
-          ? { choices: JSON.stringify(makeChoices(`${run.id}-choices-${nextRound}`, nextRound)), shopItems: '[]' }
-          : {}),
+      ...phaseData,
     }
     const postBattleReward = status === 'ACTIVE'
       ? postBattleLargeItemReward(toGameItems(run.items), `${run.id}-post-battle-${nextRound}-${wins}-${losses}`)

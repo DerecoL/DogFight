@@ -802,6 +802,10 @@ async function currentMockApiScript(buildId) {
     return qualityAmountFrom(3, quality, 'SILVER');
   }
 
+  function nightPatrolLightTriggerCount(quality) {
+    return Math.max(1, qualityAmountFrom(1, quality, 'GOLD'));
+  }
+
   function relicQualityRatio(def, quality) {
     return qualityMultiplier(quality) / qualityMultiplier(def.defaultQuality);
   }
@@ -837,6 +841,7 @@ async function currentMockApiScript(buildId) {
 
   function relicEquipmentEffectScale(relicId, quality) {
     const def = relicDefsById[relicId];
+    if (def?.effect === 'EXTRA_EQUIPMENT_REDUCED_EFFECT') return 1;
     return def ? clamp(0.85 * relicQualityRatio(def, quality), 0.5, 1) : 1;
   }
 
@@ -846,7 +851,6 @@ async function currentMockApiScript(buildId) {
     const retained = Math.round(relicEffectScale(relicId, quality) * 100);
     const rollBias = Math.round(relicRollBiasChance(relicId, quality) * 100);
     const effectReduction = 100 - retained;
-    const extraEquipmentReduction = 100 - Math.round(relicEquipmentEffectScale(relicId, quality) * 100);
     const descriptions = {
       MIRROR_BIG_TO_SMALL: '你场上所有绑定在 4~6 点数的道具，现在在掷出对应减3的点数（即1~3）时也会触发，映射触发保留 ' + retained + '% 效果',
       MIRROR_SMALL_TO_BIG: '你场上所有绑定在 1~3 点数的道具，现在在掷出对应加3的点数（即4~6）时也会触发，映射触发保留 ' + retained + '% 效果',
@@ -858,7 +862,7 @@ async function currentMockApiScript(buildId) {
       POISON_TICK_BONUS: '敌方身上的【中毒】状态每次结算时，额外造成 ' + relicPoisonTickBonus(relicId, quality) + ' 点伤害。',
       OPENING_THORNS: '战斗开始时，你直接获得 ' + relicOpeningThorns(relicId, quality) + ' 层【荆棘】。',
       HUSKY_ENGINE: def.description,
-      EXTRA_EQUIPMENT_REDUCED_EFFECT: '你可以突破背包限制，将第 13 个装备放入战斗区，但你所有装备的触发效果降低 ' + extraEquipmentReduction + '%。',
+      EXTRA_EQUIPMENT_REDUCED_EFFECT: '你可以突破背包限制，将第 13 个装备放入战斗区。',
     };
     return descriptions[def.effect] || def.description;
   }
@@ -1348,8 +1352,8 @@ async function currentMockApiScript(buildId) {
     let playerHp = 100;
     let opponentHp = 100;
     const state = {
-      player: { shield: 0, poison: 0, weak: 0, thorns: 0, disabledItemIds: [], shibaSpeedStacks: 0, furyStacks: 0, lifestealItemIds: [], boomCounter: 0, growthDamageByItemId: {} },
-      opponent: { shield: 0, poison: 0, weak: 0, thorns: 0, disabledItemIds: [], shibaSpeedStacks: 0, furyStacks: 0, lifestealItemIds: [], boomCounter: 0, growthDamageByItemId: {} },
+      player: { shield: 0, poison: 0, weak: 0, thorns: 0, disabledItemIds: [], shibaSpeedStacks: 0, furyStacks: 0, lifestealItemIds: [], boomCountersByItemId: {}, growthDamageByItemId: {} },
+      opponent: { shield: 0, poison: 0, weak: 0, thorns: 0, disabledItemIds: [], shibaSpeedStacks: 0, furyStacks: 0, lifestealItemIds: [], boomCountersByItemId: {}, growthDamageByItemId: {} },
     };
     const events = [];
     let time = 0;
@@ -1362,6 +1366,7 @@ async function currentMockApiScript(buildId) {
     const fighterOf = (side) => side === 'player' ? run : opponent;
     const equippedOf = (fighter) => (fighter.items || []).filter((item) => item.area === 'EQUIPMENT').sort((a, b) => a.x - b.x);
     const equippedWithEffect = (fighter, effect) => equippedOf(fighter).filter((item) => defs[item.defId]?.advancedEffect === effect);
+    const adjacentItems = (fighter, item) => equippedOf(fighter).filter((candidate) => candidate.id !== item.id && Math.abs(candidate.x - item.x) <= (defs[item.defId]?.width || 1));
     const bloodContractAdjacentItems = (fighter, item, quality) => {
       const itemLeft = item.x;
       const itemRight = item.x + (defs[item.defId]?.width || 1);
@@ -1489,16 +1494,24 @@ async function currentMockApiScript(buildId) {
           const advanced = def.advancedEffect || 'NONE';
           const quality = normalizeQuality(item.quality);
           const sacrificeReplacesSmallEffect = def.size === 1 && equippedWithEffect(fighter, 'SMALL_TRIGGERS_LARGE').length > 0;
-          const boomCounterItem = equippedWithEffect(fighter, 'BOOM_COUNTER')[0];
-          if (!sacrificeReplacesSmallEffect && boomCounterItem) {
-            state[side].boomCounter += 1;
-            if (state[side].boomCounter >= 30) {
-              state[side].boomCounter = 0;
-              const boomDef = defs[boomCounterItem.defId];
-              const boomQuality = normalizeQuality(boomCounterItem.quality);
-              const boomDamage = qualityAmountFrom(boomDef.effect?.amount || 0, boomQuality, boomDef.effect?.qualityBase);
-              const boomResult = applyDirectHealthDamage(target, boomDamage);
-              push({ actor: side, kind: 'ITEM', itemId: boomCounterItem.id, defId: boomCounterItem.defId, effectType: 'DAMAGE', amount: Math.max(0, -boomResult.delta), target, text: boomDef.name + ' 爆鸣计数达到 30，造成 ' + Math.max(0, -boomResult.delta) + ' 点直接伤害。' });
+          const boomCounterItems = equippedWithEffect(fighter, 'BOOM_COUNTER');
+          if (!sacrificeReplacesSmallEffect) {
+            for (const boomCounterItem of boomCounterItems) {
+              const nextCount = (state[side].boomCountersByItemId[boomCounterItem.id] || 0) + 1;
+              state[side].boomCountersByItemId[boomCounterItem.id] = nextCount;
+              const boomCounterSignal = { boomCounterItemId: boomCounterItem.id, boomCounterValue: nextCount, boomCounterMax: 30, boomCounterChanged: true };
+              if (nextCount >= 30) {
+                state[side].boomCountersByItemId[boomCounterItem.id] = 0;
+                boomCounterSignal.boomCounterValue = 0;
+                const boomDef = defs[boomCounterItem.defId];
+                const boomQuality = normalizeQuality(boomCounterItem.quality);
+                const boomDamage = qualityAmountFrom(boomDef.effect?.amount || 0, boomQuality, boomDef.effect?.qualityBase);
+                const boomResult = applyDirectHealthDamage(target, boomDamage);
+                push({ actor: side, kind: 'ITEM', itemId: boomCounterItem.id, defId: boomCounterItem.defId, effectType: 'DAMAGE', amount: Math.max(0, -boomResult.delta), target, ...boomCounterSignal, text: boomDef.name + ' 爆鸣计数达到 30，造成 ' + Math.max(0, -boomResult.delta) + ' 点直接伤害。' });
+              } else {
+                const boomDef = defs[boomCounterItem.defId];
+                push({ actor: side, kind: 'ITEM', itemId: boomCounterItem.id, defId: boomCounterItem.defId, effectType: 'UTILITY', amount: 1, target: side, ...boomCounterSignal, text: boomDef.name + ' 爆鸣计数 +' + nextCount + '/30。' });
+              }
             }
           }
           let amount = qualityAmountFrom(def.effect?.amount || 0, quality, def.effect?.qualityBase);
@@ -1520,6 +1533,26 @@ async function currentMockApiScript(buildId) {
               push({ actor: side, kind: 'ITEM', itemId: item.id, defId: item.defId, effectType: 'HEAL', amount: healAmount, target: side, text: def.name + ' 清除 ' + removed + ' 层增益，恢复 ' + Math.max(0, healed.delta) + ' 生命。' });
             } else {
               push({ actor: side, kind: 'ITEM', itemId: item.id, defId: item.defId, effectType: 'UTILITY', amount: removed, target, text: def.name + ' 清除 ' + removed + ' 层增益。' });
+            }
+          } else if (advanced === 'ADJACENT_TEMP_TRIGGER') {
+            const adjacent = adjacentItems(fighter, item);
+            for (let i = 0; i < nightPatrolLightTriggerCount(quality); i += 1) {
+              for (const adjacentItem of adjacent) {
+                const adjacentDef = defs[adjacentItem.defId];
+                if (!adjacentDef) continue;
+                const adjacentAmount = qualityAmountFrom(adjacentDef.effect?.amount || 0, adjacentItem.quality, adjacentDef.effect?.qualityBase);
+                time += 0.25;
+                if (adjacentDef.effect?.type === 'HEAL') {
+                  const healed = applyHeal(side, adjacentAmount);
+                  push({ actor: side, kind: 'ITEM', itemId: adjacentItem.id, defId: adjacentItem.defId, effectType: 'HEAL', amount: adjacentAmount, target: side, text: adjacentDef.name + ' 回复 ' + Math.max(0, healed.delta) + ' 生命。' });
+                } else if (adjacentDef.advancedEffect === 'GAIN_SHIELD' || adjacentDef.advancedEffect === 'SHIELD_IMMUNITY') {
+                  state[side].shield += adjacentAmount;
+                  push({ actor: side, kind: 'ITEM', itemId: adjacentItem.id, defId: adjacentItem.defId, effectType: 'UTILITY', amount: adjacentAmount, target: side, text: adjacentDef.name + ' 获得 ' + adjacentAmount + ' 点护盾。' });
+                } else {
+                  const result = applyDamage(target, adjacentAmount, adjacentDef.advancedEffect === 'DOUBLE_SHIELD_DAMAGE' ? adjacentAmount * 2 : adjacentAmount);
+                  push({ actor: side, kind: 'ITEM', itemId: adjacentItem.id, defId: adjacentItem.defId, effectType: 'DAMAGE', amount: Math.max(0, -result.delta), target, text: adjacentDef.name + ' 造成 ' + Math.max(0, -result.delta) + ' 点伤害。' });
+                }
+              }
             }
           } else if (def.effect?.type === 'HEAL') {
             setHp(side, Math.min(100, hpOf(side) + amount));

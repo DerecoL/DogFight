@@ -149,7 +149,7 @@ export const ITEM_DEFS: ItemDef[] = [
     advancedEffect: 'GRANT_LIFESTEAL_ADJACENT',
     defaultQuality: 'GOLD',
   }),
-  slotItem('v4-boom-counter', '爆鸣计数器', 2, 14, [1, 2, 3, 4, 5, 6], ['counter', 'trigger', 'damage'], { type: 'UTILITY', amount: 300, qualityBase: 'GOLD' }, {
+  slotItem('v4-boom-counter', '爆鸣计数器', 2, 14, [1, 6], ['counter', 'trigger', 'damage'], { type: 'UTILITY', amount: 300, qualityBase: 'GOLD' }, {
     description: '己方装备每成功触发 1 次，获得 1 点爆鸣计数。达到 30 点后清零，对敌方造成 300 点直接伤害。升级只提高伤害。',
     advancedEffect: 'BOOM_COUNTER',
     defaultQuality: 'GOLD',
@@ -214,7 +214,7 @@ export const RELIC_DEFS: RelicDef[] = [
   { id: 'v3-bad-dog-manual', name: '坏狗狗作案手册', unlockRound: 3, defaultQuality: 'GOLD', tags: ['poison'], effect: 'POISON_TICK_BONUS', description: '敌方身上的【中毒】状态每次结算时，额外造成 2 点伤害。' },
   { id: 'v3-fluffed-spike-collar', name: '炸毛护颈圈', unlockRound: 3, defaultQuality: 'GOLD', tags: ['thorn'], effect: 'OPENING_THORNS', description: '战斗开始时，你直接获得 5 层【荆棘】。' },
   { id: 'v3-husky-engine', name: '哈士奇永动机', unlockRound: 3, defaultQuality: 'DIAMOND', tags: ['attack-speed'], effect: 'HUSKY_ENGINE', description: '你的基础投掷间隔从 1 秒缩短至 0.85 秒。（全局攻速提升）' },
-  { id: 'v3-fourth-dimensional-kennel', name: '四次元狗窝', unlockRound: 3, defaultQuality: 'DIAMOND', tags: ['space'], effect: 'EXTRA_EQUIPMENT_REDUCED_EFFECT', description: '你可以突破背包限制，将第 13 个装备放入战斗区，但你所有装备的触发效果降低 15%。' },
+  { id: 'v3-fourth-dimensional-kennel', name: '四次元狗窝', unlockRound: 3, defaultQuality: 'DIAMOND', tags: ['space'], effect: 'EXTRA_EQUIPMENT_REDUCED_EFFECT', description: '你可以突破背包限制，将第 13 个装备放入战斗区。' },
 ]
 
 export const TERM_DEFS = [
@@ -259,6 +259,10 @@ export function growthDamageStep(quality?: string | null) {
   return qualityAmountFrom(3, quality, 'SILVER')
 }
 
+export function nightPatrolLightTriggerCount(quality?: string | null) {
+  return Math.max(1, qualityAmountFrom(1, quality, 'GOLD'))
+}
+
 export function itemDescription(itemId: string, quality?: string | null) {
   const def = itemDef(itemId)
   const currentQuality = normalizeQuality(quality)
@@ -280,6 +284,7 @@ export function itemDescription(itemId: string, quality?: string | null) {
   if (advanced === 'GAIN_FURY_ON_ATTACK') return `${baseEffect}攻击时有 50% 概率触发【激昂】；【激昂】使所有攻击伤害 +1，可叠加。`
   if (advanced === 'DOUBLE_SHIELD_DAMAGE') return `${baseEffect}如果敌方有护盾，该次伤害直接对护盾造成 2 倍伤害。`
   if (advanced === 'HEAL_OR_MAX_HP') return `恢复 ${amount} 点生命值。如果你当前处于满血，则永久提升自身 ${one} 点最大生命值。`
+  if (advanced === 'ADJACENT_TEMP_TRIGGER') return `触发时，额外触发【相邻】装备 ${nightPatrolLightTriggerCount(currentQuality)} 次。`
   if (advanced === 'LIFESTEAL') return `${baseEffect}并将造成伤害的 100% 转化为自身治疗。`
   if (advanced === 'POISON_AND_DISABLE_RIGHTMOST') return `对敌方施加 ${amount} 层【中毒】，并使敌方最右侧的一个装备【失效】一次。`
   if (advanced === 'SHIELD_IMMUNITY') return `获得 ${amount} 点护盾。只要你拥有护盾，你受到的【中毒】和【虚弱】层数减半（向上取整）。`
@@ -364,6 +369,7 @@ export function relicEmptyRollMisses(relicId: string, quality?: string | null) {
 
 export function relicEquipmentEffectScale(relicId: string, quality?: string | null) {
   const def = relicDef(relicId)
+  if (def.effect === 'EXTRA_EQUIPMENT_REDUCED_EFFECT') return 1
   return clamp(0.85 * relicQualityRatio(def, quality), 0.5, 1)
 }
 
@@ -373,7 +379,6 @@ export function relicDescription(relicId: string, quality?: string | null) {
   const retained = roundPercent(relicEffectScale(relicId, currentQuality))
   const rollBias = roundPercent(relicRollBiasChance(relicId, currentQuality))
   const effectReduction = 100 - retained
-  const extraEquipmentReduction = 100 - roundPercent(relicEquipmentEffectScale(relicId, currentQuality))
   const descriptions: Record<RelicEffect, string> = {
     MIRROR_BIG_TO_SMALL: `你场上所有绑定在 4~6 点数的道具，现在在掷出对应减3的点数（即1~3）时也会触发，映射触发保留 ${retained}% 效果`,
     MIRROR_SMALL_TO_BIG: `你场上所有绑定在 1~3 点数的道具，现在在掷出对应加3的点数（即4~6）时也会触发，映射触发保留 ${retained}% 效果`,
@@ -385,7 +390,7 @@ export function relicDescription(relicId: string, quality?: string | null) {
     POISON_TICK_BONUS: `敌方身上的【中毒】状态每次结算时，额外造成 ${relicPoisonTickBonus(relicId, currentQuality)} 点伤害。`,
     OPENING_THORNS: `战斗开始时，你直接获得 ${relicOpeningThorns(relicId, currentQuality)} 层【荆棘】。`,
     HUSKY_ENGINE: def.description,
-    EXTRA_EQUIPMENT_REDUCED_EFFECT: `你可以突破背包限制，将第 13 个装备放入战斗区，但你所有装备的触发效果降低 ${extraEquipmentReduction}%。`,
+    EXTRA_EQUIPMENT_REDUCED_EFFECT: '你可以突破背包限制，将第 13 个装备放入战斗区。',
   }
   return descriptions[def.effect]
 }

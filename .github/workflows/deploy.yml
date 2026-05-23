@@ -6,43 +6,31 @@ on:
       - main
   workflow_dispatch:
 
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 40
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Package source
-        run: |
-          tar -czf "$RUNNER_TEMP/dogfight-source.tar.gz" \
-            --exclude='.git' \
-            --exclude='node_modules' \
-            --exclude='dist' \
-            --exclude='dist-click' \
-            --exclude='.pglite' \
-            --exclude='.worktrees' \
-            --exclude='.codex-*' \
-            .
-
       - name: Configure SSH
+        timeout-minutes: 2
         run: |
           install -m 700 -d ~/.ssh
           printf '%s\n' "${{ secrets.SERVER_SSH_KEY }}" > ~/.ssh/dogfight_deploy_key
           chmod 600 ~/.ssh/dogfight_deploy_key
-          ssh-keyscan -H "${{ secrets.SERVER_HOST }}" >> ~/.ssh/known_hosts
-
-      - name: Upload source package
-        run: |
-          scp -i ~/.ssh/dogfight_deploy_key \
-            -o BatchMode=yes \
-            -o ConnectTimeout=20 \
-            -o ServerAliveInterval=15 \
-            -o ServerAliveCountMax=4 \
-            "$RUNNER_TEMP/dogfight-source.tar.gz" \
-            "${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:/tmp/dogfight-${{ github.sha }}.tar.gz"
+          ssh-keyscan -T 20 -H "${{ secrets.SERVER_HOST }}" >> ~/.ssh/known_hosts
 
       - name: Deploy to Tencent Cloud
+        timeout-minutes: 35
+        env:
+          DEPLOY_REPO_TOKEN: ${{ secrets.DEPLOY_REPO_TOKEN }}
+          GITHUB_SHA: ${{ github.sha }}
         run: |
           ssh -i ~/.ssh/dogfight_deploy_key \
             -o BatchMode=yes \
@@ -50,19 +38,25 @@ jobs:
             -o ServerAliveInterval=15 \
             -o ServerAliveCountMax=4 \
             "${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}" \
-            "DEPLOY_PATH='${{ secrets.DEPLOY_PATH }}' ARCHIVE_PATH='/tmp/dogfight-${{ github.sha }}.tar.gz' bash -s" <<'REMOTE'
+            "DEPLOY_PATH='${{ secrets.DEPLOY_PATH }}' GITHUB_REPOSITORY='${{ github.repository }}' GITHUB_SHA='$GITHUB_SHA' DEPLOY_REPO_TOKEN='$DEPLOY_REPO_TOKEN' bash -s" <<'REMOTE'
           set -euo pipefail
 
           TEMP_DEPLOY_PATH="${DEPLOY_PATH}.repo-tmp"
+          REPO_URL="https://github.com/${GITHUB_REPOSITORY}.git"
+          if [ -n "${DEPLOY_REPO_TOKEN:-}" ]; then
+            REPO_URL="https://x-access-token:${DEPLOY_REPO_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          fi
 
           mkdir -p "$DEPLOY_PATH"
           rm -rf "$TEMP_DEPLOY_PATH"
-          mkdir -p "$TEMP_DEPLOY_PATH"
+          git clone --filter=blob:none --no-checkout "$REPO_URL" "$TEMP_DEPLOY_PATH"
+          cd "$TEMP_DEPLOY_PATH"
+          git fetch --depth=1 origin "$GITHUB_SHA"
+          git checkout --detach "$GITHUB_SHA"
 
-          tar -xzf "$ARCHIVE_PATH" -C "$TEMP_DEPLOY_PATH"
           find "$DEPLOY_PATH" -mindepth 1 -maxdepth 1 ! -name backups ! -name .env.production -exec rm -rf {} +
           cp -a "$TEMP_DEPLOY_PATH"/. "$DEPLOY_PATH"/
-          rm -rf "$TEMP_DEPLOY_PATH" "$ARCHIVE_PATH"
+          rm -rf "$TEMP_DEPLOY_PATH"
 
           cat > "$DEPLOY_PATH/.env.production" <<'ENV'
           ${{ secrets.PRODUCTION_ENV }}

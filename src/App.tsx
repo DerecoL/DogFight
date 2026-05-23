@@ -32,15 +32,26 @@ import {
   RefreshCcw,
   Shield,
   ShoppingBag,
+  Sparkles,
   Swords,
   Trophy,
   VolumeX,
 } from 'lucide-react'
+import {
+  buildFxTimeline,
+  battlePresentationTargetSide,
+  createBattlePresentation,
+  createUiFeedbackEvent,
+  type PresentationEvent,
+  type PresentationKind,
+  type UiFeedbackEvent,
+  type UiFeedbackKind,
+} from './feedback'
 import { resolveSlotPlacement } from './placement'
 import './App.css'
 
 type DogType = 'SHIBA' | 'SAMOYED' | 'MUTT' | 'BULLY' | 'EMPEROR'
-type Phase = 'SHOP' | 'CHOICE' | 'CLASS_REWARD' | 'RELIC_CHOICE' | 'PREP' | 'MATCH' | 'BATTLE' | 'COMPLETE'
+type Phase = 'SHOP' | 'CHOICE' | 'CLASS_REWARD' | 'ENCHANT_CHOICE' | 'RELIC_CHOICE' | 'PREP' | 'MATCH' | 'BATTLE' | 'COMPLETE'
 type Area = 'EQUIPMENT' | 'BAG'
 type ShopType = 'GENERAL' | 'LARGE' | 'MEDIUM' | 'SMALL' | 'SMALL_DICE' | 'BIG_DICE' | 'RELIC'
 type ItemQuality = 'BRONZE' | 'SILVER' | 'GOLD' | 'DIAMOND'
@@ -65,12 +76,24 @@ type ItemDef = {
   advancedEffect?: string
   effect: { type: string; amount: number; qualityBase?: ItemQuality }
 }
-type Item = { id: string; defId: string; quality: ItemQuality; area: Area; x: number; y: number; def: ItemDef }
 type ShopOffer = { offerId: string; defId: string; price: number; discount: number; quality?: ItemQuality; def?: ItemDef }
 type ClassRewardChoice = { defId: string; quality: ItemQuality; def: ItemDef }
 type RelicDef = { id: string; name: string; defaultQuality: ItemQuality; tags: string[]; description: string; effect: string }
 type Relic = { id: string; relicId: string; quality: ItemQuality; slot: number; def: RelicDef }
 type RelicChoice = { relicId: string; quality: ItemQuality; def: RelicDef }
+type EnchantmentTarget = 'LEFT' | 'RIGHT' | 'ADJACENT'
+type EnchantmentBaseEffect = 'DAMAGE' | 'HEAL' | 'SHIELD'
+type EnchantmentSpecialEffect = 'THORNS' | 'FURY' | 'POISON' | 'WEAK'
+type EnchantmentGrantEffect = 'LIFESTEAL' | 'THORNS' | 'CLEANSE'
+type Enchantment =
+  | { kind: 'EXTRA_DICE'; dice: number[]; label: string }
+  | { kind: 'BASE_EFFECT'; effect: EnchantmentBaseEffect; amount: number; label: string }
+  | { kind: 'SPECIAL'; effect: EnchantmentSpecialEffect; amount: number; label: string }
+  | { kind: 'TRIGGER_NEIGHBOR'; target: EnchantmentTarget; label: string }
+  | { kind: 'BUFF_NEIGHBOR_EFFECT'; target: EnchantmentTarget; effect: EnchantmentBaseEffect; amount: number; label: string }
+  | { kind: 'GRANT_NEIGHBOR_EFFECT'; target: EnchantmentTarget; effect: EnchantmentGrantEffect; amount: number; label: string }
+type EnchantmentChoice = { id: string; description: string; enchant: Enchantment }
+type Item = { id: string; defId: string; quality: ItemQuality; area: Area; x: number; y: number; def: ItemDef; enchant?: Enchantment | null }
 type BattleActor = 'player' | 'opponent' | 'system'
 type BattleTarget = 'player' | 'opponent' | 'both' | 'none'
 type BattleSnapshot = { name: string; dogType: DogType; luckyNumber?: number | null; wins: number; losses: number; round: number; items: Item[]; relics?: Relic[] }
@@ -102,13 +125,17 @@ type BattleEvent = {
   roll?: number
   itemId?: string
   defId?: string
+  boomCounterItemId?: string
+  boomCounterValue?: number
+  boomCounterMax?: number
+  boomCounterChanged?: boolean
   effectType?: string
   amount?: number
   target?: BattleTarget
   sourceHpDelta?: number
   targetHpDelta?: number
 }
-type BattleVfxKind = 'none' | 'roll' | 'damage' | 'heal' | 'shield' | 'poison' | 'weak' | 'freeze' | 'thorns' | 'miss' | 'utility'
+type BattleVfxKind = PresentationKind
 type BattleVfxStyle = { kind: BattleVfxKind; color: string; accent: string; prefix: string; particleCount: number }
 type Battle = {
   winner: string
@@ -136,6 +163,7 @@ type Run = {
   shopItems: ShopOffer[]
   choices: ShopType[]
   classRewardChoices: ClassRewardChoice[]
+  enchantChoices: EnchantmentChoice[]
   relicChoices: RelicChoice[]
   relics: Relic[]
   refreshCost: number
@@ -195,6 +223,12 @@ type PlayerRunHistory = {
 }
 type AuthUser = { id: string; account: string; nickname: string | null }
 type TipAnchor = { x: number; y: number }
+type StatusTipState = {
+  status: BattleStatusEntry
+  side: 'player' | 'opponent'
+  polarity: 'positive' | 'negative'
+  anchor: TipAnchor
+}
 type ApexEntry = {
   id: string
   sourceRunId: string | null
@@ -209,6 +243,7 @@ type ApexEntry = {
   rank: number
   challengeWins: number
   isSeed: boolean
+  isMine: boolean
   createdAt: string
   items: Item[]
   relics: Relic[]
@@ -501,6 +536,57 @@ const ruleTerms: Record<string, { description: string; note: string }> = {
   失效: { description: '下次生效将不会有任何行为，生效后去除一层该效果', note: '无' },
   天命数字: { description: '开局时确定的幸运数字', note: '狗皇帝专属规则' },
 }
+const statusTipId = 'battle-status-tip'
+const statusTipDetails: Record<string, { polarity: '正面效果' | '负面效果'; timing: string; description: string; source: string }> = {
+  shield: {
+    polarity: '正面效果',
+    timing: '受到伤害时优先结算',
+    description: '护盾会先吸收即将受到的伤害。护盾值被扣完后，剩余伤害才会进入生命值。',
+    source: '常见来源：护盾类装备、职业道具和遗物。',
+  },
+  thorns: {
+    polarity: '正面效果',
+    timing: '受到直接伤害后触发',
+    description: '荆棘会在被直接攻击后对攻击方造成反伤。层数越高，反伤能力越强。',
+    source: '常见来源：荆棘、反伤和防御类装备。',
+  },
+  extraRoll: {
+    polarity: '正面效果',
+    timing: '后续投骰或触发时消耗',
+    description: '额外骰会增加后续投骰或装备触发机会。显示的数值代表当前剩余次数。',
+    source: '常见来源：加速、连击和额外触发类效果。',
+  },
+  fury: {
+    polarity: '正面效果',
+    timing: '后续攻击或造成伤害时生效',
+    description: '激昂会强化后续攻击或伤害表现。显示的层数代表当前增幅强度。',
+    source: '常见来源：激昂、狂怒和进攻类装备。',
+  },
+  poison: {
+    polarity: '负面效果',
+    timing: '持续结算时造成伤害',
+    description: '中毒会在结算时造成持续伤害。芯片上的层数表示毒性强度，倒计时提示下一次毒伤时机。',
+    source: '常见来源：毒刃、毒牙和持续伤害类装备。',
+  },
+  weak: {
+    polarity: '负面效果',
+    timing: '造成伤害时生效',
+    description: '虚弱会降低后续造成的伤害。层数越高，输出被削弱得越明显。',
+    source: '常见来源：削弱、压制和控制类效果。',
+  },
+  freeze: {
+    polarity: '负面效果',
+    timing: '行动或触发前检查',
+    description: '冻结会限制行动或跳过触发。显示的剩余时间或次数代表控制还会持续多久。',
+    source: '常见来源：冰冻、寒冷和控制类装备。',
+  },
+  disabled: {
+    polarity: '负面效果',
+    timing: '装备或效果触发前检查',
+    description: '失效会让装备或效果被跳过。显示的次数代表还会抵消多少次触发。',
+    source: '常见来源：缴械、破坏和反制类效果。',
+  },
+}
 
 async function api<T>(url: string, options: RequestInit = {}): Promise<T> {
   const headers = options.body ? { 'Content-Type': 'application/json', ...(options.headers || {}) } : options.headers
@@ -542,33 +628,12 @@ function equipmentSlotCount(relics?: Relic[]) {
   return relics?.some((relic) => relic.def.effect === 'EXTRA_EQUIPMENT_REDUCED_EFFECT') ? EXTRA_EQUIPMENT_SLOT_COUNT : BASE_EQUIPMENT_SLOT_COUNT
 }
 
-function battleEventHasStatus(event: BattleEvent, type: string) {
-  const rows = [event.playerStatuses, event.opponentStatuses]
-  return rows.some((row) => [...(row?.positive ?? []), ...(row?.negative ?? [])].some((status) => status.type === type))
-}
-
 function battleVfxKind(event?: BattleEvent): BattleVfxKind {
-  if (!event) return 'none'
-  if (event.kind === 'ROLL') return 'roll'
-  if (event.effectType === 'DAMAGE') return event.targetHpDelta === 0 ? 'miss' : 'damage'
-  if (event.effectType === 'HEAL') return 'heal'
-  if (event.effectType === 'POISON' || event.kind === 'POISON') return 'poison'
-  if (event.effectType === 'UTILITY') {
-    if (battleEventHasStatus(event, 'shield') || (event.actor === 'player' ? event.playerShield : event.opponentShield)) return 'shield'
-    if (battleEventHasStatus(event, 'weak')) return 'weak'
-    if (battleEventHasStatus(event, 'freeze')) return 'freeze'
-    if (battleEventHasStatus(event, 'thorns')) return 'thorns'
-    if (battleEventHasStatus(event, 'disabled')) return 'miss'
-    return 'utility'
-  }
-  return 'utility'
+  return createBattlePresentation(event).kind
 }
 
 function battleVfxTargetSide(event?: BattleEvent): 'player' | 'opponent' | null {
-  if (!event) return null
-  if (event.target === 'player' || event.target === 'opponent') return event.target
-  if ((event.effectType === 'HEAL' || battleVfxKind(event) === 'shield' || battleVfxKind(event) === 'thorns') && (event.actor === 'player' || event.actor === 'opponent')) return event.actor
-  return null
+  return battlePresentationTargetSide(event, battleVfxKind(event))
 }
 
 const battleVfxStyles: Record<BattleVfxKind, BattleVfxStyle> = {
@@ -625,6 +690,37 @@ function growthDamageTextForBattleItem(item: Item, owner: 'player' | 'opponent',
   return `当前伤害 ${baseDamage + growth}；每次成功触发后，本局内后续伤害继续提升。`
 }
 
+function boomCounterStateForBattleItem(item: Item, owner: 'player' | 'opponent', events: BattleEvent[], displayIndex: number, activeEvent?: BattleEvent) {
+  if (item.def.advancedEffect !== 'BOOM_COUNTER') return null
+  const latest = events.slice(0, displayIndex + 1).reverse().find((event) => event.actor === owner && event.boomCounterItemId === item.id)
+  const max = latest?.boomCounterMax ?? 30
+  const count = Math.max(0, Math.min(max, latest?.boomCounterValue ?? 0))
+  const progress = max > 0 ? Math.round((count / max) * 100) : 0
+  const popping = activeEvent?.actor === owner && activeEvent.boomCounterItemId === item.id && activeEvent.boomCounterChanged === true
+  return { count, max, progress, popping }
+}
+
+function enchantmentText(enchant?: Enchantment | null) {
+  if (!enchant) return ''
+  if (enchant.kind === 'EXTRA_DICE') return `附魔：额外在 ${enchant.dice.join('/')} 点触发`
+  if (enchant.kind === 'BASE_EFFECT') {
+    const effect = enchant.effect === 'DAMAGE' ? '造成伤害' : enchant.effect === 'HEAL' ? '回复生命' : '获得护盾'
+    return `附魔：触发时额外${effect} ${enchant.amount}`
+  }
+  if (enchant.kind === 'SPECIAL') {
+    const effect = enchant.effect === 'THORNS' ? '荆棘' : enchant.effect === 'FURY' ? '激昂' : enchant.effect === 'POISON' ? '中毒' : '虚弱'
+    return `附魔：触发时额外触发 ${enchant.amount} 层${effect}`
+  }
+  const target = enchant.target === 'LEFT' ? '左侧' : enchant.target === 'RIGHT' ? '右侧' : '相邻'
+  if (enchant.kind === 'TRIGGER_NEIGHBOR') return `附魔：触发时额外触发${target}装备`
+  if (enchant.kind === 'BUFF_NEIGHBOR_EFFECT') {
+    const effect = enchant.effect === 'DAMAGE' ? '攻击' : enchant.effect === 'HEAL' ? '回复生命' : '增加护盾'
+    return `附魔：触发时使${target}装备下次${effect} +${enchant.amount}`
+  }
+  const effect = enchant.effect === 'LIFESTEAL' ? '吸血' : enchant.effect === 'THORNS' ? '荆棘' : '净化'
+  return `附魔：触发时使${target}装备获得${effect} ${enchant.amount}`
+}
+
 function purchaseValueForItem(def: ItemDef, quality: ItemQuality = normalizeQuality(def.defaultQuality)) {
   const currentQuality = normalizeQuality(quality)
   return Math.floor(def.price * qualityPriceMultiplier[currentQuality])
@@ -672,6 +768,12 @@ function diceToneText(def: ItemDef) {
   return '混合'
 }
 
+function visibleTriggerDice(def: ItemDef) {
+  const dice = [...new Set(def.dice)].sort((left, right) => left - right)
+  const coversEveryFace = dice.length === 6 && dice.every((face, index) => face === index + 1)
+  return coversEveryFace ? null : dice.join('/')
+}
+
 function effectToneText(def: ItemDef) {
   if (def.advancedEffect === 'GRANT_LIFESTEAL_ADJACENT') return '吸血'
   if (def.advancedEffect === 'BOOM_COUNTER') return '爆鸣计数'
@@ -697,6 +799,10 @@ function canUpgradeDrop(source: Item | undefined, target: Item | undefined) {
   if (!source || !target || source.id === target.id) return false
   const quality = normalizeQuality(source.quality)
   return quality !== 'DIAMOND' && source.defId === target.defId && normalizeQuality(target.quality) === quality
+}
+
+function shopOfferOwnedCount(run: Run, offer: ShopOffer) {
+  return run.items.filter((item) => item.defId === offer.defId).length
 }
 
 function parseSlotId(id: string) {
@@ -778,6 +884,7 @@ export default function App() {
   const [error, setError] = useState('')
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
   const [selectedOfferId, setSelectedOfferId] = useState<string | null>(null)
+  const [selectedEnchantId, setSelectedEnchantId] = useState<string | null>(null)
   const [tipAnchor, setTipAnchor] = useState<TipAnchor | null>(null)
   const [draggingItemId, setDraggingItemId] = useState<string | null>(null)
   const [battle, setBattle] = useState<Battle | null>(null)
@@ -866,13 +973,30 @@ export default function App() {
 
   const selectedItem = run?.items.find((item) => item.id === selectedItemId) || null
   const selectedOffer = run?.shopItems.find((offer) => offer.offerId === selectedOfferId) || null
+  const selectedEnchant = run?.phase === 'ENCHANT_CHOICE'
+    ? run.enchantChoices.find((choice) => choice.id === selectedEnchantId) ?? run.enchantChoices[0] ?? null
+    : null
   const draggingItem = run?.items.find((item) => item.id === draggingItemId) || null
   const currentEvent = battle?.events[eventIndex]
   const score = run ? run.wins * 100 + Math.max(0, 12 - run.losses * 2) * 5 : 0
   const classRewardCeremonyKey = run?.phase === 'CLASS_REWARD' ? `${run.id}:${run.round}` : ''
   const showClassRewardCeremony = Boolean(run?.phase === 'CLASS_REWARD' && classRewardCeremonyKey && !ceremonyDismissedRounds.has(classRewardCeremonyKey))
+  const enchantCeremonyKey = run?.phase === 'ENCHANT_CHOICE' ? `${run.id}:enchant:${run.round}` : ''
+  const showEnchantCeremony = Boolean(run?.phase === 'ENCHANT_CHOICE' && enchantCeremonyKey && !ceremonyDismissedRounds.has(enchantCeremonyKey))
+  const [uiFeedbacks, setUiFeedbacks] = useState<UiFeedbackEvent[]>([])
 
-  const action = async (fn: () => Promise<{ run: Run; battle?: Battle } | { user: AuthUser | null; activeRun?: Run | null; needsNickname?: boolean }>) => {
+  const pushUiFeedback = useCallback((kind: UiFeedbackKind, label?: string) => {
+    const feedback = createUiFeedbackEvent(kind, label)
+    setUiFeedbacks((current) => [...current.slice(-3), feedback])
+    window.setTimeout(() => {
+      setUiFeedbacks((current) => current.filter((entry) => entry.id !== feedback.id))
+    }, feedback.durationMs)
+  }, [])
+
+  const action = async (
+    fn: () => Promise<{ run: Run; battle?: Battle } | { user: AuthUser | null; activeRun?: Run | null; needsNickname?: boolean }>,
+    feedback?: { success?: UiFeedbackKind; failure?: UiFeedbackKind; successLabel?: string; failureLabel?: string },
+  ) => {
     setError('')
     try {
       const data = await fn()
@@ -900,26 +1024,52 @@ export default function App() {
         void loadRunHistory().catch(() => undefined)
         void loadLadderProfile().catch(() => undefined)
       }
+      if (feedback?.success) pushUiFeedback(feedback.success, feedback.successLabel)
     } catch (err) {
-      setError(err instanceof Error ? err.message : '操作失败')
+      const message = err instanceof Error ? err.message : '操作失败'
+      setError(message)
+      pushUiFeedback(feedback?.failure ?? (message.includes('金币') ? 'gold-shortage' : 'action-failed'), feedback?.failureLabel ?? message)
     }
   }
 
   const moveItem = (itemId: string, area: Area, x: number, y: number) => {
     if (!run) return
     const placement = resolveRunSlotPlacement(run, itemId, area, x, y)
-    void action(() => api(`/runs/${run.id}/items/move`, { method: 'POST', body: JSON.stringify({ itemId, area: placement?.area ?? area, x: placement?.x ?? x, y: placement?.y ?? y }) }))
+    if (!placement) {
+      pushUiFeedback('place-failed')
+      return
+    }
+    void action(
+      () => api(`/runs/${run.id}/items/move`, { method: 'POST', body: JSON.stringify({ itemId, area: placement.area, x: placement.x, y: placement.y }) }),
+      { success: 'place-success', failure: 'place-failed' },
+    )
   }
 
   const upgradeItem = (itemId: string, targetItemId?: string) => {
     if (!run) return
     setTipAnchor(null)
-    void action(() => api(`/runs/${run.id}/items/upgrade`, { method: 'POST', body: JSON.stringify({ itemId, targetItemId }) }))
+    void action(
+      () => api(`/runs/${run.id}/items/upgrade`, { method: 'POST', body: JSON.stringify({ itemId, targetItemId }) }),
+      { success: 'upgrade-success', failure: 'upgrade-failed' },
+    )
   }
 
   const sellRelic = (relicId: string) => {
     if (!run) return
-    void action(() => api(`/runs/${run.id}/relic/sell`, { method: 'POST', body: JSON.stringify({ relicId }) }))
+    void action(
+      () => api(`/runs/${run.id}/relic/sell`, { method: 'POST', body: JSON.stringify({ relicId }) }),
+      { success: 'relic-sold' },
+    )
+  }
+
+  const applyEnchant = (itemId: string) => {
+    if (!run || !selectedEnchant) return
+    setTipAnchor(null)
+    setSelectedItemId(null)
+    void action(
+      () => api(`/runs/${run.id}/enchant/select`, { method: 'POST', body: JSON.stringify({ enchantId: selectedEnchant.id, itemId }) }),
+      { success: 'enchant-applied' },
+    )
   }
 
   const finishBattle = async () => {
@@ -960,6 +1110,10 @@ export default function App() {
   }
 
   const onInspectItem = (itemId: string, element: HTMLElement) => {
+    if (run?.phase === 'ENCHANT_CHOICE' && selectedEnchant) {
+      applyEnchant(itemId)
+      return
+    }
     setSelectedItemId(itemId)
     setSelectedOfferId(null)
     setTipAnchor(getFloatingTipPosition(element))
@@ -1005,17 +1159,23 @@ export default function App() {
         upgradeItem(itemId, targetItemId)
       } else if (targetItem && targetItem.id !== itemId) {
         moveItem(itemId, targetItem.area, targetItem.x, targetItem.y)
+      } else {
+        pushUiFeedback('upgrade-failed')
       }
       return
     }
     if (String(event.over?.id) === 'SELL_ZONE' && run?.phase === 'SHOP') {
       setSelectedItemId(null)
       setTipAnchor(null)
-      void action(() => api(`/runs/${run.id}/shop/sell`, { method: 'POST', body: JSON.stringify({ itemId }) }))
+      void action(
+        () => api(`/runs/${run.id}/shop/sell`, { method: 'POST', body: JSON.stringify({ itemId }) }),
+        { success: 'sell-success' },
+      )
       return
     }
     const slot = event.over ? parseSlotId(overId) : null
     if (slot) moveItem(itemId, slot.area, slot.x, slot.y)
+    else pushUiFeedback('place-failed')
   }
 
   if (!user) {
@@ -1037,13 +1197,14 @@ export default function App() {
             <button className="secondary action-button" onClick={() => action(() => api('/auth/register', { method: 'POST', body: JSON.stringify({ account, password }) }))}>注册</button>
           </div>
         </section>
+        <FeedbackLayer feedbacks={uiFeedbacks} />
       </main>
     )
   }
 
   if (needsNicknameSetup) {
     return (
-      <Shell error={error} musicEnabled={musicEnabled} musicBlocked={musicBlocked} onToggleMusic={toggleMusic} onLogout={() => action(() => api('/auth/logout', { method: 'POST' }).then(() => ({ user: null })))}>
+      <Shell feedbacks={uiFeedbacks} error={error} musicEnabled={musicEnabled} musicBlocked={musicBlocked} onToggleMusic={toggleMusic} onLogout={() => action(() => api('/auth/logout', { method: 'POST' }).then(() => ({ user: null })))}>
         <NicknameSetup onSubmit={(nickname) => action(() => api('/profile/nickname', { method: 'POST', body: JSON.stringify({ nickname }) }))} />
       </Shell>
     )
@@ -1051,7 +1212,7 @@ export default function App() {
 
   if (appScreen === 'LOBBY') {
     return (
-      <Shell run={run ?? undefined} error={error} musicEnabled={musicEnabled} musicBlocked={musicBlocked} onToggleMusic={toggleMusic} onLogout={() => action(() => api('/auth/logout', { method: 'POST' }).then(() => ({ user: null })))}>
+      <Shell feedbacks={uiFeedbacks} run={run ?? undefined} error={error} musicEnabled={musicEnabled} musicBlocked={musicBlocked} onToggleMusic={toggleMusic} onLogout={() => action(() => api('/auth/logout', { method: 'POST' }).then(() => ({ user: null })))}>
         <PlayerRunHistoryPanel history={runHistory} ladderProfile={ladderProfile} onOpen={() => setHistoryOverlayOpen(true)} />
         <ModeLobby run={run} runHistory={runHistory} onOpen={() => setHistoryOverlayOpen(true)} onEnterCasual={() => setAppScreen('CASUAL')} onEnterLadder={() => setAppScreen('LADDER')} onEnterDogfight={() => setAppScreen('DOGFIGHT')} onEnterPeak={() => setAppScreen('PEAK')} />
         {historyOverlayOpen && <PlayerHistoryOverlay history={runHistory} onClose={() => setHistoryOverlayOpen(false)} />}
@@ -1061,7 +1222,7 @@ export default function App() {
 
   if (appScreen === 'LADDER' && run?.mode !== 'LADDER') {
     return (
-      <Shell run={run ?? undefined} error={error} musicEnabled={musicEnabled} musicBlocked={musicBlocked} onToggleMusic={toggleMusic} onOpenLobby={() => setAppScreen('LOBBY')} onLogout={() => action(() => api('/auth/logout', { method: 'POST' }).then(() => ({ user: null })))}>
+      <Shell feedbacks={uiFeedbacks} run={run ?? undefined} error={error} musicEnabled={musicEnabled} musicBlocked={musicBlocked} onToggleMusic={toggleMusic} onOpenLobby={() => setAppScreen('LOBBY')} onLogout={() => action(() => api('/auth/logout', { method: 'POST' }).then(() => ({ user: null })))}>
         <LadderHome onStart={(choice) => action(() => api('/runs', { method: 'POST', body: JSON.stringify({ ...choice, mode: 'LADDER' }) }))} />
       </Shell>
     )
@@ -1069,7 +1230,7 @@ export default function App() {
 
   if (appScreen === 'DOGFIGHT') {
     return (
-      <Shell run={run ?? undefined} error={error} musicEnabled={musicEnabled} musicBlocked={musicBlocked} onToggleMusic={toggleMusic} onOpenLobby={() => setAppScreen('LOBBY')} onLogout={() => action(() => api('/auth/logout', { method: 'POST' }).then(() => ({ user: null })))}>
+      <Shell feedbacks={uiFeedbacks} run={run ?? undefined} error={error} musicEnabled={musicEnabled} musicBlocked={musicBlocked} onToggleMusic={toggleMusic} onOpenLobby={() => setAppScreen('LOBBY')} onLogout={() => action(() => api('/auth/logout', { method: 'POST' }).then(() => ({ user: null })))}>
         <DogfightLobby />
       </Shell>
     )
@@ -1077,7 +1238,7 @@ export default function App() {
 
   if (appScreen === 'PEAK') {
     return (
-      <Shell run={run ?? undefined} error={error} musicEnabled={musicEnabled} musicBlocked={musicBlocked} onToggleMusic={toggleMusic} onOpenLobby={() => setAppScreen('LOBBY')} onLogout={() => action(() => api('/auth/logout', { method: 'POST' }).then(() => ({ user: null })))}>
+      <Shell feedbacks={uiFeedbacks} run={run ?? undefined} error={error} musicEnabled={musicEnabled} musicBlocked={musicBlocked} onToggleMusic={toggleMusic} onOpenLobby={() => setAppScreen('LOBBY')} onLogout={() => action(() => api('/auth/logout', { method: 'POST' }).then(() => ({ user: null })))}>
         <ApexArena />
       </Shell>
     )
@@ -1085,13 +1246,13 @@ export default function App() {
 
   if (!run) {
     return (
-      <Shell error={error} musicEnabled={musicEnabled} musicBlocked={musicBlocked} onToggleMusic={toggleMusic} onOpenLobby={() => setAppScreen('LOBBY')} onLogout={() => action(() => api('/auth/logout', { method: 'POST' }).then(() => ({ user: null })))}>
+      <Shell feedbacks={uiFeedbacks} error={error} musicEnabled={musicEnabled} musicBlocked={musicBlocked} onToggleMusic={toggleMusic} onOpenLobby={() => setAppScreen('LOBBY')} onLogout={() => action(() => api('/auth/logout', { method: 'POST' }).then(() => ({ user: null })))}>
         <DogSelect onPick={(choice) => action(() => api('/runs', { method: 'POST', body: JSON.stringify(choice) }))} />
       </Shell>
     )
   }
   return (
-    <Shell run={run} error={error} musicEnabled={musicEnabled} musicBlocked={musicBlocked} onToggleMusic={toggleMusic} onOpenLobby={() => setAppScreen('LOBBY')} onLogout={() => action(() => api('/auth/logout', { method: 'POST' }).then(() => ({ user: null })))}>
+    <Shell feedbacks={uiFeedbacks} run={run} error={error} musicEnabled={musicEnabled} musicBlocked={musicBlocked} onToggleMusic={toggleMusic} onOpenLobby={() => setAppScreen('LOBBY')} onLogout={() => action(() => api('/auth/logout', { method: 'POST' }).then(() => ({ user: null })))}>
       {!battle && run.phase === 'CHOICE' && (
         <ShopChoiceSelect choices={run.choices} onPick={(shopType) => action(() => api(`/runs/${run.id}/choice/select`, { method: 'POST', body: JSON.stringify({ shopType }) }))} />
       )}
@@ -1109,7 +1270,7 @@ export default function App() {
           <section className="reward-workbench">
             <ClassRewardSelect
               choices={run.classRewardChoices}
-              onPick={(defId) => action(() => api(`/runs/${run.id}/class-reward/select`, { method: 'POST', body: JSON.stringify({ defId }) }))}
+              onPick={(defId) => action(() => api(`/runs/${run.id}/class-reward/select`, { method: 'POST', body: JSON.stringify({ defId }) }), { success: 'reward-picked' })}
             />
             <InventoryBoard
               run={run}
@@ -1127,8 +1288,27 @@ export default function App() {
         </DndContext>
       )}
 
+      {!battle && run.phase === 'ENCHANT_CHOICE' && showEnchantCeremony && (
+        <EnchantCeremony run={run} choices={run.enchantChoices} onDismiss={() => dismissClassRewardCeremony(enchantCeremonyKey)} />
+      )}
+
+      {!battle && run.phase === 'ENCHANT_CHOICE' && !showEnchantCeremony && (
+        <section className="reward-workbench enchant-workbench">
+          <EnchantChoiceSelect choices={run.enchantChoices} selectedId={selectedEnchant?.id ?? ''} onSelect={setSelectedEnchantId} />
+          <InventoryBoard
+            run={run}
+            selectedItemId={selectedItemId}
+            draggingItemId={draggingItemId}
+            onSellRelic={sellRelic}
+            onSelectItem={onInspectItem}
+            onSlotClick={() => undefined}
+          />
+          <FloatingTip run={run} item={selectedItem} offer={null} anchor={tipAnchor} onClose={closeShopTip} onBuy={null} onSell={null} onUpgrade={null} />
+        </section>
+      )}
+
       {!battle && run.phase === 'RELIC_CHOICE' && (
-        <RelicChoiceSelect choices={run.relicChoices} onPick={(relicId) => action(() => api(`/runs/${run.id}/relic/select`, { method: 'POST', body: JSON.stringify({ relicId }) }))} />
+        <RelicChoiceSelect choices={run.relicChoices} onPick={(relicId) => action(() => api(`/runs/${run.id}/relic/select`, { method: 'POST', body: JSON.stringify({ relicId }) }), { success: 'relic-picked' })} />
       )}
 
       {!battle && run.phase === 'SHOP' && (
@@ -1139,8 +1319,8 @@ export default function App() {
               selectedOfferId={selectedOfferId}
               draggingItemId={draggingItemId}
               onInspectOffer={onInspectOffer}
-              onReroll={() => action(() => api(`/runs/${run.id}/shop/reroll`, { method: 'POST' }))}
-              onMatch={() => action(() => api(`/runs/${run.id}/battle/match`, { method: 'POST' }))}
+              onReroll={() => action(() => api(`/runs/${run.id}/shop/reroll`, { method: 'POST' }), { success: 'reroll-success' })}
+              onMatch={() => action(() => api(`/runs/${run.id}/battle/match`, { method: 'POST' }), { success: 'battle-start' })}
             />
             <InventoryBoard
               run={run}
@@ -1156,8 +1336,8 @@ export default function App() {
               offer={selectedOffer}
               anchor={tipAnchor}
               onClose={closeShopTip}
-              onBuy={() => selectedOffer && action(() => api(`/runs/${run.id}/shop/buy`, { method: 'POST', body: JSON.stringify({ offerId: selectedOffer.offerId, area: 'BAG' }) }))}
-              onSell={() => selectedItem && action(() => api(`/runs/${run.id}/shop/sell`, { method: 'POST', body: JSON.stringify({ itemId: selectedItem.id }) }))}
+              onBuy={() => selectedOffer && action(() => api(`/runs/${run.id}/shop/buy`, { method: 'POST', body: JSON.stringify({ offerId: selectedOffer.offerId, area: 'BAG' }) }), { success: 'buy-success', failure: 'gold-shortage' })}
+              onSell={() => selectedItem && action(() => api(`/runs/${run.id}/shop/sell`, { method: 'POST', body: JSON.stringify({ itemId: selectedItem.id }) }), { success: 'sell-success' })}
               onUpgrade={selectedItem && canUpgradeItem(selectedItem, run.items) ? () => upgradeItem(selectedItem.id) : null}
             />
           </section>
@@ -1193,7 +1373,7 @@ export default function App() {
               onSell={null}
               onUpgrade={selectedItem && canUpgradeItem(selectedItem, run.items) ? () => upgradeItem(selectedItem.id) : null}
             />
-            <button className="primary action-button" onClick={() => action(() => api(run.phase === 'PREP' ? `/runs/${run.id}/battle/match` : `/runs/${run.id}/battle/start`, { method: 'POST' }))}>
+            <button className="primary action-button" onClick={() => action(() => api(run.phase === 'PREP' ? `/runs/${run.id}/battle/match` : `/runs/${run.id}/battle/start`, { method: 'POST' }), { success: 'battle-start' })}>
               <Dice5 size={18} /> {run.phase === 'PREP' ? '匹配对手' : '开始战斗'}
             </button>
           </section>
@@ -1465,6 +1645,7 @@ function HistoryRunDetails({ entry, inspectedItem, tipAnchor, onInspectItem, onC
     shopItems: [],
     choices: [],
     classRewardChoices: [],
+    enchantChoices: [],
     relicChoices: [],
     relics: entry.relics,
     refreshCost: 1,
@@ -1490,7 +1671,9 @@ function HistoryRunDetails({ entry, inspectedItem, tipAnchor, onInspectItem, onC
         </div>
         <div className="battle-slot-grid" style={{ gridTemplateColumns: `repeat(${equipmentSlotCount(entry.relics)}, minmax(0, 1fr))` }}>
           {Array.from({ length: equipmentSlotCount(entry.relics) }).map((_, x) => <i key={x} className="battle-slot" style={{ gridColumn: x + 1, gridRow: 1 }} />)}
-          {equipment.map((item) => (
+          {equipment.map((item) => {
+            const triggerDice = visibleTriggerDice(item.def)
+            return (
             <button
               type="button"
               key={item.id}
@@ -1502,9 +1685,10 @@ function HistoryRunDetails({ entry, inspectedItem, tipAnchor, onInspectItem, onC
               <img className="item-icon" src={itemIcon(item.def)} alt="" />
               <span className="quality-chip">{qualityLabel[normalizeQuality(item.quality)]}</span>
               <span>{item.def.name}</span>
-              <small><Dice5 size={12} /> {item.def.dice.join('/')}</small>
+              {triggerDice && <small><Dice5 size={12} /> {triggerDice}</small>}
             </button>
-          ))}
+            )
+          })}
         </div>
       </div>
       <div className="history-inventory-summary">
@@ -1660,9 +1844,12 @@ function DogfightRoomView({ room, onRoomChange, onLeave }: { room: DogfightRoom;
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
   const [selectedOfferId, setSelectedOfferId] = useState<string | null>(null)
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null)
+  const [selectedEnchantId, setSelectedEnchantId] = useState<string | null>(null)
   const [tipAnchor, setTipAnchor] = useState<TipAnchor | null>(null)
   const [draggingItemId, setDraggingItemId] = useState<string | null>(null)
   const [battle, setBattle] = useState<Battle | null>(null)
+  const [battleId, setBattleId] = useState<string | null>(null)
+  const [dismissedAutoBattleId, setDismissedAutoBattleId] = useState<string | null>(null)
   const [eventIndex, setEventIndex] = useState(0)
   const [speed, setSpeed] = useState(1)
   const [error, setError] = useState('')
@@ -1672,6 +1859,7 @@ function DogfightRoomView({ room, onRoomChange, onLeave }: { room: DogfightRoom;
   const currentMember = room.currentRunMember ?? (run ? room.members.find((member) => member.runId === run.id) ?? null : null)
   const selectedItem = run?.items.find((item) => item.id === selectedItemId) || null
   const selectedOffer = run?.shopItems.find((offer) => offer.offerId === selectedOfferId) || null
+  const selectedEnchant = run?.enchantChoices.find((choice) => choice.id === selectedEnchantId) ?? run?.enchantChoices[0] ?? null
   const draggingItem = run?.items.find((item) => item.id === draggingItemId) || null
   const deadline = room.phaseDeadline ? Math.max(0, Math.ceil((new Date(room.phaseDeadline).getTime() - now) / 1000)) : 0
   const selectedBattleMemberId = selectedMemberId ?? currentMember?.id ?? sortedDogfightMembers(room.members)[0]?.id ?? null
@@ -1712,22 +1900,50 @@ function DogfightRoomView({ room, onRoomChange, onLeave }: { room: DogfightRoom;
   const readyRoom = () => runAction(() => api<DogfightRoomResponse>(`/dogfight/rooms/${room.id}/ready`, { method: 'POST' }))
   const chooseDog = (choice: { dogType: DogType; luckyNumber?: number }) => runAction(() => api<DogfightRoomResponse>(`/dogfight/rooms/${room.id}/dog-choice`, { method: 'POST', body: JSON.stringify(choice) }))
 
-  const loadBattle = async (battleId: string) => {
+  const loadBattle = async (battleId: string, options: { auto?: boolean } = {}) => {
     setError('')
+    if (!options.auto) setDismissedAutoBattleId(null)
     try {
       const data = await api<DogfightBattleResponse>(`/dogfight/battles/${battleId}`)
       setBattle(data.battle.result)
+      setBattleId(data.battle.id)
       setEventIndex(0)
     } catch (err) {
       setError(err instanceof Error ? err.message : '战报读取失败')
     }
   }
 
+  const dismissDogfightBattleReplay = () => {
+    if (battleId) setDismissedAutoBattleId(battleId)
+    setBattle(null)
+    setBattleId(null)
+  }
+
+  const finishDogfightBattleReplay = () => {
+    const shouldMarkFinished = room.phase === 'BATTLE'
+      && Boolean(run)
+      && Boolean(currentMember)
+      && !currentMember?.ready
+      && !currentMember?.eliminated
+      && battleId === currentMember?.currentBattleId
+    dismissDogfightBattleReplay()
+    if (shouldMarkFinished) void readyRoom()
+  }
+
   useEffect(() => {
     if (battle || room.phase !== 'BATTLE') return
     const battleId = currentMember?.currentBattleId ?? sortedDogfightMembers(room.members).find((member) => member.currentBattleId)?.currentBattleId
-    if (battleId) void loadBattle(battleId)
-  }, [battle, currentMember?.currentBattleId, room.phase, room.members])
+    if (!battleId) return
+    if (dismissedAutoBattleId === battleId) return
+    const timer = window.setTimeout(() => {
+      void loadBattle(battleId, { auto: true })
+    }, 0)
+    return () => window.clearTimeout(timer)
+  }, [battle, currentMember?.currentBattleId, dismissedAutoBattleId, room.phase, room.members])
+
+  useEffect(() => {
+    if (room.phase !== 'BATTLE') setDismissedAutoBattleId(null)
+  }, [room.phase])
 
   const moveItem = (itemId: string, area: Area, x: number, y: number) => {
     if (!run || currentMember?.ready) return
@@ -1746,6 +1962,13 @@ function DogfightRoomView({ room, onRoomChange, onLeave }: { room: DogfightRoom;
     void runAction(() => api<{ run: Run }>(`/runs/${run.id}/relic/sell`, { method: 'POST', body: JSON.stringify({ relicId }) }))
   }
 
+  const applyEnchant = (itemId: string) => {
+    if (!run || !selectedEnchant || currentMember?.ready) return
+    setTipAnchor(null)
+    setSelectedItemId(null)
+    void runAction(() => api<{ run: Run }>(`/runs/${run.id}/enchant/select`, { method: 'POST', body: JSON.stringify({ enchantId: selectedEnchant.id, itemId }) }))
+  }
+
   const onInspectOffer = (offerId: string, element: HTMLElement) => {
     setSelectedOfferId(offerId)
     setSelectedItemId(null)
@@ -1753,6 +1976,10 @@ function DogfightRoomView({ room, onRoomChange, onLeave }: { room: DogfightRoom;
   }
 
   const onInspectItem = (itemId: string, element: HTMLElement) => {
+    if (run?.phase === 'ENCHANT_CHOICE' && selectedEnchant) {
+      applyEnchant(itemId)
+      return
+    }
     setSelectedItemId(itemId)
     setSelectedOfferId(null)
     setTipAnchor(getFloatingTipPosition(element))
@@ -1817,12 +2044,13 @@ function DogfightRoomView({ room, onRoomChange, onLeave }: { room: DogfightRoom;
             <span className="resource-pill gold"><Coins size={16} /> 金币 {run.gold}</span>
             <span className="resource-pill win"><Trophy size={16} /> {run.wins}胜 {run.losses}败</span>
             <span className="resource-pill round"><RefreshCcw size={16} /> 第 {run.round} 回合</span>
-            {currentMember && <span className={`resource-pill ${currentMember.ready ? 'safe' : 'round'}`}>{currentMember.ready ? '已准备' : '调整中'}</span>}
+            {currentMember && <span className={`resource-pill ${currentMember.ready ? 'safe' : 'round'}`}>{currentMember.ready ? (room.phase === 'BATTLE' ? '已完成' : '已准备') : (room.phase === 'BATTLE' ? '回放中' : '调整中')}</span>}
           </div>
         )}
         {currentMember && <span className="resource-pill safe"><Shield size={16} /> 剩余存活 {dogfightLives(currentMember)}</span>}
         {room.isHost && room.status === 'WAITING' && <button className="primary action-button" onClick={startRoom}>开始房间</button>}
         {run && room.phase === 'SHOP' && !currentMember?.ready && !currentMember?.eliminated && <button className="primary action-button" onClick={readyRoom}>完成本回合</button>}
+        {run && room.phase === 'BATTLE' && !currentMember?.ready && !currentMember?.eliminated && <button className="primary action-button" onClick={readyRoom}>完成本回合</button>}
       </div>
 
       <div className="dogfight-room-columns">
@@ -1840,7 +2068,7 @@ function DogfightRoomView({ room, onRoomChange, onLeave }: { room: DogfightRoom;
               {member.dogType ? <img className="dog-avatar small" src={dogAssets[member.dogType]} alt="" /> : <PawPrint size={28} />}
               <div>
                 <strong>{member.nickname}{member.isHost ? ' · 房主' : ''}</strong>
-                <p>{member.dogType ? dogNames[member.dogType] : '等待选狗'} · {member.kind === 'BOT' ? '机器人' : '玩家'} · {member.wins}胜 {member.losses}败</p>
+                <p>{member.dogType ? dogNames[member.dogType] : '等待选狗'} · {member.kind === 'BOT' ? '参赛者' : '玩家'} · {member.wins}胜 {member.losses}败</p>
               </div>
               <b>{dogfightLives(member)}</b>
             </button>
@@ -1849,7 +2077,7 @@ function DogfightRoomView({ room, onRoomChange, onLeave }: { room: DogfightRoom;
 
         <main className="dogfight-play-area">
           {battle && battleRun ? (
-            <BattleView run={battleRun} battle={battle} currentEvent={battle.events[eventIndex]} eventIndex={eventIndex} speed={speed} score={0} onSpeed={setSpeed} onContinue={() => setBattle(null)} onRestart={() => setBattle(null)} />
+            <BattleView run={battleRun} battle={battle} currentEvent={battle.events[eventIndex]} eventIndex={eventIndex} speed={speed} score={0} onSpeed={setSpeed} onContinue={() => finishDogfightBattleReplay()} onRestart={() => dismissDogfightBattleReplay()} />
           ) : room.phase === 'DOG_SELECT' && !run ? (
             <section className="dogfight-dog-select sketch-panel">
               <div className="section-title">
@@ -1879,6 +2107,8 @@ function DogfightRoomView({ room, onRoomChange, onLeave }: { room: DogfightRoom;
                 onChoice={(shopType) => !currentMember?.ready && runAction(() => api<{ run: Run }>(`/runs/${run.id}/choice/select`, { method: 'POST', body: JSON.stringify({ shopType }) }))}
                 onClassReward={(defId) => !currentMember?.ready && runAction(() => api<{ run: Run }>(`/runs/${run.id}/class-reward/select`, { method: 'POST', body: JSON.stringify({ defId }) }))}
                 onRelic={(relicId) => !currentMember?.ready && runAction(() => api<{ run: Run }>(`/runs/${run.id}/relic/select`, { method: 'POST', body: JSON.stringify({ relicId }) }))}
+                selectedEnchantId={selectedEnchant?.id ?? ''}
+                onEnchantChoice={setSelectedEnchantId}
                 selectedItem={selectedItem}
                 selectedOffer={selectedOffer}
                 tipAnchor={tipAnchor}
@@ -1906,7 +2136,7 @@ function DogfightRoomView({ room, onRoomChange, onLeave }: { room: DogfightRoom;
   )
 }
 
-function DogfightRunWorkbench({ run, selectedItemId, selectedOfferId, draggingItemId, selectedItem, selectedOffer, tipAnchor, onInspectOffer, onInspectItem, onMoveItem, onReroll, onBuy, onSell, onSellRelic, onUpgrade, onChoice, onClassReward, onRelic, onCloseTip }: {
+function DogfightRunWorkbench({ run, selectedItemId, selectedOfferId, draggingItemId, selectedItem, selectedOffer, tipAnchor, onInspectOffer, onInspectItem, onMoveItem, onReroll, onBuy, onSell, onSellRelic, onUpgrade, onChoice, onClassReward, onRelic, selectedEnchantId, onEnchantChoice, onCloseTip }: {
   run: Run
   selectedItemId: string | null
   selectedOfferId: string | null
@@ -1925,6 +2155,8 @@ function DogfightRunWorkbench({ run, selectedItemId, selectedOfferId, draggingIt
   onChoice: (shopType: ShopType) => void
   onClassReward: (defId: string) => void
   onRelic: (relicId: string) => void
+  selectedEnchantId: string
+  onEnchantChoice: (id: string) => void
   onCloseTip: () => void
 }) {
   if (run.phase === 'CHOICE') return <ShopChoiceSelect choices={run.choices} onPick={onChoice} />
@@ -1934,6 +2166,15 @@ function DogfightRunWorkbench({ run, selectedItemId, selectedOfferId, draggingIt
         <ClassRewardSelect choices={run.classRewardChoices} onPick={onClassReward} />
         <InventoryBoard run={run} selectedItemId={selectedItemId} draggingItemId={draggingItemId} onSellRelic={onSellRelic} onSelectItem={onInspectItem} onSlotClick={(area, x, y) => selectedItemId && onMoveItem(selectedItemId, area, x, y)} />
         <FloatingTip run={run} item={selectedItem} offer={null} anchor={tipAnchor} onClose={onCloseTip} onBuy={null} onSell={null} onUpgrade={onUpgrade} />
+      </section>
+    )
+  }
+  if (run.phase === 'ENCHANT_CHOICE') {
+    return (
+      <section className="reward-workbench enchant-workbench">
+        <EnchantChoiceSelect choices={run.enchantChoices} selectedId={selectedEnchantId} onSelect={onEnchantChoice} />
+        <InventoryBoard run={run} selectedItemId={selectedItemId} draggingItemId={draggingItemId} onSellRelic={onSellRelic} onSelectItem={onInspectItem} onSlotClick={() => undefined} />
+        <FloatingTip run={run} item={selectedItem} offer={null} anchor={tipAnchor} onClose={onCloseTip} onBuy={null} onSell={null} onUpgrade={null} />
       </section>
     )
   }
@@ -1965,6 +2206,7 @@ function battleToRun(battle: Battle | null): Run | null {
     shopItems: [],
     choices: [],
     classRewardChoices: [],
+    enchantChoices: [],
     relicChoices: [],
     relics: snapshot.relics ?? [],
     refreshCost: 1,
@@ -2095,13 +2337,14 @@ function ApexArena() {
           <div className="apex-rank-list">
             {leaderboard.map((entry) => (
               <div className="apex-rank-entry" key={entry.id}>
-                <article className={`apex-rank-row ${entry.isSeed ? 'seed' : 'player-entry'}`}>
+                <article className={`apex-rank-row ${entry.isSeed ? 'seed' : ''} ${entry.isMine ? 'player-entry' : ''}`}>
                   <b>#{entry.rank}</b>
                   <img className="dog-avatar small" src={dogAssets[entry.dogType]} alt="" />
                   <div>
                     <strong>{entry.name}</strong>
                     <p>{dogNames[entry.dogType]} · {entry.wins}胜{entry.losses}败 · 第 {entry.round} 回合</p>
                   </div>
+                  {entry.isMine && <span className="apex-self-marker">我的记录</span>}
                   <span>{entry.isSeed ? '种子' : `${entry.challengeWins}连胜`}</span>
                   <button className="secondary action-button apex-config-toggle" onClick={() => setExpandedEntryId(expandedEntryId === entry.id ? null : entry.id)}>
                     {expandedEntryId === entry.id ? '收起配置' : '查看配置'}
@@ -2137,6 +2380,7 @@ function ApexSnapshotDetails({ entry }: { entry: ApexEntry }) {
     shopItems: [],
     choices: [],
     classRewardChoices: [],
+    enchantChoices: [],
     relicChoices: [],
     relics: entry.relics,
     refreshCost: 1,
@@ -2163,7 +2407,9 @@ function ApexSnapshotDetails({ entry }: { entry: ApexEntry }) {
         </div>
         <div className="battle-slot-grid" style={{ gridTemplateColumns: 'repeat(12, minmax(0, 1fr))' }}>
           {Array.from({ length: 12 }).map((_, x) => <i key={x} className="battle-slot" style={{ gridColumn: x + 1, gridRow: 1 }} />)}
-          {equipment.map((item) => (
+          {equipment.map((item) => {
+            const triggerDice = visibleTriggerDice(item.def)
+            return (
             <button
               type="button"
               key={item.id}
@@ -2175,9 +2421,10 @@ function ApexSnapshotDetails({ entry }: { entry: ApexEntry }) {
               <img className="item-icon" src={itemIcon(item.def)} alt="" />
               <span className="quality-chip">{qualityLabel[normalizeQuality(item.quality)]}</span>
               <span>{item.def.name}</span>
-              <small><Dice5 size={12} /> {item.def.dice.join('/')}</small>
+              {triggerDice && <small><Dice5 size={12} /> {triggerDice}</small>}
             </button>
-          ))}
+            )
+          })}
         </div>
       </div>
       <div className="apex-relic-preview">
@@ -2402,13 +2649,26 @@ function DogSelect({ onPick }: { onPick: (choice: { dogType: DogType; luckyNumbe
   )
 }
 
-function Shell({ children, run, error, musicEnabled, musicBlocked, onToggleMusic, onOpenLobby, onLogout }: { children: React.ReactNode; run?: Run; error?: string; musicEnabled: boolean; musicBlocked: boolean; onToggleMusic: () => void; onOpenLobby?: () => void; onLogout: () => void }) {
+function Shell({ children, run, error, feedbacks = [], musicEnabled, musicBlocked, onToggleMusic, onOpenLobby, onLogout }: { children: React.ReactNode; run?: Run; error?: string; feedbacks?: UiFeedbackEvent[]; musicEnabled: boolean; musicBlocked: boolean; onToggleMusic: () => void; onOpenLobby?: () => void; onLogout: () => void }) {
   return (
     <main className="app-shell">
       <TopBar run={run} musicEnabled={musicEnabled} musicBlocked={musicBlocked} onToggleMusic={onToggleMusic} onOpenLobby={onOpenLobby} onLogout={onLogout} />
       {error && <p className="error">{error}</p>}
       <div className="screen-content">{children}</div>
+      <FeedbackLayer feedbacks={feedbacks} />
     </main>
+  )
+}
+
+function FeedbackLayer({ feedbacks }: { feedbacks: UiFeedbackEvent[] }) {
+  return (
+    <div className="feedback-layer" aria-live="polite" aria-atomic="false">
+      {feedbacks.map((feedback) => (
+        <div key={feedback.id} className={`ui-feedback-toast ${feedback.tone}`} data-feedback-kind={feedback.kind}>
+          <span>{feedback.label}</span>
+        </div>
+      ))}
+    </div>
   )
 }
 
@@ -2575,12 +2835,15 @@ function ClassRewardCeremony({ run, choices, onDismiss }: { run: Run; choices: C
           <p>{subtitle}</p>
         </div>
         <div className="ceremony-reward-preview" aria-label="本次可选职业装备">
-          {choices.map((choice) => (
+          {choices.map((choice) => {
+            const triggerDice = visibleTriggerDice(choice.def)
+            return (
             <span key={choice.defId} className={`ceremony-reward-chip ${qualityClass(choice.quality)}`}>
               <strong>{choice.def.name}</strong>
-              <small>{choice.def.size}格 · {choice.def.dice.join('/')}</small>
+              <small>{choice.def.size}格{triggerDice ? ` · ${triggerDice}` : ''}</small>
             </span>
-          ))}
+            )
+          })}
         </div>
         <span className="ceremony-skip-hint">点击任意处继续</span>
       </div>
@@ -2597,16 +2860,73 @@ function ClassRewardSelect({ choices, onPick }: { choices: ClassRewardChoice[]; 
         <p>先整理背包，再选择一个职业装备放入背包。</p>
       </div>
       <div className="reward-choice-grid">
-        {choices.map((choice) => (
+        {choices.map((choice) => {
+          const triggerDice = visibleTriggerDice(choice.def)
+          return (
           <div key={choice.defId} role="button" tabIndex={0} className={`choice paper-card sticker-card reward-choice ${selected === choice.defId ? 'selected' : ''}`} onClick={() => setSelected(choice.defId)} onKeyDown={(event) => handleChoiceCardKeyDown(event, () => setSelected(choice.defId))}>
             <strong>{choice.def.name}</strong>
             <span className={`tip-tag ${qualityClass(choice.quality)}`}>{qualityLabel[choice.quality]}</span>
-            <span>{choice.def.size}格 · {choice.def.dice.join('/')}</span>
+            <span>{choice.def.size}格{triggerDice ? ` · ${triggerDice}` : ''}</span>
             <span><RuleText text={choice.def.description ?? effectText(choice.def, choice.quality)} /></span>
+          </div>
+          )
+        })}
+      </div>
+      <button className="primary action-button choice-submit" disabled={!selected} onClick={() => selected && onPick(selected)}>领取职业装备</button>
+    </section>
+  )
+}
+
+function EnchantCeremony({ run, choices, onDismiss }: { run: Run; choices: EnchantmentChoice[]; onDismiss: () => void }) {
+  return (
+    <section
+      className="class-reward-ceremony enchant-ceremony"
+      role="button"
+      tabIndex={0}
+      onClick={onDismiss}
+      onKeyDown={(event) => handleChoiceCardKeyDown(event, onDismiss)}
+      aria-label="附魔商店出现"
+    >
+      <div className="ceremony-stage">
+        <div className="ceremony-round-badge">第 {run.round} 回合</div>
+        <Sparkles className="ceremony-dog-avatar enchant-orb" size={96} />
+        <div className="ceremony-copy">
+          <span>神秘附魔商店</span>
+          <h2>免费附魔</h2>
+          <p>选择一种附魔，再点击任意装备施加；升级后会保留目标装备上的附魔。</p>
+        </div>
+        <div className="ceremony-reward-preview" aria-label="本次可选附魔">
+          {choices.map((choice) => (
+            <span key={choice.id} className="ceremony-reward-chip enchant-chip">
+              <strong>{choice.enchant.label}</strong>
+              <small>{choice.description}</small>
+            </span>
+          ))}
+        </div>
+        <span className="ceremony-skip-hint">点击任意处继续</span>
+      </div>
+    </section>
+  )
+}
+
+function EnchantChoiceSelect({ choices, selectedId, onSelect }: { choices: EnchantmentChoice[]; selectedId: string; onSelect: (id: string) => void }) {
+  return (
+    <section className="reward-panel paper-card enchant-panel">
+      <div className="screen-heading centered">
+        <h2>选择附魔</h2>
+        <p>选中一个附魔后，点击装备栏或背包中的任意装备施加。</p>
+      </div>
+      <div className="reward-choice-grid">
+        {choices.map((choice) => (
+          <div key={choice.id} role="button" tabIndex={0} className={`choice paper-card sticker-card reward-choice enchant-choice ${selectedId === choice.id ? 'selected' : ''}`} onClick={() => onSelect(choice.id)} onKeyDown={(event) => handleChoiceCardKeyDown(event, () => onSelect(choice.id))}>
+            <Sparkles size={28} />
+            <strong>{choice.enchant.label}</strong>
+            <span className="tip-tag">免费</span>
+            <span><RuleText text={choice.description} /></span>
           </div>
         ))}
       </div>
-      <button className="primary action-button choice-submit" disabled={!selected} onClick={() => selected && onPick(selected)}>领取职业装备</button>
+      <small className="disabled-reason">当前选中：{choices.find((choice) => choice.id === selectedId)?.enchant.label ?? '请选择附魔'}</small>
     </section>
   )
 }
@@ -2652,7 +2972,7 @@ function ShopShelf({ run, selectedOfferId, draggingItemId, onInspectOffer, onRer
       </div>
       <div className="offer-row">
         {run.shopItems.map((offer) => (
-          <ShopCard key={offer.offerId} offer={offer} selected={selectedOfferId === offer.offerId} onClick={(element) => onInspectOffer(offer.offerId, element)} />
+          <ShopCard key={offer.offerId} offer={offer} selected={selectedOfferId === offer.offerId} ownedCount={shopOfferOwnedCount(run, offer)} onClick={(element) => onInspectOffer(offer.offerId, element)} />
         ))}
       </div>
       <button className="primary action-button match-button" onClick={onMatch}>
@@ -2672,19 +2992,22 @@ function SellDropZone({ active }: { active: boolean }) {
   )
 }
 
-function ShopCard({ offer, selected, onClick }: { offer: ShopOffer; selected: boolean; onClick: (element: HTMLElement) => void }) {
+function ShopCard({ offer, selected, ownedCount, onClick }: { offer: ShopOffer; selected: boolean; ownedCount: number; onClick: (element: HTMLElement) => void }) {
   const def = offer.def
   const quality = normalizeQuality(offer.quality)
+  const owned = ownedCount > 0
+  const triggerDice = def ? visibleTriggerDice(def) : null
   return (
-    <button className={`shop-card paper-shop-card paper-card ${qualityClass(offer.quality)} ${selected ? 'selected' : ''}`} onClick={(event) => onClick(event.currentTarget)}>
+    <button className={`shop-card paper-shop-card paper-card ${qualityClass(offer.quality)} ${owned ? 'shop-card-owned' : ''} ${selected ? 'selected' : ''}`} onClick={(event) => onClick(event.currentTarget)}>
       <span className="quality-chip shop-quality-chip">{qualityLabel[quality]}</span>
+      {owned && <span className="owned-badge" aria-label={`已拥有 ${ownedCount} 件同名装备`}>已拥有 x{ownedCount}</span>}
       {def && <img className="shop-item-icon" src={itemIcon(def)} alt="" />}
       <div className="shop-card-main">
         <span className={`size-badge ${def ? itemTone(def) : 'utility'}`}>{def?.size ?? '?'}格</span>
         <strong>{def?.name ?? offer.defId}</strong>
       </div>
       {def && <SizePreview size={def.size} />}
-      <span className="dice-line"><Dice5 size={15} /> {def?.dice.join(' / ') ?? '-'}</span>
+      {triggerDice && <span className="dice-line"><Dice5 size={15} /> {triggerDice}</span>}
       <span className="effect-line">{def ? effectText(def, quality) : '未知效果'}</span>
       <span className="price-tag"><Coins size={14} />{offer.price}{offer.discount < 1 ? ` · ${Math.round(offer.discount * 10)}折` : ''}</span>
     </button>
@@ -2826,6 +3149,7 @@ function DraggableItem({ item, selected, dragging, upgradeable, onSelect }: { it
     gridColumn: `${item.x + 1} / span ${item.def.width}`,
     gridRow: `${item.y + 1} / span ${item.def.height}`,
   }
+  const triggerDice = visibleTriggerDice(item.def)
   return (
     <button
       ref={setNodeRef}
@@ -2835,7 +3159,7 @@ function DraggableItem({ item, selected, dragging, upgradeable, onSelect }: { it
         event.stopPropagation()
         onSelect(event.currentTarget)
       }}
-      title={`${qualityLabel[normalizeQuality(item.quality)]} ${item.def.name} · ${item.def.size}格 · 点数 ${item.def.dice.join('/')}`}
+      title={`${qualityLabel[normalizeQuality(item.quality)]} ${item.def.name} · ${item.def.size}格${triggerDice ? ` · 点数 ${triggerDice}` : ''}`}
       {...listeners}
       {...attributes}
     >
@@ -2845,15 +3169,18 @@ function DraggableItem({ item, selected, dragging, upgradeable, onSelect }: { it
 }
 
 function ItemCardContent({ item, upgradeable = false }: { item: Item; upgradeable?: boolean }) {
+  const triggerDice = visibleTriggerDice(item.def)
   return (
     <>
       <span className="quality-chip">{qualityLabel[normalizeQuality(item.quality)]}</span>
       {upgradeable && <span className="upgrade-indicator" title="可升级">↑</span>}
       <img className="item-icon" src={itemIcon(item.def)} alt="" />
       <span>{item.def.name}</span>
+      {item.enchant && <span className="enchant-badge"><Sparkles size={12} />附魔</span>}
       <SizePreview size={item.def.size} />
-      <small><Dice5 size={12} /> {item.def.dice.join('/')}</small>
+      {triggerDice && <small><Dice5 size={12} /> {triggerDice}</small>}
       <small className="item-effect">{effectText(item.def, normalizeQuality(item.quality))}</small>
+      {item.enchant && <small className="item-effect enchant-text">{enchantmentText(item.enchant)}</small>}
     </>
   )
 }
@@ -2904,6 +3231,7 @@ function FloatingTip({ run, item, offer, anchor, descriptionOverride, onClose, o
         {def.dice.map((face) => <span key={face}>{face}</span>)}
       </div>
       <p className="tip-description"><RuleText text={descriptionOverride ?? def.description ?? effectText(def, quality)} /></p>
+      {item?.enchant && <p className="tip-description enchant-tip"><Sparkles size={16} /> <RuleText text={enchantmentText(item.enchant)} /></p>}
       {isOffer && (
         <div className="tip-price">
           <Coins size={16} />
@@ -2937,6 +3265,42 @@ function FloatingTip({ run, item, offer, anchor, descriptionOverride, onClose, o
   )
 }
 
+function StatusFloatingTip({ statusTip, onClose }: { statusTip: StatusTipState | null; onClose: () => void }) {
+  useOutsideTipDismiss(Boolean(statusTip), onClose)
+  useEffect(() => {
+    if (!statusTip) return undefined
+    const onKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (event.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [statusTip, onClose])
+  if (!statusTip) return null
+  const { status, anchor, side, polarity } = statusTip
+  const detail = statusTipDetails[status.type] ?? {
+    polarity: polarity === 'positive' ? '正面效果' : '负面效果',
+    timing: '状态存在期间生效',
+    description: '这个状态会影响当前战斗。请以芯片上的数值和战斗日志为准。',
+    source: '来源：装备、职业道具或遗物效果。',
+  }
+  const style = { '--tip-x': `${anchor.x}px`, '--tip-y': `${anchor.y}px` } as React.CSSProperties
+  return (
+    <aside id={statusTipId} className="floating-tip paper-card status-floating-tip" style={style} role="tooltip">
+      <div className="status-tip-title">
+        <strong>{status.label}</strong>
+        <span className={`tip-tag ${status.type}`}>{detail.polarity}</span>
+      </div>
+      <div className="tip-tags">
+        <span className="tip-tag">{side === 'player' ? '我方' : '敌方'}</span>
+        <span className="tip-tag">{statusText(status)}</span>
+      </div>
+      <p className="status-tip-description">{detail.description}</p>
+      <small>{detail.timing}</small>
+      <small>{detail.source}</small>
+    </aside>
+  )
+}
+
 function ForfeitRunAction({ run, onForfeit }: { run: Run; onForfeit: () => void }) {
   return (
     <section className="forfeit-run-action paper-card" aria-label="放弃并结算当前跑局">
@@ -2958,6 +3322,7 @@ function BattleView({ run, battle, currentEvent, eventIndex, speed, score, onSpe
   const events = playback?.events ?? []
   const displayIndex = battle ? eventIndex : Math.max(0, events.length - 1)
   const event = currentEvent ?? events[Math.min(displayIndex, Math.max(0, events.length - 1))]
+  const presentation = event ? createBattlePresentation(event) : null
   const playerSnapshot = playback?.playerSnapshot ?? {
     name: '你的狗狗',
     dogType: run.dogType,
@@ -2996,6 +3361,7 @@ function BattleView({ run, battle, currentEvent, eventIndex, speed, score, onSpe
         player={playerSnapshot}
         opponent={opponentSnapshot}
         event={event}
+        presentation={presentation}
         lastRoll={lastRollEvent}
         speed={speed}
         finished={isFinished}
@@ -3068,11 +3434,12 @@ function BattleEquipmentRow({ owner, snapshot, events, displayIndex, activeEvent
         {Array.from({ length: slots }).map((_, x) => <i key={x} className="battle-slot" style={{ gridColumn: x + 1, gridRow: 1 }} />)}
         {items.map((item) => {
           const growthText = growthDamageTextForBattleItem(item, owner, events, displayIndex)
+          const boomCounterState = boomCounterStateForBattleItem(item, owner, events, displayIndex, activeEvent)
           return (
           <button
             type="button"
             key={item.id}
-            className={`battle-item item-card paper-item-card ${itemTone(item.def)} ${qualityClass(item.quality)} ${activeItemId === item.id ? `active battle-item-trigger vfx-trigger-${activeVfxKind}` : ''}`}
+            className={`battle-item item-card paper-item-card ${itemTone(item.def)} ${qualityClass(item.quality)} ${activeItemId === item.id ? `active battle-item-trigger vfx-trigger-${activeVfxKind}` : ''} ${boomCounterState ? 'boom-counter' : ''} ${boomCounterState?.popping ? 'boom-counter-pop' : ''}`}
             data-vfx-kind={battleVfxKind(activeEvent)}
             style={{
               gridColumn: `${item.x + 1} / span ${item.def.width}`,
@@ -3084,8 +3451,15 @@ function BattleEquipmentRow({ owner, snapshot, events, displayIndex, activeEvent
             <img className="item-icon" src={itemIcon(item.def)} alt="" />
             <span className="quality-chip">{qualityLabel[normalizeQuality(item.quality)]}</span>
             <span>{item.def.name}</span>
+            {item.enchant && <span className="enchant-badge"><Sparkles size={12} />附魔</span>}
             <small><Dice5 size={12} /> {item.def.dice.join('/')}</small>
             <small className="item-effect">{growthText ?? effectText(item.def, normalizeQuality(item.quality))}</small>
+            {boomCounterState && (
+              <span className="boom-counter-meter" aria-label={`爆鸣计数 ${boomCounterState.count}/${boomCounterState.max}`}>
+                <i style={{ width: `${boomCounterState.progress}%` }} />
+                <b>{boomCounterState?.count}/{boomCounterState.max}</b>
+              </span>
+            )}
           </button>
           )
         })}
@@ -3094,16 +3468,22 @@ function BattleEquipmentRow({ owner, snapshot, events, displayIndex, activeEvent
   )
 }
 
-function BattleStage({ player, opponent, event, lastRoll, speed, finished, winner }: { player: BattleSnapshot; opponent: BattleSnapshot; event?: BattleEvent; lastRoll?: BattleEvent; speed: number; finished: boolean; winner?: string }) {
+function BattleStage({ player, opponent, event, presentation, lastRoll, speed, finished, winner }: { player: BattleSnapshot; opponent: BattleSnapshot; event?: BattleEvent; presentation: PresentationEvent | null; lastRoll?: BattleEvent; speed: number; finished: boolean; winner?: string }) {
+  const [statusTip, setStatusTip] = useState<StatusTipState | null>(null)
+  const inspectStatus = (status: BattleStatusEntry, side: 'player' | 'opponent', polarity: 'positive' | 'negative', element: HTMLElement) => {
+    setStatusTip({ status, side, polarity, anchor: getFloatingTipPosition(element) })
+  }
+  const activeStatusKey = statusTip ? statusTipKey(statusTip.status, statusTip.side, statusTip.polarity) : null
   const playerMaxHp = event?.playerMaxHp ?? maxHealthForRound(player.round)
   const opponentMaxHp = event?.opponentMaxHp ?? maxHealthForRound(opponent.round)
   const playerHp = event?.playerHp ?? playerMaxHp
   const opponentHp = event?.opponentHp ?? opponentMaxHp
   const playerShield = event?.playerShield ?? 0
   const opponentShield = event?.opponentShield ?? 0
+  const activePresentationKind = presentation?.kind ?? 'none'
   return (
-    <div className="battle-stage handdrawn-stage">
-      <BattleFxCanvas event={event} speed={speed} />
+    <div className="battle-stage handdrawn-stage" data-presentation-kind={activePresentationKind}>
+      <BattleFxStage event={event} presentation={presentation} speed={speed} />
       <BattleDog
         side="opponent"
         snapshot={opponent}
@@ -3113,6 +3493,8 @@ function BattleStage({ player, opponent, event, lastRoll, speed, finished, winne
         event={event}
         finished={finished}
         winner={winner}
+        onStatusInspect={inspectStatus}
+        activeStatusKey={activeStatusKey}
       />
       <BattleDice event={event} lastRoll={lastRoll} />
       <BattleDog
@@ -3124,12 +3506,15 @@ function BattleStage({ player, opponent, event, lastRoll, speed, finished, winne
         event={event}
         finished={finished}
         winner={winner}
+        onStatusInspect={inspectStatus}
+        activeStatusKey={activeStatusKey}
       />
+      <StatusFloatingTip statusTip={statusTip} onClose={() => setStatusTip(null)} />
     </div>
   )
 }
 
-function BattleDog({ side, snapshot, hp, maxHp, shield, event, finished, winner }: { side: 'player' | 'opponent'; snapshot: BattleSnapshot; hp: number; maxHp: number; shield: number; event?: BattleEvent; finished: boolean; winner?: string }) {
+function BattleDog({ side, snapshot, hp, maxHp, shield, event, finished, winner, onStatusInspect, activeStatusKey }: { side: 'player' | 'opponent'; snapshot: BattleSnapshot; hp: number; maxHp: number; shield: number; event?: BattleEvent; finished: boolean; winner?: string; onStatusInspect: (status: BattleStatusEntry, side: 'player' | 'opponent', polarity: 'positive' | 'negative', element: HTMLElement) => void; activeStatusKey: string | null }) {
   const isActor = event?.actor === side
   const vfxKind = battleVfxKind(event)
   const vfxTargetSide = battleVfxTargetSide(event)
@@ -3151,13 +3536,13 @@ function BattleDog({ side, snapshot, hp, maxHp, shield, event, finished, winner 
     <div className={`battle-dog ${side} ${isActor ? 'attacking' : ''} ${isTarget && event?.effectType !== 'HEAL' ? 'hit' : ''} ${healing ? 'healing' : ''} ${isVfxTarget ? `vfx-target-${battleVfxKind(event)}` : ''} ${shieldValue > 0 ? 'status-shield' : ''} ${poisonStatus ? 'poisoned status-poison' : ''} ${won ? 'winner' : ''} ${lost ? 'loser' : ''}`}>
       <div className="hp">
         <span><HeartPulse size={16} /> {snapshot.name}</span>
-        <StatusEffectRow tone="positive" statuses={positiveStatuses} />
+        <StatusEffectRow tone="positive" side={side} statuses={positiveStatuses} onStatusInspect={onStatusInspect} activeStatusKey={activeStatusKey} />
         <div className="hp-bar">
           {shieldValue > 0 && <i className="hp-shield" style={{ width: `${Math.max(6, Math.min(100, shieldPercent))}%` }} />}
           <i className="hp-current" style={{ width: `${Math.max(0, Math.min(100, hpPercent))}%` }} />
           {poisonPreviewPercent > 0 && <i className="hp-preview poison" style={{ left: `${poisonPreviewLeft}%`, width: `${Math.max(3, Math.min(100, poisonPreviewPercent))}%` }} />}
         </div>
-        <StatusEffectRow tone="negative" statuses={negativeStatuses} />
+        <StatusEffectRow tone="negative" side={side} statuses={negativeStatuses} onStatusInspect={onStatusInspect} activeStatusKey={activeStatusKey} />
         <b>{Math.max(0, Math.round(hp))}/{maxHp}</b>
         {shieldValue > 0 && (
           <div className="shield-bar" aria-label={`护盾 ${shieldValue}`}>
@@ -3172,15 +3557,35 @@ function BattleDog({ side, snapshot, hp, maxHp, shield, event, finished, winner 
   )
 }
 
-function StatusEffectRow({ tone, statuses }: { tone: 'positive' | 'negative'; statuses: BattleStatusEntry[] }) {
+function StatusEffectRow({ tone, side, statuses, onStatusInspect, activeStatusKey }: { tone: 'positive' | 'negative'; side: 'player' | 'opponent'; statuses: BattleStatusEntry[]; onStatusInspect: (status: BattleStatusEntry, side: 'player' | 'opponent', polarity: 'positive' | 'negative', element: HTMLElement) => void; activeStatusKey: string | null }) {
   const visible = statuses.slice(0, 3)
   const hidden = statuses.length - visible.length
   return (
     <div className={`status-effects ${tone}`}>
-      {visible.map((status) => <span key={`${tone}-${status.type}`} className={`status-chip handdrawn-status-chip ${status.type}`}>{statusText(status)}</span>)}
+      {visible.map((status) => {
+        const isActive = activeStatusKey === statusTipKey(status, side, tone)
+        return (
+          <button
+            key={`${tone}-${status.type}`}
+            type="button"
+            className={`status-chip handdrawn-status-chip ${status.type}`}
+            aria-label={`查看${status.label}说明`}
+            aria-describedby={isActive ? statusTipId : undefined}
+            aria-expanded={isActive}
+            aria-controls={statusTipId}
+            onClick={(event) => onStatusInspect(status, side, tone, event.currentTarget)}
+          >
+            {statusText(status)}
+          </button>
+        )
+      })}
       {hidden > 0 && <span className="status-chip handdrawn-status-chip more" title={statuses.map(statusText).join(' / ')}>+{hidden}</span>}
     </div>
   )
+}
+
+function statusTipKey(status: BattleStatusEntry, side: 'player' | 'opponent', polarity: 'positive' | 'negative') {
+  return `${side}-${polarity}-${status.type}`
 }
 
 function statusText(status: BattleStatusEntry) {
@@ -3203,8 +3608,10 @@ function BattleDice({ event, lastRoll }: { event?: BattleEvent; lastRoll?: Battl
   )
 }
 
-function BattleFxCanvas({ event, speed }: { event?: BattleEvent; speed: number }) {
+function BattleFxStage({ event, presentation, speed }: { event?: BattleEvent; presentation: PresentationEvent | null; speed: number }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
+  const reducedMotion = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+  const timeline = presentation ? buildFxTimeline(presentation, Boolean(reducedMotion)) : []
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -3262,7 +3669,16 @@ function BattleFxCanvas({ event, speed }: { event?: BattleEvent; speed: number }
     return () => window.cancelAnimationFrame(frame)
   }, [event, speed])
 
-  return <canvas ref={canvasRef} className="battle-fx-canvas handdrawn-fx-canvas" data-vfx-kind={battleVfxKind(event)} aria-hidden="true" />
+  return (
+    <div className="battle-fx-stage" data-vfx-kind={battleVfxKind(event)} data-timeline={timeline.map((step) => step.phase).join(' ')}>
+      <canvas ref={canvasRef} className="battle-fx-canvas handdrawn-fx-canvas" data-vfx-kind={battleVfxKind(event)} aria-hidden="true" />
+      {presentation && presentation.kind !== 'none' && (
+        <span className={`battle-feedback-burst ${presentation.kind}`} aria-hidden="true">
+          {presentation.kind === 'roll' ? '掷' : presentation.amount ?? ''}
+        </span>
+      )}
+    </div>
+  )
 }
 
 function drawBattleFxTrail(context: CanvasRenderingContext2D, actorX: number, targetX: number, centerY: number, t: number, fx: BattleVfxStyle) {
@@ -3329,14 +3745,18 @@ function createBattleParticles(event: BattleEvent, fx: BattleVfxStyle, x: number
 }
 
 function CollapsedBattleLog({ events, eventIndex, open, onToggle }: { events: BattleEvent[]; eventIndex: number; open: boolean; onToggle: () => void }) {
-  const visible = open ? events.slice(Math.max(0, eventIndex - 40), eventIndex + 1) : events.slice(Math.max(0, eventIndex - 3), eventIndex + 1)
+  const startIndex = open ? Math.max(0, eventIndex - 40) : Math.max(0, eventIndex - 3)
+  const visible = events.slice(startIndex, eventIndex + 1)
   return (
     <div className={`battle-log-shell ${open ? 'open' : ''}`}>
       <button className="log-toggle" onClick={onToggle}>{open ? '收起日志' : '展开日志'}</button>
       <div className="battle-log">
-        {visible.map((event, index) => (
-          <p key={`${event.time}-${index}-${event.text}`} className={`${event.actor} ${event.effectType === 'POISON' ? 'poison' : ''}`}>{event.time}s · {event.text}</p>
-        ))}
+        {visible.map((event, index) => {
+          const absoluteIndex = startIndex + index
+          return (
+            <p key={`${event.time}-${index}-${event.text}`} className={`${event.actor} ${event.effectType === 'POISON' ? 'poison' : ''} ${absoluteIndex === eventIndex ? 'active-feedback' : ''}`}>{event.time}s · {event.text}</p>
+          )
+        })}
       </div>
     </div>
   )

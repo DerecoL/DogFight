@@ -51,5 +51,21 @@
     "typescript-eslint": "^8.59.2",
     "vite": "^8.0.12",
     "vitest": "^4.1.6"
-  }
+  },
+  "description": "DogFight is a React/Vite game with a Fastify API and Prisma persistence.",
+  "main": "eslint.config.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/DerecoL/DogFight.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/DerecoL/DogFight/issues"
+  },
+  "homepage": "https://github.com/DerecoL/DogFight#readme"
 }
