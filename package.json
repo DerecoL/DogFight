@@ -15,7 +15,7 @@
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
     "db:init": "node scripts/init-db.cjs",
-    "test": "vitest run"
+    "test": "vitest run --exclude src/server/api.test.ts && vitest run src/server/api.test.ts --maxConcurrency=1"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

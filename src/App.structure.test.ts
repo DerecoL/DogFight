@@ -22,7 +22,7 @@ function itemDefIds() {
 }
 
 function relicDefIds() {
-  const relicBlock = data.slice(data.indexOf('export const RELIC_DEFS'), data.indexOf('export const TERM_DEFS'))
+  const relicBlock = data.slice(data.indexOf('export const RELIC_DEFS'), data.indexOf('export const ALL_ITEM_DEFS'))
   return [...relicBlock.matchAll(/\{\s*id:\s*['`]([^'`]+)['`]/g)].map((match) => match[1])
 }
 
@@ -339,10 +339,10 @@ describe('selection screen structure', () => {
   })
 
   it('hides full-range trigger dice on direct-trigger item surfaces', () => {
-    expect(app).toContain('function visibleTriggerDice(def: ItemDef)')
-    expect(app).toContain('const triggerDice = visibleTriggerDice(item.def)')
+    expect(app).toContain("import { triggerDiceLabel } from './item-trigger-display'")
+    expect(app).toContain('const triggerDice = triggerDiceLabel(item.def)')
     expect(app).toContain('{triggerDice && <small><Dice5 size={12} /> {triggerDice}</small>}')
-    expect(app).toContain('const tipTriggerDice = visibleTriggerDice(def)')
+    expect(app).toContain('const tipTriggerDice = triggerDiceLabel(def)')
     expect(app).toContain('{tipTriggerDice && (')
     expect(app).not.toContain('<small><Dice5 size={12} /> {item.def.dice.join')
   })
@@ -355,6 +355,11 @@ describe('selection screen structure', () => {
     expect(app).toContain('RuleText')
     expect(app).toContain('rule-term')
     expect(app).toContain('rule-tip')
+    expect(app).toContain("import { TERM_DEFS } from './shared/rule-terms'")
+    expect(app).toContain('Object.fromEntries(TERM_DEFS.map')
+    expect(data).toContain("import { TERM_DEFS } from '../../shared/rule-terms'")
+    expect(data).toContain('export { TERM_DEFS }')
+    expect(data).not.toContain('export const TERM_DEFS = [')
   })
 
   it('maps every item and relic definition to a dedicated SVG icon asset', () => {

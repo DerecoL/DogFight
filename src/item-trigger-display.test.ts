@@ -1,0 +1,19 @@
+import { describe, expect, it } from 'vitest'
+import { triggerDiceLabel } from './item-trigger-display'
+
+const item = (dice: number[], advancedEffect = 'NONE') => ({ dice, advancedEffect })
+
+describe('item trigger dice display', () => {
+  it('keeps all six dice visible when an item triggers from every roll face', () => {
+    expect(triggerDiceLabel(item([1, 2, 3, 4, 5, 6], 'POISON_ON_ROLL'))).toBe('1/2/3/4/5/6')
+  })
+
+  it('hides dice for equipment whose effect is driven by passive, opening, or event hooks', () => {
+    expect(triggerDiceLabel(item([1, 2, 3, 4, 5, 6], 'POST_BATTLE_LARGE_ITEM'))).toBeNull()
+    expect(triggerDiceLabel(item([1, 6], 'BOOM_COUNTER'))).toBeNull()
+  })
+
+  it('keeps normal face-triggered items visible', () => {
+    expect(triggerDiceLabel(item([4, 5, 6]))).toBe('4/5/6')
+  })
+})

@@ -42,7 +42,7 @@ describe('quality-adjusted item descriptions', () => {
     const description = itemDefForQuality('dog-house', 'BRONZE').description
 
     expect(description).toContain('偷取敌方 1 层增益')
-    expect(description).toContain('护盾不算增益')
+    expect(description).toContain('【护盾】不算增益')
   })
 
   it('describes giant bone fury as a stacking attack damage buff', () => {

@@ -286,6 +286,33 @@ describe('battle simulation', () => {
     )
   }
 
+  it('night patrol light upgrade increases adjacent trigger count', () => {
+    const fighterWithLight = (quality: GameItem['quality']): FighterSnapshot => ({
+      name: 'P',
+      dogType: 'BULLY',
+      wins: 0,
+      losses: 0,
+      round: 6,
+      items: [
+        { id: 'neighbor', defId: 'starter-6', quality: 'BRONZE', area: 'EQUIPMENT', x: 0, y: 0 },
+        { id: 'lamp', defId: 'v3-night-patrol-light', quality, area: 'EQUIPMENT', x: 1, y: 0 },
+      ],
+    })
+    const opponent: FighterSnapshot = { name: 'O', dogType: 'BULLY', wins: 0, losses: 0, round: 6, items: [] }
+    const adjacentTriggersAtFirstRoll = (quality: GameItem['quality']) => {
+      const result = simulateBattle(fighterWithLight(quality), opponent, 'night-light-0')
+      return result.events.filter((event) =>
+        event.time === 1
+        && event.kind === 'ITEM'
+        && event.actor === 'player'
+        && event.itemId === 'neighbor'
+      )
+    }
+
+    expect(adjacentTriggersAtFirstRoll('GOLD')).toHaveLength(1)
+    expect(adjacentTriggersAtFirstRoll('DIAMOND')).toHaveLength(2)
+  })
+
   it('reflects two damage per thorn stack when attacked', () => {
     const player: FighterSnapshot = {
       name: 'P',
@@ -317,33 +344,6 @@ describe('battle simulation', () => {
       sourceHpDelta: -10,
     })
     expect(thorn?.text).toContain('反弹 10 点伤害')
-  })
-
-  it('night patrol light upgrade increases adjacent trigger count', () => {
-    const fighterWithLight = (quality: GameItem['quality']): FighterSnapshot => ({
-      name: 'P',
-      dogType: 'BULLY',
-      wins: 0,
-      losses: 0,
-      round: 6,
-      items: [
-        { id: 'neighbor', defId: 'starter-6', quality: 'BRONZE', area: 'EQUIPMENT', x: 0, y: 0 },
-        { id: 'lamp', defId: 'v3-night-patrol-light', quality, area: 'EQUIPMENT', x: 1, y: 0 },
-      ],
-    })
-    const opponent: FighterSnapshot = { name: 'O', dogType: 'BULLY', wins: 0, losses: 0, round: 6, items: [] }
-    const adjacentTriggersAtFirstRoll = (quality: GameItem['quality']) => {
-      const result = simulateBattle(fighterWithLight(quality), opponent, 'night-light-0')
-      return result.events.filter((event) =>
-        event.time === 1
-        && event.kind === 'ITEM'
-        && event.actor === 'player'
-        && event.itemId === 'neighbor'
-      )
-    }
-
-    expect(adjacentTriggersAtFirstRoll('GOLD')).toHaveLength(1)
-    expect(adjacentTriggersAtFirstRoll('DIAMOND')).toHaveLength(2)
   })
 
   it('reverse fur comb silver purges enemy thorns first and heals by removed layers', () => {
@@ -828,7 +828,7 @@ describe('battle simulation', () => {
       event.actor === 'player'
       && event.itemId === 'fang'
       && event.effectType === 'UTILITY'
-      && event.text.includes('左右相邻')
+      && event.text.includes('左右【相邻】')
       && event.text.includes('吸血')
     )
     const laterEvents = result.events.slice(grantIndex + 1)
@@ -903,7 +903,7 @@ describe('battle simulation', () => {
       && event.itemId === 'counter'
       && event.defId === 'v4-boom-counter'
       && event.effectType === 'DAMAGE'
-      && event.text.includes('爆鸣计数达到 30')
+      && event.text.includes('【爆鸣计数】达到 30')
     )
 
     expect(explosion).toMatchObject({
@@ -933,7 +933,7 @@ describe('battle simulation', () => {
       event.actor === 'player'
       && event.itemId === 'counter'
       && event.effectType === 'DAMAGE'
-      && event.text.includes('爆鸣计数达到 30')
+      && event.text.includes('【爆鸣计数】达到 30')
     )
 
     expect(explosion).toMatchObject({
@@ -992,12 +992,12 @@ describe('battle simulation', () => {
       items: [
         { id: 'fang', defId: 'v4-blood-contract-fang', quality: 'DIAMOND', area: 'EQUIPMENT', x: 0, y: 0 },
         { id: 'counter', defId: 'v4-boom-counter', quality: 'GOLD', area: 'EQUIPMENT', x: 2, y: 0 },
-        ...Array.from({ length: 10 }, (_, index) => ({
+        ...Array.from({ length: 11 }, (_, index) => ({
           id: `extreme-${index}`,
           defId: 'v3-chew-scratch-post',
           quality: 'BRONZE' as const,
           area: 'EQUIPMENT' as const,
-          x: index + 3,
+          x: index + 4,
           y: 0,
         })),
       ],
@@ -1014,7 +1014,7 @@ describe('battle simulation', () => {
       event.actor === 'player'
       && event.itemId === 'counter'
       && event.effectType === 'DAMAGE'
-      && event.text.includes('爆鸣计数达到 30')
+      && event.text.includes('【爆鸣计数】达到 30')
     )
     const nextPlayerEvent = result.events.slice(explosionIndex + 1).find((event) => event.actor === 'player')
 

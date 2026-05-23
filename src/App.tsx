@@ -48,6 +48,8 @@ import {
   type UiFeedbackKind,
 } from './feedback'
 import { resolveSlotPlacement } from './placement'
+import { triggerDiceLabel } from './item-trigger-display'
+import { TERM_DEFS } from './shared/rule-terms'
 import './App.css'
 
 type DogType = 'SHIBA' | 'SAMOYED' | 'MUTT' | 'BULLY' | 'EMPEROR'
@@ -342,11 +344,11 @@ type DogfightBattleResponse = { battle: { id: string; roomId: string; round: num
 
 const dogNames: Record<DogType, string> = { SHIBA: '柴犬', SAMOYED: '萨摩耶', MUTT: '土狗', BULLY: '恶霸', EMPEROR: '狗皇帝' }
 const dogTraits: Record<DogType, string> = {
-  SHIBA: '20% 概率改掷为小点 1/2/3',
-  SAMOYED: '20% 概率改掷为大点 4/5/6',
-  MUTT: '20% 概率额外投掷一次',
-  BULLY: '40% 概率使本次触发的大型物品效果翻倍',
-  EMPEROR: '指定幸运数字，命中时 50% 概率使触发效果翻倍',
+  SHIBA: '20% 概率改掷为【小点】 1/2/3',
+  SAMOYED: '20% 概率改掷为【大点】 4/5/6',
+  MUTT: '20% 概率【额外投掷】一次',
+  BULLY: '40% 概率使本次触发的【大型物品】效果翻倍',
+  EMPEROR: '指定【天命数字】，命中时 50% 概率使触发效果翻倍',
 }
 const dogAssets: Record<DogType, string> = {
   SHIBA: '/assets/dogs/shiba.webp',
@@ -471,10 +473,6 @@ const BASE_MAX_HP = 100
 const EARLY_ROUND_HP_GROWTH = 20
 const LATE_ROUND_HP_GROWTH = 50
 const EARLY_HP_GROWTH_ROUNDS = 6
-const STATUS_THORNS_DAMAGE_PER_STACK = 2
-const STATUS_FURY_DAMAGE_PER_STACK = 1
-const STATUS_SPEED_REDUCTION_PER_STACK = 0.1
-const STATUS_SPEED_MIN_INTERVAL = 0.5
 const emptyRunHistory: PlayerRunHistory = {
   totalRuns: 0,
   activeRuns: 0,
@@ -505,10 +503,10 @@ const dogOptions: DogType[] = ['SHIBA', 'SAMOYED', 'MUTT', 'BULLY', 'EMPEROR']
 const shopChoiceOrder: ShopType[] = ['GENERAL', 'LARGE', 'MEDIUM', 'SMALL', 'SMALL_DICE', 'BIG_DICE', 'RELIC']
 const dogStrategies: Record<DogType, string> = {
   SHIBA: '适合新手，专注于持续输出伤害',
-  SAMOYED: '适合押大点构筑，爆发窗口更集中',
+  SAMOYED: '适合押【大点】构筑，爆发窗口更集中',
   MUTT: '适合随机和连击构筑，上限更高但波动更大',
-  BULLY: '适合大型物品构筑，围绕 4 格道具打爆发',
-  EMPEROR: '适合围绕一个核心点数堆叠道具，命中幸运数字时有爆发上限',
+  BULLY: '适合【大型物品】构筑，围绕 4 格道具打爆发',
+  EMPEROR: '适合围绕一个核心点数堆叠道具，命中【天命数字】时有爆发上限',
 }
 const dogTags: Record<DogType, string[]> = {
   SHIBA: ['进攻', '简单'],
@@ -522,76 +520,62 @@ const shopDescriptions: Record<ShopType, string> = {
   LARGE: '提供高占格高收益道具，适合大件路线',
   MEDIUM: '提供稳定中型道具，适合均衡过渡',
   SMALL: '提供低占格道具，适合填补装备缝隙',
-  SMALL_DICE: '偏向小点触发道具，适合小点战术',
-  BIG_DICE: '偏向大点触发道具，适合高点爆发',
+  SMALL_DICE: '偏向【小点】触发道具，适合【小点】战术',
+  BIG_DICE: '偏向【大点】触发道具，适合高点爆发',
   RELIC: '免费选择一个遗物，强化骰子倾向和触发频率',
 }
-const ruleTerms: Record<string, { description: string; note: string }> = {
-  相邻: { description: '该物品左边和右边的第1个物品', note: '无' },
-  小点: { description: '投掷出1~3点', note: '无' },
-  大点: { description: '投掷出4~6点', note: '无' },
-  极值: { description: '投掷出1和6点', note: '无' },
-  护盾: { description: '特殊生命值，优先吸收受到的普通伤害；护盾不属于正面增益', note: '无' },
-  荆棘: { description: '正面增益。每 1 层在受到攻击时反弹 2 点伤害，也就是每层造成2点伤害；当前反伤 = 层数 × 2', note: '无' },
-  加速: { description: '正面增益。每 1 层使投掷间隔减少 0.1 秒，最多 5 层，最低投掷间隔 0.5 秒', note: '由极速太刀等效果获得' },
-  激昂: { description: '正面增益。每 1 层使自身所有攻击伤害 +1，可叠加；攻击时按当前层数加成', note: '由巨型骨棒等效果获得' },
-  中毒: { description: '负面效果。每 1 层每秒造成 1 点伤害，每 1 秒结算 1 次；遗物可能额外提高每次结算伤害', note: '无' },
-  虚弱: { description: '负面效果。下一次攻击造成的伤害降低 50%，触发后消耗 1 层；多层只增加可消耗次数', note: '无' },
-  冻结: { description: '负面效果。冻结期间无法行动；剩余时间归零后恢复投掷和装备触发', note: '无' },
-  大型物品: { description: '容量为4的物品', note: '恶霸袖标可让3格物品也按大型物品处理' },
-  中型物品: { description: '容量为2或3的物品', note: '无' },
-  小型物品: { description: '容量为1的物品', note: '无' },
-  失效: { description: '负面效果。每 1 层抵消 1 次装备触发，被抵消后消耗 1 层', note: '无' },
-  天命数字: { description: '开局时确定的幸运数字', note: '狗皇帝专属规则' },
-}
+const ruleTerms = Object.fromEntries(TERM_DEFS.map((term) => [term.term, term]))
 const statusTipId = 'battle-status-tip'
+const STATUS_THORNS_DAMAGE_PER_STACK = 2
+const STATUS_FURY_DAMAGE_PER_STACK = 1
+const STATUS_SPEED_REDUCTION_PER_STACK = 0.1
 const statusTipDetails: Record<string, { polarity: '正面效果' | '负面效果'; timing: string; description: string; source: string }> = {
   shield: {
     polarity: '正面效果',
     timing: '受到伤害时优先结算',
-    description: '护盾会先吸收即将受到的伤害。护盾值被扣完后，剩余伤害才会进入生命值。',
-    source: '常见来源：护盾类装备、职业道具和遗物。',
+    description: '【护盾】会先吸收即将受到的普通伤害；不会被小狗窝偷取，但可被部分【净化】效果按每 8 点折算清除。',
+    source: '常见来源：【护盾】类装备、职业道具和遗物。',
   },
   thorns: {
     polarity: '正面效果',
     timing: '受到直接伤害后触发',
-    description: '荆棘会在被直接攻击后对攻击方造成反伤。层数越高，反伤能力越强。',
-    source: '常见来源：荆棘、反伤和防御类装备。',
+    description: '【荆棘】会在被直接攻击后对攻击方造成反伤。层数越高，反伤能力越强。',
+    source: '常见来源：【荆棘】、反伤和防御类装备。',
   },
   extraRoll: {
     polarity: '正面效果',
     timing: '后续投骰或触发时消耗',
-    description: '额外骰会增加后续投骰或装备触发机会。显示的数值代表当前剩余次数。',
-    source: '常见来源：加速、连击和额外触发类效果。',
+    description: '【加速】会缩短后续基础投掷间隔。显示的层数代表当前投掷频率提升强度。',
+    source: '常见来源：【加速】、连击和额外触发类效果。',
   },
   fury: {
     polarity: '正面效果',
     timing: '后续攻击或造成伤害时生效',
-    description: '激昂会强化后续攻击或伤害表现。显示的层数代表当前增幅强度。',
-    source: '常见来源：激昂、狂怒和进攻类装备。',
+    description: '【激昂】会强化后续攻击伤害。显示的层数代表当前增幅强度。',
+    source: '常见来源：【激昂】、狂怒和进攻类装备。',
   },
   poison: {
     polarity: '负面效果',
     timing: '持续结算时造成伤害',
-    description: '中毒会在结算时造成持续伤害。芯片上的层数表示毒性强度，倒计时提示下一次毒伤时机。',
+    description: '【中毒】每秒结算 1 次，芯片上的层数表示毒性强度，倒计时提示下一次毒伤时机。',
     source: '常见来源：毒刃、毒牙和持续伤害类装备。',
   },
   weak: {
     polarity: '负面效果',
     timing: '造成伤害时生效',
-    description: '虚弱会降低后续造成的伤害。层数越高，输出被削弱得越明显。',
+    description: '【虚弱】会让下次攻击伤害降低，层数表示还可消耗多少次。',
     source: '常见来源：削弱、压制和控制类效果。',
   },
   freeze: {
     polarity: '负面效果',
     timing: '行动或触发前检查',
-    description: '冻结会限制行动或跳过触发。显示的剩余时间或次数代表控制还会持续多久。',
+    description: '【冻结】期间会跳过投掷和装备触发。显示的剩余时间代表控制还会持续多久。',
     source: '常见来源：冰冻、寒冷和控制类装备。',
   },
   disabled: {
     polarity: '负面效果',
     timing: '装备或效果触发前检查',
-    description: '失效会让装备或效果被跳过。显示的次数代表还会抵消多少次触发。',
+    description: '【失效】会让指定装备或大型装备的触发被抵消。显示的次数代表还会抵消多少次触发。',
     source: '常见来源：缴械、破坏和反制类效果。',
   },
 }
@@ -664,16 +648,16 @@ function createBattleFxStyle(event: BattleEvent) {
 
 function effectText(def: ItemDef, quality: ItemQuality = 'BRONZE') {
   const amount = qualityAmountFrom(def.effect.amount, quality, def.effect.qualityBase)
-  if (def.advancedEffect === 'GRANT_LIFESTEAL_ADJACENT') return quality === 'DIAMOND' ? '左右相邻装备获得吸血' : '左侧相邻装备获得吸血'
-  if (def.advancedEffect === 'BOOM_COUNTER') return `爆鸣计数达到 30 后造成 ${amount} 伤害`
+  if (def.advancedEffect === 'GRANT_LIFESTEAL_ADJACENT') return quality === 'DIAMOND' ? '左右【相邻】装备获得【吸血】' : '左侧【相邻】装备获得【吸血】'
+  if (def.advancedEffect === 'BOOM_COUNTER') return `【爆鸣计数】达到 30 后造成 ${amount} 伤害`
   if (def.advancedEffect === 'GROWTH_DAMAGE') return `造成 ${amount} 伤害，后续伤害提升`
   if (def.advancedEffect === 'PURGE_ENEMY_BUFFS') return '清除敌方增益并恢复生命'
   if (def.effect.type === 'HEAL') return `回复 ${amount} 生命`
   if (def.effect.type === 'DAMAGE' || def.effect.type === 'DAMAGE_SELF_SHIELD') return `造成 ${amount} 伤害`
   if (def.effect.type === 'UTILITY') {
-    if (def.tags.includes('shield')) return `获得 ${amount} 护盾`
-    if (def.tags.includes('poison')) return `施加 ${amount} 中毒`
-    if (def.tags.includes('weak')) return `施加 ${amount} 虚弱`
+    if (def.tags.includes('shield')) return `获得 ${amount} 点【护盾】`
+    if (def.tags.includes('poison')) return `施加 ${amount} 层【中毒】`
+    if (def.tags.includes('weak')) return `施加 ${amount} 层【虚弱】`
     if (def.tags.includes('cleanse')) return `回复 ${amount} 生命`
     if (amount > 0) return `效果 ${amount}`
   }
@@ -776,12 +760,6 @@ function diceToneText(def: ItemDef) {
   return '混合'
 }
 
-function visibleTriggerDice(def: ItemDef) {
-  const dice = [...new Set(def.dice)].sort((left, right) => left - right)
-  const coversEveryFace = dice.length === 6 && dice.every((face, index) => face === index + 1)
-  return coversEveryFace ? null : dice.join('/')
-}
-
 function effectToneText(def: ItemDef) {
   if (def.advancedEffect === 'GRANT_LIFESTEAL_ADJACENT') return '吸血'
   if (def.advancedEffect === 'BOOM_COUNTER') return '爆鸣计数'
@@ -856,13 +834,14 @@ function useOutsideTipDismiss(active: boolean, onClose: () => void) {
 
 function RuleText({ text }: { text: string }) {
   const [openTerm, setOpenTerm] = useState<string | null>(null)
+  const ruleTermStart = String.fromCharCode(0x3010)
+  const ruleTermEnd = String.fromCharCode(0x3011)
   const parts = text.split(/(【[^】]+】)/g).filter(Boolean)
   return (
     <>
       {parts.map((part, index) => {
-        const match = part.match(/^【(.+)】$/)
-        if (!match) return <span key={`${part}-${index}`}>{part}</span>
-        const term = match[1]
+        if (!part.startsWith(ruleTermStart) || !part.endsWith(ruleTermEnd)) return <span key={`${part}-${index}`}>{part}</span>
+        const term = part.slice(1, -1)
         const entry = ruleTerms[term]
         if (!entry) return <strong key={`${term}-${index}`}>【{term}】</strong>
         return (
@@ -1636,8 +1615,8 @@ function PlayerHistoryOverlay({ history, onClose }: { history: PlayerRunHistory;
 }
 
 function HistoryRunDetails({ entry, inspectedItem, tipAnchor, onInspectItem, onCloseTip }: { entry: PlayerRunHistoryEntry; inspectedItem: Item | null; tipAnchor: TipAnchor | null; onInspectItem: (item: Item, element: HTMLElement) => void; onCloseTip: () => void }) {
-        const equipment = entry.items.filter((item) => item.area === 'EQUIPMENT')
-        const bag = entry.items.filter((item) => item.area === 'BAG')
+  const equipment = entry.items.filter((item) => item.area === 'EQUIPMENT')
+  const bag = entry.items.filter((item) => item.area === 'BAG')
   const tipRun: Run = {
     id: entry.id,
     mode: entry.mode === 'LADDER' ? 'LADDER' : 'CASUAL',
@@ -1680,7 +1659,7 @@ function HistoryRunDetails({ entry, inspectedItem, tipAnchor, onInspectItem, onC
         <div className="battle-slot-grid" style={{ gridTemplateColumns: `repeat(${equipmentSlotCount(entry.relics)}, minmax(0, 1fr))` }}>
           {Array.from({ length: equipmentSlotCount(entry.relics) }).map((_, x) => <i key={x} className="battle-slot" style={{ gridColumn: x + 1, gridRow: 1 }} />)}
           {equipment.map((item) => {
-            const triggerDice = visibleTriggerDice(item.def)
+            const triggerDice = triggerDiceLabel(item.def)
             return (
             <button
               type="button"
@@ -2416,7 +2395,7 @@ function ApexSnapshotDetails({ entry }: { entry: ApexEntry }) {
         <div className="battle-slot-grid" style={{ gridTemplateColumns: 'repeat(12, minmax(0, 1fr))' }}>
           {Array.from({ length: 12 }).map((_, x) => <i key={x} className="battle-slot" style={{ gridColumn: x + 1, gridRow: 1 }} />)}
           {equipment.map((item) => {
-            const triggerDice = visibleTriggerDice(item.def)
+            const triggerDice = triggerDiceLabel(item.def)
             return (
             <button
               type="button"
@@ -2535,7 +2514,7 @@ function LadderHome({ onStart }: { onStart: (choice: { dogType: DogType; luckyNu
                   <img className="dog-avatar" src={dogAssets[dog]} alt="" />
                 </span>
                 <strong>{dogNames[dog]}</strong>
-                <small>{dogTraits[dog]}</small>
+                <small><RuleText text={dogTraits[dog]} /></small>
               </button>
             ) : (
               <div className="dog-card placeholder paper-card paper-dog-card" key={`ladder-dog-placeholder-${index}`} aria-hidden="true" />
@@ -2546,7 +2525,7 @@ function LadderHome({ onStart }: { onStart: (choice: { dogType: DogType; luckyNu
               <img className="dog-avatar large" src={dogAssets[selectedDog]} alt="" />
             </span>
             <h2>{dogNames[selectedDog]}</h2>
-            <p>{dogStrategies[selectedDog]}</p>
+            <p><RuleText text={dogStrategies[selectedDog]} /></p>
             {selectedDog === 'EMPEROR' && (
               <div className="lucky-number-picker">
                 <strong>幸运数字</strong>
@@ -2610,7 +2589,7 @@ function DogSelect({ onPick }: { onPick: (choice: { dogType: DogType; luckyNumbe
                 <img className="dog-avatar" src={dogAssets[dog]} alt="" />
               </span>
               <strong>{dogNames[dog]}</strong>
-              <small>{dogTraits[dog]}</small>
+              <small><RuleText text={dogTraits[dog]} /></small>
               <span className="tag-row">{dogTags[dog].map((tag) => <b key={tag}>{tag}</b>)}</span>
             </button>
           ) : (
@@ -2624,11 +2603,11 @@ function DogSelect({ onPick }: { onPick: (choice: { dogType: DogType; luckyNumbe
           <h2>{dogNames[selectedDog]}</h2>
           <div className="detail-box">
             <strong>被动特性</strong>
-            <p>{dogTraits[selectedDog]}</p>
+            <p><RuleText text={dogTraits[selectedDog]} /></p>
           </div>
           <div className="detail-box">
             <strong>策略说明</strong>
-            <p>{dogStrategies[selectedDog]}</p>
+            <p><RuleText text={dogStrategies[selectedDog]} /></p>
           </div>
           <div className="tag-row">
             {dogTags[selectedDog].map((tag) => <b key={tag}>{tag}</b>)}
@@ -2716,14 +2695,14 @@ function TopBar({ run, musicEnabled, musicBlocked, onToggleMusic, onOpenLobby, o
 
 function DogTraitSummary({ run }: { run: Run }) {
   const trait = run.dogType === 'EMPEROR' && run.luckyNumber
-    ? `${dogTraits[run.dogType]}（天命 ${run.luckyNumber}）`
+    ? `${dogTraits[run.dogType]}（【天命数字】 ${run.luckyNumber}）`
     : dogTraits[run.dogType]
   return (
     <span className="dog-trait-summary" title={`${dogNames[run.dogType]}：${trait}`}>
       <img src={dogAssets[run.dogType]} alt="" />
       <span>当前狗狗</span>
       <strong>{dogNames[run.dogType]}</strong>
-      <p>{trait}</p>
+      <p><RuleText text={trait} /></p>
     </span>
   )
 }
@@ -2783,7 +2762,7 @@ function ShopChoiceSelect({ choices, onPick }: { choices: ShopType[]; onPick: (s
           <button key={choice} className={`choice paper-card sticker-card ${selectedChoice === choice ? 'selected' : ''}`} onClick={() => setSelectedChoice(choice)}>
             <span className="choice-icon">{shopChoiceIcon(choice)}</span>
             <strong>{shopNames[choice]}</strong>
-            <span>{shopDescriptions[choice]}</span>
+            <span><RuleText text={shopDescriptions[choice]} /></span>
           </button>
         ) : (
           <div className="choice placeholder paper-card sticker-card" key={`choice-placeholder-${index}`} aria-hidden="true" />
@@ -2844,7 +2823,7 @@ function ClassRewardCeremony({ run, choices, onDismiss }: { run: Run; choices: C
         </div>
         <div className="ceremony-reward-preview" aria-label="本次可选职业装备">
           {choices.map((choice) => {
-            const triggerDice = visibleTriggerDice(choice.def)
+            const triggerDice = triggerDiceLabel(choice.def)
             return (
             <span key={choice.defId} className={`ceremony-reward-chip ${qualityClass(choice.quality)}`}>
               <strong>{choice.def.name}</strong>
@@ -2869,7 +2848,7 @@ function ClassRewardSelect({ choices, onPick }: { choices: ClassRewardChoice[]; 
       </div>
       <div className="reward-choice-grid">
         {choices.map((choice) => {
-          const triggerDice = visibleTriggerDice(choice.def)
+          const triggerDice = triggerDiceLabel(choice.def)
           return (
           <div key={choice.defId} role="button" tabIndex={0} className={`choice paper-card sticker-card reward-choice ${selected === choice.defId ? 'selected' : ''}`} onClick={() => setSelected(choice.defId)} onKeyDown={(event) => handleChoiceCardKeyDown(event, () => setSelected(choice.defId))}>
             <strong>{choice.def.name}</strong>
@@ -3004,7 +2983,7 @@ function ShopCard({ offer, selected, ownedCount, onClick }: { offer: ShopOffer; 
   const def = offer.def
   const quality = normalizeQuality(offer.quality)
   const owned = ownedCount > 0
-  const triggerDice = def ? visibleTriggerDice(def) : null
+  const triggerDice = def ? triggerDiceLabel(def) : null
   return (
     <button className={`shop-card paper-shop-card paper-card ${qualityClass(offer.quality)} ${owned ? 'shop-card-owned' : ''} ${selected ? 'selected' : ''}`} onClick={(event) => onClick(event.currentTarget)}>
       <span className="quality-chip shop-quality-chip">{qualityLabel[quality]}</span>
@@ -3157,7 +3136,7 @@ function DraggableItem({ item, selected, dragging, upgradeable, onSelect }: { it
     gridColumn: `${item.x + 1} / span ${item.def.width}`,
     gridRow: `${item.y + 1} / span ${item.def.height}`,
   }
-  const triggerDice = visibleTriggerDice(item.def)
+  const triggerDice = triggerDiceLabel(item.def)
   return (
     <button
       ref={setNodeRef}
@@ -3177,7 +3156,7 @@ function DraggableItem({ item, selected, dragging, upgradeable, onSelect }: { it
 }
 
 function ItemCardContent({ item, upgradeable = false }: { item: Item; upgradeable?: boolean }) {
-  const triggerDice = visibleTriggerDice(item.def)
+  const triggerDice = triggerDiceLabel(item.def)
   return (
     <>
       <span className="quality-chip">{qualityLabel[normalizeQuality(item.quality)]}</span>
@@ -3214,7 +3193,7 @@ function FloatingTip({ run, item, offer, anchor, descriptionOverride, onClose, o
   const canAfford = !offer || run.gold >= offer.price
   const sellValue = item ? sellValueForItem(item) : null
   const style = anchor ? { '--tip-x': `${anchor.x}px`, '--tip-y': `${anchor.y}px` } as React.CSSProperties : undefined
-  const tipTriggerDice = visibleTriggerDice(def)
+  const tipTriggerDice = triggerDiceLabel(def)
   return (
     <aside className="floating-tip paper-card" style={style}>
       <div className="tip-tags">
@@ -3305,9 +3284,9 @@ function StatusFloatingTip({ statusTip, onClose }: { statusTip: StatusTipState |
         <span className="tip-tag">{side === 'player' ? '我方' : '敌方'}</span>
         <span className="tip-tag">{statusText(status)}</span>
       </div>
-      <p className="status-tip-description">{statusDescription(status)}</p>
-      <small>{detail.timing}</small>
-      <small>{detail.source}</small>
+      <p className="status-tip-description"><RuleText text={detail.description} /></p>
+      <small><RuleText text={detail.timing} /></small>
+      <small><RuleText text={detail.source} /></small>
     </aside>
   )
 }
@@ -3446,7 +3425,7 @@ function BattleEquipmentRow({ owner, snapshot, events, displayIndex, activeEvent
         {items.map((item) => {
           const growthText = growthDamageTextForBattleItem(item, owner, events, displayIndex)
           const boomCounterState = boomCounterStateForBattleItem(item, owner, events, displayIndex, activeEvent)
-          const triggerDice = visibleTriggerDice(item.def)
+          const triggerDice = triggerDiceLabel(item.def)
           return (
           <button
             type="button"
@@ -3581,18 +3560,18 @@ function StatusEffectRow({ tone, side, statuses, onStatusInspect, activeStatusKe
             key={`${tone}-${status.type}`}
             type="button"
             className={`status-chip handdrawn-status-chip ${status.type}`}
-            title={statusDescription(status)}
             aria-label={`查看${status.label}说明`}
             aria-describedby={isActive ? statusTipId : undefined}
             aria-expanded={isActive}
             aria-controls={statusTipId}
+            title={statusDescription(status)}
             onClick={(event) => onStatusInspect(status, side, tone, event.currentTarget)}
           >
             {statusText(status)}
           </button>
         )
       })}
-      {hidden > 0 && <span className="status-chip handdrawn-status-chip more" title={statuses.map(statusDescription).join(' / ')}>+{hidden}</span>}
+      {hidden > 0 && <span className="status-chip handdrawn-status-chip more" title={statuses.map(statusText).join(' / ')}>+{hidden}</span>}
     </div>
   )
 }
@@ -3601,43 +3580,39 @@ function statusTipKey(status: BattleStatusEntry, side: 'player' | 'opponent', po
   return `${side}-${polarity}-${status.type}`
 }
 
-function statusStacks(status: BattleStatusEntry) {
-  return Math.max(0, status.stacks ?? 0)
-}
-
-function poisonTickDamage(status: BattleStatusEntry) {
-  return Math.max(0, status.tickDamage ?? statusStacks(status))
-}
-
-function formatStatusSeconds(value: number) {
-  return Number(value.toFixed(1)).toString()
-}
-
 function statusText(status: BattleStatusEntry) {
   const stacks = statusStacks(status)
   if (status.type === 'thorns') return `${status.label} ${stacks}层 · 反伤${stacks * STATUS_THORNS_DAMAGE_PER_STACK}`
-  if (status.type === 'extraRoll') return `${status.label} ${stacks}层 · 间隔-${formatStatusSeconds(stacks * STATUS_SPEED_REDUCTION_PER_STACK)}s`
-  if (status.type === 'fury') return `${status.label} ${stacks}层 · 伤害+${stacks * STATUS_FURY_DAMAGE_PER_STACK}`
-  if (status.type === 'poison') return `${status.label} ${stacks}层 · 每秒${poisonTickDamage(status)}伤`
+  if (status.type === 'poison') return `${status.label} ${status.stacks ?? 0}层 · 每秒${poisonTickDamage(status)}伤 · ${status.nextTickIn ?? 1}s`
   if (status.type === 'weak') return `${status.label} ${stacks}层 · 下次伤害-50%`
-  if (status.type === 'freeze') return `${status.label} ${status.remaining ?? 0}s · 无法行动`
-  if (status.type === 'disabled') return `${status.label} ${status.amount ?? 0}次 · 抵消触发`
-  if (status.stacks != null) return `${status.label} ${stacks}层`
-  if (status.amount != null) return `${status.label} ${status.amount}次`
+  if (status.type === 'fury') return `${status.label} ${stacks}层 · 伤害+${stacks * STATUS_FURY_DAMAGE_PER_STACK}`
+  if (status.type === 'extraRoll') {
+    return `${status.label} ${stacks}层 · 间隔-${formatStatusSeconds(stacks * STATUS_SPEED_REDUCTION_PER_STACK)}s`
+  }
+  if (status.type === 'poison') return `${status.label} ${status.stacks ?? 0}层 · ${status.nextTickIn ?? 1}s`
+  if (status.stacks != null) return `${status.label} ${status.stacks}层`
+  if (status.amount != null) return `${status.label} ${status.amount}`
   if (status.remaining != null) return `${status.label} ${status.remaining}s`
   return status.label
 }
 
+function statusStacks(status: BattleStatusEntry) {
+  return status.stacks ?? status.amount ?? 0
+}
+
+function poisonTickDamage(status: BattleStatusEntry) {
+  return status.tickDamage ?? status.stacks ?? 0
+}
+
+function formatStatusSeconds(seconds: number) {
+  return Number.isInteger(seconds) ? String(seconds) : seconds.toFixed(1).replace(/\.0$/, '')
+}
+
 function statusDescription(status: BattleStatusEntry) {
-  const stacks = statusStacks(status)
-  if (status.type === 'thorns') return `正面增益：每 1 层在受到攻击时反弹 ${STATUS_THORNS_DAMAGE_PER_STACK} 点伤害；当前 ${stacks} 层，反弹 ${stacks * STATUS_THORNS_DAMAGE_PER_STACK} 点伤害。`
-  if (status.type === 'extraRoll') return `正面增益：每 1 层使投掷间隔减少 ${STATUS_SPEED_REDUCTION_PER_STACK} 秒，最低 ${STATUS_SPEED_MIN_INTERVAL} 秒；当前减少 ${formatStatusSeconds(stacks * STATUS_SPEED_REDUCTION_PER_STACK)} 秒。`
-  if (status.type === 'fury') return `正面增益：每 1 层使自身所有攻击伤害 +${STATUS_FURY_DAMAGE_PER_STACK}；当前攻击伤害 +${stacks * STATUS_FURY_DAMAGE_PER_STACK}。`
-  if (status.type === 'poison') return `负面效果：每 1 秒结算 1 次；当前 ${stacks} 层，每次造成 ${poisonTickDamage(status)} 点伤害。`
-  if (status.type === 'weak') return `负面效果：下一次攻击造成的伤害降低 50%，触发后消耗 1 层；当前可消耗 ${stacks} 次。`
-  if (status.type === 'freeze') return `负面效果：冻结期间无法行动；当前剩余 ${status.remaining ?? 0} 秒。`
-  if (status.type === 'disabled') return `负面效果：每 1 层抵消 1 次装备触发；当前可抵消 ${status.amount ?? 0} 次。`
-  return statusText(status)
+  const detail = statusTipDetails[status.type]
+  const values = statusText(status)
+  if (!detail) return values
+  return `${values}；${detail.timing}；${detail.description}`
 }
 
 function BattleDice({ event, lastRoll }: { event?: BattleEvent; lastRoll?: BattleEvent }) {

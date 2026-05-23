@@ -13,8 +13,8 @@ import {
   growthDamageBase,
   growthDamageStep,
   itemDefForQuality,
-  THORNS_DAMAGE_PER_STACK,
   nightPatrolLightTriggerCount,
+  THORNS_DAMAGE_PER_STACK,
 } from './data'
 import { triggerOrder } from './grid'
 import { normalizeQuality, qualityAmount, qualityAmountFrom, QUALITY_LABELS } from './quality'
@@ -482,7 +482,7 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
         target: side,
         sourceHpDelta: 0,
         targetHpDelta: 0,
-        text: `${itemName(def, quality)} 光环使${quality === 'DIAMOND' ? '左右相邻' : '左侧'}装备获得【吸血】`,
+        text: `${itemName(def, quality)} 光环使${quality === 'DIAMOND' ? '左右【相邻】' : '左侧'}装备获得【吸血】`,
       })
     }
   }
@@ -586,7 +586,7 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
             targetHpDelta: result.delta,
             roll,
             ...boomCounterSignal,
-            text: `${itemName(boomDef, boomQuality)} 爆鸣计数达到 30，造成 ${result.before - result.after} 点直接伤害`,
+            text: `${itemName(boomDef, boomQuality)} 【爆鸣计数】达到 30，造成 ${result.before - result.after} 点直接伤害`,
           })
         } else {
           const boomQuality = normalizeQuality(boomCounterItem.quality)
@@ -604,7 +604,7 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
             targetHpDelta: 0,
             roll,
             ...boomCounterSignal,
-            text: `${itemName(boomDef, boomQuality)} 爆鸣计数 +${nextCount}/30`,
+            text: `${itemName(boomDef, boomQuality)} 【爆鸣计数】 +${nextCount}/30`,
           })
         }
       }
@@ -624,7 +624,7 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
           else actorState.weak -= 1
           cleansed += 1
         }
-        triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'UTILITY', amount: cleansed, target: actorSide, sourceHp: getHp(actorSide), targetHp: getHp(targetSide), sourceHpDelta: 0, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 的附魔净化 ${cleansed} 层负面状态` })
+        triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'UTILITY', amount: cleansed, target: actorSide, sourceHp: getHp(actorSide), targetHp: getHp(targetSide), sourceHpDelta: 0, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 的附魔【净化】 ${cleansed} 层负面状态` })
       }
     }
 
@@ -744,7 +744,7 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
           sourceHpDelta: 0,
           targetHpDelta: bonusResult.delta,
           roll,
-          text: `${itemName(def, quality)} 对【虚弱】目标额外造成 ${bonus} 点真实伤害`,
+          text: `${itemName(def, quality)} 对【虚弱】目标额外造成 ${bonus} 点【真实伤害】`,
         })
       }
       if (advanced === 'APPLY_WEAK_ON_HIT') {
@@ -791,7 +791,7 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
       if (advanced === 'CLEANSE_ONE') {
         if (actorState.poison > 0) actorState.poison -= 1
         else if (actorState.weak > 0) actorState.weak -= 1
-        triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'UTILITY', amount: 1, target: actorSide, sourceHp: getHp(actorSide), targetHp: getHp(targetSide), sourceHpDelta: 0, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 净化 1 层负面状态` })
+        triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'UTILITY', amount: 1, target: actorSide, sourceHp: getHp(actorSide), targetHp: getHp(targetSide), sourceHpDelta: 0, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 【净化】 1 层负面状态` })
       }
       if (advanced === 'HEAL_OR_MAX_HP' && wasFull) {
         const gain = qualityAmount(1, quality)
@@ -861,7 +861,7 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
         const damage = roundScaled(qualityAmount(actorState.avalancheDamage, quality) * extraRollDamageScale, scale * globalEffectScale(actor))
         actorState.avalancheDamage *= 2
         const result = applyDamage(targetSide, damage)
-        triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'DAMAGE', amount: damage, target: targetSide, sourceHp: getHp(actorSide), targetHp: result.after, sourceHpDelta: 0, targetHpDelta: result.delta, roll, text: `${itemName(def, quality)} 引发雪崩，造成 ${damage} 点伤害` })
+        triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'DAMAGE', amount: damage, target: targetSide, sourceHp: getHp(actorSide), targetHp: result.after, sourceHpDelta: 0, targetHpDelta: result.delta, roll, text: `${itemName(def, quality)} 引发【雪崩】，造成 ${damage} 点伤害` })
       }
     }
     if (!sacrificeReplacesSmallEffect && advanced === 'FREEZE_STACK' && roll >= 4) {
@@ -869,39 +869,39 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
       if (actorState.freezeStacks >= 10) {
         actorState.freezeStacks = 0
         targetState.frozenUntil = Math.max(targetState.frozenUntil, time + 2)
-        triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'UTILITY', amount: 2, target: targetSide, sourceHp: getHp(actorSide), targetHp: getHp(targetSide), sourceHpDelta: 0, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 冻结敌人 2 秒` })
+        triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'UTILITY', amount: 2, target: targetSide, sourceHp: getHp(actorSide), targetHp: getHp(targetSide), sourceHpDelta: 0, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 【冻结】敌人 2 秒` })
       }
     }
     if (!sacrificeReplacesSmallEffect && advanced === 'PURGE_ENEMY_BUFFS') {
       const maxLayers = qualityAmountFrom(def.effect.amount, quality, def.effect.qualityBase)
       const removed = purgePositiveBuffs(targetSide, maxLayers)
       if (removed <= 0) {
-        triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'UTILITY', amount: 0, target: targetSide, sourceHp: getHp(actorSide), targetHp: getHp(targetSide), sourceHpDelta: 0, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 未清除任何敌方增益` })
+        triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'UTILITY', amount: 0, target: targetSide, sourceHp: getHp(actorSide), targetHp: getHp(targetSide), sourceHpDelta: 0, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 未【净化】任何敌方增益` })
       } else if (recoveryBlocked) {
-        triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'UTILITY', amount: removed, target: targetSide, sourceHp: getHp(actorSide), targetHp: getHp(targetSide), sourceHpDelta: 0, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 清除 ${removed} 层增益` })
+        triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'UTILITY', amount: removed, target: targetSide, sourceHp: getHp(actorSide), targetHp: getHp(targetSide), sourceHpDelta: 0, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 【净化】清除 ${removed} 层增益` })
       } else {
         const healAmount = removed * qualityAmountFrom(5, quality, 'SILVER')
         const healed = applyHeal(actorSide, healAmount)
-        triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'HEAL', amount: healAmount, target: actorSide, sourceHp: healed.after, targetHp: getHp(targetSide), sourceHpDelta: healed.delta, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 清除 ${removed} 层增益，恢复 ${healAmount} 点生命` })
+        triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'HEAL', amount: healAmount, target: actorSide, sourceHp: healed.after, targetHp: getHp(targetSide), sourceHpDelta: healed.delta, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 【净化】清除 ${removed} 层增益，恢复 ${healAmount} 点生命` })
       }
     }
     if (!sacrificeReplacesSmallEffect && !recoveryBlocked && advanced === 'SHIELD_ON_NON_LUCKY' && actor.luckyNumber !== roll) {
       applyShield(actorSide, qualityAmount(5, quality))
-      triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'UTILITY', amount: qualityAmount(5, quality), target: actorSide, sourceHp: getHp(actorSide), targetHp: getHp(targetSide), sourceHpDelta: 0, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 获得 ${qualityAmount(5, quality)} 点护盾` })
+      triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'UTILITY', amount: qualityAmount(5, quality), target: actorSide, sourceHp: getHp(actorSide), targetHp: getHp(targetSide), sourceHpDelta: 0, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 获得 ${qualityAmount(5, quality)} 点【护盾】` })
     }
     if (!sacrificeReplacesSmallEffect && !recoveryBlocked && (advanced === 'GAIN_SHIELD' || advanced === 'SHIELD_IMMUNITY')) {
       applyShield(actorSide, amount)
-      triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'UTILITY', amount, target: actorSide, sourceHp: getHp(actorSide), targetHp: getHp(targetSide), sourceHpDelta: 0, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 获得 ${amount} 点护盾` })
+      triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'UTILITY', amount, target: actorSide, sourceHp: getHp(actorSide), targetHp: getHp(targetSide), sourceHpDelta: 0, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 获得 ${amount} 点【护盾】` })
     }
     if (!sacrificeReplacesSmallEffect && !recoveryBlocked && advanced === 'GAIN_SHIELD_THORNS') {
       applyShield(actorSide, amount)
       actorState.thorns += qualityAmount(1, quality)
-      triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'UTILITY', amount, target: actorSide, sourceHp: getHp(actorSide), targetHp: getHp(targetSide), sourceHpDelta: 0, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 获得 ${amount} 点护盾与 ${qualityAmount(1, quality)} 层【荆棘】` })
+      triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'UTILITY', amount, target: actorSide, sourceHp: getHp(actorSide), targetHp: getHp(targetSide), sourceHpDelta: 0, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 获得 ${amount} 点【护盾】与 ${qualityAmount(1, quality)} 层【荆棘】` })
     }
     if (!sacrificeReplacesSmallEffect && advanced === 'CLEANSE_ON_LUCKY' && actor.luckyNumber === roll) {
       actorState.poison = 0
       actorState.weak = 0
-      triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'UTILITY', amount: 0, target: actorSide, sourceHp: getHp(actorSide), targetHp: getHp(targetSide), sourceHpDelta: 0, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 驱散所有负面状态` })
+      triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'UTILITY', amount: 0, target: actorSide, sourceHp: getHp(actorSide), targetHp: getHp(targetSide), sourceHpDelta: 0, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 【净化】所有负面状态` })
     }
 
     if (!sacrificeReplacesSmallEffect && advanced === 'ADJACENT_DAMAGE_BONUS') {
@@ -958,7 +958,7 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
           triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'HEAL', amount: enchant.amount, target: actorSide, sourceHp: result.after, targetHp: getHp(targetSide), sourceHpDelta: result.delta, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 附魔回复 ${enchant.amount} 点生命` })
         } else if (enchant.effect === 'SHIELD' && !recoveryBlocked) {
           applyShield(actorSide, enchant.amount)
-          triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'UTILITY', amount: enchant.amount, target: actorSide, sourceHp: getHp(actorSide), targetHp: getHp(targetSide), sourceHpDelta: 0, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 附魔获得 ${enchant.amount} 点护盾` })
+          triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'UTILITY', amount: enchant.amount, target: actorSide, sourceHp: getHp(actorSide), targetHp: getHp(targetSide), sourceHpDelta: 0, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 附魔获得 ${enchant.amount} 点【护盾】` })
         }
       }
       if (enchant.kind === 'SPECIAL') {
@@ -1121,7 +1121,7 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
         time,
         actor: actorSide,
         kind: 'ITEM',
-        text: `额外投掷链达到上限 ${EXTRA_ROLL_CHAIN_CAP}，后续额外投掷已截断`,
+        text: `【额外投掷】链达到上限 ${EXTRA_ROLL_CHAIN_CAP}，后续【额外投掷】已截断`,
         effectType: 'UTILITY',
         target: 'none',
       })

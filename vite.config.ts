@@ -7,6 +7,11 @@ export default defineConfig({
   plugins: [react()],
   test: {
     exclude: [...configDefaults.exclude, '.worktrees/**'],
+    maxConcurrency: 1,
+    sequence: {
+      concurrent: false,
+      hooks: 'list',
+    },
   },
   server: {
     proxy: {
