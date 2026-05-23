@@ -66,6 +66,7 @@ type BattleEventLike = {
   time?: number
   actor?: FeedbackSide | string
   kind?: string
+  text?: string
   itemId?: string
   effectType?: string
   amount?: number
@@ -162,6 +163,8 @@ function battlePresentationKind(event?: BattleEventLike | null): PresentationKin
   if (event.effectType === 'HEAL') return 'heal'
   if (event.effectType === 'POISON' || event.kind === 'POISON') return 'poison'
   if (event.effectType === 'UTILITY') {
+    const eventKind = utilityKindFromEvent(event)
+    if (eventKind) return eventKind
     if (eventHasStatus(event, 'shield') || shieldValueForActor(event) > 0) return 'shield'
     if (eventHasStatus(event, 'weak')) return 'weak'
     if (eventHasStatus(event, 'freeze')) return 'freeze'
@@ -170,6 +173,16 @@ function battlePresentationKind(event?: BattleEventLike | null): PresentationKin
     return 'utility'
   }
   return event.kind === 'END' ? 'none' : 'utility'
+}
+
+function utilityKindFromEvent(event: BattleEventLike): PresentationKind | null {
+  const text = event.text ?? ''
+  if (text.includes('护盾') || event.statusChanged?.includes('shield')) return 'shield'
+  if (text.includes('虚弱') || event.statusChanged?.includes('weak')) return 'weak'
+  if (text.includes('冻结') || event.statusChanged?.includes('freeze')) return 'freeze'
+  if (text.includes('荆棘') || event.statusChanged?.includes('thorns')) return 'thorns'
+  if (text.includes('失效') || event.statusChanged?.includes('disabled')) return 'miss'
+  return null
 }
 
 function battlePresentationSource(event: BattleEventLike | null | undefined, kind: PresentationKind): FxAnchor {

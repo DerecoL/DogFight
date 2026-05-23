@@ -72,6 +72,38 @@ describe('feedback presentation mapping', () => {
     }
   })
 
+  it('classifies utility events by current event text before status snapshots', () => {
+    const weakPresentation = createBattlePresentation({
+      ...baseEvent,
+      effectType: 'UTILITY',
+      target: 'opponent',
+      text: '施加 1 层【虚弱】',
+      opponentShield: 8,
+      opponentStatuses: {
+        positive: [{ type: 'shield' }],
+        negative: [{ type: 'weak' }],
+      },
+    })
+
+    expect(weakPresentation.kind).toBe('weak')
+    expect(weakPresentation.target).toEqual({ anchor: 'status-negative', side: 'opponent' })
+
+    const shieldPresentation = createBattlePresentation({
+      ...baseEvent,
+      effectType: 'UTILITY',
+      target: 'player',
+      text: '获得 5 点【护盾】',
+      playerShield: 5,
+      playerStatuses: {
+        positive: [{ type: 'shield' }],
+        negative: [{ type: 'weak' }],
+      },
+    })
+
+    expect(shieldPresentation.kind).toBe('shield')
+    expect(shieldPresentation.target).toEqual({ anchor: 'hp', side: 'player' })
+  })
+
   it('collapses motion-heavy timeline steps when reduced motion is requested', () => {
     const presentation = createBattlePresentation({
       ...baseEvent,
