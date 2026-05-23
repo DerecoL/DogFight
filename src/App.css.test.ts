@@ -268,6 +268,7 @@ describe('equipment layout scale', () => {
     expect(cssRule('.battle-item')).toContain('min-height: 142px')
     expect(cssRule('.battle-item')).toContain('padding-bottom: 34px')
     expect(cssRule('.trigger-count-stamp')).toContain('bottom: 8px')
+    expect(cssRule('.trigger-count-stamp')).toContain('white-space: nowrap')
     expect(css).toContain('.battle-equipment-row { --slot-w: 58px; --slot-h: 104px; }')
     expect(css).toContain('.battle-item { min-height: 104px; }')
   })
