@@ -180,7 +180,11 @@ describe('selection screen structure', () => {
     expect(app).toContain('SHOP_CHOICE_SLOT_COUNT = 7')
     expect(app).toContain('choice placeholder')
     expect(app).toContain('ShopChoiceSelect')
+    expect(app).toContain('role="button" tabIndex={0} className={`choice paper-card sticker-card ${selectedChoice === choice ? \'selected\' : \'\'}`}')
+    expect(app).toContain('onKeyDown={(event) => handleChoiceCardKeyDown(event, () => setSelectedChoice(choice))}')
+    expect(app).toContain('<span className="choice-copy"><RuleText text={shopDescriptions[choice]} /></span>')
     expect(app).toContain("进入 {selectedChoice ? shopNames[selectedChoice] : '商店'}")
+    expect(app).not.toContain('<button key={choice} className={`choice paper-card sticker-card')
     expect(css).toContain('grid-template-columns: repeat(3, minmax(240px, 1fr))')
     expect(css).toContain('.choice.placeholder')
   })
@@ -431,10 +435,15 @@ describe('selection screen structure', () => {
 
   it('keeps rule tooltip buttons out of nested choice buttons', () => {
     expect(app).toContain('function handleChoiceCardKeyDown')
+    expect(app).toContain('className={`dog-card paper-card paper-dog-card ${selectedDog === dog ? \'selected\' : \'\'}`}')
+    expect(app).toContain('onKeyDown={(event) => handleChoiceCardKeyDown(event, () => setSelectedDog(dog))}')
+    expect(app).toContain('<small className="card-copy"><RuleText text={dogTraits[dog]} /></small>')
     expect(app).toContain('<div key={choice.defId} role="button"')
     expect(app).toContain('<div key={choice.relicId} role="button"')
+    expect(app).toContain('onKeyDown={(event) => event.stopPropagation()}')
     expect(app).not.toContain('<button key={choice.defId} className={`choice reward-choice')
     expect(app).not.toContain('<button key={choice.relicId} className={`choice relic-choice')
+    expect(app).not.toContain('<button className={`dog-card paper-card paper-dog-card')
   })
 
   it('anchors dog card tags at the bottom for a consistent gallery rhythm', () => {
@@ -446,7 +455,9 @@ describe('selection screen structure', () => {
 
   it('uses stable rows on shop choice cards to avoid similar floating content', () => {
     expect(css).toContain('grid-template-rows: auto auto minmax(0, 1fr)')
-    expect(css).toContain('.choice > span:last-of-type')
+    expect(css).toContain('.choice-copy,')
+    expect(css).toContain('.card-copy')
+    expect(css).not.toContain('.choice > span:last-of-type')
     expect(css).toContain('align-self: stretch')
   })
 
