@@ -44,10 +44,10 @@ describe('feedback presentation mapping', () => {
       [{ effectType: 'HEAL', target: 'player' }, 'heal'],
       [{ effectType: 'POISON', target: 'opponent' }, 'poison'],
       [{ kind: 'POISON', target: 'player' }, 'poison'],
-      [{ effectType: 'UTILITY', opponentStatuses: { positive: [{ type: 'shield', label: '护盾', tone: 'positive' }], negative: [] } }, 'shield'],
-      [{ effectType: 'UTILITY', opponentStatuses: { positive: [], negative: [{ type: 'weak', label: '虚弱', tone: 'negative' }] } }, 'weak'],
-      [{ effectType: 'UTILITY', opponentStatuses: { positive: [], negative: [{ type: 'freeze', label: '冻结', tone: 'negative' }] } }, 'freeze'],
-      [{ effectType: 'UTILITY', playerStatuses: { positive: [{ type: 'thorns', label: '荆棘', tone: 'positive' }], negative: [] }, target: 'player' }, 'thorns'],
+      [{ effectType: 'UTILITY', statusChanged: ['shield'], opponentStatuses: { positive: [{ type: 'shield', label: '护盾', tone: 'positive' }], negative: [] } }, 'shield'],
+      [{ effectType: 'UTILITY', statusChanged: ['weak'], opponentStatuses: { positive: [], negative: [{ type: 'weak', label: '虚弱', tone: 'negative' }] } }, 'weak'],
+      [{ effectType: 'UTILITY', statusChanged: ['freeze'], opponentStatuses: { positive: [], negative: [{ type: 'freeze', label: '冻结', tone: 'negative' }] } }, 'freeze'],
+      [{ effectType: 'UTILITY', statusChanged: ['thorns'], playerStatuses: { positive: [{ type: 'thorns', label: '荆棘', tone: 'positive' }], negative: [] }, target: 'player' }, 'thorns'],
       [{ kind: 'ROLL', itemId: undefined, target: undefined }, 'roll'],
     ] as const
 
@@ -61,10 +61,10 @@ describe('feedback presentation mapping', () => {
       [{ effectType: 'DAMAGE', targetHpDelta: -3, target: 'opponent' }, { anchor: 'dog-avatar', side: 'opponent' }],
       [{ effectType: 'DAMAGE', targetHpDelta: 0, target: 'opponent' }, { anchor: 'dog-avatar', side: 'opponent' }],
       [{ effectType: 'HEAL', target: 'player' }, { anchor: 'hp', side: 'player' }],
-      [{ effectType: 'UTILITY', playerStatuses: { positive: [{ type: 'shield', label: '护盾', tone: 'positive' }] }, target: 'player' }, { anchor: 'hp', side: 'player' }],
+      [{ effectType: 'UTILITY', statusChanged: ['shield'], playerStatuses: { positive: [{ type: 'shield', label: '护盾', tone: 'positive' }] }, target: 'player' }, { anchor: 'hp', side: 'player' }],
       [{ effectType: 'POISON', target: 'opponent' }, { anchor: 'status-negative', side: 'opponent' }],
-      [{ effectType: 'UTILITY', opponentStatuses: { positive: [], negative: [{ type: 'weak', label: '虚弱', tone: 'negative' }] }, target: 'opponent' }, { anchor: 'status-negative', side: 'opponent' }],
-      [{ effectType: 'UTILITY', playerStatuses: { positive: [{ type: 'thorns', label: '荆棘', tone: 'positive' }], negative: [] }, target: 'player' }, { anchor: 'status-positive', side: 'player' }],
+      [{ effectType: 'UTILITY', statusChanged: ['weak'], opponentStatuses: { positive: [], negative: [{ type: 'weak', label: '虚弱', tone: 'negative' }] }, target: 'opponent' }, { anchor: 'status-negative', side: 'opponent' }],
+      [{ effectType: 'UTILITY', statusChanged: ['thorns'], playerStatuses: { positive: [{ type: 'thorns', label: '荆棘', tone: 'positive' }], negative: [] }, target: 'player' }, { anchor: 'status-positive', side: 'player' }],
     ] as const
 
     for (const [patch, expectedTarget] of cases) {
@@ -102,6 +102,36 @@ describe('feedback presentation mapping', () => {
 
     expect(shieldPresentation.kind).toBe('shield')
     expect(shieldPresentation.target).toEqual({ anchor: 'hp', side: 'player' })
+  })
+
+  it('does not classify utility events from stale status snapshots alone', () => {
+    const presentation = createBattlePresentation({
+      ...baseEvent,
+      effectType: 'UTILITY',
+      target: 'opponent',
+      text: '测试事件',
+      opponentShield: 8,
+      opponentStatuses: {
+        positive: [{ type: 'shield' }],
+        negative: [{ type: 'weak' }],
+      },
+    })
+
+    expect(presentation.kind).toBe('utility')
+    expect(presentation.target).toEqual({ anchor: 'dog-avatar', side: 'opponent' })
+  })
+
+  it('targets disabled utility events at negative status anchors', () => {
+    const presentation = createBattlePresentation({
+      ...baseEvent,
+      effectType: 'UTILITY',
+      target: 'opponent',
+      text: '触发控制失效',
+      statusChanged: ['disabled'],
+    })
+
+    expect(presentation.kind).not.toBe('miss')
+    expect(presentation.target).toEqual({ anchor: 'status-negative', side: 'opponent' })
   })
 
   it('collapses motion-heavy timeline steps when reduced motion is requested', () => {

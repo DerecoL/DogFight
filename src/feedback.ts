@@ -76,7 +76,7 @@ type BattleEventLike = {
   opponentShield?: number
   playerStatuses?: StatusRowsLike
   opponentStatuses?: StatusRowsLike
-  statusChanged?: string[]
+  statusChanged?: readonly string[]
 }
 
 export const uiFeedbackDurationMs = 560
@@ -124,7 +124,7 @@ export function createBattlePresentation(event?: BattleEventLike | null): Presen
     source,
     target,
     amount: typeof event?.amount === 'number' ? event.amount : null,
-    statusChanged: event?.statusChanged ?? [],
+    statusChanged: [...(event?.statusChanged ?? [])],
     logTone: kind,
     timeline: [],
   }
@@ -165,11 +165,6 @@ function battlePresentationKind(event?: BattleEventLike | null): PresentationKin
   if (event.effectType === 'UTILITY') {
     const eventKind = utilityKindFromEvent(event)
     if (eventKind) return eventKind
-    if (eventHasStatus(event, 'shield') || shieldValueForActor(event) > 0) return 'shield'
-    if (eventHasStatus(event, 'weak')) return 'weak'
-    if (eventHasStatus(event, 'freeze')) return 'freeze'
-    if (eventHasStatus(event, 'thorns')) return 'thorns'
-    if (eventHasStatus(event, 'disabled')) return 'miss'
     return 'utility'
   }
   return event.kind === 'END' ? 'none' : 'utility'
@@ -181,7 +176,7 @@ function utilityKindFromEvent(event: BattleEventLike): PresentationKind | null {
   if (text.includes('虚弱') || event.statusChanged?.includes('weak')) return 'weak'
   if (text.includes('冻结') || event.statusChanged?.includes('freeze')) return 'freeze'
   if (text.includes('荆棘') || event.statusChanged?.includes('thorns')) return 'thorns'
-  if (text.includes('失效') || event.statusChanged?.includes('disabled')) return 'miss'
+  if (text.includes('失效') || text.toLowerCase().includes('control') || event.statusChanged?.includes('disabled')) return 'freeze'
   return null
 }
 
@@ -210,19 +205,6 @@ export function battlePresentationTargetSide(event?: BattleEventLike | null, kin
   if (actor === 'player') return 'opponent'
   if (actor === 'opponent') return 'player'
   return null
-}
-
-function eventHasStatus(event: BattleEventLike, type: string) {
-  return [event.playerStatuses, event.opponentStatuses].some((row) => {
-    const statuses = [...(row?.positive ?? []), ...(row?.negative ?? [])]
-    return statuses.some((status) => status.type === type)
-  })
-}
-
-function shieldValueForActor(event: BattleEventLike) {
-  if (event.actor === 'player') return event.playerShield ?? 0
-  if (event.actor === 'opponent') return event.opponentShield ?? 0
-  return Math.max(event.playerShield ?? 0, event.opponentShield ?? 0)
 }
 
 function normalizeSide(side: string | undefined): FeedbackSide {
