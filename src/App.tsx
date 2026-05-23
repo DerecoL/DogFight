@@ -48,6 +48,7 @@ import {
   type UiFeedbackKind,
 } from './feedback'
 import { resolveSlotPlacement } from './placement'
+import { TERM_DEFS } from './shared/rule-terms'
 import './App.css'
 
 type DogType = 'SHIBA' | 'SAMOYED' | 'MUTT' | 'BULLY' | 'EMPEROR'
@@ -522,20 +523,7 @@ const shopDescriptions: Record<ShopType, string> = {
   BIG_DICE: '偏向大点触发道具，适合高点爆发',
   RELIC: '免费选择一个遗物，强化骰子倾向和触发频率',
 }
-const ruleTerms: Record<string, { description: string; note: string }> = {
-  相邻: { description: '该物品左边和右边的第1个物品', note: '无' },
-  小点: { description: '投掷出1~3点', note: '无' },
-  大点: { description: '投掷出4~6点', note: '无' },
-  极值: { description: '投掷出1和6点', note: '无' },
-  荆棘: { description: '每次受到攻击对敌方玩家造成2点伤害（可叠加）', note: '无' },
-  中毒: { description: '造成2秒持续伤害，每秒结算1次（可叠加，叠加刷新持续时间）', note: '无' },
-  虚弱: { description: '玩家的下次攻击造成的伤害减少50%（可叠加层数，不叠加效果）', note: '无' },
-  大型物品: { description: '容量为4的物品', note: '恶霸袖标可让3格物品也按大型物品处理' },
-  中型物品: { description: '容量为2或3的物品', note: '无' },
-  小型物品: { description: '容量为1的物品', note: '无' },
-  失效: { description: '下次生效将不会有任何行为，生效后去除一层该效果', note: '无' },
-  天命数字: { description: '开局时确定的幸运数字', note: '狗皇帝专属规则' },
-}
+const ruleTerms = Object.fromEntries(TERM_DEFS.map((term) => [term.term, term]))
 const statusTipId = 'battle-status-tip'
 const statusTipDetails: Record<string, { polarity: '正面效果' | '负面效果'; timing: string; description: string; source: string }> = {
   shield: {
