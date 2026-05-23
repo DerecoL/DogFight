@@ -1,6 +1,16 @@
 import { randomUUID } from 'node:crypto'
 import type { ItemInstance, LadderSettlement, Run } from '@prisma/client'
-import { CLASS_REWARD_DEFS, RELIC_DEFS, itemDef, itemDefForQuality, relicDef, relicDefForQuality, shopPool } from './game/data'
+import {
+  CLASS_REWARD_DEFS,
+  POST_BATTLE_CARRIED_SELL_BONUS_AMOUNT,
+  POST_BATTLE_EQUIPPED_SELL_BONUS_AMOUNT,
+  RELIC_DEFS,
+  itemDef,
+  itemDefForQuality,
+  relicDef,
+  relicDefForQuality,
+  shopPool,
+} from './game/data'
 import { createEnchantChoices } from './game/enchant'
 import { buildOfflineFighter } from './game/offline-builder'
 import { findSlot } from './game/grid'
@@ -398,15 +408,18 @@ export function postBattleLargeItemReward(items: GameItem[], seed: string) {
   }
 }
 
-export function postBattleSellBonusItemIds(items: GameItem[]) {
+export function postBattleSellBonusItemGrowths(items: GameItem[]) {
   return items
-    .filter((item) => {
+    .flatMap((item) => {
       const effect = itemDef(item.defId).advancedEffect
-      if (effect === 'POST_BATTLE_EQUIPPED_SELL_BONUS') return item.area === 'EQUIPMENT'
-      if (effect === 'POST_BATTLE_CARRIED_SELL_BONUS') return item.area === 'EQUIPMENT' || item.area === 'BAG'
-      return false
+      if (effect === 'POST_BATTLE_EQUIPPED_SELL_BONUS' && item.area === 'EQUIPMENT') {
+        return [{ id: item.id, increment: POST_BATTLE_EQUIPPED_SELL_BONUS_AMOUNT }]
+      }
+      if (effect === 'POST_BATTLE_CARRIED_SELL_BONUS' && (item.area === 'EQUIPMENT' || item.area === 'BAG')) {
+        return [{ id: item.id, increment: POST_BATTLE_CARRIED_SELL_BONUS_AMOUNT }]
+      }
+      return []
     })
-    .map((item) => item.id)
 }
 
 export function createFinishedBattleRecord(result: BattleResult, wins: number, losses: number): BattleResult {

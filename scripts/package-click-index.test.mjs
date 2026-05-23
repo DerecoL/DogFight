@@ -396,6 +396,35 @@ describe('buildStandaloneIndex', () => {
         quality: 'GOLD',
       })
 
+      const ingotState = JSON.parse(localStorage.getItem(storageKey))
+      ingotState.run.round = 3
+      ingotState.run.phase = 'BATTLE'
+      ingotState.run.items = [
+        { id: 'gold-equipped', defId: 'dog-gold-ingot', quality: 'BRONZE', area: 'EQUIPMENT', x: 0, y: 0, sellBonus: 0 },
+        { id: 'gold-bagged', defId: 'dog-gold-ingot', quality: 'BRONZE', area: 'BAG', x: 0, y: 0, sellBonus: 0 },
+        { id: 'silver-equipped', defId: 'dog-silver-ingot', quality: 'BRONZE', area: 'EQUIPMENT', x: 1, y: 0, sellBonus: 0 },
+        { id: 'silver-bagged', defId: 'dog-silver-ingot', quality: 'BRONZE', area: 'BAG', x: 1, y: 0, sellBonus: 0 },
+      ]
+      ingotState.run.lastBattle = {
+        winner: 'player',
+        duration: 1,
+        playerHp: 10,
+        opponentHp: 0,
+        events: [],
+        playerSnapshot: { name: 'P', dogType: 'SHIBA', wins: 0, losses: 0, round: 3, items: [] },
+        opponentSnapshot: { name: 'O', dogType: 'MUTT', wins: 0, losses: 0, round: 3, items: [] },
+      }
+      localStorage.setItem(storageKey, JSON.stringify(ingotState))
+
+      const ingotFinished = await readJson(await window.fetch(`/api/runs/${runId}/battle/finish`, { method: 'POST', body: '{}' }))
+      const bonuses = Object.fromEntries(ingotFinished.run.items.map((item) => [item.id, item.sellBonus ?? 0]))
+      expect(bonuses).toMatchObject({
+        'gold-equipped': 3,
+        'gold-bagged': 0,
+        'silver-equipped': 1,
+        'silver-bagged': 1,
+      })
+
       const relicState = JSON.parse(localStorage.getItem(storageKey))
       relicState.run.round = 4
       relicState.run.phase = 'CHOICE'

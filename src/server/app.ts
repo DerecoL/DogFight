@@ -19,7 +19,7 @@ import { simulateBattle } from './game/battle'
 import { calculateLadderResult, ladderTierForScore, ladderTierLabels, ladderTiers, LADDER_SEASON_ID, type LadderTier } from './game/ladder'
 import { STARTING_GOLD, isTrainingMatchRound, selectCasualGhostSnapshot, selectLadderGhostSnapshot, targetLadderOpponentWinsRange, targetOpponentWins } from './game/matchmaking'
 import type { BattleResult, DogType, EnchantmentChoice, FighterSnapshot, GameItem, PotionChoice, RelicInstance, ShopOffer, ShopType } from './game/types'
-import { applyRelicChoice, createFinishedBattleRecord, initialItems, makeChoices, makeNewRunShop, makePotionChoices, makeRelicChoices, makeShop, nextPhaseData, parseJson, phaseDataAfterEnchant, postBattleLargeItemReward, postBattleSellBonusItemIds, publicLadderSettlement, publicRun, publicRunHistory, relicsFromRun, removeRelicByInstanceId, seedGhost, snapshotFromRun, toGameItems } from './state'
+import { applyRelicChoice, createFinishedBattleRecord, initialItems, makeChoices, makeNewRunShop, makePotionChoices, makeRelicChoices, makeShop, nextPhaseData, parseJson, phaseDataAfterEnchant, postBattleLargeItemReward, postBattleSellBonusItemGrowths, publicLadderSettlement, publicRun, publicRunHistory, relicsFromRun, removeRelicByInstanceId, seedGhost, snapshotFromRun, toGameItems } from './state'
 
 type PrismaTransaction = Prisma.TransactionClient
 type ApexSourceRun = {
@@ -1048,7 +1048,7 @@ export function buildApp() {
     const nextRound = run.round + 1
     const roundIncome = 5 + nextRound * 2
     const currentItems = toGameItems(run.items)
-    const sellBonusItemIds = postBattleSellBonusItemIds(currentItems)
+    const sellBonusItemGrowths = postBattleSellBonusItemGrowths(currentItems)
     const postBattleReward = status === 'ACTIVE'
       ? postBattleLargeItemReward(currentItems, `${run.id}-post-battle-${nextRound}-${wins}-${losses}`)
       : null
@@ -1069,8 +1069,8 @@ export function buildApp() {
     }
     const itemUpdates = {
       ...(postBattleReward ? { create: postBattleReward } : {}),
-      ...(sellBonusItemIds.length > 0
-        ? { updateMany: { where: { id: { in: sellBonusItemIds } }, data: { sellBonus: { increment: 3 } } } }
+      ...(sellBonusItemGrowths.length > 0
+        ? { updateMany: sellBonusItemGrowths.map((growth) => ({ where: { id: growth.id }, data: { sellBonus: { increment: growth.increment } } })) }
         : {}),
     }
     if (Object.keys(itemUpdates).length > 0) {

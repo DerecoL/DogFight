@@ -160,6 +160,10 @@ describe('shop generation', () => {
     expect(itemSellValue(silverIngot, 'SILVER', 6)).toBe(7)
   })
 
+  it('describes silver ingots as gaining one sell value after each battle', () => {
+    expect(itemDefForQuality('dog-silver-ingot', 'BRONZE').description).toContain('+1')
+  })
+
   it('can offer relic and upgrade shops independently after round 4 when equipment can improve', () => {
     const rolls = [0, 0.2, 0.4, 0, 0, 0, 0]
     const choices = createChoices(() => rolls.shift() ?? 0, 4, [

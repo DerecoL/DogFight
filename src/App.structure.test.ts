@@ -574,6 +574,12 @@ describe('selection screen structure', () => {
     expect(app).toContain('owned-badge')
   })
 
+  it('marks shop offers the player cannot afford as dimmed cards', () => {
+    expect(app).toContain('affordable={run.gold >= offer.price}')
+    expect(app).toContain('affordable: boolean')
+    expect(app).toContain("affordable ? '' : 'shop-card-unaffordable'")
+  })
+
   it('exposes stable hooks for the battle vfx causality pass', () => {
     expect(app).toContain("from './feedback'")
     expect(app).toContain('createBattlePresentation')

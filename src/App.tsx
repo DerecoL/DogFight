@@ -3475,7 +3475,7 @@ function ShopShelf({ run, selectedOfferId, draggingItemId, onInspectOffer, onRer
       </div>
       <div className="offer-row">
         {run.shopItems.map((offer) => (
-          <ShopCard key={offer.offerId} offer={offer} selected={selectedOfferId === offer.offerId} ownedCount={shopOfferOwnedCount(run, offer)} onClick={(element) => onInspectOffer(offer.offerId, element)} />
+          <ShopCard key={offer.offerId} offer={offer} selected={selectedOfferId === offer.offerId} ownedCount={shopOfferOwnedCount(run, offer)} affordable={run.gold >= offer.price} onClick={(element) => onInspectOffer(offer.offerId, element)} />
         ))}
       </div>
       <button className="primary action-button match-button" data-tutorial-anchor="match-button" onClick={onMatch}>
@@ -3495,13 +3495,13 @@ function SellDropZone({ active }: { active: boolean }) {
   )
 }
 
-function ShopCard({ offer, selected, ownedCount, onClick }: { offer: ShopOffer; selected: boolean; ownedCount: number; onClick: (element: HTMLElement) => void }) {
+function ShopCard({ offer, selected, ownedCount, affordable, onClick }: { offer: ShopOffer; selected: boolean; ownedCount: number; affordable: boolean; onClick: (element: HTMLElement) => void }) {
   const def = offer.def
   const quality = normalizeQuality(offer.quality)
   const owned = ownedCount > 0
   const triggerDice = def ? triggerDiceLabel(def) : null
   return (
-    <button className={`shop-card paper-shop-card paper-card ${qualityClass(offer.quality)} ${owned ? 'shop-card-owned' : ''} ${selected ? 'selected' : ''}`} onClick={(event) => onClick(event.currentTarget)}>
+    <button className={`shop-card paper-shop-card paper-card ${qualityClass(offer.quality)} ${owned ? 'shop-card-owned' : ''} ${affordable ? '' : 'shop-card-unaffordable'} ${selected ? 'selected' : ''}`} onClick={(event) => onClick(event.currentTarget)}>
       <span className="quality-chip shop-quality-chip">{qualityLabel[quality]}</span>
       {owned && <span className="owned-badge" aria-label={`已拥有 ${ownedCount} 件同名装备`}>已拥有 x{ownedCount}</span>}
       {def && <img className="shop-item-icon" src={itemIcon(def)} alt="" />}

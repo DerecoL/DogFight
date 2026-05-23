@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createFinishedBattleRecord, nextPhaseData, postBattleLargeItemReward, postBattleSellBonusItemIds, publicRelics, publicRunHistory, toGameItems } from './state'
+import { createFinishedBattleRecord, nextPhaseData, postBattleLargeItemReward, postBattleSellBonusItemGrowths, publicRelics, publicRunHistory, toGameItems } from './state'
 
 describe('public run relic data', () => {
   it('returns quality-adjusted relic descriptions for upgraded relics', () => {
@@ -29,8 +29,8 @@ describe('post-battle equipment rewards', () => {
     expect(reward).toBeNull()
   })
 
-  it('selects equipped gold ingots and any carried silver ingots for sell bonus growth', () => {
-    const itemIds = postBattleSellBonusItemIds([
+  it('assigns post-battle sell bonus growth by ingot type and carried area', () => {
+    const growths = postBattleSellBonusItemGrowths([
       { id: 'gold-equipped', defId: 'dog-gold-ingot', quality: 'BRONZE', area: 'EQUIPMENT', x: 0, y: 0 },
       { id: 'gold-bagged', defId: 'dog-gold-ingot', quality: 'BRONZE', area: 'BAG', x: 0, y: 0 },
       { id: 'silver-equipped', defId: 'dog-silver-ingot', quality: 'BRONZE', area: 'EQUIPMENT', x: 1, y: 0 },
@@ -38,7 +38,11 @@ describe('post-battle equipment rewards', () => {
       { id: 'bite', defId: 'small-bite', quality: 'BRONZE', area: 'EQUIPMENT', x: 2, y: 0 },
     ])
 
-    expect(itemIds).toEqual(['gold-equipped', 'silver-equipped', 'silver-bagged'])
+    expect(growths).toEqual([
+      { id: 'gold-equipped', increment: 3 },
+      { id: 'silver-equipped', increment: 1 },
+      { id: 'silver-bagged', increment: 1 },
+    ])
   })
 })
 

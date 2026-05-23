@@ -10,7 +10,7 @@ import { applyPotionToBaseDice } from './game/potion'
 import { nextQuality, normalizeQuality } from './game/quality'
 import { simulateBattle } from './game/battle'
 import type { BattleEvent, BattleResult, DogType, EnchantmentChoice, FighterSnapshot, GameItem, PotionChoice, ShopType } from './game/types'
-import { applyRelicChoice, initialItems, makeChoices, makePotionChoices, makeRelicChoices, makeShop, nextPhaseData as buildNextPhaseData, parseJson, phaseDataAfterEnchant, postBattleLargeItemReward, postBattleSellBonusItemIds, publicRun, relicsFromRun, seedGhost, snapshotFromRun, toGameItems } from './state'
+import { applyRelicChoice, initialItems, makeChoices, makePotionChoices, makeRelicChoices, makeShop, nextPhaseData as buildNextPhaseData, parseJson, phaseDataAfterEnchant, postBattleLargeItemReward, postBattleSellBonusItemGrowths, publicRun, relicsFromRun, seedGhost, snapshotFromRun, toGameItems } from './state'
 
 const DOGFIGHT_TARGET_PLAYERS = 8
 const DOGFIGHT_LOBBY_MS = 15_000
@@ -597,14 +597,14 @@ async function settleShopToBattle(tx: Tx, roomId: string, force = false) {
     const gold = participant.run.gold + participantResult.goldCompensation + roundIncome
     const phaseData = eliminated ? { phase: 'COMPLETE' } : nextDogfightPhaseData({ ...participant.run, losses }, nextRound)
     const currentItems = toGameItems(participant.run.items)
-    const sellBonusItemIds = postBattleSellBonusItemIds(currentItems)
+    const sellBonusItemGrowths = postBattleSellBonusItemGrowths(currentItems)
     const postBattleReward = eliminated
       ? null
       : postBattleLargeItemReward(currentItems, `${participant.runId}-dogfight-post-battle-${nextRound}-${wins}-${losses}`)
     const itemUpdates = {
       ...(postBattleReward ? { create: postBattleReward } : {}),
-      ...(sellBonusItemIds.length > 0
-        ? { updateMany: { where: { id: { in: sellBonusItemIds } }, data: { sellBonus: { increment: 3 } } } }
+      ...(sellBonusItemGrowths.length > 0
+        ? { updateMany: sellBonusItemGrowths.map((growth) => ({ where: { id: growth.id }, data: { sellBonus: { increment: growth.increment } } })) }
         : {}),
     }
 

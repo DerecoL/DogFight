@@ -14,6 +14,8 @@ export const DOGS: Record<DogType, { name: string; trait: string }> = {
 export const SHIBA_POISON_ON_ROLL_AMOUNT = 6
 export const THORNS_DAMAGE_PER_STACK = 2
 export const BOOM_COUNTER_TRIGGER_THRESHOLD = 50
+export const POST_BATTLE_EQUIPPED_SELL_BONUS_AMOUNT = 3
+export const POST_BATTLE_CARRIED_SELL_BONUS_AMOUNT = 1
 
 function slotItem(
   id: string,
@@ -79,7 +81,7 @@ export const ITEM_DEFS: ItemDef[] = [
     defaultQuality: 'BRONZE',
   }),
   slotItem('dog-silver-ingot', '狗狗银元宝', 1, 1, [], ['economy', 'sell'], { type: 'UTILITY', amount: 0 }, {
-    description: '无需触发。放在装备栏或背包时，参战结束后出售价格 +3。',
+    description: '无需触发。放在装备栏或背包时，参战结束后出售价格 +1。',
     advancedEffect: 'POST_BATTLE_CARRIED_SELL_BONUS',
     defaultQuality: 'BRONZE',
   }),
@@ -312,8 +314,8 @@ export function itemDescription(itemId: string, quality?: string | null) {
     const healPerLayer = qualityAmountFrom(5, currentQuality, 'SILVER')
     return `【净化】敌方最多 ${purgeLimit} 层正面增益；每实际清除 1 层，自己恢复 ${healPerLayer} 点生命。优先清除【荆棘】、【加速】层数，再按每 8 点【护盾】折算 1 层。`
   }
-  if (advanced === 'POST_BATTLE_EQUIPPED_SELL_BONUS') return '无需触发。放在装备栏时，参战结束后出售价格 +3。'
-  if (advanced === 'POST_BATTLE_CARRIED_SELL_BONUS') return '无需触发。放在装备栏或背包时，参战结束后出售价格 +3。'
+  if (advanced === 'POST_BATTLE_EQUIPPED_SELL_BONUS') return `无需触发。放在装备栏时，参战结束后出售价格 +${POST_BATTLE_EQUIPPED_SELL_BONUS_AMOUNT}。`
+  if (advanced === 'POST_BATTLE_CARRIED_SELL_BONUS') return `无需触发。放在装备栏或背包时，参战结束后出售价格 +${POST_BATTLE_CARRIED_SELL_BONUS_AMOUNT}。`
   if (advanced === 'POISON_ON_ROLL') return `${baseEffect}每次投掷都会对敌人叠加 ${SHIBA_POISON_ON_ROLL_AMOUNT} 层【中毒】（不随品质提升）。`
   if (advanced === 'GAIN_THORNS') return `${baseEffect}每次触发有 50% 概率获得 ${one} 层【荆棘】。`
   if (advanced === 'APPLY_WEAK') return `${baseEffect}每次触发有 50% 概率给敌人施加 ${one} 层【虚弱】。`

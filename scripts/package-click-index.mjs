@@ -693,6 +693,8 @@ async function loadStandaloneGameData() {
     itemDescriptions,
     shibaPoisonOnRollAmount: dataModule.SHIBA_POISON_ON_ROLL_AMOUNT,
     thornsDamagePerStack: dataModule.THORNS_DAMAGE_PER_STACK,
+    postBattleEquippedSellBonusAmount: dataModule.POST_BATTLE_EQUIPPED_SELL_BONUS_AMOUNT,
+    postBattleCarriedSellBonusAmount: dataModule.POST_BATTLE_CARRIED_SELL_BONUS_AMOUNT,
   }
 }
 
@@ -714,6 +716,8 @@ async function currentMockApiScript(buildId) {
   const relicDefs = gameData.relicDefs;
   const shibaPoisonOnRollAmount = gameData.shibaPoisonOnRollAmount;
   const thornsDamagePerStack = gameData.thornsDamagePerStack;
+  const postBattleEquippedSellBonusAmount = gameData.postBattleEquippedSellBonusAmount;
+  const postBattleCarriedSellBonusAmount = gameData.postBattleCarriedSellBonusAmount;
   const allItemDefs = [...itemDefs, ...classRewardDefs];
   const defs = Object.fromEntries(allItemDefs.map((def) => [def.id, def]));
   const relicDefsById = Object.fromEntries(relicDefs.map((def) => [def.id, def]));
@@ -1647,6 +1651,7 @@ async function currentMockApiScript(buildId) {
     run.losses += playerWon ? 0 : 1;
     run.round += 1;
     run.gold += 5 + run.round * 2;
+    applyPostBattleSellBonuses(run.items);
     run.matchedGhost = null;
     run.lastBattle = battle;
     run.status = run.wins >= 12 || run.losses >= 3 ? 'COMPLETE' : 'ACTIVE';
@@ -1667,6 +1672,18 @@ async function currentMockApiScript(buildId) {
       run.choices = [];
     }
     if (run.status === 'COMPLETE' && run.mode === 'LADDER' && !run.ladderSettlement) settleLadderRun(state, run);
+  }
+
+  function applyPostBattleSellBonuses(items) {
+    for (const item of items) {
+      const advanced = defs[item.defId]?.advancedEffect;
+      if (advanced === 'POST_BATTLE_EQUIPPED_SELL_BONUS' && item.area === 'EQUIPMENT') {
+        item.sellBonus = Math.max(0, Number(item.sellBonus) || 0) + postBattleEquippedSellBonusAmount;
+      }
+      if (advanced === 'POST_BATTLE_CARRIED_SELL_BONUS' && (item.area === 'EQUIPMENT' || item.area === 'BAG')) {
+        item.sellBonus = Math.max(0, Number(item.sellBonus) || 0) + postBattleCarriedSellBonusAmount;
+      }
+    }
   }
 
   async function parseBody(options) {

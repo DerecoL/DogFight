@@ -545,6 +545,14 @@ input {
   border: 2px solid transparent;
 }
 .shop-card.selected { border-color: var(--pink); box-shadow: 0 0 0 4px rgba(255, 122, 168, .16); }
+.shop-card-unaffordable {
+  filter: grayscale(.82) brightness(.68) saturate(.55);
+  opacity: .72;
+}
+.shop-card-unaffordable:hover {
+  transform: none;
+  box-shadow: 4px 5px 0 rgba(61, 45, 37, .18);
+}
 .shop-item-icon {
   grid-row: 1 / 4;
   width: 52px;
@@ -1566,6 +1574,7 @@ input {
   max-width: 100%;
   width: 100%;
   padding: 9px;
+  padding-bottom: 25px;
   border-radius: 16px;
   background: linear-gradient(180deg, #72563f, #493729);
   box-shadow: inset 0 0 0 2px rgba(255, 255, 255, .16), 0 10px 24px rgba(112, 72, 30, .14);
@@ -1582,7 +1591,7 @@ input {
   width: 100%;
   height: var(--slot-h);
   min-height: 142px;
-  padding-bottom: 34px;
+  padding-bottom: 12px;
   cursor: pointer;
   text-align: center;
 }
@@ -1667,7 +1676,7 @@ input {
 .trigger-count-stamp {
   position: absolute;
   left: 50%;
-  bottom: 3px;
+  bottom: -17px;
   z-index: 5;
   display: inline-flex;
   align-items: center;
@@ -3765,6 +3774,11 @@ input {
   filter: drop-shadow(0 9px 10px rgba(112, 72, 30, .18)) saturate(1.08);
 }
 
+.paper-shop-card.shop-card-unaffordable:hover .shop-item-icon {
+  rotate: 0deg;
+  filter: drop-shadow(0 8px 10px rgba(112, 72, 30, .08)) saturate(.62);
+}
+
 .paper-inventory .slot-grid {
   overflow: hidden;
 }
@@ -4656,6 +4670,8 @@ input {
   .tip-body { grid-template-columns: 1fr; }
   .slot-grid { gap: 5px; padding: 10px; }
   .battle-slot-grid { gap: 5px; padding: 10px; }
+  .battle-slot-grid { padding-bottom: 25px; }
+  .battle-item { padding-bottom: 8px; }
   .item-card { padding: 6px 4px; font-size: 11px; }
   .item-icon { width: 28px; height: 28px; }
   .shop-card { grid-template-columns: 48px 1fr; }
