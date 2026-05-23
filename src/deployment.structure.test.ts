@@ -37,6 +37,13 @@ describe('production deployment assets', () => {
     expect(schema).toContain('provider = "postgresql"')
   })
 
+  it('copies shared server imports into the production API image', () => {
+    const dockerfile = read('Dockerfile')
+
+    expect(dockerfile).toContain('COPY src/server ./src/server')
+    expect(dockerfile).toContain('COPY src/shared ./src/shared')
+  })
+
   it('adds GitHub Actions deployment and server backup scripts', () => {
     const workflow = read('.github/workflows/deploy.yml')
     const backup = read('deploy/backup-postgres.sh')
@@ -58,7 +65,8 @@ describe('production deployment assets', () => {
     expect(workflow).toContain('timeout-minutes:')
     expect(workflow).toContain('docker compose up -d --build')
     expect(workflow).toContain("docker compose exec -T api node --input-type=module -e")
-    expect(workflow).toContain("fetch('http://localhost:4000/api/health')")
+    expect(workflow).toContain("fetch('http://127.0.0.1:4000/api/health')")
+    expect(workflow).toContain('docker compose logs --tail=200 api caddy')
     expect(workflow).toContain('DATABASE_URL')
     expect(backup).toContain('pg_dump')
     expect(backup).toContain('-mtime +7')

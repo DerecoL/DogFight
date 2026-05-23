@@ -20,6 +20,7 @@ COPY package*.json ./
 RUN npm ci --include=dev && npm cache clean --force
 COPY prisma ./prisma
 COPY src/server ./src/server
+COPY src/shared ./src/shared
 COPY tsconfig.server.json ./tsconfig.server.json
 RUN npx prisma generate
 EXPOSE 4000
