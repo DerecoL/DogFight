@@ -408,7 +408,7 @@ describe('equipment layout scale', () => {
 
   it('adds meteor-quality battle equipment vfx styling and reduced-motion fallbacks', () => {
     expect(cssRule('.visual-battle')).toContain('overflow: hidden')
-    expect(cssRule('.battle-fx-stage')).toContain('z-index: 8')
+    expect(cssRule('.battle-fx-stage')).toContain('z-index: 80')
     expect(cssRule('.battle-item-vfx-target')).toContain('meteorTargetPulse')
     expect(cssRule('.battle-item-vfx-target::after')).toContain('meteorTargetSweep')
     expect(cssRule('.battle-item-trigger')).toContain('meteorSourcePulse')
@@ -419,6 +419,17 @@ describe('equipment layout scale', () => {
     expect(css).toContain('@keyframes meteorTargetSweep')
     expect(css).toContain('@keyframes meteorImpactGlow')
     expect(cssRule('@media (prefers-reduced-motion: reduce)')).toContain('.battle-item-vfx-target')
+  })
+
+  it('keeps meteor projectile canvas above battle rows and paper surfaces', () => {
+    expect(cssRule('.visual-battle')).toContain('isolation: isolate')
+    expect(cssRule('.battle-equipment-row')).toContain('z-index: 1')
+    expect(cssRule('.battle-stage')).toContain('z-index: 1')
+    expect(cssRule('.battle-fx-stage')).toContain('z-index: 80')
+    expect(cssRule('.battle-fx-stage')).toContain('overflow: visible')
+    expect(cssRule('.battle-fx-canvas')).toContain('z-index: 2')
+    expect(cssRule('.battle-fx-canvas')).toContain('mix-blend-mode: screen')
+    expect(cssRule('.battle-feedback-burst')).toContain('z-index: 3')
   })
 
   it('adds ornate border, manuscript, hud, and paper-bounce polish for the refined handdrawn direction', () => {

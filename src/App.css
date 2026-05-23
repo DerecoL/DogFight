@@ -1636,6 +1636,7 @@ input {
   position: relative;
   width: 100%;
   overflow: hidden;
+  isolation: isolate;
   display: grid;
   grid-template-rows: auto auto minmax(190px, 240px) auto auto auto;
   align-items: stretch;
@@ -1665,6 +1666,8 @@ input {
   justify-self: end;
 }
 .battle-equipment-row {
+  position: relative;
+  z-index: 1;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 5px;
@@ -1863,6 +1866,7 @@ input {
 }
 .battle-stage {
   position: relative;
+  z-index: 1;
   min-height: 190px;
   max-height: 240px;
   display: grid;
@@ -1880,18 +1884,23 @@ input {
 .battle-fx-stage {
   position: absolute;
   inset: 0;
+  overflow: visible;
   pointer-events: none;
-  z-index: 8;
+  z-index: 80;
 }
 .battle-fx-canvas {
   position: absolute;
   inset: 0;
+  z-index: 2;
   width: 100%;
   height: 100%;
+  mix-blend-mode: screen;
+  filter: drop-shadow(0 0 10px rgba(255, 255, 255, .5));
   pointer-events: none;
 }
 .battle-feedback-burst {
   position: absolute;
+  z-index: 3;
   left: 50%;
   top: 39%;
   min-width: 42px;
