@@ -1,11 +1,11 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import request from 'supertest'
 import { buildApp } from './app'
+import { shouldRunDestructiveDatabaseTests } from './config'
 import { prisma } from './db'
 import { nextQuality } from './game/quality'
 
-const databaseUrl = process.env.TEST_DATABASE_URL || process.env.DATABASE_URL || ''
-const describeWithDatabase = databaseUrl.startsWith('postgresql://') || databaseUrl.startsWith('postgres://') ? describe : describe.skip
+const describeWithDatabase = shouldRunDestructiveDatabaseTests() ? describe : describe.skip
 const app = buildApp()
 
 beforeEach(async () => {

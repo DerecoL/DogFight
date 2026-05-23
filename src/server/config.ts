@@ -5,6 +5,11 @@ export type ServerConfig = {
 }
 
 const DEVELOPMENT_JWT_SECRET = 'dog-dice-dev-secret'
+const POSTGRESQL_URL_PATTERN = /^postgres(?:ql)?:\/\//
+
+export function shouldRunDestructiveDatabaseTests(env: Pick<NodeJS.ProcessEnv, 'TEST_DATABASE_URL'> = process.env) {
+  return POSTGRESQL_URL_PATTERN.test(env.TEST_DATABASE_URL || '')
+}
 
 export function resolveServerConfig(env = process.env): ServerConfig {
   const nodeEnv = env.NODE_ENV || 'development'
@@ -15,7 +20,7 @@ export function resolveServerConfig(env = process.env): ServerConfig {
     throw new Error('JWT_SECRET is required in production')
   }
 
-  if (databaseUrl && !databaseUrl.startsWith('postgresql://') && !databaseUrl.startsWith('postgres://')) {
+  if (databaseUrl && !POSTGRESQL_URL_PATTERN.test(databaseUrl)) {
     throw new Error('DATABASE_URL must start with postgresql:// or postgres://')
   }
 
