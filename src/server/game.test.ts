@@ -828,7 +828,7 @@ describe('battle simulation', () => {
       event.actor === 'player'
       && event.itemId === 'fang'
       && event.effectType === 'UTILITY'
-      && event.text.includes('左右相邻')
+      && event.text.includes('左右【相邻】')
       && event.text.includes('吸血')
     )
     const laterEvents = result.events.slice(grantIndex + 1)
@@ -903,7 +903,7 @@ describe('battle simulation', () => {
       && event.itemId === 'counter'
       && event.defId === 'v4-boom-counter'
       && event.effectType === 'DAMAGE'
-      && event.text.includes('爆鸣计数达到 30')
+      && event.text.includes('【爆鸣计数】达到 30')
     )
 
     expect(explosion).toMatchObject({
@@ -933,7 +933,7 @@ describe('battle simulation', () => {
       event.actor === 'player'
       && event.itemId === 'counter'
       && event.effectType === 'DAMAGE'
-      && event.text.includes('爆鸣计数达到 30')
+      && event.text.includes('【爆鸣计数】达到 30')
     )
 
     expect(explosion).toMatchObject({
@@ -992,6 +992,14 @@ describe('battle simulation', () => {
       items: [
         { id: 'fang', defId: 'v4-blood-contract-fang', quality: 'DIAMOND', area: 'EQUIPMENT', x: 0, y: 0 },
         { id: 'counter', defId: 'v4-boom-counter', quality: 'GOLD', area: 'EQUIPMENT', x: 2, y: 0 },
+        ...Array.from({ length: 11 }, (_, index) => ({
+          id: `extreme-${index}`,
+          defId: 'v3-chew-scratch-post',
+          quality: 'BRONZE' as const,
+          area: 'EQUIPMENT' as const,
+          x: index + 4,
+          y: 0,
+        })),
       ],
     }
     const opponent: FighterSnapshot = { name: 'O', dogType: 'SHIBA', wins: 0, losses: 0, round: 10, items: [] }
@@ -1006,7 +1014,7 @@ describe('battle simulation', () => {
       event.actor === 'player'
       && event.itemId === 'counter'
       && event.effectType === 'DAMAGE'
-      && event.text.includes('爆鸣计数达到 30')
+      && event.text.includes('【爆鸣计数】达到 30')
     )
     const nextPlayerEvent = result.events.slice(explosionIndex + 1).find((event) => event.actor === 'player')
 

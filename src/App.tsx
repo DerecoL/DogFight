@@ -48,6 +48,7 @@ import {
   type UiFeedbackKind,
 } from './feedback'
 import { resolveSlotPlacement } from './placement'
+import { triggerDiceLabel } from './item-trigger-display'
 import { TERM_DEFS } from './shared/rule-terms'
 import './App.css'
 
@@ -525,53 +526,56 @@ const shopDescriptions: Record<ShopType, string> = {
 }
 const ruleTerms = Object.fromEntries(TERM_DEFS.map((term) => [term.term, term]))
 const statusTipId = 'battle-status-tip'
+const STATUS_THORNS_DAMAGE_PER_STACK = 2
+const STATUS_FURY_DAMAGE_PER_STACK = 1
+const STATUS_SPEED_REDUCTION_PER_STACK = 0.1
 const statusTipDetails: Record<string, { polarity: '正面效果' | '负面效果'; timing: string; description: string; source: string }> = {
   shield: {
     polarity: '正面效果',
     timing: '受到伤害时优先结算',
-    description: '护盾会先吸收即将受到的伤害。护盾值被扣完后，剩余伤害才会进入生命值。',
-    source: '常见来源：护盾类装备、职业道具和遗物。',
+    description: '【护盾】会先吸收即将受到的普通伤害；不会被小狗窝偷取，但可被部分【净化】效果按每 8 点折算清除。',
+    source: '常见来源：【护盾】类装备、职业道具和遗物。',
   },
   thorns: {
     polarity: '正面效果',
     timing: '受到直接伤害后触发',
-    description: '荆棘会在被直接攻击后对攻击方造成反伤。层数越高，反伤能力越强。',
-    source: '常见来源：荆棘、反伤和防御类装备。',
+    description: '【荆棘】会在被直接攻击后对攻击方造成反伤。层数越高，反伤能力越强。',
+    source: '常见来源：【荆棘】、反伤和防御类装备。',
   },
   extraRoll: {
     polarity: '正面效果',
     timing: '后续投骰或触发时消耗',
-    description: '额外骰会增加后续投骰或装备触发机会。显示的数值代表当前剩余次数。',
-    source: '常见来源：加速、连击和额外触发类效果。',
+    description: '【加速】会缩短后续基础投掷间隔。显示的层数代表当前投掷频率提升强度。',
+    source: '常见来源：【加速】、连击和额外触发类效果。',
   },
   fury: {
     polarity: '正面效果',
     timing: '后续攻击或造成伤害时生效',
-    description: '激昂会强化后续攻击或伤害表现。显示的层数代表当前增幅强度。',
-    source: '常见来源：激昂、狂怒和进攻类装备。',
+    description: '【激昂】会强化后续攻击伤害。显示的层数代表当前增幅强度。',
+    source: '常见来源：【激昂】、狂怒和进攻类装备。',
   },
   poison: {
     polarity: '负面效果',
     timing: '持续结算时造成伤害',
-    description: '中毒会在结算时造成持续伤害。芯片上的层数表示毒性强度，倒计时提示下一次毒伤时机。',
+    description: '【中毒】每秒结算 1 次，芯片上的层数表示毒性强度，倒计时提示下一次毒伤时机。',
     source: '常见来源：毒刃、毒牙和持续伤害类装备。',
   },
   weak: {
     polarity: '负面效果',
     timing: '造成伤害时生效',
-    description: '虚弱会降低后续造成的伤害。层数越高，输出被削弱得越明显。',
+    description: '【虚弱】会让下次攻击伤害降低，层数表示还可消耗多少次。',
     source: '常见来源：削弱、压制和控制类效果。',
   },
   freeze: {
     polarity: '负面效果',
     timing: '行动或触发前检查',
-    description: '冻结会限制行动或跳过触发。显示的剩余时间或次数代表控制还会持续多久。',
+    description: '【冻结】期间会跳过投掷和装备触发。显示的剩余时间代表控制还会持续多久。',
     source: '常见来源：冰冻、寒冷和控制类装备。',
   },
   disabled: {
     polarity: '负面效果',
     timing: '装备或效果触发前检查',
-    description: '失效会让装备或效果被跳过。显示的次数代表还会抵消多少次触发。',
+    description: '【失效】会让指定装备或大型装备的触发被抵消。显示的次数代表还会抵消多少次触发。',
     source: '常见来源：缴械、破坏和反制类效果。',
   },
 }
@@ -644,16 +648,16 @@ function createBattleFxStyle(event: BattleEvent) {
 
 function effectText(def: ItemDef, quality: ItemQuality = 'BRONZE') {
   const amount = qualityAmountFrom(def.effect.amount, quality, def.effect.qualityBase)
-  if (def.advancedEffect === 'GRANT_LIFESTEAL_ADJACENT') return quality === 'DIAMOND' ? '左右相邻装备获得吸血' : '左侧相邻装备获得吸血'
-  if (def.advancedEffect === 'BOOM_COUNTER') return `爆鸣计数达到 30 后造成 ${amount} 伤害`
+  if (def.advancedEffect === 'GRANT_LIFESTEAL_ADJACENT') return quality === 'DIAMOND' ? '左右【相邻】装备获得【吸血】' : '左侧【相邻】装备获得【吸血】'
+  if (def.advancedEffect === 'BOOM_COUNTER') return `【爆鸣计数】达到 30 后造成 ${amount} 伤害`
   if (def.advancedEffect === 'GROWTH_DAMAGE') return `造成 ${amount} 伤害，后续伤害提升`
   if (def.advancedEffect === 'PURGE_ENEMY_BUFFS') return '清除敌方增益并恢复生命'
   if (def.effect.type === 'HEAL') return `回复 ${amount} 生命`
   if (def.effect.type === 'DAMAGE' || def.effect.type === 'DAMAGE_SELF_SHIELD') return `造成 ${amount} 伤害`
   if (def.effect.type === 'UTILITY') {
-    if (def.tags.includes('shield')) return `获得 ${amount} 护盾`
-    if (def.tags.includes('poison')) return `施加 ${amount} 中毒`
-    if (def.tags.includes('weak')) return `施加 ${amount} 虚弱`
+    if (def.tags.includes('shield')) return `获得 ${amount} 点【护盾】`
+    if (def.tags.includes('poison')) return `施加 ${amount} 层【中毒】`
+    if (def.tags.includes('weak')) return `施加 ${amount} 层【虚弱】`
     if (def.tags.includes('cleanse')) return `回复 ${amount} 生命`
     if (amount > 0) return `效果 ${amount}`
   }
@@ -830,13 +834,14 @@ function useOutsideTipDismiss(active: boolean, onClose: () => void) {
 
 function RuleText({ text }: { text: string }) {
   const [openTerm, setOpenTerm] = useState<string | null>(null)
+  const ruleTermStart = String.fromCharCode(0x3010)
+  const ruleTermEnd = String.fromCharCode(0x3011)
   const parts = text.split(/(【[^】]+】)/g).filter(Boolean)
   return (
     <>
       {parts.map((part, index) => {
-        const match = part.match(/^【(.+)】$/)
-        if (!match) return <span key={`${part}-${index}`}>{part}</span>
-        const term = match[1]
+        if (!part.startsWith(ruleTermStart) || !part.endsWith(ruleTermEnd)) return <span key={`${part}-${index}`}>{part}</span>
+        const term = part.slice(1, -1)
         const entry = ruleTerms[term]
         if (!entry) return <strong key={`${term}-${index}`}>【{term}】</strong>
         return (
@@ -1653,7 +1658,9 @@ function HistoryRunDetails({ entry, inspectedItem, tipAnchor, onInspectItem, onC
         </div>
         <div className="battle-slot-grid" style={{ gridTemplateColumns: `repeat(${equipmentSlotCount(entry.relics)}, minmax(0, 1fr))` }}>
           {Array.from({ length: equipmentSlotCount(entry.relics) }).map((_, x) => <i key={x} className="battle-slot" style={{ gridColumn: x + 1, gridRow: 1 }} />)}
-          {equipment.map((item) => (
+          {equipment.map((item) => {
+            const triggerDice = triggerDiceLabel(item.def)
+            return (
             <button
               type="button"
               key={item.id}
@@ -1665,9 +1672,10 @@ function HistoryRunDetails({ entry, inspectedItem, tipAnchor, onInspectItem, onC
               <img className="item-icon" src={itemIcon(item.def)} alt="" />
               <span className="quality-chip">{qualityLabel[normalizeQuality(item.quality)]}</span>
               <span>{item.def.name}</span>
-              <small><Dice5 size={12} /> {item.def.dice.join('/')}</small>
+              {triggerDice && <small><Dice5 size={12} /> {triggerDice}</small>}
             </button>
-          ))}
+            )
+          })}
         </div>
       </div>
       <div className="history-inventory-summary">
@@ -2386,7 +2394,9 @@ function ApexSnapshotDetails({ entry }: { entry: ApexEntry }) {
         </div>
         <div className="battle-slot-grid" style={{ gridTemplateColumns: 'repeat(12, minmax(0, 1fr))' }}>
           {Array.from({ length: 12 }).map((_, x) => <i key={x} className="battle-slot" style={{ gridColumn: x + 1, gridRow: 1 }} />)}
-          {equipment.map((item) => (
+          {equipment.map((item) => {
+            const triggerDice = triggerDiceLabel(item.def)
+            return (
             <button
               type="button"
               key={item.id}
@@ -2398,9 +2408,10 @@ function ApexSnapshotDetails({ entry }: { entry: ApexEntry }) {
               <img className="item-icon" src={itemIcon(item.def)} alt="" />
               <span className="quality-chip">{qualityLabel[normalizeQuality(item.quality)]}</span>
               <span>{item.def.name}</span>
-              <small><Dice5 size={12} /> {item.def.dice.join('/')}</small>
+              {triggerDice && <small><Dice5 size={12} /> {triggerDice}</small>}
             </button>
-          ))}
+            )
+          })}
         </div>
       </div>
       <div className="apex-relic-preview">
@@ -2811,12 +2822,15 @@ function ClassRewardCeremony({ run, choices, onDismiss }: { run: Run; choices: C
           <p>{subtitle}</p>
         </div>
         <div className="ceremony-reward-preview" aria-label="本次可选职业装备">
-          {choices.map((choice) => (
+          {choices.map((choice) => {
+            const triggerDice = triggerDiceLabel(choice.def)
+            return (
             <span key={choice.defId} className={`ceremony-reward-chip ${qualityClass(choice.quality)}`}>
               <strong>{choice.def.name}</strong>
-              <small>{choice.def.size}格 · {choice.def.dice.join('/')}</small>
+              <small>{choice.def.size}格{triggerDice ? ` · ${triggerDice}` : ''}</small>
             </span>
-          ))}
+            )
+          })}
         </div>
         <span className="ceremony-skip-hint">点击任意处继续</span>
       </div>
@@ -2833,14 +2847,17 @@ function ClassRewardSelect({ choices, onPick }: { choices: ClassRewardChoice[]; 
         <p>先整理背包，再选择一个职业装备放入背包。</p>
       </div>
       <div className="reward-choice-grid">
-        {choices.map((choice) => (
+        {choices.map((choice) => {
+          const triggerDice = triggerDiceLabel(choice.def)
+          return (
           <div key={choice.defId} role="button" tabIndex={0} className={`choice paper-card sticker-card reward-choice ${selected === choice.defId ? 'selected' : ''}`} onClick={() => setSelected(choice.defId)} onKeyDown={(event) => handleChoiceCardKeyDown(event, () => setSelected(choice.defId))}>
             <strong>{choice.def.name}</strong>
             <span className={`tip-tag ${qualityClass(choice.quality)}`}>{qualityLabel[choice.quality]}</span>
-            <span>{choice.def.size}格 · {choice.def.dice.join('/')}</span>
+            <span>{choice.def.size}格{triggerDice ? ` · ${triggerDice}` : ''}</span>
             <span><RuleText text={choice.def.description ?? effectText(choice.def, choice.quality)} /></span>
           </div>
-        ))}
+          )
+        })}
       </div>
       <button className="primary action-button choice-submit" disabled={!selected} onClick={() => selected && onPick(selected)}>领取职业装备</button>
     </section>
@@ -2966,6 +2983,7 @@ function ShopCard({ offer, selected, ownedCount, onClick }: { offer: ShopOffer; 
   const def = offer.def
   const quality = normalizeQuality(offer.quality)
   const owned = ownedCount > 0
+  const triggerDice = def ? triggerDiceLabel(def) : null
   return (
     <button className={`shop-card paper-shop-card paper-card ${qualityClass(offer.quality)} ${owned ? 'shop-card-owned' : ''} ${selected ? 'selected' : ''}`} onClick={(event) => onClick(event.currentTarget)}>
       <span className="quality-chip shop-quality-chip">{qualityLabel[quality]}</span>
@@ -2976,7 +2994,7 @@ function ShopCard({ offer, selected, ownedCount, onClick }: { offer: ShopOffer; 
         <strong>{def?.name ?? offer.defId}</strong>
       </div>
       {def && <SizePreview size={def.size} />}
-      <span className="dice-line"><Dice5 size={15} /> {def?.dice.join(' / ') ?? '-'}</span>
+      {triggerDice && <span className="dice-line"><Dice5 size={15} /> {triggerDice}</span>}
       <span className="effect-line">{def ? effectText(def, quality) : '未知效果'}</span>
       <span className="price-tag"><Coins size={14} />{offer.price}{offer.discount < 1 ? ` · ${Math.round(offer.discount * 10)}折` : ''}</span>
     </button>
@@ -3175,6 +3193,7 @@ function FloatingTip({ run, item, offer, anchor, descriptionOverride, onClose, o
   const canAfford = !offer || run.gold >= offer.price
   const sellValue = item ? sellValueForItem(item) : null
   const style = anchor ? { '--tip-x': `${anchor.x}px`, '--tip-y': `${anchor.y}px` } as React.CSSProperties : undefined
+  const tipTriggerDice = triggerDiceLabel(def)
   return (
     <aside className="floating-tip paper-card" style={style}>
       <div className="tip-tags">
@@ -3195,10 +3214,12 @@ function FloatingTip({ run, item, offer, anchor, descriptionOverride, onClose, o
           <span>占用 {def.size} 格</span>
         </div>
       </div>
-      <div className="tip-dice" aria-label={`触发点数 ${def.dice.join('/')}`}>
-        <Dice5 size={22} />
-        {def.dice.map((face) => <span key={face}>{face}</span>)}
-      </div>
+      {tipTriggerDice && (
+        <div className="tip-dice" aria-label={`触发点数 ${tipTriggerDice}`}>
+          <Dice5 size={22} />
+          {tipTriggerDice.split('/').map((face) => <span key={face}>{face}</span>)}
+        </div>
+      )}
       <p className="tip-description"><RuleText text={descriptionOverride ?? def.description ?? effectText(def, quality)} /></p>
       {item?.enchant && <p className="tip-description enchant-tip"><Sparkles size={16} /> <RuleText text={enchantmentText(item.enchant)} /></p>}
       {isOffer && (
@@ -3263,9 +3284,9 @@ function StatusFloatingTip({ statusTip, onClose }: { statusTip: StatusTipState |
         <span className="tip-tag">{side === 'player' ? '我方' : '敌方'}</span>
         <span className="tip-tag">{statusText(status)}</span>
       </div>
-      <p className="status-tip-description">{detail.description}</p>
-      <small>{detail.timing}</small>
-      <small>{detail.source}</small>
+      <p className="status-tip-description"><RuleText text={detail.description} /></p>
+      <small><RuleText text={detail.timing} /></small>
+      <small><RuleText text={detail.source} /></small>
     </aside>
   )
 }
@@ -3404,6 +3425,7 @@ function BattleEquipmentRow({ owner, snapshot, events, displayIndex, activeEvent
         {items.map((item) => {
           const growthText = growthDamageTextForBattleItem(item, owner, events, displayIndex)
           const boomCounterState = boomCounterStateForBattleItem(item, owner, events, displayIndex, activeEvent)
+          const triggerDice = triggerDiceLabel(item.def)
           return (
           <button
             type="button"
@@ -3421,7 +3443,7 @@ function BattleEquipmentRow({ owner, snapshot, events, displayIndex, activeEvent
             <span className="quality-chip">{qualityLabel[normalizeQuality(item.quality)]}</span>
             <span>{item.def.name}</span>
             {item.enchant && <span className="enchant-badge"><Sparkles size={12} />附魔</span>}
-            <small><Dice5 size={12} /> {item.def.dice.join('/')}</small>
+            {triggerDice && <small><Dice5 size={12} /> {triggerDice}</small>}
             <small className="item-effect">{growthText ?? effectText(item.def, normalizeQuality(item.quality))}</small>
             {boomCounterState && (
               <span className="boom-counter-meter" aria-label={`爆鸣计数 ${boomCounterState.count}/${boomCounterState.max}`}>
@@ -3542,6 +3564,7 @@ function StatusEffectRow({ tone, side, statuses, onStatusInspect, activeStatusKe
             aria-describedby={isActive ? statusTipId : undefined}
             aria-expanded={isActive}
             aria-controls={statusTipId}
+            title={statusDescription(status)}
             onClick={(event) => onStatusInspect(status, side, tone, event.currentTarget)}
           >
             {statusText(status)}
@@ -3558,11 +3581,38 @@ function statusTipKey(status: BattleStatusEntry, side: 'player' | 'opponent', po
 }
 
 function statusText(status: BattleStatusEntry) {
+  const stacks = statusStacks(status)
+  if (status.type === 'thorns') return `${status.label} ${stacks}层 · 反伤${stacks * STATUS_THORNS_DAMAGE_PER_STACK}`
+  if (status.type === 'poison') return `${status.label} ${status.stacks ?? 0}层 · 每秒${poisonTickDamage(status)}伤 · ${status.nextTickIn ?? 1}s`
+  if (status.type === 'weak') return `${status.label} ${stacks}层 · 下次伤害-50%`
+  if (status.type === 'fury') return `${status.label} ${stacks}层 · 伤害+${stacks * STATUS_FURY_DAMAGE_PER_STACK}`
+  if (status.type === 'extraRoll') {
+    return `${status.label} ${stacks}层 · 间隔-${formatStatusSeconds(stacks * STATUS_SPEED_REDUCTION_PER_STACK)}s`
+  }
   if (status.type === 'poison') return `${status.label} ${status.stacks ?? 0}层 · ${status.nextTickIn ?? 1}s`
   if (status.stacks != null) return `${status.label} ${status.stacks}层`
   if (status.amount != null) return `${status.label} ${status.amount}`
   if (status.remaining != null) return `${status.label} ${status.remaining}s`
   return status.label
+}
+
+function statusStacks(status: BattleStatusEntry) {
+  return status.stacks ?? status.amount ?? 0
+}
+
+function poisonTickDamage(status: BattleStatusEntry) {
+  return status.tickDamage ?? status.stacks ?? 0
+}
+
+function formatStatusSeconds(seconds: number) {
+  return Number.isInteger(seconds) ? String(seconds) : seconds.toFixed(1).replace(/\.0$/, '')
+}
+
+function statusDescription(status: BattleStatusEntry) {
+  const detail = statusTipDetails[status.type]
+  const values = statusText(status)
+  if (!detail) return values
+  return `${values}；${detail.timing}；${detail.description}`
 }
 
 function BattleDice({ event, lastRoll }: { event?: BattleEvent; lastRoll?: BattleEvent }) {

@@ -8,7 +8,7 @@ export const DOGS: Record<DogType, { name: string; trait: string }> = {
   SAMOYED: { name: '萨摩耶', trait: '20% 概率改掷为【大点】 4/5/6' },
   MUTT: { name: '土狗', trait: '20% 概率【额外投掷】一次' },
   BULLY: { name: '恶霸', trait: '40% 概率使本次触发的【大型物品】效果翻倍' },
-  EMPEROR: { name: '狗皇帝', trait: '指定【天命数字】，命中时 50% 概率使触发效果翻倍' },
+  EMPEROR: { name: '狗皇帝', trait: '指定【天命数字】（幸运数字），命中时 50% 概率使触发效果翻倍' },
 }
 
 export const SHIBA_POISON_ON_ROLL_AMOUNT = 6
@@ -69,11 +69,11 @@ export const ITEM_DEFS: ItemDef[] = [
     advancedEffect: 'GAIN_FURY_ON_ATTACK',
   }),
   slotItem('dog-house', '小狗窝', 4, 9, [1, 2], ['large', 'small'], { type: 'HEAL', amount: 12 }, {
-    description: '恢复 12 点生命值，并偷取敌方 1 层增益（优先【荆棘】，其次【加速】；护盾不算增益）。',
+    description: '恢复 12 点生命值，并偷取敌方 1 层增益（优先【荆棘】，其次【加速】；【护盾】不会被偷取）。',
     advancedEffect: 'STEAL_ENEMY_BUFF',
   }),
   slotItem('v3-broken-canine', '断裂的犬齿', 1, 3, [1, 2], ['small', 'weak'], { type: 'DAMAGE', amount: 3 }, {
-    description: '造成 3 点伤害。若目标处于【虚弱】，额外造成 4 点真实伤害。',
+    description: '造成 3 点伤害。若目标处于【虚弱】，额外造成 4 点【真实伤害】。',
     advancedEffect: 'TARGET_WEAK_BONUS_DAMAGE',
     defaultQuality: 'BRONZE',
   }),
@@ -83,12 +83,12 @@ export const ITEM_DEFS: ItemDef[] = [
     defaultQuality: 'BRONZE',
   }),
   slotItem('v3-cone-collar', '耻辱圈(防咬套)', 1, 3, [1, 2, 3], ['small', 'shield'], { type: 'UTILITY', amount: 3 }, {
-    description: '获得 3 点护盾。',
+    description: '获得 3 点【护盾】。',
     advancedEffect: 'GAIN_SHIELD',
     defaultQuality: 'BRONZE',
   }),
   slotItem('v3-dog-catnip', '特效狗薄荷', 1, 4, [3, 4], ['cleanse', 'heal'], { type: 'HEAL', amount: 4 }, {
-    description: '恢复 4 点生命值，并使自身的一层【中毒】或者【虚弱】失效。',
+    description: '恢复 4 点生命值，并【净化】自身的一层【中毒】或者【虚弱】。',
     advancedEffect: 'CLEANSE_ONE',
     defaultQuality: 'BRONZE',
   }),
@@ -102,12 +102,12 @@ export const ITEM_DEFS: ItemDef[] = [
     defaultQuality: 'BRONZE',
   }),
   slotItem('v3-wooden-shield', '狗屋木板盾', 2, 6, [2, 3, 4], ['stable', 'shield'], { type: 'UTILITY', amount: 8 }, {
-    description: '获得 8 点护盾。',
+    description: '获得 8 点【护盾】。',
     advancedEffect: 'GAIN_SHIELD',
     defaultQuality: 'BRONZE',
   }),
   slotItem('v3-spiked-vest', '带刺防爆冲胸背', 2, 7, [4, 5, 6], ['big', 'thorn', 'shield'], { type: 'UTILITY', amount: 1 }, {
-    description: '获得 1 点护盾，并获得 1 层【荆棘】。',
+    description: '获得 1 点【护盾】，并获得 1 层【荆棘】。',
     advancedEffect: 'GAIN_SHIELD_THORNS',
     defaultQuality: 'BRONZE',
   }),
@@ -117,7 +117,7 @@ export const ITEM_DEFS: ItemDef[] = [
     defaultQuality: 'BRONZE',
   }),
   slotItem('v3-dinosaur-leg-bone', '巨型恐龙腿骨', 4, 10, [5, 6], ['big', 'shield-break'], { type: 'DAMAGE', amount: 18 }, {
-    description: '造成 18 点伤害。如果敌方有护盾，该次伤害直接对护盾造成 2 倍伤害。',
+    description: '造成 18 点伤害。如果敌方有【护盾】，该次伤害直接对【护盾】造成 2 倍伤害。',
     advancedEffect: 'DOUBLE_SHIELD_DAMAGE',
     defaultQuality: 'BRONZE',
   }),
@@ -142,17 +142,17 @@ export const ITEM_DEFS: ItemDef[] = [
     defaultQuality: 'GOLD',
   }),
   slotItem('v3-golden-kennel', '不可侵犯的纯金狗窝', 4, 18, [4, 5], ['shield', 'immune'], { type: 'UTILITY', amount: 14, qualityBase: 'DIAMOND' }, {
-    description: '获得 14 点护盾。只要你拥有护盾，你受到的【中毒】和【虚弱】层数减半（向上取整）。',
+    description: '获得 14 点【护盾】。只要你拥有【护盾】，你受到的【中毒】和【虚弱】层数减半（向上取整）。',
     advancedEffect: 'SHIELD_IMMUNITY',
     defaultQuality: 'DIAMOND',
   }),
   slotItem('v4-blood-contract-fang', '血契犬牙', 2, 12, [1, 6], ['lifesteal', 'support', 'extreme'], { type: 'UTILITY', amount: 0 }, {
-    description: '光环：战斗开始时，使左边 1 个相邻装备获得【吸血】直到战斗结束。钻石品质改为使左右相邻装备都获得【吸血】。',
+    description: '触发时，使左边 1 个【相邻】装备获得【吸血】直到战斗结束。钻石品质改为使左右【相邻】装备都获得【吸血】。',
     advancedEffect: 'GRANT_LIFESTEAL_ADJACENT',
     defaultQuality: 'GOLD',
   }),
   slotItem('v4-boom-counter', '爆鸣计数器', 2, 14, [1, 6], ['counter', 'trigger', 'damage'], { type: 'UTILITY', amount: 300, qualityBase: 'GOLD' }, {
-    description: '己方装备每成功触发 1 次，获得 1 点爆鸣计数。达到 30 点后清零，对敌方造成 300 点直接伤害。升级只提高伤害。',
+    description: '己方装备每成功触发 1 次，获得 1 点【爆鸣计数】。达到 30 点后清零，对敌方造成 300 点直接伤害。升级只提高伤害。',
     advancedEffect: 'BOOM_COUNTER',
     defaultQuality: 'GOLD',
   }),
@@ -162,7 +162,7 @@ export const ITEM_DEFS: ItemDef[] = [
     defaultQuality: 'SILVER',
   }),
   slotItem('v4-reverse-fur-comb', '逆毛净化梳', 1, 8, [3, 4], ['cleanse', 'heal', 'counter'], { type: 'UTILITY', amount: 3, qualityBase: 'SILVER' }, {
-    description: '清除敌方最多 3 层正面增益；每实际清除 1 层，自己恢复 5 点生命。优先清除荆棘，再清除加速层数，最后每 8 点护盾折算 1 层。',
+    description: '【净化】敌方最多 3 层正面增益；每实际清除 1 层，自己恢复 5 点生命。优先清除【荆棘】，再清除【加速】层数，最后每 8 点【护盾】折算 1 层。',
     advancedEffect: 'PURGE_ENEMY_BUFFS',
     defaultQuality: 'SILVER',
   }),
@@ -177,7 +177,7 @@ export const CLASS_REWARD_DEFS: ItemDef[] = [
   classItem('SHIBA', 6, 'shiba-poison', '忍法·剧毒', 1, [1, 2, 3, 4, 5, 6], ['poison'], `每次投掷都会对敌人叠加${SHIBA_POISON_ON_ROLL_AMOUNT}层【中毒】（不随品质提升）`, 'POISON_ON_ROLL', 'DIAMOND'),
 
   classItem('SAMOYED', 3, 'samoyed-soft-fur', '松软毛皮', 2, [4, 5, 6], ['big', 'heal'], '每次触发恢复8的血量', 'NONE', 'GOLD', { type: 'HEAL', amount: 8 }),
-  classItem('SAMOYED', 3, 'samoyed-thorn-fur', '荆棘毛发', 2, [4, 5, 6], ['big', 'thorn'], '每次触发有 50% 概率获得1层【荆棘】', 'GAIN_THORNS', 'GOLD'),
+  classItem('SAMOYED', 3, 'samoyed-thorn-fur', '荆棘毛发', 2, [4, 5, 6], ['big', 'thorn'], '每次触发有 50% 概率获得 1 层【荆棘】', 'GAIN_THORNS', 'GOLD'),
   classItem('SAMOYED', 3, 'samoyed-frost-fur', '冰霜毛发', 1, [4, 5, 6], ['big', 'weak'], '每次触发有 50% 概率给敌人施加 1 层【虚弱】', 'APPLY_WEAK', 'GOLD'),
   classItem('SAMOYED', 6, 'samoyed-avalanche-core', '雪崩核心', 3, [1, 2, 3], ['big'], '每当掷出【小点】时，积攒 1 层【雪崩】。5 层【雪崩】时会清空层数同时对敌人造成 50 点伤害。每次【雪崩】后下次【雪崩】伤害加倍。', 'AVALANCHE', 'DIAMOND'),
   classItem('SAMOYED', 6, 'samoyed-absolute-zero', '绝对零度', 2, [4, 5, 6], ['big', 'weak'], '每当掷出【大点】时，积攒 1 层【冻结】计数。10 层【冻结】计数时会清空层数，同时使敌人【冻结】2 秒无法行动。', 'FREEZE_STACK', 'DIAMOND'),
@@ -206,10 +206,10 @@ export const CLASS_REWARD_DEFS: ItemDef[] = [
 ]
 
 export const RELIC_DEFS: RelicDef[] = [
-  { id: 'midas-left', name: '点金手·左', unlockRound: 3, defaultQuality: 'SILVER', tags: ['big'], effect: 'MIRROR_BIG_TO_SMALL', description: '你场上所有绑定在 4~6 点数的道具，现在在掷出对应减3的点数（即1~3）时也会触发，但效果降低 50%' },
-  { id: 'midas-right', name: '点金手·右', unlockRound: 3, defaultQuality: 'SILVER', tags: ['small'], effect: 'MIRROR_SMALL_TO_BIG', description: '你场上所有绑定在 1~3 点数的道具，现在在掷出对应加3的点数（即4~6）时也会触发，但效果降低 50%' },
-  { id: 'half-die-left', name: '半截骰·左', unlockRound: 3, defaultQuality: 'SILVER', tags: ['big'], effect: 'ONLY_BIG_HALF_EFFECT', description: '你只能投掷出4~6的点数，但所有装备效果降低50%' },
-  { id: 'half-die-right', name: '半截骰·右', unlockRound: 3, defaultQuality: 'SILVER', tags: ['small'], effect: 'ONLY_SMALL_HALF_EFFECT', description: '你只能投掷出1~3的点数，但所有装备效果降低50%' },
+  { id: 'midas-left', name: '点金手·左', unlockRound: 3, defaultQuality: 'SILVER', tags: ['big'], effect: 'MIRROR_BIG_TO_SMALL', description: '你场上所有绑定在 4~6 点数的道具，现在在掷出对应减3的【小点】时也会触发，但效果降低 50%' },
+  { id: 'midas-right', name: '点金手·右', unlockRound: 3, defaultQuality: 'SILVER', tags: ['small'], effect: 'MIRROR_SMALL_TO_BIG', description: '你场上所有绑定在 1~3 点数的道具，现在在掷出对应加3的【大点】时也会触发，但效果降低 50%' },
+  { id: 'half-die-left', name: '半截骰·左', unlockRound: 3, defaultQuality: 'SILVER', tags: ['big'], effect: 'ONLY_BIG_HALF_EFFECT', description: '你只能投掷出【大点】，但所有装备效果降低50%' },
+  { id: 'half-die-right', name: '半截骰·右', unlockRound: 3, defaultQuality: 'SILVER', tags: ['small'], effect: 'ONLY_SMALL_HALF_EFFECT', description: '你只能投掷出【小点】，但所有装备效果降低50%' },
   { id: 'v3-two-sided-gold-tag', name: '两面金狗牌', unlockRound: 3, defaultQuality: 'SILVER', tags: ['extreme'], effect: 'EXTREME_ROLL_BIAS', description: '你的投掷结果出现【极值】（1和6）的概率绝对值提升 30%。' },
   { id: 'v3-balanced-food-bowl', name: '平衡狗粮盆', unlockRound: 3, defaultQuality: 'SILVER', tags: ['middle'], effect: 'MIDDLE_ROLL_BIAS', description: '你的投掷结果出现 3 和 4 的概率绝对值提升 30%。' },
   { id: 'v3-lucky-foxtail', name: '幸运狗尾草', unlockRound: 3, defaultQuality: 'GOLD', tags: ['pity', 'large'], effect: 'EMPTY_ROLL_LARGE_SAFETY', description: '当你连续 2 次投掷“空过”时，第 3 次投掷必定为你随机触发一件【大型物品】（若没有则触发【中型物品】）。' },
@@ -259,26 +259,26 @@ export function itemDescription(itemId: string, quality?: string | null) {
     ? `${itemEffectVerb(def.effect.type)} ${amount} ${itemEffectUnit(def.effect.type)}。`
     : ''
 
-  if (advanced === 'TARGET_WEAK_BONUS_DAMAGE') return `${baseEffect}若目标处于【虚弱】，额外造成 ${qualityAmount(4, currentQuality)} 点真实伤害。`
+  if (advanced === 'TARGET_WEAK_BONUS_DAMAGE') return `${baseEffect}若目标处于【虚弱】，额外造成 ${qualityAmount(4, currentQuality)} 点【真实伤害】。`
   if (advanced === 'ADJACENT_DAMAGE_BONUS') return `${baseEffect}使【相邻】装备的下一次触发伤害 +${qualityAmount(4, currentQuality)}。`
-  if (advanced === 'GAIN_SHIELD') return `获得 ${amount} 点护盾。`
-  if (advanced === 'CLEANSE_ONE') return `恢复 ${amount} 点生命值，并使自身的一层【中毒】或者【虚弱】失效。`
+  if (advanced === 'GAIN_SHIELD') return `获得 ${amount} 点【护盾】。`
+  if (advanced === 'CLEANSE_ONE') return `恢复 ${amount} 点生命值，并【净化】自身的一层【中毒】或者【虚弱】。`
   if (advanced === 'APPLY_POISON') return `对敌人施加 ${amount} 层【中毒】。`
-  if (advanced === 'GAIN_SHIELD_THORNS') return `获得 ${amount} 点护盾，并获得 ${one} 层【荆棘】。`
+  if (advanced === 'GAIN_SHIELD_THORNS') return `获得 ${amount} 点【护盾】，并获得 ${one} 层【荆棘】。`
   if (advanced === 'APPLY_WEAK_ON_HIT') return `${baseEffect}并给敌人施加 ${one} 层【虚弱】。`
   if (advanced === 'APPLY_WEAK_20_ON_HIT') return `${baseEffect}命中后有 20% 概率给敌人施加 ${one} 层【虚弱】。`
   if (advanced === 'GAIN_FURY_ON_ATTACK') return `${baseEffect}攻击时有 50% 概率触发【激昂】；【激昂】使所有攻击伤害 +1，可叠加。`
-  if (advanced === 'DOUBLE_SHIELD_DAMAGE') return `${baseEffect}如果敌方有护盾，该次伤害直接对护盾造成 2 倍伤害。`
+  if (advanced === 'DOUBLE_SHIELD_DAMAGE') return `${baseEffect}如果敌方有【护盾】，该次伤害直接对【护盾】造成 2 倍伤害。`
   if (advanced === 'HEAL_OR_MAX_HP') return `恢复 ${amount} 点生命值。如果你当前处于满血，则永久提升自身 ${one} 点最大生命值。`
   if (advanced === 'ADJACENT_TEMP_TRIGGER') return `触发时，额外触发【相邻】装备 ${nightPatrolLightTriggerCount(currentQuality)} 次。`
-  if (advanced === 'LIFESTEAL') return `${baseEffect}并将造成伤害的 100% 转化为自身治疗。`
+  if (advanced === 'LIFESTEAL') return `${baseEffect}并将造成生命伤害的 100% 转化为自身【吸血】治疗。`
   if (advanced === 'POISON_AND_DISABLE_RIGHTMOST') return `对敌方施加 ${amount} 层【中毒】，并使敌方最右侧的一个装备【失效】一次。`
-  if (advanced === 'SHIELD_IMMUNITY') return `获得 ${amount} 点护盾。只要你拥有护盾，你受到的【中毒】和【虚弱】层数减半（向上取整）。`
-  if (advanced === 'STEAL_ENEMY_BUFF') return `恢复 ${amount} 点生命值，并偷取敌方 1 层增益（优先【荆棘】，其次【加速】；护盾不算增益）。`
+  if (advanced === 'SHIELD_IMMUNITY') return `获得 ${amount} 点【护盾】。只要你拥有【护盾】，你受到的【中毒】和【虚弱】层数减半（向上取整）。`
+  if (advanced === 'STEAL_ENEMY_BUFF') return `恢复 ${amount} 点生命值，并偷取敌方 1 层增益（优先【荆棘】，其次【加速】；【护盾】不算增益，不会被偷取）。`
   if (advanced === 'GRANT_LIFESTEAL_ADJACENT') return currentQuality === 'DIAMOND'
-    ? '光环：战斗开始时，使左右相邻装备都获得【吸血】直到战斗结束。被赋予吸血的装备按实际造成的生命伤害 100% 治疗自己。'
-    : '光环：战斗开始时，使左边 1 个相邻装备获得【吸血】直到战斗结束。被赋予吸血的装备按实际造成的生命伤害 100% 治疗自己。'
-  if (advanced === 'BOOM_COUNTER') return `己方装备每成功触发 1 次，获得 1 点爆鸣计数。达到 30 点后清零，对敌方造成 ${amount} 点直接伤害。`
+    ? '光环：战斗开始时，使左右【相邻】装备都获得【吸血】直到战斗结束。被赋予【吸血】的装备按实际造成的生命伤害 100% 治疗自己。'
+    : '光环：战斗开始时，使左边 1 个【相邻】装备获得【吸血】直到战斗结束。被赋予【吸血】的装备按实际造成的生命伤害 100% 治疗自己。'
+  if (advanced === 'BOOM_COUNTER') return `己方装备每成功触发 1 次，获得 1 点【爆鸣计数】。达到 30 点后清零，对敌方造成 ${amount} 点直接伤害。`
   if (advanced === 'GROWTH_DAMAGE') {
     const growth = growthDamageStep(currentQuality)
     return `初始造成 ${growthDamageBase(currentQuality)} 点伤害。每次该装备成功触发后，本局内后续伤害 +${growth}，无成长次数上限。`
@@ -286,14 +286,14 @@ export function itemDescription(itemId: string, quality?: string | null) {
   if (advanced === 'PURGE_ENEMY_BUFFS') {
     const purgeLimit = amount
     const healPerLayer = qualityAmountFrom(5, currentQuality, 'SILVER')
-    return `清除敌方最多 ${purgeLimit} 层正面增益；每实际清除 1 层，自己恢复 ${healPerLayer} 点生命。优先清除荆棘、加速层数，再按每 8 点护盾折算 1 层。`
+    return `【净化】敌方最多 ${purgeLimit} 层正面增益；每实际清除 1 层，自己恢复 ${healPerLayer} 点生命。优先清除【荆棘】、【加速】层数，再按每 8 点【护盾】折算 1 层。`
   }
   if (advanced === 'POISON_ON_ROLL') return `${baseEffect}每次投掷都会对敌人叠加 ${SHIBA_POISON_ON_ROLL_AMOUNT} 层【中毒】（不随品质提升）。`
   if (advanced === 'GAIN_THORNS') return `${baseEffect}每次触发有 50% 概率获得 ${one} 层【荆棘】。`
   if (advanced === 'APPLY_WEAK') return `${baseEffect}每次触发有 50% 概率给敌人施加 ${one} 层【虚弱】。`
-  if (advanced === 'MAX_HP_ON_EXTRA_ROLL') return `每当系统触发职业特性的“额外投掷”时，永久使你最大生命值 +${one}。`
-  if (advanced === 'SHIELD_ON_NON_LUCKY') return `非【天命数字】时获得 ${qualityAmount(5, currentQuality)} 点护盾。`
-  if (advanced === 'AVALANCHE') return `每当掷出【小点】时，积攒1层“雪崩”。5层雪崩时会清空层数同时对敌人造成 ${qualityAmount(50, currentQuality)} 点伤害。每次雪崩后下次雪崩伤害加倍。`
+  if (advanced === 'MAX_HP_ON_EXTRA_ROLL') return `每当系统触发职业特性的【额外投掷】时，永久使你最大生命值 +${one}。`
+  if (advanced === 'SHIELD_ON_NON_LUCKY') return `非【天命数字】时获得 ${qualityAmount(5, currentQuality)} 点【护盾】。`
+  if (advanced === 'AVALANCHE') return `每当掷出【小点】时，积攒 1 层【雪崩】。5 层【雪崩】时会清空层数同时对敌人造成 ${qualityAmount(50, currentQuality)} 点伤害。每次【雪崩】后下次【雪崩】伤害加倍。`
   if (advanced === 'SHIBA_SPEED') return `${baseEffect}${def.description}`
   if (advanced === 'TRIGGER_ADJACENT') return `${baseEffect}${def.description}`
   if (advanced === 'EXTRA_ROLL_CHANCE') return `${baseEffect}${def.description}`
@@ -366,13 +366,13 @@ export function relicDescription(relicId: string, quality?: string | null) {
   const rollBias = roundPercent(relicRollBiasChance(relicId, currentQuality))
   const effectReduction = 100 - retained
   const descriptions: Record<RelicEffect, string> = {
-    MIRROR_BIG_TO_SMALL: `你场上所有绑定在 4~6 点数的道具，现在在掷出对应减3的点数（即1~3）时也会触发，映射触发保留 ${retained}% 效果`,
-    MIRROR_SMALL_TO_BIG: `你场上所有绑定在 1~3 点数的道具，现在在掷出对应加3的点数（即4~6）时也会触发，映射触发保留 ${retained}% 效果`,
-    ONLY_BIG_HALF_EFFECT: `你只能掷出4~6的点数，但所有装备效果降低 ${effectReduction}%`,
-    ONLY_SMALL_HALF_EFFECT: `你只能掷出1~3的点数，但所有装备效果降低 ${effectReduction}%`,
+    MIRROR_BIG_TO_SMALL: `你场上所有绑定在 4~6 点数的道具，现在在掷出对应减3的【小点】时也会触发，映射触发保留 ${retained}% 效果`,
+    MIRROR_SMALL_TO_BIG: `你场上所有绑定在 1~3 点数的道具，现在在掷出对应加3的【大点】时也会触发，映射触发保留 ${retained}% 效果`,
+    ONLY_BIG_HALF_EFFECT: `你只能掷出【大点】，但所有装备效果降低 ${effectReduction}%`,
+    ONLY_SMALL_HALF_EFFECT: `你只能掷出【小点】，但所有装备效果降低 ${effectReduction}%`,
     EXTREME_ROLL_BIAS: `你的投掷结果出现【极值】（1和6）的概率绝对值提升 ${rollBias}%。`,
     MIDDLE_ROLL_BIAS: `你的投掷结果出现 3 和 4 的概率绝对值提升 ${rollBias}%。`,
-    EMPTY_ROLL_LARGE_SAFETY: `当你连续 ${relicEmptyRollMisses(relicId, currentQuality)} 次投掷“空过”时，下一次投掷必定为你随机触发一件【大型物品】（若没有则触发中型）。`,
+    EMPTY_ROLL_LARGE_SAFETY: `当你连续 ${relicEmptyRollMisses(relicId, currentQuality)} 次投掷“空过”时，下一次投掷必定为你随机触发一件【大型物品】（若没有则触发【中型物品】）。`,
     POISON_TICK_BONUS: `敌方身上的【中毒】状态每次结算时，额外造成 ${relicPoisonTickBonus(relicId, currentQuality)} 点伤害。`,
     OPENING_THORNS: `战斗开始时，你直接获得 ${relicOpeningThorns(relicId, currentQuality)} 层【荆棘】。`,
     HUSKY_ENGINE: def.description,

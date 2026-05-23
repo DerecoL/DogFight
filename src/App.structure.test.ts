@@ -22,7 +22,7 @@ function itemDefIds() {
 }
 
 function relicDefIds() {
-  const relicBlock = data.slice(data.indexOf('export const RELIC_DEFS'), data.indexOf('export const TERM_DEFS'))
+  const relicBlock = data.slice(data.indexOf('export const RELIC_DEFS'), data.indexOf('export const ALL_ITEM_DEFS'))
   return [...relicBlock.matchAll(/\{\s*id:\s*['`]([^'`]+)['`]/g)].map((match) => match[1])
 }
 
@@ -355,6 +355,11 @@ describe('selection screen structure', () => {
     expect(app).toContain('RuleText')
     expect(app).toContain('rule-term')
     expect(app).toContain('rule-tip')
+    expect(app).toContain("import { TERM_DEFS } from './shared/rule-terms'")
+    expect(app).toContain('Object.fromEntries(TERM_DEFS.map')
+    expect(data).toContain("import { TERM_DEFS } from '../../shared/rule-terms'")
+    expect(data).toContain('export { TERM_DEFS }')
+    expect(data).not.toContain('export const TERM_DEFS = [')
   })
 
   it('maps every item and relic definition to a dedicated SVG icon asset', () => {
