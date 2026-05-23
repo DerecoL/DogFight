@@ -163,6 +163,7 @@ function battlePresentationKind(event?: BattleEventLike | null): PresentationKin
   if (event.effectType === 'HEAL') return 'heal'
   if (event.effectType === 'POISON' || event.kind === 'POISON') return 'poison'
   if (event.effectType === 'UTILITY') {
+    if (event.target === 'none') return 'utility'
     const eventKind = utilityKindFromEvent(event)
     if (eventKind) return eventKind
     return 'utility'

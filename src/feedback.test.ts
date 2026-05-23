@@ -154,6 +154,7 @@ describe('feedback presentation mapping', () => {
       text: '巨型骨棒 被【失效】抵消',
     })
 
+    expect(presentation.kind).toBe('utility')
     expect(presentation.target).toEqual({ anchor: 'screen', side: 'system' })
   })
 
