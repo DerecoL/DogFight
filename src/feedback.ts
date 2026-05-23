@@ -176,7 +176,7 @@ function utilityKindFromEvent(event: BattleEventLike): PresentationKind | null {
   if (text.includes('虚弱') || event.statusChanged?.includes('weak')) return 'weak'
   if (text.includes('冻结') || event.statusChanged?.includes('freeze')) return 'freeze'
   if (text.includes('荆棘') || event.statusChanged?.includes('thorns')) return 'thorns'
-  if (text.includes('失效') || text.toLowerCase().includes('control') || event.statusChanged?.includes('disabled')) return 'freeze'
+  if (text.includes('失效') || text.toLowerCase().includes('control') || event.statusChanged?.includes('disabled') || event.statusChanged?.includes('control')) return 'freeze'
   return null
 }
 

@@ -135,6 +135,17 @@ describe('feedback presentation mapping', () => {
     expect(presentation.target).toEqual({ anchor: 'status-negative', side: 'opponent' })
   })
 
+  it('targets structured control utility events at negative status anchors', () => {
+    const presentation = createBattlePresentation({
+      ...baseEvent,
+      effectType: 'UTILITY',
+      target: 'opponent',
+      statusChanged: ['control'],
+    })
+
+    expect(presentation.target).toEqual({ anchor: 'status-negative', side: 'opponent' })
+  })
+
   it('targets self positive utility statuses at the actor status anchors', () => {
     const presentation = createBattlePresentation({
       ...baseEvent,
