@@ -1,12 +1,14 @@
 import { normalizeQuality, qualityAmount, qualityAmountFrom, qualityMultiplier } from './quality'
 import type { AdvancedEffect, DogType, ItemDef, ItemQuality, RelicDef, RelicEffect, ShopType } from './types'
+import { TERM_DEFS } from '../../shared/rule-terms'
+export { TERM_DEFS }
 
 export const DOGS: Record<DogType, { name: string; trait: string }> = {
-  SHIBA: { name: '柴犬', trait: '20% 概率改掷为小点 1/2/3' },
-  SAMOYED: { name: '萨摩耶', trait: '20% 概率改掷为大点 4/5/6' },
-  MUTT: { name: '土狗', trait: '20% 概率额外投掷一次' },
-  BULLY: { name: '恶霸', trait: '40% 概率使本次触发的大型物品效果翻倍' },
-  EMPEROR: { name: '狗皇帝', trait: '指定幸运数字，命中时 50% 概率使触发效果翻倍' },
+  SHIBA: { name: '柴犬', trait: '20% 概率改掷为【小点】 1/2/3' },
+  SAMOYED: { name: '萨摩耶', trait: '20% 概率改掷为【大点】 4/5/6' },
+  MUTT: { name: '土狗', trait: '20% 概率【额外投掷】一次' },
+  BULLY: { name: '恶霸', trait: '40% 概率使本次触发的【大型物品】效果翻倍' },
+  EMPEROR: { name: '狗皇帝', trait: '指定【天命数字】，命中时 50% 概率使触发效果翻倍' },
 }
 
 export const SHIBA_POISON_ON_ROLL_AMOUNT = 6
@@ -215,22 +217,6 @@ export const RELIC_DEFS: RelicDef[] = [
   { id: 'v3-fluffed-spike-collar', name: '炸毛护颈圈', unlockRound: 3, defaultQuality: 'GOLD', tags: ['thorn'], effect: 'OPENING_THORNS', description: '战斗开始时，你直接获得 5 层【荆棘】。' },
   { id: 'v3-husky-engine', name: '哈士奇永动机', unlockRound: 3, defaultQuality: 'DIAMOND', tags: ['attack-speed'], effect: 'HUSKY_ENGINE', description: '你的基础投掷间隔从 1 秒缩短至 0.85 秒。（全局攻速提升）' },
   { id: 'v3-fourth-dimensional-kennel', name: '四次元狗窝', unlockRound: 3, defaultQuality: 'DIAMOND', tags: ['space'], effect: 'EXTRA_EQUIPMENT_REDUCED_EFFECT', description: '你可以突破背包限制，将第 13 个装备放入战斗区。' },
-]
-
-export const TERM_DEFS = [
-  { term: '相邻', description: '该物品左边和右边的第1个物品', note: '无' },
-  { term: '小点', description: '投掷出1~3点', note: '无' },
-  { term: '大点', description: '投掷出4~6点', note: '无' },
-  { term: '极值', description: '投掷出1和6点', note: '无' },
-  { term: '荆棘', description: '每次受到攻击对敌方玩家造成2点伤害（可叠加）', note: '无' },
-  { term: '激昂', description: '自身所有攻击伤害 +1（可叠加）', note: '由巨型骨棒等效果获得' },
-  { term: '中毒', description: '造成2秒持续伤害，每秒结算1次（可叠加，叠加刷新持续时间）', note: '无' },
-  { term: '虚弱', description: '玩家的下次攻击造成的伤害减少50%（可叠加层数，不叠加效果）', note: '无' },
-  { term: '大型物品', description: '容量为4的物品', note: '恶霸袖标可让3格物品也按大型物品处理' },
-  { term: '中型物品', description: '容量为2或3的物品', note: '无' },
-  { term: '小型物品', description: '容量为1的物品', note: '无' },
-  { term: '失效', description: '下次生效将不会有任何行为，生效后去除一层该效果', note: '无' },
-  { term: '天命数字', description: '开局时确定的幸运数字', note: '狗皇帝专属规则' },
 ]
 
 export const ALL_ITEM_DEFS = [...ITEM_DEFS, ...CLASS_REWARD_DEFS]
