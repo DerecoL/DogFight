@@ -79,10 +79,23 @@ describe('item detail tooltip interactions', () => {
     expect(cssRule('.relic-tip-identity h3')).toContain('overflow-wrap: anywhere')
   })
 
-  it('raises the whole paper card that owns an opened rule tip above neighboring panels', () => {
-    expect(cssRule('.paper-card:has(.rule-tip)')).toContain('z-index: 1300')
-    expect(cssRule('.paper-card:has(.rule-tip)')).toContain('overflow: visible')
+  it('raises opened rule tips above neighboring panels', () => {
     expect(cssRule('.rule-tip')).toContain('z-index: 1301')
+  })
+
+  it('renders opened rule tips outside the parent text flow so the copy card keeps its size', () => {
+    expect(app).toContain("import { createPortal } from 'react-dom'")
+    expect(app).toContain('type RuleTermTipState')
+    expect(app).toContain('function RuleTermFloatingTip')
+    expect(app).toContain('createPortal(')
+    expect(app).toContain('const position = getRuleTermTipPosition(event.currentTarget)\n                setOpenTerm((current) => {')
+    expect(app).toContain('className={`rule-tip paper-card rule-tip-floating ${tip.placement}`}')
+    expect(cssRule('.rule-tip.rule-tip-floating')).toContain('position: fixed')
+    expect(cssRule('.rule-tip.rule-tip-floating.above')).toContain('transform: translateY(-100%) rotate(-.35deg)')
+    expect(cssRule('.rule-tip-floating')).toContain('left: var(--rule-tip-x)')
+    expect(cssRule('.rule-tip-floating')).toContain('top: var(--rule-tip-y)')
+    expect(cssRule('.rule-term-wrap')).toContain('display: contents')
+    expect(css).not.toContain('.paper-card:has(.rule-tip)')
   })
 
   it('lets battle status chips open compact rule tips', () => {

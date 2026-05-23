@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react'
+import { createPortal } from 'react-dom'
 import {
   DndContext,
   DragOverlay,
@@ -243,6 +244,13 @@ type CasualTutorialStepId = 'LOBBY' | 'DOG_SELECT' | 'SHOP_INSPECT' | 'SHOP_BUY'
 type CasualTutorialStatus = 'idle' | 'active' | 'completed' | 'skipped' | 'replaying'
 type CasualTutorialState = { status: CasualTutorialStatus; stepId: CasualTutorialStepId }
 type TipAnchor = { x: number; y: number }
+type RuleTermTipState = {
+  term: string
+  description: string
+  note: string
+  anchor: TipAnchor
+  placement: 'above' | 'below'
+}
 type StatusTipState = {
   status: BattleStatusEntry
   side: 'player' | 'opponent'
@@ -374,10 +382,11 @@ const dogAssets: Record<DogType, string> = {
   BULLY: '/assets/dogs/bully.webp',
   EMPEROR: '/assets/dogs/emperor.webp',
 }
+const dogBrawlTownBackground = '/assets/backgrounds/dog-brawl-town.png'
 const visualThemeAssets: Record<VisualThemeId, string> = {
-  dogPark: '/assets/backgrounds/storybook-dog-park.webp',
-  backAlley: '/assets/backgrounds/storybook-back-alley.webp',
-  royalKennel: '/assets/backgrounds/storybook-royal-kennel.webp',
+  dogPark: dogBrawlTownBackground,
+  backAlley: dogBrawlTownBackground,
+  royalKennel: dogBrawlTownBackground,
 }
 const visualThemeOrder: VisualThemeId[] = ['dogPark', 'backAlley', 'royalKennel']
 const gameIcon = '/assets/game-icon.png'
@@ -1000,12 +1009,24 @@ function getFloatingTipPosition(element: HTMLElement): TipAnchor {
   return { x, y }
 }
 
+function getRuleTermTipPosition(element: HTMLElement): Pick<RuleTermTipState, 'anchor' | 'placement'> {
+  const rect = element.getBoundingClientRect()
+  const edge = 16
+  const gap = 8
+  const tipWidth = Math.min(260, window.innerWidth - edge * 2)
+  const estimatedTipHeight = 136
+  const x = Math.min(Math.max(edge, rect.left), Math.max(edge, window.innerWidth - tipWidth - edge))
+  const placement = rect.top - estimatedTipHeight - gap >= edge ? 'above' : 'below'
+  const y = placement === 'above' ? Math.max(edge, rect.top - gap) : Math.min(window.innerHeight - edge, rect.bottom + gap)
+  return { anchor: { x, y }, placement }
+}
+
 function useOutsideTipDismiss(active: boolean, onClose: () => void) {
   useEffect(() => {
     if (!active) return
     const onPointerDown = (event: PointerEvent) => {
       const target = event.target
-      if (target instanceof Element && target.closest('.floating-tip')) return
+      if (target instanceof Element && target.closest('.floating-tip, .rule-tip')) return
       onClose()
     }
     document.addEventListener('pointerdown', onPointerDown, true)
@@ -1014,7 +1035,7 @@ function useOutsideTipDismiss(active: boolean, onClose: () => void) {
 }
 
 function RuleText({ text }: { text: string }) {
-  const [openTerm, setOpenTerm] = useState<string | null>(null)
+  const [openTerm, setOpenTerm] = useState<RuleTermTipState | null>(null)
   const ruleTermStart = String.fromCharCode(0x3010)
   const ruleTermEnd = String.fromCharCode(0x3011)
   const parts = text.split(/(【[^】]+】)/g).filter(Boolean)
@@ -1027,18 +1048,42 @@ function RuleText({ text }: { text: string }) {
         if (!entry) return <strong key={`${term}-${index}`}>【{term}】</strong>
         return (
           <span className="rule-term-wrap" key={`${term}-${index}`} onClick={(event) => event.stopPropagation()}>
-            <button type="button" className="rule-term" onClick={(event) => { event.stopPropagation(); setOpenTerm(openTerm === term ? null : term) }} onKeyDown={(event) => event.stopPropagation()}>【{term}】</button>
-            {openTerm === term && (
-              <span className="rule-tip paper-card" role="tooltip">
-                <b>{term}</b>
-                <span>{entry.description}</span>
-                {entry.note !== '无' && <small>{entry.note}</small>}
-              </span>
-            )}
+            <button
+              type="button"
+              className="rule-term"
+              onClick={(event) => {
+                event.stopPropagation()
+                const position = getRuleTermTipPosition(event.currentTarget)
+                setOpenTerm((current) => {
+                  if (current?.term === term) return null
+                  return { term, description: entry.description, note: entry.note, ...position }
+                })
+              }}
+              onKeyDown={(event) => event.stopPropagation()}
+            >
+              【{term}】
+            </button>
           </span>
         )
       })}
+      <RuleTermFloatingTip tip={openTerm} />
     </>
+  )
+}
+
+function RuleTermFloatingTip({ tip }: { tip: RuleTermTipState | null }) {
+  if (!tip || typeof document === 'undefined') return null
+  const style = {
+    '--rule-tip-x': `${tip.anchor.x}px`,
+    '--rule-tip-y': `${tip.anchor.y}px`,
+  } as React.CSSProperties
+  return createPortal(
+    <span className={`rule-tip paper-card rule-tip-floating ${tip.placement}`} style={style} role="tooltip" onPointerDown={(event) => event.stopPropagation()}>
+      <b>{tip.term}</b>
+      <span>{tip.description}</span>
+      {tip.note !== '无' && <small>{tip.note}</small>}
+    </span>,
+    document.body,
   )
 }
 

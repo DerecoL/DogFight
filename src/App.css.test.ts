@@ -298,7 +298,12 @@ describe('equipment layout scale', () => {
     expect(cssRule('.battle-equipment-row')).toContain('--slot-h: 142px')
     expect(cssRule('.battle-item')).toContain('min-height: 142px')
     expect(cssRule('.battle-item')).toContain('padding-bottom: 12px')
+    expect(cssRule('.battle-item')).toContain('overflow: visible')
+    expect(cssRule('.battle-item')).toContain('isolation: auto')
+    expect(cssRule('.battle-item')).toContain('z-index: auto')
+    expect(css).toContain(".battle-item:hover,\n.battle-item:focus-visible,\n.battle-item.trigger-count-pop {\n  z-index: 8")
     expect(cssRule('.trigger-count-stamp')).toContain('bottom: -17px')
+    expect(cssRule('.trigger-count-stamp')).toContain('z-index: 9')
     expect(cssRule('.trigger-count-stamp')).toContain('white-space: nowrap')
     expect(css).toContain('.battle-equipment-row { --slot-w: 58px; --slot-h: 104px; }')
     expect(css).toContain('.battle-item { min-height: 104px; }')
@@ -314,7 +319,7 @@ describe('equipment layout scale', () => {
   })
 
   it('keeps rule text as an inline flow inside cards and tips', () => {
-    expect(cssRule('.rule-term-wrap')).toContain('display: inline')
+    expect(cssRule('.rule-term-wrap')).toContain('display: contents')
     expect(cssRule('.rule-term')).toContain('display: inline')
     expect(cssRule('.rule-term')).toContain('white-space: nowrap')
     expect(cssRule('.rule-term')).toContain('overflow-wrap: normal')
@@ -390,12 +395,13 @@ describe('equipment layout scale', () => {
     expect(cssRule('.status-tip-description')).toContain('line-height: 1.55')
   })
 
-  it('adds stable storybook visual themes across battle, shop, inventory, rewards, and results', () => {
-    for (const fileName of ['storybook-dog-park.webp', 'storybook-back-alley.webp', 'storybook-royal-kennel.webp']) {
-      expect(existsSync(new URL(`../public/assets/backgrounds/${fileName}`, import.meta.url))).toBe(true)
-      expect(app).toContain(`/assets/backgrounds/${fileName}`)
-      expect(css).toContain(`/assets/backgrounds/${fileName}`)
-    }
+  it('adds stable dog brawl town visual themes across battle, shop, inventory, rewards, and results', () => {
+    expect(existsSync(new URL('../public/assets/backgrounds/dog-brawl-town.png', import.meta.url))).toBe(true)
+    expect(app).toContain('/assets/backgrounds/dog-brawl-town.png')
+    expect(css).toContain('/assets/backgrounds/dog-brawl-town.png')
+    expect(app).not.toContain('/assets/backgrounds/storybook-dog-park.webp')
+    expect(app).not.toContain('/assets/backgrounds/storybook-back-alley.webp')
+    expect(app).not.toContain('/assets/backgrounds/storybook-royal-kennel.webp')
 
     expect(app).toContain("type VisualThemeId = 'dogPark' | 'backAlley' | 'royalKennel'")
     expect(app).toContain('function visualThemeForRound(round: number): VisualThemeId')
@@ -426,6 +432,20 @@ describe('equipment layout scale', () => {
     expect(cssRule('.screen-content')).toContain('position: relative')
   })
 
+  it('lets the dog brawl town background show through the main play surfaces', () => {
+    expect(css).toMatch(/\.auth-panel,[\s\S]*\.floating-tip\s*\{[\s\S]*rgba\(255, 250, 241, \.78\)/)
+    expect(cssRule('.mode-card')).toContain('rgba(255, 250, 241, .72)')
+    expect(cssRule('.mode-card.available')).toContain('rgba(255, 250, 241, .68)')
+    expect(cssRule('.player-history-panel')).toContain('rgba(255, 250, 241, .72)')
+    expect(cssRule('.auth-panel.paper-card')).toContain('rgba(255, 250, 241, .76)')
+    expect(cssRule('.topbar.paper-card')).toContain('rgba(255, 250, 241, .74)')
+    expect(cssRule('.visual-theme-surface')).toContain('--theme-bg-opacity: .2')
+    expect(cssRule('.visual-theme-surface::before')).toContain('rgba(255, 250, 241, .42)')
+    expect(cssRule('.shop-shelf.visual-theme-surface::before')).toContain('rgba(255, 250, 241, .46)')
+    expect(cssRule('.inventory-board.visual-theme-surface::before')).toContain('rgba(255, 250, 241, .52)')
+    expect(cssRule('.reward-panel.visual-theme-surface::before')).toContain('rgba(255, 250, 241, .48)')
+  })
+
   it('upgrades full-flow feedback to high-impact but bounded visual effects', () => {
     expect(app).toContain('high-impact-vfx')
     expect(cssRule('.high-impact-vfx .battle-feedback-burst')).toContain('animation')
@@ -433,7 +453,11 @@ describe('equipment layout scale', () => {
     expect(cssRule('.battle-dog.vfx-target-damage::after')).toContain('highImpactHitFlash')
     expect(cssRule('.ui-feedback-toast[data-feedback-kind="buy-success"]')).toContain('highImpactRewardPop')
     expect(cssRule('.ui-feedback-toast[data-feedback-kind="place-failed"]')).toContain('highImpactRejectShake')
-    expect(cssRule('.reward-choice.selected::after')).toContain('content')
+    const selectedChoiceMark = cssRule('.choice.selected::after, .reward-choice.selected::after')
+    expect(selectedChoiceMark).toContain('content')
+    expect(selectedChoiceMark).toContain('dogPawMarkPop')
+    expect(selectedChoiceMark).toContain('radial-gradient')
+    expect(selectedChoiceMark).not.toContain('border-radius: 999px')
     expect(css).toContain('@keyframes highImpactTrailPulse')
     expect(css).toContain('@keyframes highImpactHitFlash')
     expect(css).toContain('@keyframes highImpactRewardPop')

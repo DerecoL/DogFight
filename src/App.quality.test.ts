@@ -42,9 +42,10 @@ describe('item quality upgrade UI', () => {
     expect(css).toContain('0 0 18px')
   })
 
-  it('keeps inventory and bag slot colors neutral against bronze quality borders', () => {
-    expect(css).toContain('background: linear-gradient(180deg, #eef0f2, #dfe3e7);')
+  it('keeps inventory and battle slot surfaces distinct from bronze quality borders', () => {
+    expect(css).toContain('background: var(--wood-grain), var(--wood-frame);')
     expect(css).toContain('border: 2px solid #b8c0ca;')
-    expect(css).toContain('background: linear-gradient(180deg, #4b5158, #363b42);')
+    expect(css).toContain('linear-gradient(180deg, #f2d2a1, #c88b4b)')
+    expect(css).toContain('background: #fff4e4;')
   })
 })

@@ -876,7 +876,7 @@ input {
   line-height: 1.2;
   overflow-wrap: anywhere;
 }
-.rule-term-wrap { position: relative; display: inline; max-width: 100%; vertical-align: baseline; }
+.rule-term-wrap { display: contents; max-width: 100%; vertical-align: baseline; }
 .rule-term {
   display: inline;
   max-width: 100%;
@@ -911,6 +911,21 @@ input {
   line-height: 1.35;
   overflow-wrap: anywhere;
   word-break: break-word;
+}
+.rule-tip-floating {
+  position: fixed;
+  left: var(--rule-tip-x);
+  top: var(--rule-tip-y);
+  bottom: auto;
+  max-height: min(220px, calc(100dvh - 32px));
+  overflow-y: auto;
+  pointer-events: auto;
+}
+.rule-tip-floating.above {
+  transform: translateY(-100%) rotate(-.35deg);
+}
+.rule-tip-floating.below {
+  transform: rotate(-.35deg);
 }
 .rule-tip small { color: #6b5d53; }
 .grid-panel { display: grid; gap: 10px; min-width: 0; max-width: 100%; min-height: 0; }
@@ -1745,10 +1760,18 @@ input {
   height: var(--slot-h);
   min-height: 142px;
   padding-bottom: 12px;
+  overflow: visible;
+  isolation: auto;
+  z-index: auto;
   cursor: pointer;
   text-align: center;
 }
 .battle-item:hover { filter: brightness(1.04); }
+.battle-item:hover,
+.battle-item:focus-visible,
+.battle-item.trigger-count-pop {
+  z-index: 8;
+}
 .battle-item .item-icon { width: 42px; height: 42px; }
 .battle-item span {
   max-width: 100%;
@@ -1830,7 +1853,7 @@ input {
   position: absolute;
   left: 50%;
   bottom: -17px;
-  z-index: 5;
+  z-index: 9;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -2220,7 +2243,7 @@ input {
 .match-panel,
 .battle-panel,
 .floating-tip {
-  background: var(--paper);
+  background: rgba(255, 250, 241, .78);
   border: 3px solid var(--ink);
   border-radius: 10px;
   box-shadow: 6px 7px 0 rgba(61, 45, 37, .22);
@@ -2663,7 +2686,7 @@ input {
   padding: 16px;
   color: var(--ink);
   text-align: left;
-  background: var(--paper);
+  background: rgba(255, 250, 241, .72);
   border: 3px solid var(--ink);
   border-radius: 10px;
   box-shadow: 6px 7px 0 rgba(61, 45, 37, .22);
@@ -3073,7 +3096,7 @@ input {
   justify-items: start;
   padding: 18px;
   overflow: hidden;
-  background: var(--paper);
+  background: rgba(255, 250, 241, .72);
   border: 3px solid var(--ink);
   border-radius: 10px;
   box-shadow: 6px 7px 0 rgba(61, 45, 37, .22);
@@ -3082,7 +3105,7 @@ input {
 .mode-card.available {
   background:
     radial-gradient(circle at 92% 14%, rgba(255, 216, 107, .48), transparent 22%),
-    var(--paper);
+    rgba(255, 250, 241, .68);
 }
 
 .mode-card.locked {
@@ -4132,7 +4155,7 @@ input {
   border-radius: 12px;
   background:
     var(--paper-fiber),
-    linear-gradient(180deg, rgba(255, 250, 241, .98), rgba(255, 241, 218, .96));
+    linear-gradient(180deg, rgba(255, 250, 241, .76), rgba(255, 241, 218, .7));
   box-shadow: var(--sketch-shadow);
 }
 
@@ -4142,7 +4165,7 @@ input {
   border-radius: 12px;
   background:
     var(--paper-fiber),
-    linear-gradient(180deg, rgba(255, 250, 241, .98), rgba(255, 244, 223, .96));
+    linear-gradient(180deg, rgba(255, 250, 241, .74), rgba(255, 244, 223, .68));
   box-shadow: var(--sketch-shadow-soft);
 }
 
@@ -4371,19 +4394,19 @@ input {
 }
 
 .visual-theme-dogPark {
-  --theme-bg: url("/assets/backgrounds/storybook-dog-park.webp");
+  --theme-bg: url("/assets/backgrounds/dog-brawl-town.png");
   --theme-accent: rgba(139, 209, 157, .34);
   --theme-spark: rgba(255, 216, 107, .42);
 }
 
 .visual-theme-backAlley {
-  --theme-bg: url("/assets/backgrounds/storybook-back-alley.webp");
+  --theme-bg: url("/assets/backgrounds/dog-brawl-town.png");
   --theme-accent: rgba(100, 210, 255, .24);
   --theme-spark: rgba(255, 111, 145, .28);
 }
 
 .visual-theme-royalKennel {
-  --theme-bg: url("/assets/backgrounds/storybook-royal-kennel.webp");
+  --theme-bg: url("/assets/backgrounds/dog-brawl-town.png");
   --theme-accent: rgba(255, 216, 107, .38);
   --theme-spark: rgba(180, 71, 82, .24);
 }
@@ -4392,7 +4415,7 @@ input {
   position: relative;
   isolation: isolate;
   overflow: hidden;
-  --theme-bg-opacity: .28;
+  --theme-bg-opacity: .2;
 }
 
 .visual-theme-surface > * {
@@ -4407,7 +4430,7 @@ input {
   z-index: 0;
   border-radius: inherit;
   background-image:
-    linear-gradient(180deg, rgba(255, 250, 241, .72), rgba(255, 244, 228, .86)),
+    linear-gradient(180deg, rgba(255, 250, 241, .42), rgba(255, 244, 228, .62)),
     var(--theme-bg);
   background-position: center;
   background-size: cover;
@@ -4431,21 +4454,21 @@ input {
 
 .shop-shelf.visual-theme-surface::before {
   background-image:
-    linear-gradient(180deg, rgba(255, 250, 241, .78), rgba(255, 244, 228, .9)),
+    linear-gradient(180deg, rgba(255, 250, 241, .46), rgba(255, 244, 228, .66)),
     radial-gradient(circle at 12% 20%, var(--theme-spark), transparent 22%),
     var(--theme-bg);
 }
 
 .inventory-board.visual-theme-surface::before {
   background-image:
-    linear-gradient(180deg, rgba(255, 250, 241, .84), rgba(255, 244, 228, .92)),
+    linear-gradient(180deg, rgba(255, 250, 241, .52), rgba(255, 244, 228, .7)),
     radial-gradient(circle at 88% 18%, var(--theme-accent), transparent 20%),
     var(--theme-bg);
 }
 
 .reward-panel.visual-theme-surface::before {
   background-image:
-    linear-gradient(180deg, rgba(255, 250, 241, .76), rgba(255, 244, 228, .88)),
+    linear-gradient(180deg, rgba(255, 250, 241, .48), rgba(255, 244, 228, .68)),
     radial-gradient(circle at 50% 10%, var(--theme-spark), transparent 24%),
     var(--theme-bg);
 }
@@ -4527,20 +4550,31 @@ input {
   animation: uiFeedbackToast .56s ease-out both, highImpactRejectShake .46s ease-out both;
 }
 
-.reward-choice.selected::after {
+.choice.selected::after, .reward-choice.selected::after {
   content: "";
   position: absolute;
-  right: 10px;
-  top: 10px;
+  right: 9px;
+  top: 8px;
   z-index: 3;
-  width: 42px;
-  height: 42px;
-  border: 4px solid rgba(61, 45, 37, .76);
-  border-radius: 999px;
-  background: rgba(255, 216, 107, .44);
-  box-shadow: 0 0 0 5px rgba(255, 250, 241, .48);
-  transform: rotate(-12deg);
-  animation: highImpactRewardPop .62s ease-out both;
+  width: 52px;
+  height: 48px;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse at 50% 66%, rgba(61, 45, 37, .82) 0 23%, transparent 24%),
+    radial-gradient(ellipse at 31% 35%, rgba(61, 45, 37, .78) 0 10%, transparent 11%),
+    radial-gradient(ellipse at 46% 24%, rgba(61, 45, 37, .8) 0 11%, transparent 12%),
+    radial-gradient(ellipse at 62% 28%, rgba(61, 45, 37, .78) 0 10%, transparent 11%),
+    radial-gradient(ellipse at 75% 43%, rgba(61, 45, 37, .76) 0 9%, transparent 10%),
+    radial-gradient(ellipse at 50% 66%, rgba(255, 250, 241, .52) 0 34%, transparent 35%),
+    radial-gradient(ellipse at 31% 35%, rgba(255, 250, 241, .5) 0 17%, transparent 18%),
+    radial-gradient(ellipse at 46% 24%, rgba(255, 250, 241, .48) 0 18%, transparent 19%),
+    radial-gradient(ellipse at 62% 28%, rgba(255, 250, 241, .5) 0 17%, transparent 18%),
+    radial-gradient(ellipse at 75% 43%, rgba(255, 250, 241, .48) 0 16%, transparent 17%);
+  filter:
+    drop-shadow(0 1px 0 rgba(255, 250, 241, .72))
+    drop-shadow(2px 3px 0 rgba(61, 45, 37, .18));
+  transform: rotate(-13deg);
+  animation: dogPawMarkPop .62s ease-out both;
 }
 
 .rule-tip.paper-card {
@@ -4553,13 +4587,16 @@ input {
   transform: rotate(-.35deg);
 }
 
-.paper-card:has(.rule-tip) {
-  z-index: 1300;
-  overflow: visible;
+.rule-tip.rule-tip-floating {
+  position: fixed;
 }
 
-.paper-card:has(.rule-tip) .rule-tip {
-  z-index: 1301;
+.rule-tip.rule-tip-floating.above {
+  transform: translateY(-100%) rotate(-.35deg);
+}
+
+.rule-tip.rule-tip-floating.below {
+  transform: rotate(-.35deg);
 }
 
 @keyframes itemPulse {
@@ -5006,6 +5043,11 @@ input {
   0% { transform: translateY(8px) rotate(-7deg) scale(.84); filter: brightness(1); }
   42% { transform: translateY(-4px) rotate(4deg) scale(1.1); filter: brightness(1.18); }
   100% { transform: translateY(0) rotate(-1deg) scale(1); filter: brightness(1); }
+}
+@keyframes dogPawMarkPop {
+  0% { opacity: 0; transform: translateY(8px) rotate(-20deg) scale(.74); }
+  46% { opacity: 1; transform: translateY(-4px) rotate(-8deg) scale(1.13); }
+  100% { opacity: 1; transform: translateY(0) rotate(-13deg) scale(1); }
 }
 @keyframes highImpactRejectShake {
   0%, 100% { transform: translateX(0) rotate(0); }
