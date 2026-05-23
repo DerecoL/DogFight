@@ -817,6 +817,11 @@ function adjacentBattleItems(snapshot: BattleSnapshot, source: Item) {
   })
 }
 
+function leftAdjacentBattleItems(snapshot: BattleSnapshot, source: Item) {
+  const sourceLeft = source.x
+  return battleEquipmentItems(snapshot).filter((item) => item.id !== source.id && item.x + item.def.width === sourceLeft)
+}
+
 function rightmostBattleItem(snapshot: BattleSnapshot) {
   return battleEquipmentItems(snapshot).at(-1) ?? null
 }
@@ -840,6 +845,12 @@ function targetEquipmentItemsForBattleEvent(event: BattleEvent, player: BattleSn
   if (targetSnapshot && event.text.includes('最右侧装备')) {
     const rightmost = rightmostBattleItem(targetSnapshot)
     return rightmost ? { owner: targetOwner, itemIds: [rightmost.id] } : { owner: null, itemIds: [] }
+  }
+
+  if (actorSnapshot && sourceItem && advancedEffect === 'GRANT_LIFESTEAL_ADJACENT') {
+    const owner = event.actor === 'player' || event.actor === 'opponent' ? event.actor : null
+    const targets = normalizeQuality(sourceItem.quality) === 'DIAMOND' ? adjacentBattleItems(actorSnapshot, sourceItem) : leftAdjacentBattleItems(actorSnapshot, sourceItem)
+    return { owner, itemIds: targets.map((item) => item.id) }
   }
 
   if (actorSnapshot && sourceItem && (advancedEffect === 'TRIGGER_ADJACENT' || event.text.includes('相邻'))) {
