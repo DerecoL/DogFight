@@ -343,11 +343,11 @@ type DogfightBattleResponse = { battle: { id: string; roomId: string; round: num
 
 const dogNames: Record<DogType, string> = { SHIBA: '柴犬', SAMOYED: '萨摩耶', MUTT: '土狗', BULLY: '恶霸', EMPEROR: '狗皇帝' }
 const dogTraits: Record<DogType, string> = {
-  SHIBA: '20% 概率改掷为小点 1/2/3',
-  SAMOYED: '20% 概率改掷为大点 4/5/6',
-  MUTT: '20% 概率额外投掷一次',
-  BULLY: '40% 概率使本次触发的大型物品效果翻倍',
-  EMPEROR: '指定幸运数字，命中时 50% 概率使触发效果翻倍',
+  SHIBA: '20% 概率改掷为【小点】 1/2/3',
+  SAMOYED: '20% 概率改掷为【大点】 4/5/6',
+  MUTT: '20% 概率【额外投掷】一次',
+  BULLY: '40% 概率使本次触发的【大型物品】效果翻倍',
+  EMPEROR: '指定【天命数字】，命中时 50% 概率使触发效果翻倍',
 }
 const dogAssets: Record<DogType, string> = {
   SHIBA: '/assets/dogs/shiba.webp',
@@ -502,10 +502,10 @@ const dogOptions: DogType[] = ['SHIBA', 'SAMOYED', 'MUTT', 'BULLY', 'EMPEROR']
 const shopChoiceOrder: ShopType[] = ['GENERAL', 'LARGE', 'MEDIUM', 'SMALL', 'SMALL_DICE', 'BIG_DICE', 'RELIC']
 const dogStrategies: Record<DogType, string> = {
   SHIBA: '适合新手，专注于持续输出伤害',
-  SAMOYED: '适合押大点构筑，爆发窗口更集中',
+  SAMOYED: '适合押【大点】构筑，爆发窗口更集中',
   MUTT: '适合随机和连击构筑，上限更高但波动更大',
-  BULLY: '适合大型物品构筑，围绕 4 格道具打爆发',
-  EMPEROR: '适合围绕一个核心点数堆叠道具，命中幸运数字时有爆发上限',
+  BULLY: '适合【大型物品】构筑，围绕 4 格道具打爆发',
+  EMPEROR: '适合围绕一个核心点数堆叠道具，命中【天命数字】时有爆发上限',
 }
 const dogTags: Record<DogType, string[]> = {
   SHIBA: ['进攻', '简单'],
@@ -519,8 +519,8 @@ const shopDescriptions: Record<ShopType, string> = {
   LARGE: '提供高占格高收益道具，适合大件路线',
   MEDIUM: '提供稳定中型道具，适合均衡过渡',
   SMALL: '提供低占格道具，适合填补装备缝隙',
-  SMALL_DICE: '偏向小点触发道具，适合小点战术',
-  BIG_DICE: '偏向大点触发道具，适合高点爆发',
+  SMALL_DICE: '偏向【小点】触发道具，适合【小点】战术',
+  BIG_DICE: '偏向【大点】触发道具，适合高点爆发',
   RELIC: '免费选择一个遗物，强化骰子倾向和触发频率',
 }
 const ruleTerms = Object.fromEntries(TERM_DEFS.map((term) => [term.term, term]))
