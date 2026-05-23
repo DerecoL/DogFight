@@ -824,6 +824,58 @@ describeWithDatabase('run API', () => {
     expect(moved.body.run.items.find((item: { id: string }) => item.id === right.id)).toMatchObject({ area: 'BAG', x: 1, y: 0 })
   })
 
+  it('replaces every equipment item covered by a large item from left to right', async () => {
+    const agent = request.agent(app.server)
+    await app.ready()
+
+    await agent.post('/api/auth/register').send({ email: `replace-large${Date.now()}@dog.test`, password: 'dogdice' }).expect(200)
+    const created = await agent.post('/api/runs').send({ dogType: 'SHIBA' }).expect(200)
+    const runId = created.body.run.id
+    const covered = [0, 1, 2, 3].map((x) => created.body.run.items.find((item: { x: number }) => item.x === x))
+    const moving = await prisma.itemInstance.create({
+      data: { runId, defId: 'giant-bone', quality: 'BRONZE', area: 'BAG', x: 0, y: 0 },
+    })
+
+    const moved = await agent.post(`/api/runs/${runId}/items/move`).send({ itemId: moving.id, area: 'EQUIPMENT', x: 0, y: 0 }).expect(200)
+
+    expect(moved.body.run.items.find((item: { id: string }) => item.id === moving.id)).toMatchObject({ area: 'EQUIPMENT', x: 0, y: 0 })
+    for (const [index, item] of covered.entries()) {
+      expect(moved.body.run.items.find((entry: { id: string }) => entry.id === item.id)).toMatchObject({ area: 'BAG', x: index, y: 0 })
+    }
+  })
+
+  it('rejects equipment replacement when the bag cannot hold every covered item', async () => {
+    const agent = request.agent(app.server)
+    await app.ready()
+
+    await agent.post('/api/auth/register').send({ email: `replace-full-bag${Date.now()}@dog.test`, password: 'dogdice' }).expect(200)
+    const created = await agent.post('/api/runs').send({ dogType: 'SHIBA' }).expect(200)
+    const runId = created.body.run.id
+    const left = created.body.run.items.find((item: { x: number }) => item.x === 0)
+    const right = created.body.run.items.find((item: { x: number }) => item.x === 1)
+    await prisma.itemInstance.createMany({
+      data: Array.from({ length: 11 }, (_, index) => ({
+        runId,
+        defId: 'small-bite',
+        quality: 'BRONZE',
+        area: 'BAG',
+        x: index,
+        y: 0,
+      })),
+    })
+    const moving = await prisma.itemInstance.create({
+      data: { runId, defId: 'spiked-collar', quality: 'BRONZE', area: 'BAG', x: 0, y: 0 },
+    })
+
+    const rejected = await agent.post(`/api/runs/${runId}/items/move`).send({ itemId: moving.id, area: 'EQUIPMENT', x: 0, y: 0 }).expect(400)
+    const unchanged = await prisma.itemInstance.findMany({ where: { id: { in: [moving.id, left.id, right.id] } } })
+
+    expect(rejected.body.error).toContain('背包空间不足')
+    expect(unchanged.find((item) => item.id === moving.id)).toMatchObject({ area: 'BAG', x: 0, y: 0 })
+    expect(unchanged.find((item) => item.id === left.id)).toMatchObject({ area: 'EQUIPMENT', x: 0, y: 0 })
+    expect(unchanged.find((item) => item.id === right.id)).toMatchObject({ area: 'EQUIPMENT', x: 1, y: 0 })
+  })
+
   it('upgrades matching items when a move lands on an identical item', async () => {
     const agent = request.agent(app.server)
     await app.ready()

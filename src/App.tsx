@@ -471,6 +471,10 @@ const BASE_MAX_HP = 100
 const EARLY_ROUND_HP_GROWTH = 20
 const LATE_ROUND_HP_GROWTH = 50
 const EARLY_HP_GROWTH_ROUNDS = 6
+const STATUS_THORNS_DAMAGE_PER_STACK = 2
+const STATUS_FURY_DAMAGE_PER_STACK = 1
+const STATUS_SPEED_REDUCTION_PER_STACK = 0.1
+const STATUS_SPEED_MIN_INTERVAL = 0.5
 const emptyRunHistory: PlayerRunHistory = {
   totalRuns: 0,
   activeRuns: 0,
@@ -527,13 +531,17 @@ const ruleTerms: Record<string, { description: string; note: string }> = {
   小点: { description: '投掷出1~3点', note: '无' },
   大点: { description: '投掷出4~6点', note: '无' },
   极值: { description: '投掷出1和6点', note: '无' },
-  荆棘: { description: '每次受到攻击对敌方玩家造成2点伤害（可叠加）', note: '无' },
-  中毒: { description: '造成2秒持续伤害，每秒结算1次（可叠加，叠加刷新持续时间）', note: '无' },
-  虚弱: { description: '玩家的下次攻击造成的伤害减少50%（可叠加层数，不叠加效果）', note: '无' },
+  护盾: { description: '特殊生命值，优先吸收受到的普通伤害；护盾不属于正面增益', note: '无' },
+  荆棘: { description: '正面增益。每 1 层在受到攻击时反弹 2 点伤害，也就是每层造成2点伤害；当前反伤 = 层数 × 2', note: '无' },
+  加速: { description: '正面增益。每 1 层使投掷间隔减少 0.1 秒，最多 5 层，最低投掷间隔 0.5 秒', note: '由极速太刀等效果获得' },
+  激昂: { description: '正面增益。每 1 层使自身所有攻击伤害 +1，可叠加；攻击时按当前层数加成', note: '由巨型骨棒等效果获得' },
+  中毒: { description: '负面效果。每 1 层每秒造成 1 点伤害，每 1 秒结算 1 次；遗物可能额外提高每次结算伤害', note: '无' },
+  虚弱: { description: '负面效果。下一次攻击造成的伤害降低 50%，触发后消耗 1 层；多层只增加可消耗次数', note: '无' },
+  冻结: { description: '负面效果。冻结期间无法行动；剩余时间归零后恢复投掷和装备触发', note: '无' },
   大型物品: { description: '容量为4的物品', note: '恶霸袖标可让3格物品也按大型物品处理' },
   中型物品: { description: '容量为2或3的物品', note: '无' },
   小型物品: { description: '容量为1的物品', note: '无' },
-  失效: { description: '下次生效将不会有任何行为，生效后去除一层该效果', note: '无' },
+  失效: { description: '负面效果。每 1 层抵消 1 次装备触发，被抵消后消耗 1 层', note: '无' },
   天命数字: { description: '开局时确定的幸运数字', note: '狗皇帝专属规则' },
 }
 const statusTipId = 'battle-status-tip'
@@ -766,6 +774,12 @@ function diceToneText(def: ItemDef) {
   if (max <= 3) return '小点'
   if (min >= 4) return '大点'
   return '混合'
+}
+
+function visibleTriggerDice(def: ItemDef) {
+  const dice = [...new Set(def.dice)].sort((left, right) => left - right)
+  const coversEveryFace = dice.length === 6 && dice.every((face, index) => face === index + 1)
+  return coversEveryFace ? null : dice.join('/')
 }
 
 function effectToneText(def: ItemDef) {
@@ -1622,8 +1636,8 @@ function PlayerHistoryOverlay({ history, onClose }: { history: PlayerRunHistory;
 }
 
 function HistoryRunDetails({ entry, inspectedItem, tipAnchor, onInspectItem, onCloseTip }: { entry: PlayerRunHistoryEntry; inspectedItem: Item | null; tipAnchor: TipAnchor | null; onInspectItem: (item: Item, element: HTMLElement) => void; onCloseTip: () => void }) {
-  const equipment = entry.items.filter((item) => item.area === 'EQUIPMENT')
-  const bag = entry.items.filter((item) => item.area === 'BAG')
+        const equipment = entry.items.filter((item) => item.area === 'EQUIPMENT')
+        const bag = entry.items.filter((item) => item.area === 'BAG')
   const tipRun: Run = {
     id: entry.id,
     mode: entry.mode === 'LADDER' ? 'LADDER' : 'CASUAL',
@@ -1665,7 +1679,9 @@ function HistoryRunDetails({ entry, inspectedItem, tipAnchor, onInspectItem, onC
         </div>
         <div className="battle-slot-grid" style={{ gridTemplateColumns: `repeat(${equipmentSlotCount(entry.relics)}, minmax(0, 1fr))` }}>
           {Array.from({ length: equipmentSlotCount(entry.relics) }).map((_, x) => <i key={x} className="battle-slot" style={{ gridColumn: x + 1, gridRow: 1 }} />)}
-          {equipment.map((item) => (
+          {equipment.map((item) => {
+            const triggerDice = visibleTriggerDice(item.def)
+            return (
             <button
               type="button"
               key={item.id}
@@ -1677,9 +1693,10 @@ function HistoryRunDetails({ entry, inspectedItem, tipAnchor, onInspectItem, onC
               <img className="item-icon" src={itemIcon(item.def)} alt="" />
               <span className="quality-chip">{qualityLabel[normalizeQuality(item.quality)]}</span>
               <span>{item.def.name}</span>
-              <small><Dice5 size={12} /> {item.def.dice.join('/')}</small>
+              {triggerDice && <small><Dice5 size={12} /> {triggerDice}</small>}
             </button>
-          ))}
+            )
+          })}
         </div>
       </div>
       <div className="history-inventory-summary">
@@ -2398,7 +2415,9 @@ function ApexSnapshotDetails({ entry }: { entry: ApexEntry }) {
         </div>
         <div className="battle-slot-grid" style={{ gridTemplateColumns: 'repeat(12, minmax(0, 1fr))' }}>
           {Array.from({ length: 12 }).map((_, x) => <i key={x} className="battle-slot" style={{ gridColumn: x + 1, gridRow: 1 }} />)}
-          {equipment.map((item) => (
+          {equipment.map((item) => {
+            const triggerDice = visibleTriggerDice(item.def)
+            return (
             <button
               type="button"
               key={item.id}
@@ -2410,9 +2429,10 @@ function ApexSnapshotDetails({ entry }: { entry: ApexEntry }) {
               <img className="item-icon" src={itemIcon(item.def)} alt="" />
               <span className="quality-chip">{qualityLabel[normalizeQuality(item.quality)]}</span>
               <span>{item.def.name}</span>
-              <small><Dice5 size={12} /> {item.def.dice.join('/')}</small>
+              {triggerDice && <small><Dice5 size={12} /> {triggerDice}</small>}
             </button>
-          ))}
+            )
+          })}
         </div>
       </div>
       <div className="apex-relic-preview">
@@ -2823,12 +2843,15 @@ function ClassRewardCeremony({ run, choices, onDismiss }: { run: Run; choices: C
           <p>{subtitle}</p>
         </div>
         <div className="ceremony-reward-preview" aria-label="本次可选职业装备">
-          {choices.map((choice) => (
+          {choices.map((choice) => {
+            const triggerDice = visibleTriggerDice(choice.def)
+            return (
             <span key={choice.defId} className={`ceremony-reward-chip ${qualityClass(choice.quality)}`}>
               <strong>{choice.def.name}</strong>
-              <small>{choice.def.size}格 · {choice.def.dice.join('/')}</small>
+              <small>{choice.def.size}格{triggerDice ? ` · ${triggerDice}` : ''}</small>
             </span>
-          ))}
+            )
+          })}
         </div>
         <span className="ceremony-skip-hint">点击任意处继续</span>
       </div>
@@ -2845,14 +2868,17 @@ function ClassRewardSelect({ choices, onPick }: { choices: ClassRewardChoice[]; 
         <p>先整理背包，再选择一个职业装备放入背包。</p>
       </div>
       <div className="reward-choice-grid">
-        {choices.map((choice) => (
+        {choices.map((choice) => {
+          const triggerDice = visibleTriggerDice(choice.def)
+          return (
           <div key={choice.defId} role="button" tabIndex={0} className={`choice paper-card sticker-card reward-choice ${selected === choice.defId ? 'selected' : ''}`} onClick={() => setSelected(choice.defId)} onKeyDown={(event) => handleChoiceCardKeyDown(event, () => setSelected(choice.defId))}>
             <strong>{choice.def.name}</strong>
             <span className={`tip-tag ${qualityClass(choice.quality)}`}>{qualityLabel[choice.quality]}</span>
-            <span>{choice.def.size}格 · {choice.def.dice.join('/')}</span>
+            <span>{choice.def.size}格{triggerDice ? ` · ${triggerDice}` : ''}</span>
             <span><RuleText text={choice.def.description ?? effectText(choice.def, choice.quality)} /></span>
           </div>
-        ))}
+          )
+        })}
       </div>
       <button className="primary action-button choice-submit" disabled={!selected} onClick={() => selected && onPick(selected)}>领取职业装备</button>
     </section>
@@ -2978,6 +3004,7 @@ function ShopCard({ offer, selected, ownedCount, onClick }: { offer: ShopOffer; 
   const def = offer.def
   const quality = normalizeQuality(offer.quality)
   const owned = ownedCount > 0
+  const triggerDice = def ? visibleTriggerDice(def) : null
   return (
     <button className={`shop-card paper-shop-card paper-card ${qualityClass(offer.quality)} ${owned ? 'shop-card-owned' : ''} ${selected ? 'selected' : ''}`} onClick={(event) => onClick(event.currentTarget)}>
       <span className="quality-chip shop-quality-chip">{qualityLabel[quality]}</span>
@@ -2988,7 +3015,7 @@ function ShopCard({ offer, selected, ownedCount, onClick }: { offer: ShopOffer; 
         <strong>{def?.name ?? offer.defId}</strong>
       </div>
       {def && <SizePreview size={def.size} />}
-      <span className="dice-line"><Dice5 size={15} /> {def?.dice.join(' / ') ?? '-'}</span>
+      {triggerDice && <span className="dice-line"><Dice5 size={15} /> {triggerDice}</span>}
       <span className="effect-line">{def ? effectText(def, quality) : '未知效果'}</span>
       <span className="price-tag"><Coins size={14} />{offer.price}{offer.discount < 1 ? ` · ${Math.round(offer.discount * 10)}折` : ''}</span>
     </button>
@@ -3130,6 +3157,7 @@ function DraggableItem({ item, selected, dragging, upgradeable, onSelect }: { it
     gridColumn: `${item.x + 1} / span ${item.def.width}`,
     gridRow: `${item.y + 1} / span ${item.def.height}`,
   }
+  const triggerDice = visibleTriggerDice(item.def)
   return (
     <button
       ref={setNodeRef}
@@ -3139,7 +3167,7 @@ function DraggableItem({ item, selected, dragging, upgradeable, onSelect }: { it
         event.stopPropagation()
         onSelect(event.currentTarget)
       }}
-      title={`${qualityLabel[normalizeQuality(item.quality)]} ${item.def.name} · ${item.def.size}格 · 点数 ${item.def.dice.join('/')}`}
+      title={`${qualityLabel[normalizeQuality(item.quality)]} ${item.def.name} · ${item.def.size}格${triggerDice ? ` · 点数 ${triggerDice}` : ''}`}
       {...listeners}
       {...attributes}
     >
@@ -3149,6 +3177,7 @@ function DraggableItem({ item, selected, dragging, upgradeable, onSelect }: { it
 }
 
 function ItemCardContent({ item, upgradeable = false }: { item: Item; upgradeable?: boolean }) {
+  const triggerDice = visibleTriggerDice(item.def)
   return (
     <>
       <span className="quality-chip">{qualityLabel[normalizeQuality(item.quality)]}</span>
@@ -3157,7 +3186,7 @@ function ItemCardContent({ item, upgradeable = false }: { item: Item; upgradeabl
       <span>{item.def.name}</span>
       {item.enchant && <span className="enchant-badge"><Sparkles size={12} />附魔</span>}
       <SizePreview size={item.def.size} />
-      <small><Dice5 size={12} /> {item.def.dice.join('/')}</small>
+      {triggerDice && <small><Dice5 size={12} /> {triggerDice}</small>}
       <small className="item-effect">{effectText(item.def, normalizeQuality(item.quality))}</small>
       {item.enchant && <small className="item-effect enchant-text">{enchantmentText(item.enchant)}</small>}
     </>
@@ -3185,6 +3214,7 @@ function FloatingTip({ run, item, offer, anchor, descriptionOverride, onClose, o
   const canAfford = !offer || run.gold >= offer.price
   const sellValue = item ? sellValueForItem(item) : null
   const style = anchor ? { '--tip-x': `${anchor.x}px`, '--tip-y': `${anchor.y}px` } as React.CSSProperties : undefined
+  const tipTriggerDice = visibleTriggerDice(def)
   return (
     <aside className="floating-tip paper-card" style={style}>
       <div className="tip-tags">
@@ -3205,10 +3235,12 @@ function FloatingTip({ run, item, offer, anchor, descriptionOverride, onClose, o
           <span>占用 {def.size} 格</span>
         </div>
       </div>
-      <div className="tip-dice" aria-label={`触发点数 ${def.dice.join('/')}`}>
-        <Dice5 size={22} />
-        {def.dice.map((face) => <span key={face}>{face}</span>)}
-      </div>
+      {tipTriggerDice && (
+        <div className="tip-dice" aria-label={`触发点数 ${tipTriggerDice}`}>
+          <Dice5 size={22} />
+          {tipTriggerDice.split('/').map((face) => <span key={face}>{face}</span>)}
+        </div>
+      )}
       <p className="tip-description"><RuleText text={descriptionOverride ?? def.description ?? effectText(def, quality)} /></p>
       {item?.enchant && <p className="tip-description enchant-tip"><Sparkles size={16} /> <RuleText text={enchantmentText(item.enchant)} /></p>}
       {isOffer && (
@@ -3273,7 +3305,7 @@ function StatusFloatingTip({ statusTip, onClose }: { statusTip: StatusTipState |
         <span className="tip-tag">{side === 'player' ? '我方' : '敌方'}</span>
         <span className="tip-tag">{statusText(status)}</span>
       </div>
-      <p className="status-tip-description">{detail.description}</p>
+      <p className="status-tip-description">{statusDescription(status)}</p>
       <small>{detail.timing}</small>
       <small>{detail.source}</small>
     </aside>
@@ -3414,6 +3446,7 @@ function BattleEquipmentRow({ owner, snapshot, events, displayIndex, activeEvent
         {items.map((item) => {
           const growthText = growthDamageTextForBattleItem(item, owner, events, displayIndex)
           const boomCounterState = boomCounterStateForBattleItem(item, owner, events, displayIndex, activeEvent)
+          const triggerDice = visibleTriggerDice(item.def)
           return (
           <button
             type="button"
@@ -3431,7 +3464,7 @@ function BattleEquipmentRow({ owner, snapshot, events, displayIndex, activeEvent
             <span className="quality-chip">{qualityLabel[normalizeQuality(item.quality)]}</span>
             <span>{item.def.name}</span>
             {item.enchant && <span className="enchant-badge"><Sparkles size={12} />附魔</span>}
-            <small><Dice5 size={12} /> {item.def.dice.join('/')}</small>
+            {triggerDice && <small><Dice5 size={12} /> {triggerDice}</small>}
             <small className="item-effect">{growthText ?? effectText(item.def, normalizeQuality(item.quality))}</small>
             {boomCounterState && (
               <span className="boom-counter-meter" aria-label={`爆鸣计数 ${boomCounterState.count}/${boomCounterState.max}`}>
@@ -3548,6 +3581,7 @@ function StatusEffectRow({ tone, side, statuses, onStatusInspect, activeStatusKe
             key={`${tone}-${status.type}`}
             type="button"
             className={`status-chip handdrawn-status-chip ${status.type}`}
+            title={statusDescription(status)}
             aria-label={`查看${status.label}说明`}
             aria-describedby={isActive ? statusTipId : undefined}
             aria-expanded={isActive}
@@ -3558,7 +3592,7 @@ function StatusEffectRow({ tone, side, statuses, onStatusInspect, activeStatusKe
           </button>
         )
       })}
-      {hidden > 0 && <span className="status-chip handdrawn-status-chip more" title={statuses.map(statusText).join(' / ')}>+{hidden}</span>}
+      {hidden > 0 && <span className="status-chip handdrawn-status-chip more" title={statuses.map(statusDescription).join(' / ')}>+{hidden}</span>}
     </div>
   )
 }
@@ -3567,12 +3601,43 @@ function statusTipKey(status: BattleStatusEntry, side: 'player' | 'opponent', po
   return `${side}-${polarity}-${status.type}`
 }
 
+function statusStacks(status: BattleStatusEntry) {
+  return Math.max(0, status.stacks ?? 0)
+}
+
+function poisonTickDamage(status: BattleStatusEntry) {
+  return Math.max(0, status.tickDamage ?? statusStacks(status))
+}
+
+function formatStatusSeconds(value: number) {
+  return Number(value.toFixed(1)).toString()
+}
+
 function statusText(status: BattleStatusEntry) {
-  if (status.type === 'poison') return `${status.label} ${status.stacks ?? 0}层 · ${status.nextTickIn ?? 1}s`
-  if (status.stacks != null) return `${status.label} ${status.stacks}层`
-  if (status.amount != null) return `${status.label} ${status.amount}`
+  const stacks = statusStacks(status)
+  if (status.type === 'thorns') return `${status.label} ${stacks}层 · 反伤${stacks * STATUS_THORNS_DAMAGE_PER_STACK}`
+  if (status.type === 'extraRoll') return `${status.label} ${stacks}层 · 间隔-${formatStatusSeconds(stacks * STATUS_SPEED_REDUCTION_PER_STACK)}s`
+  if (status.type === 'fury') return `${status.label} ${stacks}层 · 伤害+${stacks * STATUS_FURY_DAMAGE_PER_STACK}`
+  if (status.type === 'poison') return `${status.label} ${stacks}层 · 每秒${poisonTickDamage(status)}伤`
+  if (status.type === 'weak') return `${status.label} ${stacks}层 · 下次伤害-50%`
+  if (status.type === 'freeze') return `${status.label} ${status.remaining ?? 0}s · 无法行动`
+  if (status.type === 'disabled') return `${status.label} ${status.amount ?? 0}次 · 抵消触发`
+  if (status.stacks != null) return `${status.label} ${stacks}层`
+  if (status.amount != null) return `${status.label} ${status.amount}次`
   if (status.remaining != null) return `${status.label} ${status.remaining}s`
   return status.label
+}
+
+function statusDescription(status: BattleStatusEntry) {
+  const stacks = statusStacks(status)
+  if (status.type === 'thorns') return `正面增益：每 1 层在受到攻击时反弹 ${STATUS_THORNS_DAMAGE_PER_STACK} 点伤害；当前 ${stacks} 层，反弹 ${stacks * STATUS_THORNS_DAMAGE_PER_STACK} 点伤害。`
+  if (status.type === 'extraRoll') return `正面增益：每 1 层使投掷间隔减少 ${STATUS_SPEED_REDUCTION_PER_STACK} 秒，最低 ${STATUS_SPEED_MIN_INTERVAL} 秒；当前减少 ${formatStatusSeconds(stacks * STATUS_SPEED_REDUCTION_PER_STACK)} 秒。`
+  if (status.type === 'fury') return `正面增益：每 1 层使自身所有攻击伤害 +${STATUS_FURY_DAMAGE_PER_STACK}；当前攻击伤害 +${stacks * STATUS_FURY_DAMAGE_PER_STACK}。`
+  if (status.type === 'poison') return `负面效果：每 1 秒结算 1 次；当前 ${stacks} 层，每次造成 ${poisonTickDamage(status)} 点伤害。`
+  if (status.type === 'weak') return `负面效果：下一次攻击造成的伤害降低 50%，触发后消耗 1 层；当前可消耗 ${stacks} 次。`
+  if (status.type === 'freeze') return `负面效果：冻结期间无法行动；当前剩余 ${status.remaining ?? 0} 秒。`
+  if (status.type === 'disabled') return `负面效果：每 1 层抵消 1 次装备触发；当前可抵消 ${status.amount ?? 0} 次。`
+  return statusText(status)
 }
 
 function BattleDice({ event, lastRoll }: { event?: BattleEvent; lastRoll?: BattleEvent }) {
