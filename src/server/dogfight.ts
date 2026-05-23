@@ -6,10 +6,11 @@ import { itemDef } from './game/data'
 import { findSlot } from './game/grid'
 import { STARTING_GOLD } from './game/matchmaking'
 import { buildOfflineFighter, offlineFighterName } from './game/offline-builder'
-import { normalizeQuality } from './game/quality'
+import { applyPotionToBaseDice } from './game/potion'
+import { nextQuality, normalizeQuality } from './game/quality'
 import { simulateBattle } from './game/battle'
-import type { BattleEvent, BattleResult, DogType, EnchantmentChoice, FighterSnapshot, GameItem, ShopType } from './game/types'
-import { applyRelicChoice, initialItems, makeChoices, makeRelicChoices, makeShop, nextPhaseData as buildNextPhaseData, parseJson, phaseDataAfterEnchant, postBattleLargeItemReward, postBattleSellBonusItemIds, publicRun, relicsFromRun, seedGhost, snapshotFromRun, toGameItems } from './state'
+import type { BattleEvent, BattleResult, DogType, EnchantmentChoice, FighterSnapshot, GameItem, PotionChoice, ShopType } from './game/types'
+import { applyRelicChoice, initialItems, makeChoices, makePotionChoices, makeRelicChoices, makeShop, nextPhaseData as buildNextPhaseData, parseJson, phaseDataAfterEnchant, postBattleLargeItemReward, postBattleSellBonusItemIds, publicRun, relicsFromRun, seedGhost, snapshotFromRun, toGameItems } from './state'
 
 const DOGFIGHT_TARGET_PLAYERS = 8
 const DOGFIGHT_LOBBY_MS = 15_000
@@ -269,8 +270,8 @@ function responseFor(room: DogfightRoomWithDetails, userId: string) {
   return { room: publicDogfightRoom(room, userId) }
 }
 
-function nextDogfightPhaseData(run: Run, nextRound: number) {
-  return buildNextPhaseData(run, nextRound, `${run.id}-dogfight-round-${nextRound}-${run.wins}-${run.losses}`)
+function nextDogfightPhaseData(run: Run & { items?: Prisma.ItemInstanceGetPayload<object>[] }, nextRound: number) {
+  return buildNextPhaseData({ ...run, items: run.items ? toGameItems(run.items) : [] }, nextRound, `${run.id}-dogfight-round-${nextRound}-${run.wins}-${run.losses}`)
 }
 
 async function autoChoosePendingRunStep(tx: Tx, run: Run & { items: Prisma.ItemInstanceGetPayload<object>[] }) {
@@ -282,6 +283,21 @@ async function autoChoosePendingRunStep(tx: Tx, run: Run & { items: Prisma.ItemI
       return tx.run.update({
         where: { id: run.id },
         data: { phase: 'RELIC_CHOICE', shopType: 'RELIC', choices: '[]', shopItems: '[]', relicChoices: JSON.stringify(relicChoices) },
+        include: { items: true },
+      })
+    }
+    if (shopType === 'UPGRADE') {
+      return tx.run.update({
+        where: { id: run.id },
+        data: { phase: 'UPGRADE_CHOICE', shopType: 'UPGRADE', choices: '[]', shopItems: '[]', relicChoices: '[]', potionChoices: '[]' },
+        include: { items: true },
+      })
+    }
+    if (shopType === 'POTION') {
+      const potionChoices = makePotionChoices(`${run.id}-dogfight-auto-potion-${run.round}`)
+      return tx.run.update({
+        where: { id: run.id },
+        data: { phase: 'POTION_CHOICE', shopType: 'POTION', choices: '[]', shopItems: '[]', relicChoices: '[]', potionChoices: JSON.stringify(potionChoices) },
         include: { items: true },
       })
     }
@@ -306,7 +322,10 @@ async function autoChoosePendingRunStep(tx: Tx, run: Run & { items: Prisma.ItemI
       data: {
         phase: pendingEnchantChoices.length > 0 ? 'ENCHANT_CHOICE' : 'CHOICE',
         classRewardChoices: '[]',
-        choices: pendingEnchantChoices.length > 0 ? '[]' : JSON.stringify(makeChoices(`${run.id}-dogfight-class-${run.round}`, run.round)),
+        choices: pendingEnchantChoices.length > 0 ? '[]' : JSON.stringify(makeChoices(`${run.id}-dogfight-class-${run.round}`, run.round, [
+          ...toGameItems(run.items),
+          { id: 'class-reward-preview', defId, quality: normalizeQuality(def.defaultQuality), area: 'BAG', x: slot?.x ?? 0, y: slot?.y ?? 0 },
+        ])),
         ...(slot ? { items: { create: { defId, quality: normalizeQuality(def.defaultQuality), area: 'BAG', x: slot.x, y: slot.y } } } : {}),
       },
       include: { items: true },
@@ -323,6 +342,44 @@ async function autoChoosePendingRunStep(tx: Tx, run: Run & { items: Prisma.ItemI
         relicChoices: '[]',
         relics: relicId ? JSON.stringify(applyRelicChoice(relicsFromRun(run), relicId)) : run.relics,
       },
+      include: { items: true },
+    })
+  }
+
+  if (run.phase === 'UPGRADE_CHOICE') {
+    const item = toGameItems(run.items).find((entry) => nextQuality(entry.quality) !== null)
+    if (!item) {
+      return tx.run.update({
+        where: { id: run.id },
+        data: { phase: 'PREP' },
+        include: { items: true },
+      })
+    }
+    await tx.itemInstance.update({ where: { id: item.id }, data: { quality: nextQuality(item.quality)! } })
+    return tx.run.update({
+      where: { id: run.id },
+      data: { phase: 'PREP' },
+      include: { items: true },
+    })
+  }
+
+  if (run.phase === 'POTION_CHOICE') {
+    const choices = parseJson<PotionChoice[]>(run.potionChoices, [])
+    const choice = choices[0]
+    const target = toGameItems(run.items).find((item) => itemDef(item.defId).kind !== 'CLASS_EQUIPMENT' && itemDef(item.defId).advancedEffect !== 'BOOM_COUNTER')
+    if (!choice || !target) {
+      return tx.run.update({
+        where: { id: run.id },
+        data: { phase: 'PREP', potionChoices: '[]' },
+        include: { items: true },
+      })
+    }
+    const def = itemDef(target.defId)
+    const triggerDiceOverride = applyPotionToBaseDice(target.triggerDiceOverride ?? def.dice, choice)
+    await tx.itemInstance.update({ where: { id: target.id }, data: { triggerDiceOverride: JSON.stringify(triggerDiceOverride) } })
+    return tx.run.update({
+      where: { id: run.id },
+      data: { phase: 'PREP', potionChoices: '[]' },
       include: { items: true },
     })
   }
@@ -351,7 +408,7 @@ async function autoChoosePendingRunStep(tx: Tx, run: Run & { items: Prisma.ItemI
 
 async function normalizeRunForDogfightBattle(tx: Tx, run: Run & { items: Prisma.ItemInstanceGetPayload<object>[] }) {
   let current = run
-  while (['CHOICE', 'CLASS_REWARD', 'ENCHANT_CHOICE', 'RELIC_CHOICE'].includes(current.phase)) {
+  while (['CHOICE', 'CLASS_REWARD', 'ENCHANT_CHOICE', 'RELIC_CHOICE', 'UPGRADE_CHOICE', 'POTION_CHOICE'].includes(current.phase)) {
     current = await autoChoosePendingRunStep(tx, current)
   }
   return current

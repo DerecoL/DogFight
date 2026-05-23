@@ -1,6 +1,6 @@
 export type DogType = 'SHIBA' | 'SAMOYED' | 'MUTT' | 'BULLY' | 'EMPEROR'
-export type Phase = 'SHOP' | 'CHOICE' | 'CLASS_REWARD' | 'ENCHANT_CHOICE' | 'RELIC_CHOICE' | 'PREP' | 'MATCH' | 'BATTLE' | 'COMPLETE'
-export type ShopType = 'GENERAL' | 'LARGE' | 'MEDIUM' | 'SMALL' | 'SMALL_DICE' | 'BIG_DICE' | 'RELIC'
+export type Phase = 'SHOP' | 'CHOICE' | 'CLASS_REWARD' | 'ENCHANT_CHOICE' | 'RELIC_CHOICE' | 'UPGRADE_CHOICE' | 'POTION_CHOICE' | 'PREP' | 'MATCH' | 'BATTLE' | 'COMPLETE'
+export type ShopType = 'GENERAL' | 'LARGE' | 'MEDIUM' | 'SMALL' | 'SMALL_DICE' | 'BIG_DICE' | 'RELIC' | 'UPGRADE' | 'POTION'
 export type Area = 'EQUIPMENT' | 'BAG'
 export type ItemQuality = 'BRONZE' | 'SILVER' | 'GOLD' | 'DIAMOND'
 export type ItemKind = 'EQUIPMENT' | 'CLASS_EQUIPMENT'
@@ -42,6 +42,7 @@ export type AdvancedEffect =
   | 'ADJACENT_DAMAGE_BONUS'
   | 'CLEANSE_ONE'
   | 'APPLY_POISON'
+  | 'POISON_ON_ATTACK_HIT'
   | 'GAIN_SHIELD'
   | 'GAIN_SHIELD_THORNS'
   | 'APPLY_WEAK_ON_HIT'
@@ -89,6 +90,7 @@ export type GameItem = {
   x: number
   y: number
   enchant?: Enchantment | null
+  triggerDiceOverride?: number[] | null
   sellBonus?: number
 }
 
@@ -109,6 +111,15 @@ export type EnchantmentChoice = {
   id: string
   description: string
   enchant: Enchantment
+}
+
+export type PotionCategory = 'ADD_ONE' | 'ADD_TWO' | 'EXTRA_ONE' | 'REPLACE_RANGE' | 'REPLACE_ALL'
+
+export type PotionChoice = {
+  id: string
+  category: PotionCategory
+  dice: number[]
+  description: string
 }
 
 export type ShopOffer = {

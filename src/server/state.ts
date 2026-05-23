@@ -4,10 +4,11 @@ import { CLASS_REWARD_DEFS, RELIC_DEFS, itemDef, itemDefForQuality, relicDef, re
 import { createEnchantChoices } from './game/enchant'
 import { buildOfflineFighter } from './game/offline-builder'
 import { findSlot } from './game/grid'
+import { createPotionChoices, normalizeTriggerDice } from './game/potion'
 import { nextQuality, normalizeQuality } from './game/quality'
 import { createRng } from './game/rng'
 import { createChoices, createShop } from './game/shop'
-import type { BattleResult, DogType, Enchantment, EnchantmentChoice, FighterSnapshot, GameItem, ItemQuality, Phase, RelicInstance, ShopOffer, ShopType } from './game/types'
+import type { BattleResult, DogType, Enchantment, EnchantmentChoice, FighterSnapshot, GameItem, ItemQuality, Phase, PotionChoice, RelicInstance, ShopOffer, ShopType } from './game/types'
 
 type RunMode = 'CASUAL' | 'LADDER'
 
@@ -33,8 +34,15 @@ export function toGameItems(items: ItemInstance[]): GameItem[] {
     x: item.x,
     y: item.y,
     enchant: parseOptionalJson<Enchantment | null>(item.enchant, null),
+    triggerDiceOverride: normalizeOptionalTriggerDice((item as ItemInstance & { triggerDiceOverride?: string | null }).triggerDiceOverride),
     sellBonus: item.sellBonus,
   }))
+}
+
+function normalizeOptionalTriggerDice(value: string | null | undefined) {
+  if (!value) return null
+  const dice = normalizeTriggerDice(parseJson<number[]>(value, []))
+  return dice.length > 0 ? dice : null
 }
 
 export function normalizeRelics(relics: RelicInstance[]): RelicInstance[] {
@@ -102,6 +110,7 @@ export function publicRun(run: Run & { items: ItemInstance[]; ladderSettlement?:
     }),
     choices: parseJson<ShopType[]>(run.choices, []),
     enchantChoices: parseJson<EnchantmentChoice[]>(run.enchantChoices, []),
+    potionChoices: parseOptionalJson<PotionChoice[]>((run as Run & { potionChoices?: string }).potionChoices, []),
     classRewardChoices: parseJson<string[]>(run.classRewardChoices, []).map((defId) => {
       const quality = normalizeQuality(itemDef(defId).defaultQuality)
       return { defId, def: itemDefForQuality(defId, quality), quality }
@@ -119,7 +128,7 @@ export function publicRun(run: Run & { items: ItemInstance[]; ladderSettlement?:
   }
 }
 
-type RunHistoryItemSource = Pick<ItemInstance, 'id' | 'runId' | 'defId' | 'quality' | 'area' | 'x' | 'y'> & { enchant?: string | null; sellBonus?: number }
+type RunHistoryItemSource = Pick<ItemInstance, 'id' | 'runId' | 'defId' | 'quality' | 'area' | 'x' | 'y'> & { enchant?: string | null; triggerDiceOverride?: string | null; sellBonus?: number }
 type RunHistorySource = Pick<Run, 'id' | 'mode' | 'dogType' | 'luckyNumber' | 'wins' | 'losses' | 'round' | 'status' | 'phase' | 'createdAt' | 'updatedAt'> & {
   relics?: string
   items?: RunHistoryItemSource[]
@@ -164,7 +173,7 @@ function toHistoryEntry(run: RunHistorySource): PublicRunHistoryEntry {
     status: run.status,
     phase: run.phase as Phase,
     items: (run.items ?? [])
-      .map((item) => ({ id: item.id, defId: item.defId, quality: normalizeQuality(item.quality), area: item.area as GameItem['area'], x: item.x, y: item.y, enchant: parseOptionalJson<Enchantment | null>(item.enchant, null), sellBonus: item.sellBonus ?? 0 }))
+      .map((item) => ({ id: item.id, defId: item.defId, quality: normalizeQuality(item.quality), area: item.area as GameItem['area'], x: item.x, y: item.y, enchant: parseOptionalJson<Enchantment | null>(item.enchant, null), triggerDiceOverride: normalizeOptionalTriggerDice(item.triggerDiceOverride), sellBonus: item.sellBonus ?? 0 }))
       .map((item) => ({ ...item, def: itemDefForQuality(item.defId, item.quality) })),
     relics: publicRelics({ relics: run.relics ?? '[]' }),
     createdAt: run.createdAt.toISOString(),
@@ -254,12 +263,18 @@ export function makeShop(type: ShopType, seed: string, round = 0) {
   return createShop(type, createRng(seed), round)
 }
 
-export function makeChoices(seed: string, round = 0) {
-  return createChoices(createRng(seed), round)
+type QualityBearingItem = { quality?: string | null }
+
+export function makeChoices<T extends QualityBearingItem>(seed: string, round = 0, items: readonly T[] = []) {
+  return createChoices(createRng(seed), round, items)
 }
 
 export function makeRelicChoices(run: Pick<Run, 'relics'>, seed: string) {
   return createRelicChoices(relicsFromRun(run), createRng(seed))
+}
+
+export function makePotionChoices(seed: string) {
+  return createPotionChoices(seed)
 }
 
 function shouldCreateEnchantChoices(run: Pick<Run, 'losses' | 'enchantThirdLossGranted'>, nextRound: number, seed: string) {
@@ -268,7 +283,7 @@ function shouldCreateEnchantChoices(run: Pick<Run, 'losses' | 'enchantThirdLossG
   return { trigger: false, thirdLossGranted: false }
 }
 
-type NextPhaseRun = Pick<Run, 'id' | 'dogType' | 'losses' | 'enchantThirdLossGranted'>
+type NextPhaseRun = Pick<Run, 'id' | 'dogType' | 'losses' | 'enchantThirdLossGranted'> & { items?: readonly QualityBearingItem[] }
 type NextPhaseData = {
   phase: Phase
   classRewardChoices: string
@@ -322,14 +337,14 @@ export function nextPhaseData(run: NextPhaseRun, nextRound: number, seed = `${ru
   }
   return {
     phase: 'CHOICE',
-    choices: JSON.stringify(makeChoices(`${run.id}-choices-${nextRound}`, nextRound)),
+    choices: JSON.stringify(makeChoices(`${run.id}-choices-${nextRound}`, nextRound, run.items ?? [])),
     shopItems: '[]',
     classRewardChoices: '[]',
     enchantChoices: '[]',
   }
 }
 
-export function phaseDataAfterEnchant(run: Pick<Run, 'id' | 'round'>) {
+export function phaseDataAfterEnchant(run: Pick<Run, 'id' | 'round'> & { items?: readonly QualityBearingItem[] }) {
   if (run.round <= 2) {
     return {
       phase: 'SHOP',
@@ -341,7 +356,7 @@ export function phaseDataAfterEnchant(run: Pick<Run, 'id' | 'round'>) {
   }
   return {
     phase: 'CHOICE',
-    choices: JSON.stringify(makeChoices(`${run.id}-post-enchant-${run.round}`, run.round)),
+    choices: JSON.stringify(makeChoices(`${run.id}-post-enchant-${run.round}`, run.round, run.items ?? [])),
     shopItems: '[]',
     enchantChoices: '[]',
   }

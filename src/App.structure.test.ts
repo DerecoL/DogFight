@@ -64,6 +64,8 @@ describe('selection screen structure', () => {
     expect(app).toContain("api<DogfightRoomResponse>(`/dogfight/rooms/${room.id}/dog-choice`")
     expect(app).toContain("api<DogfightBattleResponse>(`/dogfight/battles/${battleId}`")
     expect(app).toContain("onEnterDogfight={() => setAppScreen('DOGFIGHT')}")
+    expect(app).toContain("description: '实时房间，8 狗同场淘汰'")
+    expect(app).not.toContain('实时战斗，未开放')
     expect(app).toContain("phase: DogfightRoomPhase")
     expect(app).toContain("phaseDeadline: string | null")
     expect(app).toContain("targetPlayerCount: number")
@@ -176,8 +178,8 @@ describe('selection screen structure', () => {
     expect(app).toContain("BULLY: '/assets/dogs/bully.webp'")
   })
 
-  it('keeps shop choices in a seven-slot board and pads missing choices with blanks', () => {
-    expect(app).toContain('SHOP_CHOICE_SLOT_COUNT = 7')
+  it('keeps shop choices in an eight-slot board and pads missing choices with blanks', () => {
+    expect(app).toContain('SHOP_CHOICE_SLOT_COUNT = 8')
     expect(app).toContain('choice placeholder')
     expect(app).toContain('ShopChoiceSelect')
     expect(app).toContain('role="button" tabIndex={0} className={`choice paper-card sticker-card ${selectedChoice === choice ? \'selected\' : \'\'}`}')
@@ -187,6 +189,26 @@ describe('selection screen structure', () => {
     expect(app).not.toContain('<button key={choice} className={`choice paper-card sticker-card')
     expect(css).toContain('grid-template-columns: repeat(3, minmax(240px, 1fr))')
     expect(css).toContain('.choice.placeholder')
+  })
+
+  it('wires the free upgrade shop into choices and item selection', () => {
+    expect(app).toContain("type Phase = 'SHOP' | 'CHOICE' | 'CLASS_REWARD' | 'ENCHANT_CHOICE' | 'RELIC_CHOICE' | 'UPGRADE_CHOICE' | 'POTION_CHOICE' | 'PREP' | 'MATCH' | 'BATTLE' | 'COMPLETE'")
+    expect(app).toContain("type ShopType = 'GENERAL' | 'LARGE' | 'MEDIUM' | 'SMALL' | 'SMALL_DICE' | 'BIG_DICE' | 'RELIC' | 'UPGRADE' | 'POTION'")
+    expect(app).toContain("UPGRADE: '升级商店'")
+    expect(app).toContain('function UpgradeChoiceSelect')
+    expect(app).toContain("run.phase === 'UPGRADE_CHOICE'")
+    expect(app).toContain('/upgrade/select')
+    expect(app).toContain('onUpgradeChoice')
+    expect(app).toContain('canFreeUpgradeItem')
+  })
+
+  it('wires the potion shop into choices and non-class item selection', () => {
+    expect(app).toContain("POTION: '药水商店'")
+    expect(app).toContain('function PotionChoiceSelect')
+    expect(app).toContain("run.phase === 'POTION_CHOICE'")
+    expect(app).toContain('/potion/select')
+    expect(app).toContain('onPotionChoice')
+    expect(app).toContain('职业装备不可使用药水')
   })
 
   it('does not render the removed chapter progress or page navigator', () => {
@@ -346,9 +368,9 @@ describe('selection screen structure', () => {
 
   it('hides full-range trigger dice on direct-trigger item surfaces', () => {
     expect(app).toContain("import { triggerDiceLabel } from './item-trigger-display'")
-    expect(app).toContain('triggerDiceLabel(item.def, relics)')
+    expect(app).toContain('triggerDiceLabel(itemTriggerDisplay(item), relics)')
     expect(app).toContain('{triggerDice && <small><Dice5 size={12} /> {triggerDice}</small>}')
-    expect(app).toContain('const tipTriggerDice = triggerDiceLabel(def, item ? (relicsOverride ?? run.relics) : [])')
+    expect(app).toContain('const tipTriggerDice = triggerDiceLabel(item ? itemTriggerDisplay(item) : def, item ? (relicsOverride ?? run.relics) : [])')
     expect(app).toContain('{tipTriggerDice && (')
     expect(app).not.toContain('<small><Dice5 size={12} /> {item.def.dice.join')
   })

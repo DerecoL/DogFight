@@ -25,6 +25,14 @@ describe('apex arena logic', () => {
     expect(first[0].fighter.round).toBeGreaterThan(first[49].fighter.round)
   })
 
+  it('gives apex seed dogs natural deterministic names instead of machine labels', () => {
+    const entries = buildApexSeedEntries()
+    const names = entries.map((entry) => entry.fighter.name)
+
+    expect(new Set(names).size).toBeGreaterThanOrEqual(20)
+    expect(names.every((name) => !/Apex Seed|机器人|Bot|种子/.test(name))).toBe(true)
+  })
+
   it('challenges downward from the top and places the challenger at the first beaten rank', () => {
     const report = resolveApexChallenge(
       fighter('challenger', 6),

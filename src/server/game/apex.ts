@@ -50,13 +50,7 @@ export function buildApexSeedEntries(): ApexSeedEntry[] {
       seed: `apex-seed-${rank}`,
     })
 
-    return {
-      rank,
-      fighter: {
-        ...fighter,
-        name: `Apex Seed ${rank}`,
-      },
-    }
+    return { rank, fighter }
   })
 }
 

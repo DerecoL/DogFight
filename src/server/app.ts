@@ -1,4 +1,4 @@
-import bcrypt from 'bcryptjs'
+﻿import bcrypt from 'bcryptjs'
 import cookie from '@fastify/cookie'
 import cors from '@fastify/cors'
 import jwt from '@fastify/jwt'
@@ -12,13 +12,14 @@ import { publicErrorMessage } from './errors'
 import { buildApexSeedEntries, dailyApexBoardKey, resolveApexChallenge, type ApexBoardType, type ApexChallengeReport, type ApexOpponent } from './game/apex'
 import { itemDef, itemDefForQuality, relicDef, relicDefForQuality } from './game/data'
 import { canPlace, findSlot, type PlacementOptions } from './game/grid'
+import { applyPotionToBaseDice } from './game/potion'
 import { canUpgradePair, nextQuality, normalizeQuality, upgradeEnchant } from './game/quality'
 import { itemSellValue } from './game/shop'
 import { simulateBattle } from './game/battle'
 import { calculateLadderResult, ladderTierForScore, ladderTierLabels, ladderTiers, LADDER_SEASON_ID, type LadderTier } from './game/ladder'
 import { STARTING_GOLD, isTrainingMatchRound, selectCasualGhostSnapshot, selectLadderGhostSnapshot, targetLadderOpponentWinsRange, targetOpponentWins } from './game/matchmaking'
-import type { BattleResult, DogType, EnchantmentChoice, FighterSnapshot, GameItem, RelicInstance, ShopOffer, ShopType } from './game/types'
-import { applyRelicChoice, createFinishedBattleRecord, initialItems, makeChoices, makeRelicChoices, makeShop, nextPhaseData, parseJson, phaseDataAfterEnchant, postBattleLargeItemReward, postBattleSellBonusItemIds, publicLadderSettlement, publicRun, publicRunHistory, relicsFromRun, removeRelicByInstanceId, seedGhost, snapshotFromRun, toGameItems } from './state'
+import type { BattleResult, DogType, EnchantmentChoice, FighterSnapshot, GameItem, PotionChoice, RelicInstance, ShopOffer, ShopType } from './game/types'
+import { applyRelicChoice, createFinishedBattleRecord, initialItems, makeChoices, makePotionChoices, makeRelicChoices, makeShop, nextPhaseData, parseJson, phaseDataAfterEnchant, postBattleLargeItemReward, postBattleSellBonusItemIds, publicLadderSettlement, publicRun, publicRunHistory, relicsFromRun, removeRelicByInstanceId, seedGhost, snapshotFromRun, toGameItems } from './state'
 
 type PrismaTransaction = Prisma.TransactionClient
 type ApexSourceRun = {
@@ -751,7 +752,7 @@ export function buildApp() {
   app.post('/api/runs/:runId/choice/select', async (request, reply) => {
     const userId = requireUser(request.userId)
     const { runId } = z.object({ runId: z.string() }).parse(request.params)
-    const body = z.object({ shopType: z.enum(['GENERAL', 'LARGE', 'MEDIUM', 'SMALL', 'SMALL_DICE', 'BIG_DICE', 'RELIC']) }).parse(request.body)
+    const body = z.object({ shopType: z.enum(['GENERAL', 'LARGE', 'MEDIUM', 'SMALL', 'SMALL_DICE', 'BIG_DICE', 'RELIC', 'UPGRADE', 'POTION']) }).parse(request.body)
     const run = await prisma.run.findFirstOrThrow({ where: { id: runId, userId }, include: { items: true } })
     if (await isReadyDogfightRunLocked(run.id)) return reply.code(400).send({ error: '本回合已完成，等待其他玩家' })
     if (run.phase !== 'CHOICE') return reply.code(400).send({ error: '当前不在三选一' })
@@ -767,6 +768,25 @@ export function buildApp() {
       })
       return { run: publicRun(updated) }
     }
+    if (body.shopType === 'UPGRADE') {
+      const hasUpgradeableItem = toGameItems(run.items).some((item) => nextQuality(item.quality) !== null)
+      if (!hasUpgradeableItem) return reply.code(400).send({ error: '当前没有可升级装备' })
+      const updated = await prisma.run.update({
+        where: { id: run.id },
+        data: { phase: 'UPGRADE_CHOICE', shopType: 'UPGRADE', choices: '[]', shopItems: '[]', relicChoices: '[]', potionChoices: '[]' },
+        include: { items: true },
+      })
+      return { run: publicRun(updated) }
+    }
+    if (body.shopType === 'POTION') {
+      const potionChoices = makePotionChoices(`${run.id}-potion-${run.round}-${Date.now()}`)
+      const updated = await prisma.run.update({
+        where: { id: run.id },
+        data: { phase: 'POTION_CHOICE', shopType: 'POTION', choices: '[]', shopItems: '[]', relicChoices: '[]', potionChoices: JSON.stringify(potionChoices) },
+        include: { items: true },
+      })
+      return { run: publicRun(updated) }
+    }
     const updated = await prisma.run.update({
       where: { id: run.id },
       data: { phase: 'SHOP', shopType: body.shopType, refreshCost: 1, choices: '[]', shopItems: JSON.stringify(makeShop(body.shopType, `${run.id}-choice-${body.shopType}`, run.round)) },
@@ -775,6 +795,60 @@ export function buildApp() {
     return { run: publicRun(updated) }
   })
 
+  app.post('/api/runs/:runId/upgrade/select', async (request, reply) => {
+    const userId = requireUser(request.userId)
+    const { runId } = z.object({ runId: z.string() }).parse(request.params)
+    const body = z.object({ itemId: z.string() }).parse(request.body)
+    const run = await prisma.run.findFirst({ where: { id: runId, userId }, include: { items: true } })
+    if (!run) return reply.code(404).send({ error: '跑局不存在' })
+    if (await isReadyDogfightRunLocked(run.id)) return reply.code(400).send({ error: '本回合已完成，等待其他玩家' })
+    if (run.phase !== 'UPGRADE_CHOICE') return reply.code(400).send({ error: '当前不在升级商店' })
+    const item = run.items.find((entry) => entry.id === body.itemId)
+    if (!item) return reply.code(404).send({ error: '装备不存在' })
+    const upgradedQuality = nextQuality(item.quality)
+    if (!upgradedQuality) return reply.code(400).send({ error: '钻石品质已满级' })
+
+    const [, updated] = await prisma.$transaction([
+      prisma.itemInstance.update({ where: { id: item.id }, data: { quality: upgradedQuality } }),
+      prisma.run.update({
+        where: { id: run.id },
+        data: { phase: 'PREP', choices: '[]', shopItems: '[]', relicChoices: '[]' },
+        include: { items: true },
+      }),
+    ])
+    return { run: publicRun(updated) }
+  })
+
+  app.post('/api/runs/:runId/potion/select', async (request, reply) => {
+    const userId = requireUser(request.userId)
+    const { runId } = z.object({ runId: z.string() }).parse(request.params)
+    const body = z.object({ potionId: z.string(), itemId: z.string() }).parse(request.body)
+    const run = await prisma.run.findFirst({ where: { id: runId, userId }, include: { items: true } })
+    if (!run) return reply.code(404).send({ error: 'Run not found' })
+    if (await isReadyDogfightRunLocked(run.id)) return reply.code(400).send({ error: 'Round is already ready and locked' })
+    if (run.phase !== 'POTION_CHOICE') return reply.code(400).send({ error: 'Not in potion shop' })
+    const choices = parseJson<PotionChoice[]>(run.potionChoices, [])
+    const choice = choices.find((entry) => entry.id === body.potionId)
+    if (!choice) return reply.code(400).send({ error: 'Invalid potion' })
+    const gameItems = toGameItems(run.items)
+    const item = gameItems.find((entry) => entry.id === body.itemId)
+    if (!item) return reply.code(404).send({ error: 'Item not found' })
+    const def = itemDef(item.defId)
+    if (def.kind === 'CLASS_EQUIPMENT') return reply.code(400).send({ error: 'Class equipment cannot use potions' })
+    if (def.advancedEffect === 'BOOM_COUNTER') return reply.code(400).send({ error: 'Boom counter can only trigger by count' })
+    const baseDice = item.triggerDiceOverride ?? def.dice
+    const triggerDiceOverride = applyPotionToBaseDice(baseDice, choice)
+
+    const [, updated] = await prisma.$transaction([
+      prisma.itemInstance.update({ where: { id: item.id }, data: { triggerDiceOverride: JSON.stringify(triggerDiceOverride) } }),
+      prisma.run.update({
+        where: { id: run.id },
+        data: { phase: 'PREP', choices: '[]', shopItems: '[]', relicChoices: '[]', potionChoices: '[]' },
+        include: { items: true },
+      }),
+    ])
+    return { run: publicRun(updated) }
+  })
   app.post('/api/runs/:runId/class-reward/select', async (request, reply) => {
     const userId = requireUser(request.userId)
     const { runId } = z.object({ runId: z.string() }).parse(request.params)
@@ -793,7 +867,10 @@ export function buildApp() {
       data: {
         phase: pendingEnchantChoices.length > 0 ? 'ENCHANT_CHOICE' : 'CHOICE',
         classRewardChoices: '[]',
-        choices: pendingEnchantChoices.length > 0 ? '[]' : JSON.stringify(makeChoices(`${run.id}-choices-${run.round}`, run.round)),
+        choices: pendingEnchantChoices.length > 0 ? '[]' : JSON.stringify(makeChoices(`${run.id}-choices-${run.round}`, run.round, [
+          ...toGameItems(run.items),
+          { id: 'class-reward-preview', defId: body.defId, quality: normalizeQuality(def.defaultQuality), area: 'BAG', x: slot.x, y: slot.y },
+        ])),
         items: { create: { defId: body.defId, quality: normalizeQuality(def.defaultQuality), area: 'BAG', x: slot.x, y: slot.y } },
       },
       include: { items: true },
@@ -969,7 +1046,7 @@ export function buildApp() {
       : null
     const phaseData = status === 'COMPLETE'
       ? { phase: 'COMPLETE', enchantChoices: '[]' }
-      : nextPhaseData({ id: run.id, dogType: run.dogType, losses, enchantThirdLossGranted: run.enchantThirdLossGranted }, nextRound, `${run.id}-finish-${nextRound}-${wins}-${losses}`)
+      : nextPhaseData({ id: run.id, dogType: run.dogType, losses, enchantThirdLossGranted: run.enchantThirdLossGranted, items: currentItems }, nextRound, `${run.id}-finish-${nextRound}-${wins}-${losses}`)
     const updateData = {
       wins,
       losses,

@@ -41,6 +41,7 @@ model Run {
   classRewardChoices String @default("[]")
   enchantChoices String  @default("[]")
   enchantThirdLossGranted Boolean @default(false)
+  potionChoices String   @default("[]")
   relicChoices String   @default("[]")
   relics      String   @default("[]")
   refreshCost Int      @default(1)
@@ -64,6 +65,7 @@ model ItemInstance {
   x         Int
   y         Int
   enchant   String?
+  triggerDiceOverride String?
   sellBonus Int      @default(0)
   createdAt DateTime @default(now())
   run       Run      @relation(fields: [runId], references: [id], onDelete: Cascade)
