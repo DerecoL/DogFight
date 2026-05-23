@@ -211,7 +211,13 @@ export function battlePresentationTargetSide(event?: BattleEventLike | null, kin
 
 function isPositiveStatusUtilityEvent(event?: BattleEventLike | null) {
   const positiveStatusTypes = new Set(['thorns', 'extraRoll', 'fury'])
-  return event?.effectType === 'UTILITY' && (event.statusChanged ?? []).some((status) => positiveStatusTypes.has(status))
+  const text = event?.text ?? ''
+  return event?.effectType === 'UTILITY' && (
+    (event.statusChanged ?? []).some((status) => positiveStatusTypes.has(status))
+    || text.includes('荆棘')
+    || text.includes('激昂')
+    || text.includes('加速')
+  )
 }
 
 function normalizeSide(side: string | undefined): FeedbackSide {

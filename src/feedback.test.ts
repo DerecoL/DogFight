@@ -147,6 +147,18 @@ describe('feedback presentation mapping', () => {
     expect(presentation.target).toEqual({ anchor: 'status-positive', side: 'player' })
   })
 
+  it('targets text-only self positive utility events at the actor status anchors', () => {
+    const presentation = createBattlePresentation({
+      ...baseEvent,
+      effectType: 'UTILITY',
+      target: undefined,
+      text: '巨型骨棒 触发【激昂】，攻击伤害 +1',
+    })
+
+    expect(presentation.kind).toBe('utility')
+    expect(presentation.target).toEqual({ anchor: 'status-positive', side: 'player' })
+  })
+
   it('collapses motion-heavy timeline steps when reduced motion is requested', () => {
     const presentation = createBattlePresentation({
       ...baseEvent,
