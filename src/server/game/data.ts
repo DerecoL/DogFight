@@ -145,7 +145,7 @@ export const ITEM_DEFS: ItemDef[] = [
     defaultQuality: 'DIAMOND',
   }),
   slotItem('v4-blood-contract-fang', '血契犬牙', 2, 12, [1, 6], ['lifesteal', 'support', 'extreme'], { type: 'UTILITY', amount: 0 }, {
-    description: '触发时，使左边 1 个相邻装备获得【吸血】直到战斗结束。钻石品质改为使左右相邻装备都获得【吸血】。',
+    description: '光环：战斗开始时，使左边 1 个相邻装备获得【吸血】直到战斗结束。钻石品质改为使左右相邻装备都获得【吸血】。',
     advancedEffect: 'GRANT_LIFESTEAL_ADJACENT',
     defaultQuality: 'GOLD',
   }),
@@ -222,14 +222,17 @@ export const TERM_DEFS = [
   { term: '小点', description: '投掷出1~3点', note: '无' },
   { term: '大点', description: '投掷出4~6点', note: '无' },
   { term: '极值', description: '投掷出1和6点', note: '无' },
-  { term: '荆棘', description: '每次受到攻击对敌方玩家造成2点伤害（可叠加）', note: '无' },
-  { term: '激昂', description: '自身所有攻击伤害 +1（可叠加）', note: '由巨型骨棒等效果获得' },
-  { term: '中毒', description: '造成2秒持续伤害，每秒结算1次（可叠加，叠加刷新持续时间）', note: '无' },
-  { term: '虚弱', description: '玩家的下次攻击造成的伤害减少50%（可叠加层数，不叠加效果）', note: '无' },
+  { term: '护盾', description: '特殊生命值，优先吸收受到的普通伤害；护盾不属于正面增益', note: '无' },
+  { term: '荆棘', description: '正面增益。每 1 层在受到攻击时反弹 2 点伤害，也就是每层造成2点伤害；当前反伤 = 层数 × 2', note: '无' },
+  { term: '加速', description: '正面增益。每 1 层使投掷间隔减少 0.1 秒，最多 5 层，最低投掷间隔 0.5 秒', note: '由极速太刀等效果获得' },
+  { term: '激昂', description: '正面增益。每 1 层使自身所有攻击伤害 +1，可叠加；攻击时按当前层数加成', note: '由巨型骨棒等效果获得' },
+  { term: '中毒', description: '负面效果。每 1 层每秒造成 1 点伤害，每 1 秒结算 1 次；遗物可能额外提高每次结算伤害', note: '无' },
+  { term: '虚弱', description: '负面效果。下一次攻击造成的伤害降低 50%，触发后消耗 1 层；多层只增加可消耗次数', note: '无' },
+  { term: '冻结', description: '负面效果。冻结期间无法行动；剩余时间归零后恢复投掷和装备触发', note: '无' },
   { term: '大型物品', description: '容量为4的物品', note: '恶霸袖标可让3格物品也按大型物品处理' },
   { term: '中型物品', description: '容量为2或3的物品', note: '无' },
   { term: '小型物品', description: '容量为1的物品', note: '无' },
-  { term: '失效', description: '下次生效将不会有任何行为，生效后去除一层该效果', note: '无' },
+  { term: '失效', description: '负面效果。每 1 层抵消 1 次装备触发，被抵消后消耗 1 层', note: '无' },
   { term: '天命数字', description: '开局时确定的幸运数字', note: '狗皇帝专属规则' },
 ]
 
@@ -285,8 +288,8 @@ export function itemDescription(itemId: string, quality?: string | null) {
   if (advanced === 'SHIELD_IMMUNITY') return `获得 ${amount} 点护盾。只要你拥有护盾，你受到的【中毒】和【虚弱】层数减半（向上取整）。`
   if (advanced === 'STEAL_ENEMY_BUFF') return `恢复 ${amount} 点生命值，并偷取敌方 1 层增益（优先【荆棘】，其次【加速】；护盾不算增益）。`
   if (advanced === 'GRANT_LIFESTEAL_ADJACENT') return currentQuality === 'DIAMOND'
-    ? '触发时，使左右相邻装备都获得【吸血】直到战斗结束。被赋予吸血的装备按实际造成的生命伤害 100% 治疗自己。'
-    : '触发时，使左边 1 个相邻装备获得【吸血】直到战斗结束。被赋予吸血的装备按实际造成的生命伤害 100% 治疗自己。'
+    ? '光环：战斗开始时，使左右相邻装备都获得【吸血】直到战斗结束。被赋予吸血的装备按实际造成的生命伤害 100% 治疗自己。'
+    : '光环：战斗开始时，使左边 1 个相邻装备获得【吸血】直到战斗结束。被赋予吸血的装备按实际造成的生命伤害 100% 治疗自己。'
   if (advanced === 'BOOM_COUNTER') return `己方装备每成功触发 1 次，获得 1 点爆鸣计数。达到 30 点后清零，对敌方造成 ${amount} 点直接伤害。`
   if (advanced === 'GROWTH_DAMAGE') {
     const growth = growthDamageStep(currentQuality)

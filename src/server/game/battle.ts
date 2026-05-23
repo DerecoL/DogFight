@@ -193,6 +193,7 @@ function isAdjacentToEffect(actor: FighterSnapshot, item: GameItem, effect: stri
 
 function matchingContext(actor: FighterSnapshot, item: GameItem, roll: number, forcedItemDice: Record<string, number> = {}) {
   const def = itemDef(item.defId)
+  if (def.advancedEffect === 'GRANT_LIFESTEAL_ADJACENT') return { matches: false, scale: 1, note: '', triggeredBySize: false }
   const forcedDie = forcedItemDice[item.id]
   if (forcedDie != null) return { matches: roll === forcedDie, scale: 1, note: roll === forcedDie ? '（圣旨改点）' : '', triggeredBySize: false }
 
@@ -425,6 +426,35 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
   applyOpeningForceLucky(player)
   applyOpeningForceLucky(opponent)
 
+  const applyBloodContractAura = (side: Side, actor: FighterSnapshot) => {
+    const actorState = state[side]
+    for (const item of equippedItemsWithEffect(actor, 'GRANT_LIFESTEAL_ADJACENT')) {
+      const quality = normalizeQuality(item.quality)
+      const def = itemDef(item.defId)
+      const recipients = bloodContractAdjacentItems(actor, item, quality)
+      for (const recipient of recipients) {
+        if (!actorState.lifestealItemIds.includes(recipient.id)) actorState.lifestealItemIds.push(recipient.id)
+      }
+      if (recipients.length <= 0) continue
+      push({
+        time: 0,
+        actor: side,
+        kind: 'ITEM',
+        itemId: item.id,
+        defId: item.defId,
+        quality,
+        effectType: 'UTILITY',
+        amount: recipients.length,
+        target: side,
+        sourceHpDelta: 0,
+        targetHpDelta: 0,
+        text: `${itemName(def, quality)} 光环使${quality === 'DIAMOND' ? '左右相邻' : '左侧'}装备获得【吸血】`,
+      })
+    }
+  }
+  applyBloodContractAura('player', player)
+  applyBloodContractAura('opponent', opponent)
+
   const executeItem = (
     actorSide: Side,
     actor: FighterSnapshot,
@@ -447,6 +477,7 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
     const actorState = state[actorSide]
     const targetState = state[targetSide]
     const advanced = def.advancedEffect ?? 'NONE'
+    if (advanced === 'GRANT_LIFESTEAL_ADJACENT') return triggers
     const recoveryBlocked = time <= 10 && hasEquippedEffect(actor, 'DOUBLE_RATE_FIRST_TEN')
     const sacrificeReplacesSmallEffect = def.size === 1
       && triggerOrder(actor.items).some((entry) => itemDef(entry.defId).advancedEffect === 'SMALL_TRIGGERS_LARGE')
@@ -514,27 +545,6 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
           text: `${itemName(boomDef, boomQuality)} 爆鸣计数达到 30，造成 ${result.before - result.after} 点直接伤害`,
         })
       }
-    }
-
-    if (!sacrificeReplacesSmallEffect && advanced === 'GRANT_LIFESTEAL_ADJACENT') {
-      const recipients = bloodContractAdjacentItems(actor, item, quality)
-      for (const recipient of recipients) {
-        if (!actorState.lifestealItemIds.includes(recipient.id)) actorState.lifestealItemIds.push(recipient.id)
-      }
-      triggers.push({
-        itemId: item.id,
-        defId: item.defId,
-        quality,
-        effectType: 'UTILITY',
-        amount: recipients.length,
-        target: actorSide,
-        sourceHp: getHp(actorSide),
-        targetHp: getHp(targetSide),
-        sourceHpDelta: 0,
-        targetHpDelta: 0,
-        roll,
-        text: `${itemName(def, quality)} 使${quality === 'DIAMOND' ? '左右相邻' : '左侧'}装备获得【吸血】`,
-      })
     }
 
     const bullyDoubled = actor.dogType === 'BULLY' && isLarge(def, actor) && rng() < BULLY_LARGE_EFFECT_CHANCE

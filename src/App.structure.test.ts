@@ -310,6 +310,16 @@ describe('selection screen structure', () => {
     expect(css).toContain('.hp-preview.poison')
   })
 
+  it('shows exact current values in battle status chips and tooltips', () => {
+    expect(app).toContain('STATUS_THORNS_DAMAGE_PER_STACK = 2')
+    expect(app).toContain('反伤${stacks * STATUS_THORNS_DAMAGE_PER_STACK}')
+    expect(app).toContain('每秒${poisonTickDamage(status)}伤')
+    expect(app).toContain('下次伤害-50%')
+    expect(app).toContain('伤害+${stacks * STATUS_FURY_DAMAGE_PER_STACK}')
+    expect(app).toContain('间隔-${formatStatusSeconds(stacks * STATUS_SPEED_REDUCTION_PER_STACK)}s')
+    expect(app).toContain('title={statusDescription(status)}')
+  })
+
   it('highlights poison battle effects with green damage and log styling', () => {
     expect(app).toContain("poison: { kind: 'poison', color: '#22c55e'")
     expect(css).toContain('.battle-log p.poison')
@@ -319,6 +329,15 @@ describe('selection screen structure', () => {
     expect(app).toContain('className="item-effect"')
     expect(app).toContain('effectText(item.def, normalizeQuality(item.quality))')
     expect(css).toContain('.item-effect')
+  })
+
+  it('hides full-range trigger dice on direct-trigger item surfaces', () => {
+    expect(app).toContain('function visibleTriggerDice(def: ItemDef)')
+    expect(app).toContain('const triggerDice = visibleTriggerDice(item.def)')
+    expect(app).toContain('{triggerDice && <small><Dice5 size={12} /> {triggerDice}</small>}')
+    expect(app).toContain('const tipTriggerDice = visibleTriggerDice(def)')
+    expect(app).toContain('{tipTriggerDice && (')
+    expect(app).not.toContain('<small><Dice5 size={12} /> {item.def.dice.join')
   })
 
   it('renders class reward, relic slots, and rule term tooltip surfaces', () => {

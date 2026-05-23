@@ -248,6 +248,16 @@ describe('dog and item definitions', () => {
   it('describes thorns as two reflected damage per stack', () => {
     expect(TERM_DEFS.find((term) => term.term === '荆棘')?.description).toContain('造成2点伤害')
   })
+
+  it('defines formal numeric descriptions for battle buffs and debuffs', () => {
+    const terms = Object.fromEntries(TERM_DEFS.map((term) => [term.term, term.description]))
+
+    expect(terms.荆棘).toContain('每 1 层在受到攻击时反弹 2 点伤害')
+    expect(terms.激昂).toContain('每 1 层使自身所有攻击伤害 +1')
+    expect(terms.中毒).toContain('每 1 层每秒造成 1 点伤害')
+    expect(terms.虚弱).toContain('下一次攻击造成的伤害降低 50%')
+    expect(terms.失效).toContain('每 1 层抵消 1 次装备触发')
+  })
 })
 
 describe('battle simulation', () => {
@@ -651,8 +661,54 @@ describe('battle simulation', () => {
 
     expect(grantIndex).toBeGreaterThanOrEqual(0)
     expect(leftHeals.length).toBeGreaterThan(0)
-    expect(leftHeals.every((event) => (event.sourceHpDelta ?? 0) > 0)).toBe(true)
+    expect(leftHeals.some((event) => (event.sourceHpDelta ?? 0) > 0)).toBe(true)
     expect(rightHeals).toEqual([])
+  })
+
+  it('blood contract fang aura grants lifesteal before adjacent equipment first trigger', () => {
+    const player: FighterSnapshot = {
+      name: 'P',
+      dogType: 'SHIBA',
+      wins: 0,
+      losses: 0,
+      round: 6,
+      items: [
+        { id: 'left-bite', defId: 'starter-1', quality: 'BRONZE', area: 'EQUIPMENT', x: 0, y: 0 },
+        { id: 'fang', defId: 'v4-blood-contract-fang', quality: 'GOLD', area: 'EQUIPMENT', x: 1, y: 0 },
+      ],
+    }
+    const opponent: FighterSnapshot = {
+      name: 'O',
+      dogType: 'SHIBA',
+      wins: 0,
+      losses: 0,
+      round: 6,
+      items: [],
+    }
+    const result = simulateBattle(player, opponent, 'blood-contract-aura-first-trigger')
+    const firstLeftDamageIndex = result.events.findIndex((event) =>
+      event.actor === 'player'
+      && event.itemId === 'left-bite'
+      && event.effectType === 'DAMAGE'
+    )
+    const firstLeftHealIndex = result.events.findIndex((event, index) =>
+      index > firstLeftDamageIndex
+      && event.actor === 'player'
+      && event.itemId === 'left-bite'
+      && event.effectType === 'HEAL'
+    )
+    const rolledFangGrantBeforeHeal = result.events.findIndex((event, index) =>
+      index > firstLeftDamageIndex
+      && index < firstLeftHealIndex
+      && event.actor === 'player'
+      && event.itemId === 'fang'
+      && event.effectType === 'UTILITY'
+      && event.roll != null
+    )
+
+    expect(firstLeftDamageIndex).toBeGreaterThanOrEqual(0)
+    expect(firstLeftHealIndex).toBe(firstLeftDamageIndex + 1)
+    expect(rolledFangGrantBeforeHeal).toBe(-1)
   })
 
   it('blood contract fang grants lifesteal to wide left adjacent equipment touching edges', () => {
