@@ -25,7 +25,7 @@ describe('apex arena logic', () => {
     expect(first[0].fighter.round).toBeGreaterThan(first[49].fighter.round)
   })
 
-  it('challenges upward from the bottom and places the challenger after the first loss', () => {
+  it('challenges downward from the top and places the challenger at the first beaten rank', () => {
     const report = resolveApexChallenge(
       fighter('challenger', 6),
       [
@@ -36,10 +36,10 @@ describe('apex arena logic', () => {
       'apex-test',
     )
 
-    expect(report.battles.map((battle) => battle.opponentRank)).toEqual([3, 2])
+    expect(report.battles.map((battle) => battle.opponentRank)).toEqual([1, 2, 3])
     expect(report.challengeWins).toBe(1)
     expect(report.placementRank).toBe(3)
-    expect(report.battles.at(-1)?.winner).toBe('opponent')
+    expect(report.battles.at(-1)?.winner).toBe('player')
   })
 
   it('rolls the daily board key at 05:00 in Asia/Shanghai', () => {

@@ -71,7 +71,7 @@ export function dailyApexBoardKey(date = new Date()): string {
 
 export function resolveApexChallenge(challenger: FighterSnapshot, opponents: ApexOpponent[], seed: string): ApexChallengeReport {
   const battles: ApexBattleSummary[] = []
-  const ordered = [...opponents].sort((a, b) => b.rank - a.rank)
+  const ordered = [...opponents].sort((a, b) => a.rank - b.rank)
   let challengeWins = 0
 
   for (const opponent of ordered) {
@@ -86,19 +86,18 @@ export function resolveApexChallenge(challenger: FighterSnapshot, opponents: Ape
       opponentHp: result.opponentHp,
     })
 
-    if (result.winner !== 'player') {
+    if (result.winner === 'player') {
+      challengeWins += 1
       return {
-        placementRank: opponent.rank + 1,
+        placementRank: opponent.rank,
         challengeWins,
         battles,
       }
     }
-
-    challengeWins += 1
   }
 
   return {
-    placementRank: 1,
+    placementRank: ordered.at(-1)?.rank ? ordered.at(-1)!.rank + 1 : 1,
     challengeWins,
     battles,
   }

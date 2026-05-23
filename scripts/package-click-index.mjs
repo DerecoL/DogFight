@@ -993,7 +993,7 @@ async function currentMockApiScript(buildId) {
 
   function resolveLocalApexChallenge(challenger, opponents) {
     const score = apexScore(challenger);
-    const ordered = [...opponents].sort((a, b) => b.rank - a.rank);
+    const ordered = [...opponents].sort((a, b) => a.rank - b.rank);
     const battles = [];
     let challengeWins = 0;
     for (const opponent of ordered) {
@@ -1007,10 +1007,12 @@ async function currentMockApiScript(buildId) {
         playerHp: won ? 20 + Math.min(80, score % 80) : 0,
         opponentHp: won ? 0 : 20 + Math.min(80, apexScore(opponent) % 80),
       });
-      if (!won) return { placementRank: opponent.rank + 1, challengeWins, battles };
-      challengeWins += 1;
+      if (won) {
+        challengeWins += 1;
+        return { placementRank: opponent.rank, challengeWins, battles };
+      }
     }
-    return { placementRank: 1, challengeWins, battles };
+    return { placementRank: ordered.length > 0 ? ordered[ordered.length - 1].rank + 1 : 1, challengeWins, battles };
   }
 
   function submitApexBoard(state, boardType, boardKey, run, user) {
