@@ -194,6 +194,7 @@ function battlePresentationTarget(event: BattleEventLike | null | undefined, kin
   if (kind === 'heal' || kind === 'shield') return { anchor: 'hp', side: targetSide }
   if (kind === 'poison' || kind === 'weak' || kind === 'freeze') return { anchor: 'status-negative', side: targetSide }
   if (kind === 'thorns') return { anchor: 'status-positive', side: targetSide }
+  if (kind === 'utility' && isPositiveStatusUtilityEvent(event)) return { anchor: 'status-positive', side: targetSide }
   return { anchor: 'dog-avatar', side: targetSide }
 }
 
@@ -201,10 +202,16 @@ export function battlePresentationTargetSide(event?: BattleEventLike | null, kin
   if (!event) return null
   if (event.target === 'player' || event.target === 'opponent') return event.target
   const actor = normalizeSide(event.actor)
+  if (kind === 'utility' && isPositiveStatusUtilityEvent(event) && (actor === 'player' || actor === 'opponent')) return actor
   if ((kind === 'heal' || kind === 'shield' || kind === 'thorns') && (actor === 'player' || actor === 'opponent')) return actor
   if (actor === 'player') return 'opponent'
   if (actor === 'opponent') return 'player'
   return null
+}
+
+function isPositiveStatusUtilityEvent(event?: BattleEventLike | null) {
+  const positiveStatusTypes = new Set(['thorns', 'extraRoll', 'fury'])
+  return event?.effectType === 'UTILITY' && (event.statusChanged ?? []).some((status) => positiveStatusTypes.has(status))
 }
 
 function normalizeSide(side: string | undefined): FeedbackSide {

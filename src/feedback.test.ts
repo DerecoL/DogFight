@@ -65,6 +65,7 @@ describe('feedback presentation mapping', () => {
       [{ effectType: 'POISON', target: 'opponent' }, { anchor: 'status-negative', side: 'opponent' }],
       [{ effectType: 'UTILITY', statusChanged: ['weak'], opponentStatuses: { positive: [], negative: [{ type: 'weak', label: '虚弱', tone: 'negative' }] }, target: 'opponent' }, { anchor: 'status-negative', side: 'opponent' }],
       [{ effectType: 'UTILITY', statusChanged: ['thorns'], playerStatuses: { positive: [{ type: 'thorns', label: '荆棘', tone: 'positive' }], negative: [] }, target: 'player' }, { anchor: 'status-positive', side: 'player' }],
+      [{ effectType: 'UTILITY', statusChanged: ['fury'], target: 'player' }, { anchor: 'status-positive', side: 'player' }],
     ] as const
 
     for (const [patch, expectedTarget] of cases) {
@@ -132,6 +133,18 @@ describe('feedback presentation mapping', () => {
 
     expect(presentation.kind).not.toBe('miss')
     expect(presentation.target).toEqual({ anchor: 'status-negative', side: 'opponent' })
+  })
+
+  it('targets self positive utility statuses at the actor status anchors', () => {
+    const presentation = createBattlePresentation({
+      ...baseEvent,
+      effectType: 'UTILITY',
+      target: undefined,
+      statusChanged: ['fury'],
+    })
+
+    expect(presentation.kind).toBe('utility')
+    expect(presentation.target).toEqual({ anchor: 'status-positive', side: 'player' })
   })
 
   it('collapses motion-heavy timeline steps when reduced motion is requested', () => {
