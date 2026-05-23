@@ -10,6 +10,7 @@ import {
   relicPoisonTickBonus,
   relicRollBiasChance,
   SHIBA_POISON_ON_ROLL_AMOUNT,
+  BOOM_COUNTER_TRIGGER_THRESHOLD,
   growthDamageBase,
   growthDamageStep,
   itemDefForQuality,
@@ -212,6 +213,10 @@ function extraEnchantDice(enchant?: Enchantment | null) {
   return enchant?.kind === 'EXTRA_DICE' ? enchant.dice : []
 }
 
+function itemBaseTriggerDice(item: GameItem, def: ItemDef) {
+  return item.triggerDiceOverride && item.triggerDiceOverride.length > 0 ? item.triggerDiceOverride : def.dice
+}
+
 function shiftDieUp(die: number) {
   return die >= 6 ? 1 : die + 1
 }
@@ -222,7 +227,7 @@ function shiftDieDown(die: number) {
 
 function triggerDiceContext(actor: FighterSnapshot, item: GameItem) {
   const def = itemDef(item.defId)
-  let dice = [...def.dice, ...extraEnchantDice(item.enchant)]
+  let dice = [...itemBaseTriggerDice(item, def), ...extraEnchantDice(item.enchant)]
   const notes: string[] = []
   if (hasRelic(actor, 'SHIFT_TRIGGER_DICE_UP')) {
     dice = dice.map(shiftDieUp)
@@ -433,6 +438,38 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
     return applied
   }
 
+  const poisonOnAttackHitTriggers = (
+    actorSide: Side,
+    actor: FighterSnapshot,
+    targetSide: Side,
+    targetFighter: FighterSnapshot,
+    roll: number,
+  ): ItemTrigger[] => {
+    const triggers: ItemTrigger[] = []
+    for (const passive of equippedItemsWithEffect(actor, 'POISON_ON_ATTACK_HIT')) {
+      const passiveDef = itemDef(passive.defId)
+      const passiveQuality = normalizeQuality(passive.quality)
+      const passiveAmount = qualityAmountFrom(passiveDef.effect.amount, passiveQuality, passiveDef.effect.qualityBase)
+      const appliedPoison = addPoison(targetSide, targetFighter, passiveAmount)
+      if (appliedPoison <= 0) continue
+      triggers.push({
+        itemId: passive.id,
+        defId: passive.defId,
+        quality: passiveQuality,
+        effectType: 'POISON',
+        amount: appliedPoison,
+        target: targetSide,
+        sourceHp: getHp(actorSide),
+        targetHp: getHp(targetSide),
+        sourceHpDelta: 0,
+        targetHpDelta: 0,
+        roll,
+        text: `${itemName(passiveDef, passiveQuality)} 攻击命中，施加 ${appliedPoison} 层【中毒】`,
+      })
+    }
+    return triggers
+  }
+
   const addWeak = (target: Side, targetFighter: FighterSnapshot, amount: number) => {
     const applied = statusAmountAfterShieldMitigation(target, targetFighter, amount)
     if (applied <= 0) return 0
@@ -595,6 +632,8 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
       return triggers
     }
 
+    if (advanced === 'BOOM_COUNTER') return triggers
+
     const boomCounterItems = equippedItemsWithEffect(actor, 'BOOM_COUNTER')
     if (!sacrificeReplacesSmallEffect) {
       for (const boomCounterItem of boomCounterItems) {
@@ -603,10 +642,10 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
         const boomCounterSignal = {
           boomCounterItemId: boomCounterItem.id,
           boomCounterValue: nextCount,
-          boomCounterMax: 30,
+          boomCounterMax: BOOM_COUNTER_TRIGGER_THRESHOLD,
           boomCounterChanged: true,
         }
-        if (nextCount >= 30) {
+        if (nextCount >= BOOM_COUNTER_TRIGGER_THRESHOLD) {
           actorState.boomCountersByItemId[boomCounterItem.id] = 0
           boomCounterSignal.boomCounterValue = 0
           const boomQuality = normalizeQuality(boomCounterItem.quality)
@@ -626,7 +665,7 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
             targetHpDelta: result.delta,
             roll,
             ...boomCounterSignal,
-            text: `${itemName(boomDef, boomQuality)} 【爆鸣计数】达到 30，造成 ${result.before - result.after} 点直接伤害`,
+            text: `${itemName(boomDef, boomQuality)} 【爆鸣计数】达到 ${BOOM_COUNTER_TRIGGER_THRESHOLD}，造成 ${result.before - result.after} 点直接伤害`,
           })
         } else {
           const boomQuality = normalizeQuality(boomCounterItem.quality)
@@ -644,7 +683,7 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
             targetHpDelta: 0,
             roll,
             ...boomCounterSignal,
-            text: `${itemName(boomDef, boomQuality)} 【爆鸣计数】 +${nextCount}/30`,
+            text: `${itemName(boomDef, boomQuality)} 【爆鸣计数】 +${nextCount}/${BOOM_COUNTER_TRIGGER_THRESHOLD}`,
           })
         }
       }
@@ -730,6 +769,7 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
         roll,
         text: `${itemName(def, quality)}${traitText}${note} 造成 ${Math.abs(after - before)} 点伤害`,
       })
+      triggers.push(...poisonOnAttackHitTriggers(actorSide, actor, targetSide, targetFighter, roll))
       if (advanced === 'GAIN_FURY_ON_ATTACK' && rng() < 0.5) {
         actorState.furyStacks += 1
         triggers.push({
@@ -1002,6 +1042,7 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
           const result = applyAttackDamage(targetSide, enchant.amount)
           const attackAmount = enchant.amount + targetState.wound
           triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'DAMAGE', amount: attackAmount, target: targetSide, sourceHp: getHp(actorSide), targetHp: result.after, sourceHpDelta: 0, targetHpDelta: result.delta, roll, text: `${itemName(def, quality)} 附魔造成 ${attackAmount} 点伤害` })
+          triggers.push(...poisonOnAttackHitTriggers(actorSide, actor, targetSide, targetFighter, roll))
         } else if (enchant.effect === 'HEAL' && !recoveryBlocked) {
           const result = applyHeal(actorSide, enchant.amount)
           triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'HEAL', amount: enchant.amount, target: actorSide, sourceHp: result.after, targetHp: getHp(targetSide), sourceHpDelta: result.delta, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 附魔回复 ${enchant.amount} 点生命` })

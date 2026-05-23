@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { SHOP_CHOICES, shopPool } from './data'
-import { normalizeQuality } from './quality'
+import { nextQuality, normalizeQuality } from './quality'
 import { pick } from './rng'
 import type { ItemDef, ItemQuality, ShopOffer, ShopType } from './types'
 
@@ -44,14 +44,36 @@ export function createShop(type: ShopType, rng: () => number, round = 0): ShopOf
   return offers
 }
 
-export function createChoices(rng: () => number, round = 0): ShopType[] {
+function replaceWithSpecialChoice(choices: ShopType[], shopType: ShopType, rng: () => number) {
+  if (choices.includes(shopType)) return
+  const specialChoices = new Set<ShopType>(['RELIC', 'UPGRADE', 'POTION'])
+  const candidates = choices
+    .map((choice, index) => ({ choice, index }))
+    .filter((entry) => !specialChoices.has(entry.choice))
+  const target = candidates[Math.floor(rng() * candidates.length)] ?? candidates[0]
+  if (target) choices[target.index] = shopType
+}
+
+type QualityBearingItem = { quality?: string | null }
+
+function hasFreeUpgradeableItem<T extends QualityBearingItem>(items: readonly T[]) {
+  return items.some((item) => nextQuality(item.quality) !== null)
+}
+
+export function createChoices<T extends QualityBearingItem>(rng: () => number, round = 0, items: readonly T[] = []): ShopType[] {
   const choices: ShopType[] = []
   while (choices.length < 3) {
     const next = pick(rng, SHOP_CHOICES)
     if (!choices.includes(next)) choices.push(next)
   }
   if (round >= 4 && rng() < 0.33) {
-    choices[Math.floor(rng() * choices.length)] = 'RELIC'
+    replaceWithSpecialChoice(choices, 'RELIC', rng)
+  }
+  if (round >= 4 && hasFreeUpgradeableItem(items) && rng() < 0.33) {
+    replaceWithSpecialChoice(choices, 'UPGRADE', rng)
+  }
+  if (round >= 4 && rng() < 0.33) {
+    replaceWithSpecialChoice(choices, 'POTION', rng)
   }
   return choices
 }

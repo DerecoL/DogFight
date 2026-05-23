@@ -1093,6 +1093,87 @@ describeWithDatabase('run API', () => {
     expect(upgraded.body.run.relics).toContainEqual(expect.objectContaining({ relicId: firstRelic, quality: nextQuality(firstRelicChoice.quality) }))
   })
 
+  it('supports upgrade shop choice and upgrades one owned non-diamond item for free', async () => {
+    const agent = request.agent(app.server)
+    await app.ready()
+
+    await agent.post('/api/auth/register').send({ email: `upgrade-shop${Date.now()}@dog.test`, password: 'dogdice' }).expect(200)
+    const created = await agent.post('/api/runs').send({ dogType: 'MUTT' }).expect(200)
+    const runId = created.body.run.id
+    const target = created.body.run.items[0]
+    await prisma.run.update({ where: { id: runId }, data: { round: 4, phase: 'CHOICE', choices: JSON.stringify(['UPGRADE']), gold: 13 } })
+
+    const upgradeChoice = await agent.post(`/api/runs/${runId}/choice/select`).send({ shopType: 'UPGRADE' }).expect(200)
+    expect(upgradeChoice.body.run).toMatchObject({ phase: 'UPGRADE_CHOICE', shopType: 'UPGRADE', gold: 13 })
+
+    const upgraded = await agent.post(`/api/runs/${runId}/upgrade/select`).send({ itemId: target.id }).expect(200)
+    expect(upgraded.body.run.phase).toBe('PREP')
+    expect(upgraded.body.run.gold).toBe(13)
+    expect(upgraded.body.run.items).toHaveLength(created.body.run.items.length)
+    expect(upgraded.body.run.items.find((item: { id: string }) => item.id === target.id)).toMatchObject({
+      quality: 'SILVER',
+    })
+  })
+
+  it('supports potion shop choice and applies a concrete potion to a non-class item', async () => {
+    const agent = request.agent(app.server)
+    await app.ready()
+
+    await agent.post('/api/auth/register').send({ email: `potion-shop${Date.now()}@dog.test`, password: 'dogdice' }).expect(200)
+    const created = await agent.post('/api/runs').send({ dogType: 'MUTT' }).expect(200)
+    const runId = created.body.run.id
+    const target = created.body.run.items[0]
+    await prisma.run.update({ where: { id: runId }, data: { round: 4, phase: 'CHOICE', choices: JSON.stringify(['POTION']) } })
+
+    const potionChoice = await agent.post(`/api/runs/${runId}/choice/select`).send({ shopType: 'POTION' }).expect(200)
+    expect(potionChoice.body.run).toMatchObject({ phase: 'POTION_CHOICE', shopType: 'POTION' })
+    expect(potionChoice.body.run.potionChoices).toHaveLength(3)
+
+    const selectedPotion = potionChoice.body.run.potionChoices[0]
+    const selected = await agent.post(`/api/runs/${runId}/potion/select`).send({ potionId: selectedPotion.id, itemId: target.id }).expect(200)
+
+    expect(selected.body.run.phase).toBe('PREP')
+    expect(selected.body.run.items.find((item: { id: string }) => item.id === target.id).triggerDiceOverride).toEqual(expect.arrayContaining(selectedPotion.dice))
+  })
+
+  it('rejects applying potions to boom counter because it only triggers by count', async () => {
+    const agent = request.agent(app.server)
+    await app.ready()
+
+    await agent.post('/api/auth/register').send({ email: `potion-boom${Date.now()}@dog.test`, password: 'dogdice' }).expect(200)
+    const created = await agent.post('/api/runs').send({ dogType: 'MUTT' }).expect(200)
+    const runId = created.body.run.id
+    const target = created.body.run.items[0]
+    await prisma.itemInstance.update({ where: { id: target.id }, data: { defId: 'v4-boom-counter' } })
+    await prisma.run.update({ where: { id: runId }, data: { round: 4, phase: 'CHOICE', choices: JSON.stringify(['POTION']) } })
+
+    const potionChoice = await agent.post(`/api/runs/${runId}/choice/select`).send({ shopType: 'POTION' }).expect(200)
+    const selectedPotion = potionChoice.body.run.potionChoices[0]
+    const selected = await agent.post(`/api/runs/${runId}/potion/select`).send({ potionId: selectedPotion.id, itemId: target.id }).expect(400)
+
+    expect(selected.body.error).toBe('Boom counter can only trigger by count')
+  })
+
+  it('rejects upgrade shop selection for diamond, cross-user, or wrong-phase items', async () => {
+    const agent = request.agent(app.server)
+    await app.ready()
+
+    await agent.post('/api/auth/register').send({ email: `upgrade-reject${Date.now()}@dog.test`, password: 'dogdice' }).expect(200)
+    const created = await agent.post('/api/runs').send({ dogType: 'SHIBA' }).expect(200)
+    const runId = created.body.run.id
+    const target = created.body.run.items[0]
+
+    await agent.post(`/api/runs/${runId}/upgrade/select`).send({ itemId: target.id }).expect(400)
+
+    await prisma.run.update({ where: { id: runId }, data: { phase: 'UPGRADE_CHOICE' } })
+    await prisma.itemInstance.update({ where: { id: target.id }, data: { quality: 'DIAMOND' } })
+    await agent.post(`/api/runs/${runId}/upgrade/select`).send({ itemId: target.id }).expect(400)
+
+    const other = request.agent(app.server)
+    await other.post('/api/auth/register').send({ email: `upgrade-other${Date.now()}@dog.test`, password: 'dogdice' }).expect(200)
+    await other.post(`/api/runs/${runId}/upgrade/select`).send({ itemId: target.id }).expect(404)
+  })
+
   it('sells owned relics for zero gold and compacts the remaining relic slots', async () => {
     const agent = request.agent(app.server)
     await app.ready()

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createFinishedBattleRecord, nextPhaseData, postBattleLargeItemReward, postBattleSellBonusItemIds, publicRelics, publicRunHistory } from './state'
+import { createFinishedBattleRecord, nextPhaseData, postBattleLargeItemReward, postBattleSellBonusItemIds, publicRelics, publicRunHistory, toGameItems } from './state'
 
 describe('public run relic data', () => {
   it('returns quality-adjusted relic descriptions for upgraded relics', () => {
@@ -39,6 +39,26 @@ describe('post-battle equipment rewards', () => {
     ])
 
     expect(itemIds).toEqual(['gold-equipped', 'silver-equipped', 'silver-bagged'])
+  })
+})
+
+describe('game item conversion', () => {
+  it('exposes potion trigger dice overrides from item instances', () => {
+    const [item] = toGameItems([{
+      id: 'item-1',
+      runId: 'run-1',
+      defId: 'small-bite',
+      quality: 'BRONZE',
+      area: 'EQUIPMENT',
+      x: 0,
+      y: 0,
+      enchant: null,
+      triggerDiceOverride: JSON.stringify([2, 5]),
+      sellBonus: 0,
+      createdAt: new Date(),
+    } as never])
+
+    expect(item.triggerDiceOverride).toEqual([2, 5])
   })
 })
 

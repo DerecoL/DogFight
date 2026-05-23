@@ -92,7 +92,7 @@ describe('rule term definitions', () => {
     expect(byName.get('护盾')).toContain('每 8 点折算')
     expect(byName.get('吸血')).toContain('实际造成的生命伤害')
     expect(byName.get('吸血')).toContain('治疗自己')
-    expect(byName.get('爆鸣计数')).toContain('30')
+    expect(byName.get('爆鸣计数')).toContain('50')
     expect(byName.get('爆鸣计数')).toContain('清零')
     expect(byName.get('爆鸣计数')).toContain('直接伤害')
     expect(byName.get('雪崩')).toContain('5 层')

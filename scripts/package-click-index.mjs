@@ -5,6 +5,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 const defaultDistDir = path.resolve('dist')
 const defaultOutputFile = path.resolve('dist-click', 'index.html')
 const defaultLauncherFile = path.resolve('dist-click', 'DogFight-standalone.cmd')
+const boomCounterTriggerThreshold = 50
 
 const mimeTypes = new Map([
   ['.css', 'text/css'],
@@ -1525,18 +1526,18 @@ async function currentMockApiScript(buildId) {
             for (const boomCounterItem of boomCounterItems) {
               const nextCount = (state[side].boomCountersByItemId[boomCounterItem.id] || 0) + 1;
               state[side].boomCountersByItemId[boomCounterItem.id] = nextCount;
-              const boomCounterSignal = { boomCounterItemId: boomCounterItem.id, boomCounterValue: nextCount, boomCounterMax: 30, boomCounterChanged: true };
-              if (nextCount >= 30) {
+              const boomCounterSignal = { boomCounterItemId: boomCounterItem.id, boomCounterValue: nextCount, boomCounterMax: boomCounterTriggerThreshold, boomCounterChanged: true };
+              if (nextCount >= boomCounterTriggerThreshold) {
                 state[side].boomCountersByItemId[boomCounterItem.id] = 0;
                 boomCounterSignal.boomCounterValue = 0;
                 const boomDef = defs[boomCounterItem.defId];
                 const boomQuality = normalizeQuality(boomCounterItem.quality);
                 const boomDamage = qualityAmountFrom(boomDef.effect?.amount || 0, boomQuality, boomDef.effect?.qualityBase);
                 const boomResult = applyDirectHealthDamage(target, boomDamage);
-                push({ actor: side, kind: 'ITEM', itemId: boomCounterItem.id, defId: boomCounterItem.defId, effectType: 'DAMAGE', amount: Math.max(0, -boomResult.delta), target, ...boomCounterSignal, text: boomDef.name + ' 爆鸣计数达到 30，造成 ' + Math.max(0, -boomResult.delta) + ' 点直接伤害。' });
+                push({ actor: side, kind: 'ITEM', itemId: boomCounterItem.id, defId: boomCounterItem.defId, effectType: 'DAMAGE', amount: Math.max(0, -boomResult.delta), target, ...boomCounterSignal, text: boomDef.name + ' 爆鸣计数达到 ' + boomCounterTriggerThreshold + '，造成 ' + Math.max(0, -boomResult.delta) + ' 点直接伤害。' });
               } else {
                 const boomDef = defs[boomCounterItem.defId];
-                push({ actor: side, kind: 'ITEM', itemId: boomCounterItem.id, defId: boomCounterItem.defId, effectType: 'UTILITY', amount: 1, target: side, ...boomCounterSignal, text: boomDef.name + ' 爆鸣计数 +' + nextCount + '/30。' });
+                push({ actor: side, kind: 'ITEM', itemId: boomCounterItem.id, defId: boomCounterItem.defId, effectType: 'UTILITY', amount: 1, target: side, ...boomCounterSignal, text: boomDef.name + ' 爆鸣计数 +' + nextCount + '/' + boomCounterTriggerThreshold + '。' });
               }
             }
           }

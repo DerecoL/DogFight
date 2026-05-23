@@ -1,6 +1,7 @@
 type TriggerDisplayItem = {
   dice: number[]
   advancedEffect?: string
+  triggerDiceOverride?: number[] | null
 }
 
 type TriggerDisplayRelic = {
@@ -38,6 +39,7 @@ const nonSelfTriggeredEffects = new Set([
   'ONLY_LUCKY_DOUBLE',
   'GRANT_LIFESTEAL_ADJACENT',
   'BOOM_COUNTER',
+  'POISON_ON_ATTACK_HIT',
 ])
 
 function shiftDieUp(die: number) {
@@ -50,7 +52,7 @@ function shiftDieDown(die: number) {
 
 export function triggerDiceLabel(item: TriggerDisplayItem, relics: TriggerDisplayRelic[] = []) {
   if (item.advancedEffect && nonSelfTriggeredEffects.has(item.advancedEffect)) return null
-  let dice = item.dice
+  let dice = item.triggerDiceOverride && item.triggerDiceOverride.length > 0 ? item.triggerDiceOverride : item.dice
   if (relics.some((relic) => relic.def?.effect === 'SHIFT_TRIGGER_DICE_UP')) dice = dice.map(shiftDieUp)
   if (relics.some((relic) => relic.def?.effect === 'SHIFT_TRIGGER_DICE_DOWN')) dice = dice.map(shiftDieDown)
   return [...new Set(dice)].sort((left, right) => left - right).join('/')

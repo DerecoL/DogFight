@@ -1,5 +1,8 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { publicDogfightRoom } from './dogfight'
+
+const dogfightSource = readFileSync(new URL('./dogfight.ts', import.meta.url), 'utf8')
 
 function makeRun(overrides: Record<string, unknown>) {
   return {
@@ -51,6 +54,19 @@ function makeParticipant(overrides: Record<string, unknown>) {
 }
 
 describe('dogfight public room display state', () => {
+  it('auto-resolves upgrade choice shops before locking a dogfight round', () => {
+    expect(dogfightSource).toContain("run.phase === 'UPGRADE_CHOICE'")
+    expect(dogfightSource).toContain("nextQuality(item.quality)")
+    expect(dogfightSource).toContain("data: { phase: 'PREP' }")
+  })
+
+  it('auto-resolves potion choice shops before locking a dogfight round', () => {
+    expect(dogfightSource).toContain("run.phase === 'POTION_CHOICE'")
+    expect(dogfightSource).toContain('applyPotionToBaseDice')
+    expect(dogfightSource).toContain('triggerDiceOverride: JSON.stringify')
+    expect(dogfightSource).toContain("itemDef(item.defId).advancedEffect !== 'BOOM_COUNTER'")
+  })
+
   it('hides the current round result while the battle replay is still showing', () => {
     const participantA = makeParticipant({
       id: 'participant-a',

@@ -13,6 +13,7 @@ export const DOGS: Record<DogType, { name: string; trait: string }> = {
 
 export const SHIBA_POISON_ON_ROLL_AMOUNT = 6
 export const THORNS_DAMAGE_PER_STACK = 2
+export const BOOM_COUNTER_TRIGGER_THRESHOLD = 50
 
 function slotItem(
   id: string,
@@ -151,7 +152,7 @@ export const ITEM_DEFS: ItemDef[] = [
     advancedEffect: 'POISON_AND_DISABLE_RIGHTMOST',
     defaultQuality: 'GOLD',
   }),
-  slotItem('v3-golden-kennel', '不可侵犯的纯金狗窝', 4, 18, [4, 5], ['shield', 'immune'], { type: 'UTILITY', amount: 14, qualityBase: 'DIAMOND' }, {
+  slotItem('v3-golden-kennel', '不可侵犯的纯金狗窝', 4, 11, [4, 5], ['shield', 'immune'], { type: 'UTILITY', amount: 14, qualityBase: 'DIAMOND' }, {
     description: '获得 14 点【护盾】。只要你拥有【护盾】，你受到的【中毒】和【虚弱】层数减半（向上取整）。',
     advancedEffect: 'SHIELD_IMMUNITY',
     defaultQuality: 'DIAMOND',
@@ -161,8 +162,8 @@ export const ITEM_DEFS: ItemDef[] = [
     advancedEffect: 'GRANT_LIFESTEAL_ADJACENT',
     defaultQuality: 'GOLD',
   }),
-  slotItem('v4-boom-counter', '爆鸣计数器', 2, 14, [1, 6], ['counter', 'trigger', 'damage'], { type: 'UTILITY', amount: 300, qualityBase: 'GOLD' }, {
-    description: '己方装备每成功触发 1 次，获得 1 点【爆鸣计数】。达到 30 点后清零，对敌方造成 300 点直接伤害。升级只提高伤害。',
+  slotItem('v4-boom-counter', '爆鸣计数器', 2, 14, [], ['counter', 'trigger', 'damage'], { type: 'UTILITY', amount: 380, qualityBase: 'GOLD' }, {
+    description: '只能通过计数触发。己方其他装备每成功触发 1 次，获得 1 点【爆鸣计数】。达到 50 点后清零，对敌方造成 380 点直接伤害。升级只提高伤害。',
     advancedEffect: 'BOOM_COUNTER',
     defaultQuality: 'GOLD',
   }),
@@ -179,6 +180,11 @@ export const ITEM_DEFS: ItemDef[] = [
   slotItem('patting-bear', '拍拍熊', 2, 20, [1, 6], ['wound', 'attack'], { type: 'UTILITY', amount: 1, qualityBase: 'SILVER' }, {
     description: '每次触发对敌人叠加 1 层【伤口】；【伤口】使受到的直接攻击伤害 +1，可叠加，不影响【中毒】、【荆棘】等非直接攻击伤害。',
     advancedEffect: 'APPLY_WOUND',
+    defaultQuality: 'SILVER',
+  }),
+  slotItem('poisoned-dog-fang', '淬毒狗牙', 2, 15, [], ['poison', 'attack', 'passive'], { type: 'UTILITY', amount: 2, qualityBase: 'GOLD' }, {
+    description: '无需触发。每次攻击命中时，对敌人施加 1 层【中毒】。',
+    advancedEffect: 'POISON_ON_ATTACK_HIT',
     defaultQuality: 'SILVER',
   }),
 ]
@@ -281,6 +287,7 @@ export function itemDescription(itemId: string, quality?: string | null) {
   if (advanced === 'GAIN_SHIELD') return `获得 ${amount} 点【护盾】。`
   if (advanced === 'CLEANSE_ONE') return `恢复 ${amount} 点生命值，并【净化】自身的一层【中毒】或者【虚弱】。`
   if (advanced === 'APPLY_POISON') return `对敌人施加 ${amount} 层【中毒】。`
+  if (advanced === 'POISON_ON_ATTACK_HIT') return `无需触发。每次攻击命中时，对敌人施加 ${amount} 层【中毒】。`
   if (advanced === 'GAIN_SHIELD_THORNS') return `获得 ${amount} 点【护盾】，并获得 ${one} 层【荆棘】。`
   if (advanced === 'APPLY_WEAK_ON_HIT') return `${baseEffect}并给敌人施加 ${one} 层【虚弱】。`
   if (advanced === 'APPLY_WEAK_20_ON_HIT') return `${baseEffect}命中后有 20% 概率给敌人施加 ${one} 层【虚弱】。`
@@ -295,7 +302,7 @@ export function itemDescription(itemId: string, quality?: string | null) {
   if (advanced === 'GRANT_LIFESTEAL_ADJACENT') return currentQuality === 'DIAMOND'
     ? '光环：战斗开始时，使左右【相邻】装备都获得【吸血】直到战斗结束。被赋予【吸血】的装备按实际造成的生命伤害 100% 治疗自己。'
     : '光环：战斗开始时，使左边 1 个【相邻】装备获得【吸血】直到战斗结束。被赋予【吸血】的装备按实际造成的生命伤害 100% 治疗自己。'
-  if (advanced === 'BOOM_COUNTER') return `己方装备每成功触发 1 次，获得 1 点【爆鸣计数】。达到 30 点后清零，对敌方造成 ${amount} 点直接伤害。`
+  if (advanced === 'BOOM_COUNTER') return `只能通过计数触发。己方其他装备每成功触发 1 次，获得 1 点【爆鸣计数】。达到 ${BOOM_COUNTER_TRIGGER_THRESHOLD} 点后清零，对敌方造成 ${amount} 点直接伤害。`
   if (advanced === 'GROWTH_DAMAGE') {
     const growth = growthDamageStep(currentQuality)
     return `初始造成 ${growthDamageBase(currentQuality)} 点伤害。每次该装备成功触发后，本局内后续伤害 +${growth}，无成长次数上限。`

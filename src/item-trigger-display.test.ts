@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { itemTriggerCountLabel, triggerDiceLabel } from './item-trigger-display'
 
-const item = (dice: number[], advancedEffect = 'NONE') => ({ dice, advancedEffect })
+const item = (dice: number[], advancedEffect = 'NONE', triggerDiceOverride?: number[] | null) => ({ dice, advancedEffect, triggerDiceOverride })
 
 describe('item trigger dice display', () => {
   it('keeps all six dice visible when an item triggers from every roll face', () => {
@@ -11,6 +11,7 @@ describe('item trigger dice display', () => {
   it('hides dice for equipment whose effect is driven by passive, opening, or event hooks', () => {
     expect(triggerDiceLabel(item([1, 2, 3, 4, 5, 6], 'POST_BATTLE_LARGE_ITEM'))).toBeNull()
     expect(triggerDiceLabel(item([1, 6], 'BOOM_COUNTER'))).toBeNull()
+    expect(triggerDiceLabel(item([], 'POISON_ON_ATTACK_HIT'))).toBeNull()
   })
 
   it('keeps normal face-triggered items visible', () => {
@@ -19,6 +20,10 @@ describe('item trigger dice display', () => {
 
   it('shifts visible trigger dice up when carrot is active', () => {
     expect(triggerDiceLabel(item([4, 5, 6]), [{ def: { effect: 'SHIFT_TRIGGER_DICE_UP' } }])).toBe('1/5/6')
+  })
+
+  it('uses potion-modified base dice before relic remapping', () => {
+    expect(triggerDiceLabel(item([4, 5, 6], 'NONE', [1]), [{ def: { effect: 'SHIFT_TRIGGER_DICE_UP' } }])).toBe('2')
   })
 
   it('shifts visible trigger dice down when tissue is active', () => {

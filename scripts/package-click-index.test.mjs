@@ -491,7 +491,7 @@ describe('buildStandaloneIndex', () => {
       }
 
       expect(goldenKennelOffer).toMatchObject({ quality: 'DIAMOND' })
-      expect(goldenKennelOffer.price).toBe(Math.max(1, Math.floor(144 * goldenKennelOffer.discount)))
+      expect(goldenKennelOffer.price).toBe(Math.max(1, Math.floor(88 * goldenKennelOffer.discount)))
     } finally {
       await rm(root, { recursive: true, force: true })
     }

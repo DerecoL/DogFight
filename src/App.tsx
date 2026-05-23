@@ -59,9 +59,9 @@ import { TERM_DEFS } from './shared/rule-terms'
 import './App.css'
 
 type DogType = 'SHIBA' | 'SAMOYED' | 'MUTT' | 'BULLY' | 'EMPEROR'
-type Phase = 'SHOP' | 'CHOICE' | 'CLASS_REWARD' | 'ENCHANT_CHOICE' | 'RELIC_CHOICE' | 'PREP' | 'MATCH' | 'BATTLE' | 'COMPLETE'
+type Phase = 'SHOP' | 'CHOICE' | 'CLASS_REWARD' | 'ENCHANT_CHOICE' | 'RELIC_CHOICE' | 'UPGRADE_CHOICE' | 'POTION_CHOICE' | 'PREP' | 'MATCH' | 'BATTLE' | 'COMPLETE'
 type Area = 'EQUIPMENT' | 'BAG'
-type ShopType = 'GENERAL' | 'LARGE' | 'MEDIUM' | 'SMALL' | 'SMALL_DICE' | 'BIG_DICE' | 'RELIC'
+type ShopType = 'GENERAL' | 'LARGE' | 'MEDIUM' | 'SMALL' | 'SMALL_DICE' | 'BIG_DICE' | 'RELIC' | 'UPGRADE' | 'POTION'
 type ItemQuality = 'BRONZE' | 'SILVER' | 'GOLD' | 'DIAMOND'
 type GameMode = 'CASUAL' | 'LADDER' | 'DOGFIGHT' | 'PEAK'
 type AppScreen = 'LOBBY' | 'CASUAL' | 'LADDER' | 'DOGFIGHT' | 'PEAK'
@@ -71,9 +71,12 @@ type RunMode = 'CASUAL' | 'LADDER'
 type LadderTier = 'BRONZE' | 'SILVER' | 'GOLD' | 'PLATINUM' | 'DIAMOND' | 'MASTER' | 'DOG_KING'
 type VisualThemeId = 'dogPark' | 'backAlley' | 'royalKennel'
 
+const BOOM_COUNTER_TRIGGER_THRESHOLD = 50
+
 type ItemDef = {
   id: string
   name: string
+  kind?: string
   size: 1 | 2 | 3 | 4
   width: number
   height: number
@@ -102,7 +105,9 @@ type Enchantment =
   | { kind: 'BUFF_NEIGHBOR_EFFECT'; target: EnchantmentTarget; effect: EnchantmentBaseEffect; amount: number; label: string }
   | { kind: 'GRANT_NEIGHBOR_EFFECT'; target: EnchantmentTarget; effect: EnchantmentGrantEffect; amount: number; label: string }
 type EnchantmentChoice = { id: string; description: string; enchant: Enchantment }
-type Item = { id: string; defId: string; quality: ItemQuality; area: Area; x: number; y: number; def: ItemDef; enchant?: Enchantment | null; sellBonus?: number }
+type PotionCategory = 'ADD_ONE' | 'ADD_TWO' | 'EXTRA_ONE' | 'REPLACE_RANGE' | 'REPLACE_ALL'
+type PotionChoice = { id: string; category: PotionCategory; dice: number[]; description: string }
+type Item = { id: string; defId: string; quality: ItemQuality; area: Area; x: number; y: number; def: ItemDef; enchant?: Enchantment | null; triggerDiceOverride?: number[] | null; sellBonus?: number }
 type BattleActor = 'player' | 'opponent' | 'system'
 type BattleTarget = 'player' | 'opponent' | 'both' | 'none'
 type BattleSnapshot = { name: string; dogType: DogType; luckyNumber?: number | null; wins: number; losses: number; round: number; items: Item[]; relics?: Relic[] }
@@ -174,6 +179,7 @@ type Run = {
   choices: ShopType[]
   classRewardChoices: ClassRewardChoice[]
   enchantChoices: EnchantmentChoice[]
+  potionChoices: PotionChoice[]
   relicChoices: RelicChoice[]
   relics: Relic[]
   refreshCost: number
@@ -509,7 +515,7 @@ function resolveCasualTutorialStep(input: {
     if (!input.placed && !hasPlacedTutorialItem(input.run)) return 'PLACE_ITEM'
     return 'MATCH'
   }
-  if (input.run.phase === 'CLASS_REWARD' || input.run.phase === 'RELIC_CHOICE' || input.run.phase === 'ENCHANT_CHOICE' || input.run.phase === 'CHOICE') return 'MATCH'
+  if (input.run.phase === 'CLASS_REWARD' || input.run.phase === 'RELIC_CHOICE' || input.run.phase === 'UPGRADE_CHOICE' || input.run.phase === 'POTION_CHOICE' || input.run.phase === 'ENCHANT_CHOICE' || input.run.phase === 'CHOICE') return 'MATCH'
   return 'MATCH'
 }
 const shopNames: Record<ShopType, string> = {
@@ -520,6 +526,8 @@ const shopNames: Record<ShopType, string> = {
   SMALL_DICE: '小点商店',
   BIG_DICE: '大点商店',
   RELIC: '遗物商店',
+  UPGRADE: '升级商店',
+  POTION: '药水商店',
 }
 const itemIcons: Record<string, string> = {
   'starter-1': '/assets/items/bite.svg',
@@ -540,6 +548,7 @@ const itemIcons: Record<string, string> = {
   'dog-gold-ingot': '/assets/items/dog-gold-ingot.svg',
   'dog-silver-ingot': '/assets/items/dog-silver-ingot.svg',
   'patting-bear': '/assets/items/patting-bear.svg',
+  'poisoned-dog-fang': '/assets/items/poisoned-dog-fang.svg',
   'v3-broken-canine': '/assets/items/v3-broken-canine.svg',
   'v3-chew-scratch-post': '/assets/items/v3-chew-scratch-post.svg',
   'v3-cone-collar': '/assets/items/v3-cone-collar.svg',
@@ -619,7 +628,7 @@ const qualityPriceMultiplier: Record<ItemQuality, number> = {
   DIAMOND: 8,
 }
 const DOG_SELECTION_SLOT_COUNT = 8
-const SHOP_CHOICE_SLOT_COUNT = 7
+const SHOP_CHOICE_SLOT_COUNT = 8
 const BASE_EQUIPMENT_SLOT_COUNT = 12
 const EXTRA_EQUIPMENT_SLOT_COUNT = 13
 const BASE_MAX_HP = 100
@@ -653,7 +662,7 @@ const ladderTierLabel: Record<LadderTier, string> = {
   DOG_KING: '犬王',
 }
 const dogOptions: DogType[] = ['SHIBA', 'SAMOYED', 'MUTT', 'BULLY', 'EMPEROR']
-const shopChoiceOrder: ShopType[] = ['GENERAL', 'LARGE', 'MEDIUM', 'SMALL', 'SMALL_DICE', 'BIG_DICE', 'RELIC']
+const shopChoiceOrder: ShopType[] = ['GENERAL', 'LARGE', 'MEDIUM', 'SMALL', 'SMALL_DICE', 'BIG_DICE', 'RELIC', 'UPGRADE', 'POTION']
 const dogStrategies: Record<DogType, string> = {
   SHIBA: '适合新手，专注于持续输出伤害',
   SAMOYED: '适合押【大点】构筑，爆发窗口更集中',
@@ -676,6 +685,8 @@ const shopDescriptions: Record<ShopType, string> = {
   SMALL_DICE: '偏向【小点】触发道具，适合【小点】战术',
   BIG_DICE: '偏向【大点】触发道具，适合高点爆发',
   RELIC: '免费选择一个遗物，强化骰子倾向和触发频率',
+  UPGRADE: '免费选择一件未达到钻石的装备，直接提升 1 个品质',
+  POTION: '三选一药水，修改一件非职业装备的基础触发点数',
 }
 const ruleTerms = Object.fromEntries(TERM_DEFS.map((term) => [term.term, term]))
 const statusTipId = 'battle-status-tip'
@@ -779,6 +790,10 @@ function equipmentSlotCount(relics?: Relic[]) {
   return relics?.some((relic) => relic.def.effect === 'EXTRA_EQUIPMENT_REDUCED_EFFECT') ? EXTRA_EQUIPMENT_SLOT_COUNT : BASE_EQUIPMENT_SLOT_COUNT
 }
 
+function itemTriggerDisplay(item: Item) {
+  return { ...item.def, triggerDiceOverride: item.triggerDiceOverride }
+}
+
 function battleVfxKind(event?: BattleEvent): BattleVfxKind {
   return createBattlePresentation(event).kind
 }
@@ -808,7 +823,7 @@ function createBattleFxStyle(event: BattleEvent) {
 function effectText(def: ItemDef, quality: ItemQuality = 'BRONZE') {
   const amount = qualityAmountFrom(def.effect.amount, quality, def.effect.qualityBase)
   if (def.advancedEffect === 'GRANT_LIFESTEAL_ADJACENT') return quality === 'DIAMOND' ? '左右【相邻】装备获得【吸血】' : '左侧【相邻】装备获得【吸血】'
-  if (def.advancedEffect === 'BOOM_COUNTER') return `【爆鸣计数】达到 30 后造成 ${amount} 伤害`
+  if (def.advancedEffect === 'BOOM_COUNTER') return `只能通过计数触发，达到 ${BOOM_COUNTER_TRIGGER_THRESHOLD} 后造成 ${amount} 伤害`
   if (def.advancedEffect === 'GROWTH_DAMAGE') return `造成 ${amount} 伤害，后续伤害提升`
   if (def.advancedEffect === 'PURGE_ENEMY_BUFFS') return '清除敌方增益并恢复生命'
   if (def.advancedEffect === 'APPLY_WOUND') return `叠加 ${amount} 层【伤口】`
@@ -845,7 +860,7 @@ function growthDamageTextForBattleItem(item: Item, owner: 'player' | 'opponent',
 function boomCounterStateForBattleItem(item: Item, owner: 'player' | 'opponent', events: BattleEvent[], displayIndex: number, activeEvent?: BattleEvent) {
   if (item.def.advancedEffect !== 'BOOM_COUNTER') return null
   const latest = events.slice(0, displayIndex + 1).reverse().find((event) => event.actor === owner && event.boomCounterItemId === item.id)
-  const max = latest?.boomCounterMax ?? 30
+  const max = latest?.boomCounterMax ?? BOOM_COUNTER_TRIGGER_THRESHOLD
   const count = Math.max(0, Math.min(max, latest?.boomCounterValue ?? 0))
   const progress = max > 0 ? Math.round((count / max) * 100) : 0
   const popping = activeEvent?.actor === owner && activeEvent.boomCounterItemId === item.id && activeEvent.boomCounterChanged === true
@@ -942,6 +957,10 @@ function canUpgradeItem(item: Item, items: Item[]) {
   return quality !== 'DIAMOND' && items.some((entry) => entry.id !== item.id && entry.defId === item.defId && normalizeQuality(entry.quality) === quality)
 }
 
+function canFreeUpgradeItem(item: Item) {
+  return normalizeQuality(item.quality) !== 'DIAMOND'
+}
+
 function canUpgradeDrop(source: Item | undefined, target: Item | undefined) {
   if (!source || !target || source.id === target.id) return false
   const quality = normalizeQuality(source.quality)
@@ -1033,6 +1052,7 @@ export default function App() {
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
   const [selectedOfferId, setSelectedOfferId] = useState<string | null>(null)
   const [selectedEnchantId, setSelectedEnchantId] = useState<string | null>(null)
+  const [selectedPotionId, setSelectedPotionId] = useState<string | null>(null)
   const [tipAnchor, setTipAnchor] = useState<TipAnchor | null>(null)
   const [draggingItemId, setDraggingItemId] = useState<string | null>(null)
   const [battle, setBattle] = useState<Battle | null>(null)
@@ -1156,6 +1176,9 @@ export default function App() {
   const selectedOffer = run?.shopItems.find((offer) => offer.offerId === selectedOfferId) || null
   const selectedEnchant = run?.phase === 'ENCHANT_CHOICE'
     ? run.enchantChoices.find((choice) => choice.id === selectedEnchantId) ?? run.enchantChoices[0] ?? null
+    : null
+  const selectedPotion = run?.phase === 'POTION_CHOICE'
+    ? run.potionChoices.find((choice) => choice.id === selectedPotionId) ?? run.potionChoices[0] ?? null
     : null
   const draggingItem = run?.items.find((item) => item.id === draggingItemId) || null
   const currentEvent = battle?.events[eventIndex]
@@ -1292,6 +1315,26 @@ export default function App() {
     )
   }
 
+  const selectUpgradeChoice = (itemId: string) => {
+    if (!run) return
+    setTipAnchor(null)
+    setSelectedItemId(null)
+    void action(
+      () => api(`/runs/${run.id}/upgrade/select`, { method: 'POST', body: JSON.stringify({ itemId }) }),
+      { success: 'upgrade-success', failure: 'upgrade-failed' },
+    )
+  }
+
+  const applyPotionChoice = (itemId: string) => {
+    if (!run || !selectedPotion) return
+    setTipAnchor(null)
+    setSelectedItemId(null)
+    void action(
+      () => api(`/runs/${run.id}/potion/select`, { method: 'POST', body: JSON.stringify({ potionId: selectedPotion.id, itemId }) }),
+      { success: 'upgrade-success', failure: 'upgrade-failed' },
+    )
+  }
+
   const sellRelic = (relicId: string) => {
     if (!run) return
     void action(
@@ -1353,6 +1396,28 @@ export default function App() {
     if (run?.phase === 'ENCHANT_CHOICE' && selectedEnchant) {
       applyEnchant(itemId)
       return
+    }
+    if (run?.phase === 'UPGRADE_CHOICE') {
+      const item = run.items.find((entry) => entry.id === itemId)
+      if (item && canFreeUpgradeItem(item)) {
+        selectUpgradeChoice(itemId)
+        return
+      }
+    }
+    if (run?.phase === 'POTION_CHOICE' && selectedPotion) {
+      const item = run.items.find((entry) => entry.id === itemId)
+      if (item?.def.kind === 'CLASS_EQUIPMENT') {
+        setError('职业装备不可使用药水')
+        return
+      }
+      if (item?.def.advancedEffect === 'BOOM_COUNTER') {
+        setError('爆鸣计数器只能通过计数触发')
+        return
+      }
+      if (item) {
+        applyPotionChoice(itemId)
+        return
+      }
     }
     setSelectedItemId(itemId)
     setSelectedOfferId(null)
@@ -1567,6 +1632,36 @@ export default function App() {
         <RelicChoiceSelect choices={run.relicChoices} visualTheme={visualThemeForRound(run.round)} onPick={(relicId) => action(() => api(`/runs/${run.id}/relic/select`, { method: 'POST', body: JSON.stringify({ relicId }) }), { success: 'relic-picked' })} />
       )}
 
+      {!battle && run.phase === 'UPGRADE_CHOICE' && (
+        <section className="reward-workbench upgrade-workbench">
+          <UpgradeChoiceSelect run={run} visualTheme={visualThemeForRound(run.round)} />
+          <InventoryBoard
+            run={run}
+            selectedItemId={selectedItemId}
+            draggingItemId={draggingItemId}
+            onSellRelic={sellRelic}
+            onSelectItem={onInspectItem}
+            onSlotClick={() => undefined}
+          />
+          <FloatingTip run={run} item={selectedItem} offer={null} anchor={tipAnchor} onClose={closeShopTip} onBuy={null} onSell={null} onUpgrade={selectedItem && canFreeUpgradeItem(selectedItem) ? () => selectUpgradeChoice(selectedItem.id) : null} />
+        </section>
+      )}
+
+      {!battle && run.phase === 'POTION_CHOICE' && (
+        <section className="reward-workbench potion-workbench">
+          <PotionChoiceSelect choices={run.potionChoices} selectedId={selectedPotion?.id ?? ''} visualTheme={visualThemeForRound(run.round)} onSelect={setSelectedPotionId} />
+          <InventoryBoard
+            run={run}
+            selectedItemId={selectedItemId}
+            draggingItemId={draggingItemId}
+            onSellRelic={sellRelic}
+            onSelectItem={onInspectItem}
+            onSlotClick={() => undefined}
+          />
+          <FloatingTip run={run} item={selectedItem} offer={null} anchor={tipAnchor} onClose={closeShopTip} onBuy={null} onSell={null} onUpgrade={null} />
+        </section>
+      )}
+
       {!battle && run.phase === 'SHOP' && (
         <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd}>
           <section className="shop-workbench">
@@ -1689,7 +1784,7 @@ const modeCards: Array<{
   {
     id: 'DOGFIGHT',
     title: '斗狗模式',
-    description: '实时战斗，未开放',
+    description: '实时房间，8 狗同场淘汰',
     icon: <RadioTower size={38} />,
     locked: false,
   },
@@ -1705,7 +1800,7 @@ const modeCards: Array<{
 function CasualTutorialGuide({ state, run, battle, eventIndex, onSkip }: { state: CasualTutorialState; run: Run | null; battle: Battle | null; eventIndex: number; onSkip: () => void }) {
   const step = casualTutorialSteps[state.stepId]
   const battleFinished = battlePlaybackFinished(battle, eventIndex)
-  const advancedPhase = run?.phase === 'CLASS_REWARD' || run?.phase === 'RELIC_CHOICE' || run?.phase === 'ENCHANT_CHOICE'
+  const advancedPhase = run?.phase === 'CLASS_REWARD' || run?.phase === 'RELIC_CHOICE' || run?.phase === 'UPGRADE_CHOICE' || run?.phase === 'POTION_CHOICE' || run?.phase === 'ENCHANT_CHOICE'
   const body = advancedPhase
     ? '这是进阶奖励，选择一个适合当前装备的即可。'
     : state.stepId === 'BATTLE_WATCH' && battle && !battle.events.slice(0, eventIndex + 1).some((event) => event.kind === 'ITEM')
@@ -1942,6 +2037,7 @@ function HistoryRunDetails({ entry, inspectedItem, tipAnchor, onInspectItem, onC
     choices: [],
     classRewardChoices: [],
     enchantChoices: [],
+    potionChoices: [],
     relicChoices: [],
     relics: entry.relics,
     refreshCost: 1,
@@ -1968,7 +2064,7 @@ function HistoryRunDetails({ entry, inspectedItem, tipAnchor, onInspectItem, onC
         <div className="battle-slot-grid" style={{ gridTemplateColumns: `repeat(${equipmentSlotCount(entry.relics)}, minmax(0, 1fr))` }}>
           {Array.from({ length: equipmentSlotCount(entry.relics) }).map((_, x) => <i key={x} className="battle-slot" style={{ gridColumn: x + 1, gridRow: 1 }} />)}
           {equipment.map((item) => {
-            const triggerDice = triggerDiceLabel(item.def, entry.relics)
+            const triggerDice = triggerDiceLabel(itemTriggerDisplay(item), entry.relics)
             return (
             <button
               type="button"
@@ -2141,6 +2237,7 @@ function DogfightRoomView({ room, onRoomChange, onLeave, soundEnabled }: { room:
   const [selectedOfferId, setSelectedOfferId] = useState<string | null>(null)
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null)
   const [selectedEnchantId, setSelectedEnchantId] = useState<string | null>(null)
+  const [selectedPotionId, setSelectedPotionId] = useState<string | null>(null)
   const [tipAnchor, setTipAnchor] = useState<TipAnchor | null>(null)
   const [draggingItemId, setDraggingItemId] = useState<string | null>(null)
   const [battle, setBattle] = useState<Battle | null>(null)
@@ -2156,6 +2253,7 @@ function DogfightRoomView({ room, onRoomChange, onLeave, soundEnabled }: { room:
   const selectedItem = run?.items.find((item) => item.id === selectedItemId) || null
   const selectedOffer = run?.shopItems.find((offer) => offer.offerId === selectedOfferId) || null
   const selectedEnchant = run?.enchantChoices.find((choice) => choice.id === selectedEnchantId) ?? run?.enchantChoices[0] ?? null
+  const selectedPotion = run?.potionChoices.find((choice) => choice.id === selectedPotionId) ?? run?.potionChoices[0] ?? null
   const draggingItem = run?.items.find((item) => item.id === draggingItemId) || null
   const deadline = room.phaseDeadline ? Math.max(0, Math.ceil((new Date(room.phaseDeadline).getTime() - now) / 1000)) : 0
   const selectedBattleMemberId = selectedMemberId ?? currentMember?.id ?? sortedDogfightMembers(room.members)[0]?.id ?? null
@@ -2253,6 +2351,20 @@ function DogfightRoomView({ room, onRoomChange, onLeave, soundEnabled }: { room:
     void runAction(() => api<{ run: Run }>(`/runs/${run.id}/items/upgrade`, { method: 'POST', body: JSON.stringify({ itemId, targetItemId }) }))
   }
 
+  const selectUpgradeChoice = (itemId: string) => {
+    if (!run || currentMember?.ready) return
+    setTipAnchor(null)
+    setSelectedItemId(null)
+    void runAction(() => api<{ run: Run }>(`/runs/${run.id}/upgrade/select`, { method: 'POST', body: JSON.stringify({ itemId }) }))
+  }
+
+  const applyPotionChoice = (itemId: string) => {
+    if (!run || !selectedPotion || currentMember?.ready) return
+    setTipAnchor(null)
+    setSelectedItemId(null)
+    void runAction(() => api<{ run: Run }>(`/runs/${run.id}/potion/select`, { method: 'POST', body: JSON.stringify({ potionId: selectedPotion.id, itemId }) }))
+  }
+
   const sellRelic = (relicId: string) => {
     if (!run || currentMember?.ready) return
     void runAction(() => api<{ run: Run }>(`/runs/${run.id}/relic/sell`, { method: 'POST', body: JSON.stringify({ relicId }) }))
@@ -2275,6 +2387,24 @@ function DogfightRoomView({ room, onRoomChange, onLeave, soundEnabled }: { room:
     if (run?.phase === 'ENCHANT_CHOICE' && selectedEnchant) {
       applyEnchant(itemId)
       return
+    }
+    if (run?.phase === 'UPGRADE_CHOICE') {
+      const item = run.items.find((entry) => entry.id === itemId)
+      if (item && canFreeUpgradeItem(item)) {
+        selectUpgradeChoice(itemId)
+        return
+      }
+    }
+    if (run?.phase === 'POTION_CHOICE' && selectedPotion) {
+      const item = run.items.find((entry) => entry.id === itemId)
+      if (item?.def.kind === 'CLASS_EQUIPMENT') {
+        setError('职业装备不可使用药水')
+        return
+      }
+      if (item) {
+        applyPotionChoice(itemId)
+        return
+      }
     }
     setSelectedItemId(itemId)
     setSelectedOfferId(null)
@@ -2403,8 +2533,11 @@ function DogfightRoomView({ room, onRoomChange, onLeave, soundEnabled }: { room:
                 onChoice={(shopType) => !currentMember?.ready && runAction(() => api<{ run: Run }>(`/runs/${run.id}/choice/select`, { method: 'POST', body: JSON.stringify({ shopType }) }))}
                 onClassReward={(defId) => !currentMember?.ready && runAction(() => api<{ run: Run }>(`/runs/${run.id}/class-reward/select`, { method: 'POST', body: JSON.stringify({ defId }) }))}
                 onRelic={(relicId) => !currentMember?.ready && runAction(() => api<{ run: Run }>(`/runs/${run.id}/relic/select`, { method: 'POST', body: JSON.stringify({ relicId }) }))}
+                onUpgradeChoice={selectUpgradeChoice}
                 selectedEnchantId={selectedEnchant?.id ?? ''}
                 onEnchantChoice={setSelectedEnchantId}
+                selectedPotionId={selectedPotion?.id ?? ''}
+                onPotionChoice={setSelectedPotionId}
                 selectedItem={selectedItem}
                 selectedOffer={selectedOffer}
                 tipAnchor={tipAnchor}
@@ -2432,7 +2565,7 @@ function DogfightRoomView({ room, onRoomChange, onLeave, soundEnabled }: { room:
   )
 }
 
-function DogfightRunWorkbench({ run, selectedItemId, selectedOfferId, draggingItemId, selectedItem, selectedOffer, tipAnchor, onInspectOffer, onInspectItem, onMoveItem, onReroll, onBuy, onSell, onSellRelic, onUpgrade, onChoice, onClassReward, onRelic, selectedEnchantId, onEnchantChoice, onCloseTip }: {
+function DogfightRunWorkbench({ run, selectedItemId, selectedOfferId, draggingItemId, selectedItem, selectedOffer, tipAnchor, onInspectOffer, onInspectItem, onMoveItem, onReroll, onBuy, onSell, onSellRelic, onUpgrade, onChoice, onClassReward, onRelic, onUpgradeChoice, selectedEnchantId, onEnchantChoice, selectedPotionId, onPotionChoice, onCloseTip }: {
   run: Run
   selectedItemId: string | null
   selectedOfferId: string | null
@@ -2451,8 +2584,11 @@ function DogfightRunWorkbench({ run, selectedItemId, selectedOfferId, draggingIt
   onChoice: (shopType: ShopType) => void
   onClassReward: (defId: string) => void
   onRelic: (relicId: string) => void
+  onUpgradeChoice: (itemId: string) => void
   selectedEnchantId: string
   onEnchantChoice: (id: string) => void
+  selectedPotionId: string
+  onPotionChoice: (id: string) => void
   onCloseTip: () => void
 }) {
   if (run.phase === 'CHOICE') return <ShopChoiceSelect choices={run.choices} onPick={onChoice} />
@@ -2475,6 +2611,24 @@ function DogfightRunWorkbench({ run, selectedItemId, selectedOfferId, draggingIt
     )
   }
   if (run.phase === 'RELIC_CHOICE') return <RelicChoiceSelect choices={run.relicChoices} visualTheme={visualThemeForRound(run.round)} onPick={onRelic} />
+  if (run.phase === 'UPGRADE_CHOICE') {
+    return (
+      <section className="reward-workbench upgrade-workbench">
+        <UpgradeChoiceSelect run={run} visualTheme={visualThemeForRound(run.round)} />
+        <InventoryBoard run={run} selectedItemId={selectedItemId} draggingItemId={draggingItemId} onSellRelic={onSellRelic} onSelectItem={onInspectItem} onSlotClick={() => undefined} />
+        <FloatingTip run={run} item={selectedItem} offer={null} anchor={tipAnchor} onClose={onCloseTip} onBuy={null} onSell={null} onUpgrade={selectedItem && canFreeUpgradeItem(selectedItem) ? () => onUpgradeChoice(selectedItem.id) : null} />
+      </section>
+    )
+  }
+  if (run.phase === 'POTION_CHOICE') {
+    return (
+      <section className="reward-workbench potion-workbench">
+        <PotionChoiceSelect choices={run.potionChoices} selectedId={selectedPotionId} visualTheme={visualThemeForRound(run.round)} onSelect={onPotionChoice} />
+        <InventoryBoard run={run} selectedItemId={selectedItemId} draggingItemId={draggingItemId} onSellRelic={onSellRelic} onSelectItem={onInspectItem} onSlotClick={() => undefined} />
+        <FloatingTip run={run} item={selectedItem} offer={null} anchor={tipAnchor} onClose={onCloseTip} onBuy={null} onSell={null} onUpgrade={null} />
+      </section>
+    )
+  }
   return (
     <section className="shop-workbench dogfight-workbench">
       {run.phase === 'SHOP' && <ShopShelf run={run} selectedOfferId={selectedOfferId} draggingItemId={draggingItemId} onInspectOffer={onInspectOffer} onReroll={onReroll} onMatch={() => undefined} />}
@@ -2503,6 +2657,7 @@ function battleToRun(battle: Battle | null): Run | null {
     choices: [],
     classRewardChoices: [],
     enchantChoices: [],
+    potionChoices: [],
     relicChoices: [],
     relics: snapshot.relics ?? [],
     refreshCost: 1,
@@ -2677,6 +2832,7 @@ function ApexSnapshotDetails({ entry }: { entry: ApexEntry }) {
     choices: [],
     classRewardChoices: [],
     enchantChoices: [],
+    potionChoices: [],
     relicChoices: [],
     relics: entry.relics,
     refreshCost: 1,
@@ -2704,7 +2860,7 @@ function ApexSnapshotDetails({ entry }: { entry: ApexEntry }) {
         <div className="battle-slot-grid" style={{ gridTemplateColumns: 'repeat(12, minmax(0, 1fr))' }}>
           {Array.from({ length: 12 }).map((_, x) => <i key={x} className="battle-slot" style={{ gridColumn: x + 1, gridRow: 1 }} />)}
           {equipment.map((item) => {
-            const triggerDice = triggerDiceLabel(item.def, entry.relics)
+            const triggerDice = triggerDiceLabel(itemTriggerDisplay(item), entry.relics)
             return (
             <button
               type="button"
@@ -3089,6 +3245,8 @@ function ShopChoiceSelect({ choices, onPick }: { choices: ShopType[]; onPick: (s
 
 function shopChoiceIcon(shopType: ShopType) {
   if (shopType === 'RELIC') return <Trophy size={36} />
+  if (shopType === 'UPGRADE') return <PackagePlus size={36} />
+  if (shopType === 'POTION') return <Sparkles size={36} />
   if (shopType === 'LARGE') return <Backpack size={36} />
   if (shopType === 'MEDIUM') return <Shield size={36} />
   if (shopType === 'SMALL') return <ShoppingBag size={36} />
@@ -3255,6 +3413,48 @@ function RelicChoiceSelect({ choices, visualTheme, onPick }: { choices: RelicCho
         ))}
       </div>
       <button className="primary action-button choice-submit" disabled={!selected} onClick={() => selected && onPick(selected)}>获得遗物</button>
+    </section>
+  )
+}
+
+function UpgradeChoiceSelect({ run, visualTheme }: { run: Run; visualTheme: VisualThemeId }) {
+  const upgradeableCount = run.items.filter(canFreeUpgradeItem).length
+  return (
+    <section className={`reward-panel paper-card visual-theme-surface visual-theme-${visualTheme} upgrade-panel`} data-visual-theme={visualTheme} style={visualThemeStyle(visualTheme)}>
+      <div className="screen-heading centered">
+        <h2>选择升级装备</h2>
+        <p>点击装备栏或背包里任意未达到钻石的装备，免费提升 1 个品质。</p>
+      </div>
+      <div className="reward-choice-grid">
+        <div className="choice paper-card sticker-card reward-choice enchant-choice selected">
+          <PackagePlus size={28} />
+          <strong>免费升级</strong>
+          <span className="tip-tag">可升级 {upgradeableCount} 件</span>
+          <span className="choice-copy">钻石品质已经满级，不能继续提升。</span>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+function PotionChoiceSelect({ choices, selectedId, visualTheme, onSelect }: { choices: PotionChoice[]; selectedId: string; visualTheme: VisualThemeId; onSelect: (id: string) => void }) {
+  return (
+    <section className={`reward-panel paper-card visual-theme-surface visual-theme-${visualTheme} potion-panel`} data-visual-theme={visualTheme} style={visualThemeStyle(visualTheme)}>
+      <div className="screen-heading centered">
+        <h2>选择药水</h2>
+        <p>先选一瓶药水，再点击一件非职业装备，修改它的基础触发点数。</p>
+      </div>
+      <div className="reward-choice-grid">
+        {choices.map((choice) => (
+          <div key={choice.id} role="button" tabIndex={0} className={`choice paper-card sticker-card reward-choice enchant-choice ${selectedId === choice.id ? 'selected' : ''}`} onClick={() => onSelect(choice.id)} onKeyDown={(event) => handleChoiceCardKeyDown(event, () => onSelect(choice.id))}>
+            <Sparkles size={28} />
+            <strong>{choice.description}</strong>
+            <span className="tip-tag">药水</span>
+            <span className="choice-copy">修改基础触发点数；之后仍会被遗物和其他道具影响。</span>
+          </div>
+        ))}
+      </div>
+      <small className="disabled-reason">职业装备不可使用药水</small>
     </section>
   )
 }
@@ -3456,7 +3656,7 @@ function DraggableItem({ item, relics, selected, dragging, upgradeable, onSelect
     gridColumn: `${item.x + 1} / span ${item.def.width}`,
     gridRow: `${item.y + 1} / span ${item.def.height}`,
   }
-  const triggerDice = triggerDiceLabel(item.def, relics)
+  const triggerDice = triggerDiceLabel(itemTriggerDisplay(item), relics)
   return (
     <button
       ref={setNodeRef}
@@ -3476,7 +3676,7 @@ function DraggableItem({ item, relics, selected, dragging, upgradeable, onSelect
 }
 
 function ItemCardContent({ item, relics = [], upgradeable = false }: { item: Item; relics?: Relic[]; upgradeable?: boolean }) {
-  const triggerDice = triggerDiceLabel(item.def, relics)
+  const triggerDice = triggerDiceLabel(itemTriggerDisplay(item), relics)
   return (
     <>
       <span className="quality-chip">{qualityLabel[normalizeQuality(item.quality)]}</span>
@@ -3513,7 +3713,7 @@ function FloatingTip({ run, item, offer, anchor, descriptionOverride, relicsOver
   const canAfford = !offer || run.gold >= offer.price
   const sellValue = item ? sellValueForItem(item) : null
   const style = anchor ? { '--tip-x': `${anchor.x}px`, '--tip-y': `${anchor.y}px` } as React.CSSProperties : undefined
-  const tipTriggerDice = triggerDiceLabel(def, item ? (relicsOverride ?? run.relics) : [])
+  const tipTriggerDice = triggerDiceLabel(item ? itemTriggerDisplay(item) : def, item ? (relicsOverride ?? run.relics) : [])
   return (
     <aside className="floating-tip paper-card" style={style}>
       <div className="tip-tags">
@@ -3753,7 +3953,7 @@ function BattleEquipmentRow({ owner, snapshot, events, displayIndex, activeEvent
         {items.map((item) => {
           const growthText = growthDamageTextForBattleItem(item, owner, events, displayIndex)
           const boomCounterState = boomCounterStateForBattleItem(item, owner, events, displayIndex, activeEvent)
-          const triggerDice = triggerDiceLabel(item.def, snapshot.relics ?? [])
+          const triggerDice = triggerDiceLabel(itemTriggerDisplay(item), snapshot.relics ?? [])
           const triggerCountLabel = itemTriggerCountLabel(events, owner, item.id, displayIndex)
           const triggerCountPopping = activeItemId === item.id
           return (

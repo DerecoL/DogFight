@@ -3,7 +3,7 @@ import { resolveWinnerByHealthPercent, simulateBattle } from './game/battle'
 import { CLASS_REWARD_DEFS, DOGS, RELIC_DEFS, TERM_DEFS, itemDef, itemDefForQuality, relicDefForQuality, shopPool } from './game/data'
 import { canPlace, findSlot, triggerOrder } from './game/grid'
 import { createRng } from './game/rng'
-import { createShop, itemPurchaseValue, itemSellValue } from './game/shop'
+import { createChoices, createShop, itemPurchaseValue, itemSellValue } from './game/shop'
 import type { FighterSnapshot, GameItem, RelicInstance } from './game/types'
 
 function baseItems(): GameItem[] {
@@ -109,7 +109,7 @@ describe('shop generation', () => {
 
     expect(offer.defId).toBe('v3-golden-kennel')
     expect(offer.quality).toBe('DIAMOND')
-    expect(offer.price).toBe(144)
+    expect(offer.price).toBe(88)
   })
 
   it('values upgraded equipment by each item price doubled per quality before selling at half', () => {
@@ -148,6 +148,27 @@ describe('shop generation', () => {
     expect(itemSellValue(silverIngot, 'BRONZE')).toBe(0)
     expect(itemSellValue(silverIngot, 'BRONZE', 3)).toBe(3)
     expect(itemSellValue(silverIngot, 'SILVER', 6)).toBe(7)
+  })
+
+  it('can offer relic and upgrade shops independently after round 4 when equipment can improve', () => {
+    const rolls = [0, 0.2, 0.4, 0, 0, 0, 0]
+    const choices = createChoices(() => rolls.shift() ?? 0, 4, [
+      { id: 'upgrade-me', defId: 'starter-1', quality: 'GOLD', area: 'EQUIPMENT', x: 0, y: 0 },
+    ])
+
+    expect(choices).toContain('RELIC')
+    expect(choices).toContain('UPGRADE')
+    expect(choices).toHaveLength(3)
+  })
+
+  it('does not offer the upgrade shop when every item is already diamond', () => {
+    const rolls = [0, 0.2, 0.4, 0, 0, 0, 0]
+    const choices = createChoices(() => rolls.shift() ?? 0, 4, [
+      { id: 'maxed', defId: 'starter-1', quality: 'DIAMOND', area: 'EQUIPMENT', x: 0, y: 0 },
+    ])
+
+    expect(choices).toContain('RELIC')
+    expect(choices).not.toContain('UPGRADE')
   })
 })
 
@@ -192,7 +213,7 @@ describe('dog and item definitions', () => {
     expect(itemDef('v3-dinosaur-leg-bone')).toMatchObject({ dice: [5, 6], effect: { type: 'DAMAGE', amount: 18 }, advancedEffect: 'DOUBLE_SHIELD_DAMAGE' })
     expect(itemDef('v3-auto-waterer')).toMatchObject({ effect: { type: 'HEAL', amount: 8 }, advancedEffect: 'HEAL_OR_MAX_HP' })
     expect(itemDef('samoyed-soft-fur')).toMatchObject({ effect: { type: 'HEAL', amount: 8 } })
-    expect(itemDef('v3-golden-kennel')).toMatchObject({ size: 4, defaultQuality: 'DIAMOND' })
+    expect(itemDef('v3-golden-kennel')).toMatchObject({ size: 4, price: 11, defaultQuality: 'DIAMOND' })
     expect(shopPool('SMALL').some((item) => item.id === 'v3-flea-disc')).toBe(true)
     expect(shopPool('LARGE').some((item) => item.id === 'v3-dinosaur-leg-bone')).toBe(true)
     expect(RELIC_DEFS.map((relic) => relic.id)).toEqual(expect.arrayContaining([
@@ -216,9 +237,9 @@ describe('dog and item definitions', () => {
     expect(itemDef('v4-boom-counter')).toMatchObject({
       size: 2,
       price: 14,
-      dice: [1, 6],
+      dice: [],
       tags: ['counter', 'trigger', 'damage'],
-      effect: { type: 'UTILITY', amount: 300, qualityBase: 'GOLD' },
+      effect: { type: 'UTILITY', amount: 380, qualityBase: 'GOLD' },
       advancedEffect: 'BOOM_COUNTER',
       defaultQuality: 'GOLD',
     })
@@ -251,18 +272,30 @@ describe('dog and item definitions', () => {
       defaultQuality: 'SILVER',
     })
 
+    expect(itemDef('poisoned-dog-fang')).toMatchObject({
+      size: 2,
+      price: 15,
+      dice: [],
+      tags: ['poison', 'attack', 'passive'],
+      effect: { type: 'UTILITY', amount: 2, qualityBase: 'GOLD' },
+      advancedEffect: 'POISON_ON_ATTACK_HIT',
+      defaultQuality: 'SILVER',
+    })
+
     expect(shopPool('GENERAL').map((item) => item.id)).toEqual(expect.arrayContaining([
       'v4-blood-contract-fang',
       'v4-boom-counter',
       'v4-growing-chew-sword',
       'v4-reverse-fur-comb',
       'patting-bear',
+      'poisoned-dog-fang',
     ]))
     expect(shopPool('MEDIUM').map((item) => item.id)).toEqual(expect.arrayContaining([
       'v4-blood-contract-fang',
       'v4-boom-counter',
       'v4-growing-chew-sword',
       'patting-bear',
+      'poisoned-dog-fang',
     ]))
     expect(shopPool('SMALL').map((item) => item.id)).toContain('v4-reverse-fur-comb')
   })
@@ -427,6 +460,36 @@ describe('battle simulation', () => {
     expect(boostedAttack).toMatchObject({ amount: 6, targetHpDelta: -6 })
     expect(poisonTick).toMatchObject({ amount: 6 })
     expect(thorn).toMatchObject({ amount: 10, sourceHpDelta: -10 })
+  })
+
+  it('lets poisoned dog fang apply quality-scaled poison whenever an attack hits', () => {
+    const fighterWithFang = (quality: GameItem['quality']): FighterSnapshot => ({
+      name: 'P',
+      dogType: 'BULLY',
+      wins: 0,
+      losses: 0,
+      round: 10,
+      items: [
+        { id: 'fang', defId: 'poisoned-dog-fang', quality, area: 'EQUIPMENT', x: 0, y: 0 },
+        ...[1, 2, 3, 4, 5, 6].map((n, index) => ({
+          id: `bite-${quality}-${n}`,
+          defId: `starter-${n}`,
+          quality: 'BRONZE' as const,
+          area: 'EQUIPMENT' as const,
+          x: index + 2,
+          y: 0,
+        })),
+      ],
+    })
+    const opponent: FighterSnapshot = { name: 'O', dogType: 'BULLY', wins: 0, losses: 0, round: 10, items: [] }
+    const firstFangPoison = (quality: GameItem['quality']) => {
+      const result = simulateBattle(fighterWithFang(quality), opponent, `poisoned-fang-${quality}`)
+      return result.events.find((event) => event.defId === 'poisoned-dog-fang' && event.effectType === 'POISON')
+    }
+
+    expect(firstFangPoison('SILVER')).toMatchObject({ amount: 1, target: 'opponent' })
+    expect(firstFangPoison('GOLD')).toMatchObject({ amount: 2, target: 'opponent' })
+    expect(firstFangPoison('DIAMOND')).toMatchObject({ amount: 3, target: 'opponent' })
   })
 
   it('night patrol light upgrade increases adjacent trigger count', () => {
@@ -997,7 +1060,7 @@ describe('battle simulation', () => {
     expect(nextEvent).not.toMatchObject({ actor: 'player', itemId: 'left-bite', effectType: 'HEAL' })
   })
 
-  it('gold boom counter explodes for 300 damage after 30 successful equipment triggers', () => {
+  it('gold boom counter explodes for 380 damage after 50 successful equipment triggers', () => {
     const player: FighterSnapshot = {
       name: 'P',
       dogType: 'SHIBA',
@@ -1013,48 +1076,48 @@ describe('battle simulation', () => {
       && event.itemId === 'counter'
       && event.defId === 'v4-boom-counter'
       && event.effectType === 'DAMAGE'
-      && event.text.includes('【爆鸣计数】达到 30')
+      && event.text.includes('【爆鸣计数】达到 50')
     )
 
     expect(explosion).toMatchObject({
       quality: 'GOLD',
-      amount: 300,
+      amount: 380,
       target: 'opponent',
-      targetHpDelta: -300,
+      targetHpDelta: -380,
       boomCounterValue: 0,
-      boomCounterMax: 30,
+      boomCounterMax: 50,
     })
     const explosionIndex = result.events.indexOf(explosion!)
-    expect(result.events.slice(0, explosionIndex + 1).filter((event) => event.boomCounterChanged && event.itemId === 'counter').length).toBe(30)
+    expect(result.events.slice(0, explosionIndex + 1).filter((event) => event.boomCounterChanged && event.itemId === 'counter').length).toBe(50)
   })
 
-  it('diamond boom counter keeps threshold 30 and damage 450', () => {
+  it('diamond boom counter keeps threshold 50 and damage 570', () => {
     const player: FighterSnapshot = {
       name: 'P',
       dogType: 'SHIBA',
       wins: 0,
       losses: 0,
-      round: 11,
+      round: 13,
       items: boomCounterTestItems('DIAMOND'),
     }
-    const opponent: FighterSnapshot = { name: 'O', dogType: 'SHIBA', wins: 0, losses: 0, round: 11, items: [] }
+    const opponent: FighterSnapshot = { name: 'O', dogType: 'SHIBA', wins: 0, losses: 0, round: 13, items: [] }
     const result = simulateBattle(player, opponent, 'boom-counter-diamond')
     const explosion = result.events.find((event) =>
       event.actor === 'player'
       && event.itemId === 'counter'
       && event.effectType === 'DAMAGE'
-      && event.text.includes('【爆鸣计数】达到 30')
+      && event.text.includes('【爆鸣计数】达到 50')
     )
 
     expect(explosion).toMatchObject({
       quality: 'DIAMOND',
-      amount: 450,
-      targetHpDelta: -450,
+      amount: 570,
+      targetHpDelta: -570,
       boomCounterValue: 0,
-      boomCounterMax: 30,
+      boomCounterMax: 50,
     })
     const explosionIndex = result.events.indexOf(explosion!)
-    expect(result.events.slice(0, explosionIndex + 1).filter((event) => event.boomCounterChanged && event.itemId === 'counter').length).toBe(30)
+    expect(result.events.slice(0, explosionIndex + 1).filter((event) => event.boomCounterChanged && event.itemId === 'counter').length).toBe(50)
   })
 
   it('tracks each boom counter item instance independently', () => {
@@ -1081,12 +1144,12 @@ describe('battle simulation', () => {
     const result = simulateBattle(player, opponent, 'two-boom-counters')
 
     expect(result.events.find((event) => event.itemId === 'gold-counter' && event.effectType === 'DAMAGE')).toMatchObject({
-      amount: 300,
+      amount: 380,
       quality: 'GOLD',
       boomCounterValue: 0,
     })
     expect(result.events.find((event) => event.itemId === 'diamond-counter' && event.effectType === 'DAMAGE')).toMatchObject({
-      amount: 450,
+      amount: 570,
       quality: 'DIAMOND',
       boomCounterValue: 0,
     })
@@ -1124,7 +1187,7 @@ describe('battle simulation', () => {
       event.actor === 'player'
       && event.itemId === 'counter'
       && event.effectType === 'DAMAGE'
-      && event.text.includes('【爆鸣计数】达到 30')
+      && event.text.includes('【爆鸣计数】达到 50')
     )
     const nextPlayerEvent = result.events.slice(explosionIndex + 1).find((event) => event.actor === 'player')
 
@@ -1725,6 +1788,26 @@ describe('battle simulation', () => {
 
     expect(shifted.events.find((event) => event.time === shiftedRoll?.time && event.kind === 'ITEM' && event.itemId === 'paw')).toMatchObject({ roll: 1, amount: 12 })
     expect(original.events.find((event) => event.time === originalRoll?.time && event.kind === 'ITEM' && event.itemId === 'paw')).toBeUndefined()
+  })
+
+  it('applies potion trigger dice overrides before carrot remaps trigger dice', () => {
+    const player: FighterSnapshot = {
+      name: 'P',
+      dogType: 'BULLY',
+      wins: 0,
+      losses: 0,
+      round: 4,
+      relics: [{ id: 'carrot', relicId: 'carrot', quality: 'SILVER', slot: 0 }],
+      items: [
+        { id: 'paw', defId: 'lucky-paw', quality: 'BRONZE', area: 'EQUIPMENT', x: 0, y: 0, triggerDiceOverride: [1] },
+      ],
+    }
+    const opponent: FighterSnapshot = { name: 'O', dogType: 'BULLY', wins: 0, losses: 0, round: 4, items: [] }
+    const result = simulateBattle(player, opponent, 'potion-shift-1')
+    const roll = result.events.find((event) => event.kind === 'ROLL' && event.actor === 'player')
+
+    expect(roll?.roll).toBe(2)
+    expect(result.events.find((event) => event.time === roll?.time && event.kind === 'ITEM' && event.itemId === 'paw')).toMatchObject({ roll: 2, amount: 12 })
   })
 
   it('makes tissue shift equipped trigger dice down with wraparound', () => {
