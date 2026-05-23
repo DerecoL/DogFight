@@ -168,7 +168,7 @@ async function defaultMockApiScript(buildId = new Date().toISOString().replace(/
         state.user.account = state.user.email;
         delete state.user.email;
       }
-      return state;
+      return normalizeApexDefensiveStreaks(state);
     } catch {
       return defaultState();
     }
@@ -747,7 +747,7 @@ async function currentMockApiScript(buildId) {
   }
 
   function defaultState() {
-    return { user: null, run: null, nextId: 1, apexEntries: [] };
+    return { user: null, run: null, nextId: 1, apexEntries: [], apexDefensiveStreakVersion: 1 };
   }
 
   function id(state, prefix) {
@@ -944,6 +944,13 @@ async function currentMockApiScript(buildId) {
     return state.apexEntries;
   }
 
+  function normalizeApexDefensiveStreaks(state) {
+    if (state.apexDefensiveStreakVersion === 1) return state;
+    for (const entry of ensureApexEntries(state)) entry.challengeWins = 1;
+    state.apexDefensiveStreakVersion = 1;
+    return state;
+  }
+
   function apexSeedFighter(state, rank, boardType, boardKey) {
     const dogType = dogTypes[(rank - 1) % dogTypes.length];
     return {
@@ -958,7 +965,7 @@ async function currentMockApiScript(buildId) {
       losses: Math.max(0, 2 - Math.floor((50 - rank) / 18)),
       round: Math.max(1, Math.ceil((51 - rank) / 4)),
       rank,
-      challengeWins: 0,
+      challengeWins: 1,
       isSeed: true,
       createdAt: new Date().toISOString(),
       items: initialItems(state),
@@ -995,7 +1002,6 @@ async function currentMockApiScript(buildId) {
     const score = apexScore(challenger);
     const ordered = [...opponents].sort((a, b) => a.rank - b.rank);
     const battles = [];
-    let challengeWins = 0;
     for (const opponent of ordered) {
       const won = score >= apexScore(opponent);
       battles.push({
@@ -1008,11 +1014,10 @@ async function currentMockApiScript(buildId) {
         opponentHp: won ? 0 : 20 + Math.min(80, apexScore(opponent) % 80),
       });
       if (won) {
-        challengeWins += 1;
-        return { placementRank: opponent.rank, challengeWins, battles };
+        return { placementRank: opponent.rank, battles };
       }
     }
-    return { placementRank: ordered.length > 0 ? ordered[ordered.length - 1].rank + 1 : 1, challengeWins, battles };
+    return { placementRank: ordered.length > 0 ? ordered[ordered.length - 1].rank + 1 : 1, battles };
   }
 
   function submitApexBoard(state, boardType, boardKey, run, user) {
@@ -1035,11 +1040,16 @@ async function currentMockApiScript(buildId) {
     };
     const report = resolveLocalApexChallenge(challenger, board);
     const entries = ensureApexEntries(state);
+    for (const battle of report.battles) {
+      if (battle.winner !== 'opponent') continue;
+      const defender = entries.find((entry) => entry.id === battle.opponentId && entry.boardType === boardType && entry.boardKey === boardKey);
+      if (defender) defender.challengeWins = Math.max(1, Number(defender.challengeWins) || 1) + 1;
+    }
     for (const entry of entries) {
       if (entry.boardType === boardType && entry.boardKey === boardKey && entry.rank >= report.placementRank) entry.rank += 1;
     }
     challenger.rank = report.placementRank;
-    challenger.challengeWins = report.challengeWins;
+    challenger.challengeWins = 1;
     entries.push(challenger);
     return { entry: challenger, report };
   }

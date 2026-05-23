@@ -272,7 +272,6 @@ type ApexBattleSummary = {
 }
 type ApexChallengeReport = {
   placementRank: number
-  challengeWins: number
   battles: ApexBattleSummary[]
 }
 type ApexBoardId = 'overall' | 'daily'
@@ -2580,7 +2579,7 @@ function ApexArena() {
           <Trophy size={30} />
           <div>
             <h3>{submittedEntries.overall.name} 已投入巅峰榜</h3>
-            <p>总榜第 {reports.overall.placementRank} 名，当日榜第 {reports.daily.placementRank} 名。总榜连胜 {reports.overall.challengeWins}，当日榜连胜 {reports.daily.challengeWins}。</p>
+            <p>总榜第 {reports.overall.placementRank} 名，当日榜第 {reports.daily.placementRank} 名。新记录防守连胜从 {submittedEntries.overall.challengeWins} 开始。</p>
           </div>
         </div>
       )}
@@ -2629,7 +2628,7 @@ function ApexArena() {
                     <p>{dogNames[entry.dogType]} · {entry.wins}胜{entry.losses}败 · 第 {entry.round} 回合</p>
                   </div>
                   {entry.isMine && <span className="apex-self-marker">我的记录</span>}
-                  <span>{entry.isSeed ? '种子' : `${entry.challengeWins}连胜`}</span>
+                  <span>{entry.isSeed ? '种子' : `防守连胜 ${entry.challengeWins}`}</span>
                   <button className="secondary action-button apex-config-toggle" onClick={() => setExpandedEntryId(expandedEntryId === entry.id ? null : entry.id)}>
                     {expandedEntryId === entry.id ? '收起配置' : '查看配置'}
                   </button>
@@ -3330,7 +3329,7 @@ function InventoryBoard({ run, selectedItemId, draggingItemId, onSellRelic, onSe
   )
 }
 
-function RelicRail({ relics, onSellRelic }: { relics: Relic[]; onSellRelic?: ((relicId: string) => void) | null }) {
+function RelicRail({ relics, onSellRelic, compact = false }: { relics: Relic[]; onSellRelic?: ((relicId: string) => void) | null; compact?: boolean }) {
   const [selectedRelicId, setSelectedRelicId] = useState<string | null>(null)
   const [relicTipAnchor, setRelicTipAnchor] = useState<TipAnchor | null>(null)
   const selectedRelic = relics.find((relic) => relic.id === selectedRelicId) ?? null
@@ -3339,7 +3338,7 @@ function RelicRail({ relics, onSellRelic }: { relics: Relic[]; onSellRelic?: ((r
     setRelicTipAnchor(null)
   }
   return (
-    <aside className="relic-rail">
+    <aside className={`relic-rail ${compact ? 'compact' : ''}`}>
       <div className="grid-heading">
         <h3><Trophy size={18} />遗物</h3>
         <p>6槽，重复获得升级</p>
@@ -3362,7 +3361,7 @@ function RelicRail({ relics, onSellRelic }: { relics: Relic[]; onSellRelic?: ((r
                     setRelicTipAnchor(selectedRelicId === relic.id ? null : getFloatingTipPosition(event.currentTarget))
                   }}
                 >
-                  <RelicGlyph relic={relic} size={30} />
+                  <RelicGlyph relic={relic} size={compact ? 24 : 30} />
                   <span className="relic-quality-dot" aria-hidden="true" />
                 </button>
               ) : <span className="relic-empty-mark" aria-hidden="true" />}
@@ -3775,6 +3774,7 @@ function BattleEquipmentRow({ owner, snapshot, events, displayIndex, activeEvent
           )
         })}
       </div>
+      <RelicRail relics={snapshot.relics ?? []} compact />
     </div>
   )
 }

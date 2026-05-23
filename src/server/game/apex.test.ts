@@ -37,7 +37,7 @@ describe('apex arena logic', () => {
     )
 
     expect(report.battles.map((battle) => battle.opponentRank)).toEqual([1, 2, 3])
-    expect(report.challengeWins).toBe(1)
+    expect(report).not.toHaveProperty('challengeWins')
     expect(report.placementRank).toBe(3)
     expect(report.battles.at(-1)?.winner).toBe('player')
   })

@@ -47,7 +47,16 @@ describe('equipment layout scale', () => {
     expect(css).toContain('align-self: stretch')
     expect(cssRule('.inventory-board')).toContain('grid-template-rows: minmax(0, 1fr) minmax(0, 1fr)')
     expect(cssRule('.inventory-board.expanded .grid-panel:first-child')).toContain('align-content: start')
-    expect(cssRule('.inventory-board.expanded .grid-panel:last-child')).toContain('align-content: end')
+    expect(cssRule('.inventory-board.expanded .grid-panel:last-child')).toContain('align-content: start')
+  })
+
+  it('keeps active-run shop controls compact enough for the forfeit action to stay visible', () => {
+    expect(cssRule('.shop-workbench')).toContain('min-height: calc(100vh - 170px)')
+    expect(cssRule('.shop-workbench')).toContain('gap: 10px')
+    expect(cssRule('.inventory-board')).toContain('padding: 10px')
+    expect(cssRule('.inventory-board')).toContain('gap: 8px')
+    expect(cssRule('.inventory-board.expanded .grid-panel:last-child')).toContain('align-content: start')
+    expect(cssRule('.forfeit-run-action')).toContain('margin: 4px auto 0')
   })
 
   it('keeps the left relic rail narrow and the right bag grid wide', () => {
@@ -151,6 +160,27 @@ describe('equipment layout scale', () => {
     expect(css).toContain('.battle-dog-img { width: 92px; height: 92px; }')
   })
 
+  it('keeps desktop battle playback focused on large equipment rails over empty stage space', () => {
+    expect(cssRule('.visual-battle')).toContain('grid-template-rows: auto auto minmax(190px, 240px) auto auto auto')
+    expect(cssRule('.battle-stage')).toContain('min-height: 190px')
+    expect(cssRule('.battle-stage')).toContain('max-height: 240px')
+    expect(cssRule('.battle-stage')).toContain('grid-template-columns: minmax(220px, 1fr) minmax(120px, .34fr) minmax(220px, 1fr)')
+    expect(cssRule('.battle-equipment-row')).toContain('grid-template-columns: minmax(0, 1fr) auto')
+    expect(cssRule('.battle-equipment-row')).toContain('align-items: stretch')
+    expect(cssRule('.battle-equipment-row .relic-rail')).toContain('width: 188px')
+    expect(cssRule('.battle-equipment-row .relic-slot-grid')).toContain('grid-template-columns: repeat(3, 52px)')
+    expect(cssRule('.battle-equipment-row .relic-slot-grid')).toContain('grid-template-rows: repeat(2, 52px)')
+    expect(cssRule('.battle-item')).toContain('min-height: 118px')
+    expect(cssRule('.battle-item .item-icon')).toContain('width: 42px')
+    expect(cssRule('.battle-item .item-icon')).toContain('height: 42px')
+    expect(cssRule('.battle-stage .battle-dog')).toContain('grid-template-columns: minmax(170px, 260px) auto')
+    expect(cssRule('.battle-stage .battle-dog .hp')).toContain('grid-row: 1 / span 2')
+    expect(cssRule('.battle-stage .battle-dog-img')).toContain('width: clamp(88px, 8vw, 112px)')
+    expect(cssRule('.battle-stage .battle-dog.opponent')).toContain('grid-column: 1')
+    expect(cssRule('.battle-stage .battle-dice')).toContain('grid-column: 2')
+    expect(cssRule('.battle-stage .battle-dog.player')).toContain('grid-column: 3')
+  })
+
   it('keeps battle playback controls in one compact three-button row', () => {
     expect(app).toContain('className="battle-status"')
     expect(cssRule('.battle-status')).toContain('display: grid')
@@ -159,7 +189,7 @@ describe('equipment layout scale', () => {
     expect(cssRule('.battle-toolbar .speed-row')).toContain('display: grid')
     expect(cssRule('.battle-toolbar .speed-row')).toContain('grid-template-columns: repeat(3, minmax(0, 1fr))')
     expect(cssRule('.battle-toolbar .speed-row')).toContain('width: auto')
-    expect(cssRule('.battle-stage')).toContain('min-height: 220px')
+    expect(cssRule('.battle-stage')).toContain('min-height: 190px')
   })
 
   it('adds third-pass handdrawn detail to the shop, inventory, and dog selection surfaces', () => {

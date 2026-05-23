@@ -1131,7 +1131,7 @@ describeWithDatabase('run API', () => {
 
     await prisma.run.update({
       where: { id: runId },
-      data: { wins: 4, losses: 3, round: 7, phase: 'COMPLETE', status: 'COMPLETE' },
+      data: { wins: 0, losses: 5, round: 1, phase: 'COMPLETE', status: 'COMPLETE' },
     })
 
     const overview = await agent.get('/api/apex').expect(200)
@@ -1139,8 +1139,8 @@ describeWithDatabase('run API', () => {
     expect(overview.body.dailyResetHour).toBe(5)
     expect(overview.body.leaderboards.overall).toHaveLength(50)
     expect(overview.body.leaderboards.daily).toHaveLength(50)
-    expect(overview.body.leaderboards.overall[0]).toMatchObject({ rank: 1, isSeed: true, boardType: 'OVERALL', boardKey: 'default' })
-    expect(overview.body.leaderboards.daily[0]).toMatchObject({ rank: 1, isSeed: true, boardType: 'DAILY', boardKey: overview.body.dailyBoardKey })
+    expect(overview.body.leaderboards.overall[0]).toMatchObject({ rank: 1, isSeed: true, boardType: 'OVERALL', boardKey: 'default', challengeWins: 1 })
+    expect(overview.body.leaderboards.daily[0]).toMatchObject({ rank: 1, isSeed: true, boardType: 'DAILY', boardKey: overview.body.dailyBoardKey, challengeWins: 1 })
     expect(overview.body.leaderboards.overall[0].items.length).toBeGreaterThan(0)
     expect(overview.body.leaderboards.overall[0].items[0].def).toMatchObject({ name: expect.any(String) })
     expect(overview.body.leaderboards.overall[0].relics.length).toBeGreaterThan(0)
@@ -1148,14 +1148,16 @@ describeWithDatabase('run API', () => {
     expect(overview.body.candidates.map((run: { id: string }) => run.id)).toContain(runId)
 
     const submitted = await agent.post('/api/apex/submit').send({ runId }).expect(200)
-    expect(submitted.body.entries.overall).toMatchObject({ sourceRunId: runId, isSeed: false, boardType: 'OVERALL', boardKey: 'default', name: expect.stringContaining('Apex Player') })
-    expect(submitted.body.entries.daily).toMatchObject({ sourceRunId: runId, isSeed: false, boardType: 'DAILY', boardKey: overview.body.dailyBoardKey, name: expect.stringContaining('Apex Player') })
+    expect(submitted.body.entries.overall).toMatchObject({ sourceRunId: runId, isSeed: false, boardType: 'OVERALL', boardKey: 'default', name: expect.stringContaining('Apex Player'), challengeWins: 1 })
+    expect(submitted.body.entries.daily).toMatchObject({ sourceRunId: runId, isSeed: false, boardType: 'DAILY', boardKey: overview.body.dailyBoardKey, name: expect.stringContaining('Apex Player'), challengeWins: 1 })
     expect(submitted.body.entries.overall.items.length).toBeGreaterThan(0)
     expect(submitted.body.entries.overall.items[0].def).toMatchObject({ name: expect.any(String) })
     expect(submitted.body.reports.overall.battles.length).toBeGreaterThan(0)
     expect(submitted.body.reports.daily.battles.length).toBeGreaterThan(0)
     expect(submitted.body.leaderboards.overall).toHaveLength(51)
     expect(submitted.body.leaderboards.daily).toHaveLength(51)
+    expect(submitted.body.leaderboards.overall[0]).toMatchObject({ isSeed: true, challengeWins: 2 })
+    expect(submitted.body.leaderboards.daily[0]).toMatchObject({ isSeed: true, challengeWins: 2 })
     expect(submitted.body.leaderboards.overall.find((entry: { sourceRunId: string }) => entry.sourceRunId === runId)).toMatchObject({ isMine: true })
     expect(submitted.body.leaderboards.daily.find((entry: { sourceRunId: string }) => entry.sourceRunId === runId)).toMatchObject({ isMine: true })
 

@@ -316,7 +316,7 @@ input {
 .dog-avatar.large { width: 108px; height: 108px; }
 .dog-avatar.small { width: 58px; height: 58px; border-radius: 16px; }
 
-.shop-workbench { display: grid; gap: 14px; position: relative; min-width: 0; max-width: 100%; }
+.shop-workbench { display: grid; gap: 10px; position: relative; min-width: 0; max-width: 100%; min-height: calc(100vh - 170px); }
 .reward-workbench,
 .enchant-workbench { display: grid; gap: 14px; position: relative; min-width: 0; max-width: 100%; }
 .class-reward-ceremony {
@@ -615,9 +615,9 @@ input {
   width: 100%;
   align-self: stretch;
   grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
-  padding: 18px;
+  padding: 10px;
   display: grid;
-  gap: 18px;
+  gap: 8px;
   min-width: 0;
   max-width: 100%;
   overflow-x: visible;
@@ -635,7 +635,7 @@ input {
   align-content: start;
 }
 .inventory-board.expanded .grid-panel:last-child {
-  align-content: end;
+  align-content: start;
 }
 .bag-relic-row {
   display: grid;
@@ -1495,6 +1495,8 @@ input {
 
 .visual-battle {
   width: 100%;
+  display: grid;
+  grid-template-rows: auto auto minmax(190px, 240px) auto auto auto;
   align-items: stretch;
   justify-items: stretch;
   gap: 6px;
@@ -1523,11 +1525,15 @@ input {
 }
 .battle-equipment-row {
   display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: 5px;
+  align-items: stretch;
   min-width: 0;
   overflow-x: visible;
+  --slot-h: 118px;
 }
 .battle-row-title {
+  grid-column: 1 / -1;
   min-width: max-content;
   display: flex;
   justify-content: space-between;
@@ -1537,6 +1543,7 @@ input {
 }
 .battle-row-title span { display: inline-flex; align-items: center; gap: 7px; }
 .battle-slot-grid {
+  grid-column: 1;
   position: relative;
   display: grid;
   grid-template-rows: var(--slot-h);
@@ -1560,12 +1567,13 @@ input {
 .battle-item {
   width: 100%;
   height: var(--slot-h);
+  min-height: 118px;
   padding-bottom: 26px;
   cursor: pointer;
   text-align: center;
 }
 .battle-item:hover { filter: brightness(1.04); }
-.battle-item .item-icon { width: 36px; height: 36px; }
+.battle-item .item-icon { width: 42px; height: 42px; }
 .battle-item span {
   max-width: 100%;
   overflow-wrap: anywhere;
@@ -1682,9 +1690,10 @@ input {
 }
 .battle-stage {
   position: relative;
-  min-height: 220px;
+  min-height: 190px;
+  max-height: 240px;
   display: grid;
-  grid-template-columns: minmax(180px, 1fr) minmax(130px, .48fr) minmax(180px, 1fr);
+  grid-template-columns: minmax(220px, 1fr) minmax(120px, .34fr) minmax(220px, 1fr);
   align-items: center;
   gap: 12px;
   overflow: hidden;
@@ -1744,6 +1753,23 @@ input {
   min-width: 0;
   transition: transform .18s ease, filter .18s ease, opacity .18s ease;
 }
+.battle-stage .battle-dog {
+  grid-row: 1;
+  grid-template-columns: minmax(170px, 260px) auto;
+  grid-template-rows: auto auto;
+  justify-content: center;
+  align-items: center;
+  column-gap: 10px;
+}
+.battle-stage .battle-dog .hp {
+  grid-row: 1 / span 2;
+}
+.battle-stage .battle-dog.opponent {
+  grid-column: 1;
+}
+.battle-stage .battle-dog.player {
+  grid-column: 3;
+}
 .battle-dog .hp {
   position: relative;
   width: min(260px, 100%);
@@ -1758,6 +1784,10 @@ input {
   height: clamp(92px, 11vw, 132px);
   border-radius: 18px;
   filter: drop-shadow(0 18px 24px rgba(112, 72, 30, .20));
+}
+.battle-stage .battle-dog-img {
+  width: clamp(88px, 8vw, 112px);
+  height: clamp(88px, 8vw, 112px);
 }
 .battle-dog.poisoned .battle-dog-img {
   filter: drop-shadow(0 18px 24px rgba(112, 72, 30, .20)) drop-shadow(0 0 14px rgba(34, 197, 94, .45));
@@ -1803,9 +1833,15 @@ input {
 }
 .battle-dog.winner { animation: winnerHop .7s ease-in-out infinite alternate; }
 .battle-dog.loser { opacity: .55; filter: grayscale(.4) brightness(.82); }
+.battle-stage .battle-dice {
+  grid-column: 2;
+  grid-row: 1;
+}
 .battle-dice {
   position: relative;
   z-index: 4;
+  grid-column: 2;
+  grid-row: 1;
   display: grid;
   place-items: center;
   gap: 6px;
@@ -1907,7 +1943,7 @@ input {
 }
 .forfeit-run-action {
   width: min(760px, 100%);
-  margin: 14px auto 0;
+  margin: 4px auto 0;
   padding: 12px 14px;
   display: flex;
   align-items: center;
@@ -3354,11 +3390,11 @@ input {
 
 .shop-workbench {
   width: min(1920px, 100%);
-  min-height: calc(100vh - 90px);
+  min-height: calc(100vh - 170px);
   margin: 0 auto;
   grid-template-rows: auto 1fr;
   align-content: stretch;
-  gap: 14px;
+  gap: 10px;
 }
 
 .shop-shelf {
@@ -3412,8 +3448,8 @@ input {
   align-self: stretch;
   align-content: stretch;
   grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
-  padding: 12px;
-  gap: 12px;
+  padding: 10px;
+  gap: 8px;
 }
 
 .inventory-board.expanded {
@@ -3429,7 +3465,7 @@ input {
 }
 
 .inventory-board.expanded .grid-panel:last-child {
-  align-content: end;
+  align-content: start;
 }
 
 .grid-heading h3 {
@@ -3827,6 +3863,45 @@ input {
   background:
     var(--paper-fiber),
     rgba(255, 250, 241, .52);
+}
+
+.battle-equipment-row .relic-rail {
+  grid-column: 2;
+  grid-row: 2;
+  width: 188px;
+  align-self: stretch;
+  padding: 6px;
+  gap: 6px;
+  border-radius: 10px;
+}
+
+.battle-equipment-row .relic-rail .grid-heading {
+  min-height: auto;
+}
+
+.battle-equipment-row .relic-rail .grid-heading h3 {
+  font-size: 13px;
+}
+
+.battle-equipment-row .relic-rail .grid-heading p {
+  display: none;
+}
+
+.battle-equipment-row .relic-slot-grid {
+  grid-template-columns: repeat(3, 52px);
+  grid-template-rows: repeat(2, 52px);
+  gap: 6px;
+  justify-content: center;
+}
+
+.battle-equipment-row .relic-slot {
+  width: 52px;
+  height: 52px;
+  padding: 4px;
+}
+
+.battle-equipment-row .relic-icon-button {
+  border-radius: 8px;
 }
 
 .handdrawn-stage {
@@ -4536,11 +4611,22 @@ input {
     flex-direction: column;
   }
   .battle-stage { grid-template-columns: 1fr; min-height: 440px; padding: 10px; }
-  .battle-dice { order: 2; min-height: 108px; }
+  .battle-stage { max-height: none; }
+  .battle-dice { order: 2; min-height: 108px; grid-column: 1; grid-row: auto; }
   .battle-dog.opponent { order: 1; }
   .battle-dog.player { order: 3; }
+  .battle-stage .battle-dog { grid-row: auto; grid-template-columns: 1fr; grid-template-rows: auto auto auto; }
+  .battle-stage .battle-dog.opponent,
+  .battle-stage .battle-dog.player { grid-column: 1; }
+  .battle-stage .battle-dog .hp { grid-row: auto; }
   .battle-dog-img { width: 92px; height: 92px; }
+  .battle-stage .battle-dog-img { width: 92px; height: 92px; }
   .battle-equipment-row { --slot-w: 58px; --slot-h: 82px; }
+  .battle-equipment-row { grid-template-columns: 1fr; }
+  .battle-equipment-row .relic-rail { grid-column: 1; grid-row: 3; width: 100%; }
+  .battle-equipment-row .relic-slot-grid { grid-template-columns: repeat(6, 44px); grid-template-rows: 44px; justify-content: start; overflow-x: auto; }
+  .battle-equipment-row .relic-slot { width: 44px; height: 44px; }
+  .battle-item { min-height: 82px; }
   .floating-tip { right: auto; bottom: auto; width: min(380px, calc(100vw - 28px)); }
   .tip-body { grid-template-columns: 1fr; }
   .slot-grid { gap: 5px; padding: 10px; }

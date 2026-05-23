@@ -269,7 +269,7 @@ export function buildApp() {
         items: JSON.stringify(entry.fighter.items),
         relics: JSON.stringify(entry.fighter.relics ?? []),
         rank: entry.rank,
-        challengeWins: 0,
+        challengeWins: 1,
         isSeed: true,
       })),
     })
@@ -281,6 +281,23 @@ export function buildApp() {
   }
 
   const apexBoardSeed = (boardType: ApexBoardType, boardKey: string, runId: string) => `${runId}-apex-${boardType.toLowerCase()}-${boardKey}`
+
+  const incrementApexDefenderStreaks = async (
+    tx: PrismaTransaction,
+    boardType: ApexBoardType,
+    boardKey: string,
+    report: ApexChallengeReport,
+  ) => {
+    const defenderIds = report.battles
+      .filter((battle) => battle.winner === 'opponent')
+      .map((battle) => battle.opponentId)
+    if (defenderIds.length === 0) return
+
+    await tx.apexEntry.updateMany({
+      where: { id: { in: defenderIds }, boardType, boardKey },
+      data: { challengeWins: { increment: 1 } },
+    })
+  }
 
   const insertApexEntry = async (
     tx: PrismaTransaction,
@@ -308,7 +325,7 @@ export function buildApp() {
         items: JSON.stringify(toGameItems(run.items)),
         relics: JSON.stringify(relicsFromRun(run)),
         rank: report.placementRank,
-        challengeWins: report.challengeWins,
+        challengeWins: 1,
         isSeed: false,
       },
     })
@@ -537,6 +554,8 @@ export function buildApp() {
     const dailyReport = resolveApexChallenge(challenger, dailyOpponents, apexBoardSeed('DAILY', dailyBoardKey, run.id))
 
     const entries = await prisma.$transaction(async (tx) => {
+      await incrementApexDefenderStreaks(tx, 'OVERALL', 'default', overallReport)
+      await incrementApexDefenderStreaks(tx, 'DAILY', dailyBoardKey, dailyReport)
       const overall = await insertApexEntry(tx, 'OVERALL', 'default', userId, run, challengerName, overallReport)
       const daily = await insertApexEntry(tx, 'DAILY', dailyBoardKey, userId, run, challengerName, dailyReport)
       return { overall, daily }

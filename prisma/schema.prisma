@@ -153,7 +153,7 @@ model ApexEntry {
   items         String
   relics        String   @default("[]")
   rank          Int
-  challengeWins Int      @default(0)
+  challengeWins Int      @default(1)
   isSeed        Boolean  @default(false)
   createdAt     DateTime @default(now())
 

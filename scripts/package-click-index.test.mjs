@@ -132,6 +132,44 @@ describe('buildStandaloneIndex', () => {
     }
   })
 
+  test('standalone apex board tracks defensive streaks for unbeaten defenders', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'dogfight-standalone-apex-streak-'))
+    try {
+      const distDir = await createMinimalDist(root)
+      const outputFile = path.join(root, 'click-index.html')
+      const launcherFile = path.join(root, 'DogFight-standalone.cmd')
+      await buildStandaloneIndex({ distDir, outputFile, launcherFile })
+
+      const html = await readFile(outputFile, 'utf8')
+      const { window, localStorage, storageKey } = evaluateMockScript(extractMockScript(html))
+      await window.fetch('/api/auth/register', { method: 'POST', body: JSON.stringify({ email: 'apex@dog.test', password: 'dogdice' }) })
+      const created = await readJson(await window.fetch('/api/runs', { method: 'POST', body: JSON.stringify({ dogType: 'SHIBA' }) }))
+      const state = JSON.parse(localStorage.getItem(storageKey))
+      state.run = {
+        ...state.run,
+        id: created.run.id,
+        wins: 0,
+        losses: 5,
+        round: 1,
+        phase: 'COMPLETE',
+        status: 'COMPLETE',
+      }
+      localStorage.setItem(storageKey, JSON.stringify(state))
+
+      const overview = await readJson(await window.fetch('/api/apex'))
+      expect(overview.leaderboards.overall[0]).toMatchObject({ rank: 1, isSeed: true, challengeWins: 1 })
+      expect(overview.leaderboards.daily[0]).toMatchObject({ rank: 1, isSeed: true, challengeWins: 1 })
+
+      const submitted = await readJson(await window.fetch('/api/apex/submit', { method: 'POST', body: JSON.stringify({ runId: created.run.id }) }))
+      expect(submitted.entries.overall).toMatchObject({ sourceRunId: created.run.id, isSeed: false, challengeWins: 1 })
+      expect(submitted.entries.daily).toMatchObject({ sourceRunId: created.run.id, isSeed: false, challengeWins: 1 })
+      expect(submitted.leaderboards.overall[0]).toMatchObject({ rank: 1, isSeed: true, challengeWins: 2 })
+      expect(submitted.leaderboards.daily[0]).toMatchObject({ rank: 1, isSeed: true, challengeWins: 2 })
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   test('standalone mock buys a matching shop item as an immediate upgrade when the bag is full', async () => {
     const root = await mkdtemp(path.join(tmpdir(), 'dogfight-standalone-buy-upgrade-'))
     try {
