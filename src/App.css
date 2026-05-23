@@ -74,6 +74,26 @@
     linear-gradient(104deg, transparent 0 22%, var(--pencil-mark) 22.2% 22.7%, transparent 23%),
     radial-gradient(circle at 12% 18%, var(--pencil-mark) 0 1px, transparent 1.4px),
     repeating-linear-gradient(0deg, transparent 0 18px, rgba(31, 23, 20, .05) 18px 19px, transparent 19px 32px);
+  --wood-grain:
+    repeating-linear-gradient(92deg, rgba(255, 235, 184, .16) 0 1px, transparent 1px 10px),
+    radial-gradient(ellipse at 18% 32%, rgba(255, 218, 144, .22), transparent 24%),
+    radial-gradient(ellipse at 78% 68%, rgba(61, 35, 18, .2), transparent 28%);
+  --wood-frame:
+    var(--wood-grain),
+    linear-gradient(180deg, #8f5f32 0%, #6f421f 48%, #4d2c18 100%);
+  --wood-shadow:
+    inset 0 5px 0 rgba(255, 226, 168, .22),
+    inset 0 -8px 0 rgba(47, 25, 13, .26),
+    inset 0 0 0 3px rgba(61, 35, 18, .42),
+    5px 7px 0 rgba(61, 45, 37, .24),
+    0 18px 34px rgba(112, 72, 30, .16);
+  --rough-ink-edge:
+    linear-gradient(93deg, rgba(61, 45, 37, .38), transparent 12% 88%, rgba(61, 45, 37, .26)),
+    repeating-linear-gradient(176deg, rgba(61, 45, 37, .2) 0 2px, transparent 2px 17px);
+  --lifted-paper-shadow:
+    5px 7px 0 rgba(61, 45, 37, .2),
+    0 18px 34px rgba(112, 72, 30, .14),
+    inset 0 1px 0 rgba(255, 255, 255, .68);
   --slot-w: 96px;
   --slot-h: 108px;
   --board-slot-h: 240px;
@@ -322,7 +342,7 @@ input {
   background: rgba(255, 250, 241, .94);
   border: 1px solid var(--line);
   border-radius: 18px;
-  box-shadow: 0 14px 34px rgba(112, 72, 30, .10);
+  box-shadow: var(--lifted-paper-shadow);
 }
 .dog-card, .choice {
   min-height: 178px;
@@ -1017,7 +1037,7 @@ input {
   isolation: isolate;
   --paper-tilt: var(--paper-tilt-right);
   transform: rotate(var(--paper-tilt));
-  box-shadow: var(--sketch-shadow);
+  box-shadow: var(--lifted-paper-shadow);
 }
 
 .paper-card:nth-child(even) {
@@ -1039,15 +1059,16 @@ input {
 .paper-card::before {
   content: "";
   position: absolute;
-  inset: 5px;
+  inset: 4px 5px 6px 4px;
   z-index: -1;
   border: 2px solid rgba(61, 45, 37, .16);
   border-radius: inherit;
   background:
+    var(--rough-ink-edge),
     var(--ornament-corner) left 8px top 8px / var(--edge-ornament-size) var(--edge-ornament-size) no-repeat,
     var(--ornament-corner) right 8px bottom 8px / var(--edge-ornament-size) var(--edge-ornament-size) no-repeat;
   opacity: .72;
-  clip-path: polygon(1% 2%, 99% 0, 98.5% 97%, 0 99%);
+  clip-path: polygon(1% 3%, 18% 1%, 41% 2.5%, 64% .5%, 99% 2%, 98% 76%, 99% 97%, 70% 99%, 43% 97.5%, 17% 99%, 0 97%, 1.5% 62%);
   transform: rotate(-.35deg);
   pointer-events: none;
 }
@@ -1059,6 +1080,7 @@ input {
   z-index: -2;
   border-radius: inherit;
   background: var(--paper-grain), var(--paper-fiber);
+  box-shadow: var(--lifted-paper-shadow);
   opacity: .7;
   pointer-events: none;
   mix-blend-mode: multiply;
@@ -1086,7 +1108,7 @@ input {
 .sketch-panel {
   position: relative;
   background-image: var(--paper-fiber);
-  box-shadow: var(--sketch-shadow);
+  box-shadow: var(--lifted-paper-shadow);
 }
 
 .sticker-card::before {
@@ -1130,10 +1152,15 @@ input {
 }
 
 .paper-inventory .slot {
+  position: relative;
   box-shadow:
+    inset 0 0 0 3px rgba(92, 54, 27, .28),
     inset 0 3px 0 rgba(255, 255, 255, .72),
-    inset 0 -8px 14px rgba(61, 45, 37, .08),
+    inset 0 -10px 18px rgba(61, 45, 37, .16),
     2px 3px 0 rgba(61, 45, 37, .1);
+  background:
+    linear-gradient(180deg, #f2d2a1, #c88b4b),
+    radial-gradient(ellipse at 50% 85%, rgba(92, 54, 27, .18), transparent 54%);
 }
 
 .resource-pill::after, .dog-trait-summary::after, .speed-row button::after {
@@ -1180,7 +1207,7 @@ input {
   inset: 10px 12px;
   z-index: 0;
   border-radius: inherit;
-  background: var(--manuscript-lines);
+  background: var(--rough-ink-edge), var(--manuscript-lines);
   opacity: .12;
   mix-blend-mode: multiply;
   pointer-events: none;
@@ -1666,8 +1693,8 @@ input {
   padding: 9px;
   padding-bottom: 25px;
   border-radius: 16px;
-  background: linear-gradient(180deg, #72563f, #493729);
-  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, .16), 0 10px 24px rgba(112, 72, 30, .14);
+  background: var(--wood-grain), var(--wood-frame);
+  box-shadow: var(--wood-shadow);
 }
 .battle-slot {
   width: 100%;
@@ -1676,6 +1703,10 @@ input {
   border: 1px solid rgba(255, 255, 255, .22);
   border-radius: 11px;
   background: linear-gradient(180deg, #f4d6a6, #dca96d);
+  box-shadow:
+    inset 0 0 0 3px rgba(92, 54, 27, .26),
+    inset 0 4px 0 rgba(255, 255, 255, .46),
+    inset 0 -10px 18px rgba(61, 45, 37, .14);
 }
 .battle-item {
   width: 100%;
@@ -3640,8 +3671,8 @@ input {
   padding: 14px;
   border: 3px solid var(--ink);
   border-radius: 12px;
-  background: linear-gradient(180deg, #4b5158, #363b42);
-  box-shadow: inset 0 0 0 3px rgba(255, 250, 241, .18);
+  background: var(--wood-grain), var(--wood-frame);
+  box-shadow: var(--wood-shadow);
 }
 
 .battle-slot-grid {
@@ -3649,20 +3680,26 @@ input {
   padding: 10px;
   border: 3px solid var(--ink);
   border-radius: 12px;
-  background: #7b5b42;
-  box-shadow: inset 0 0 0 3px rgba(255, 250, 241, .18);
+  background: var(--wood-grain), var(--wood-frame);
+  box-shadow: var(--wood-shadow);
 }
 
 .slot {
   border: 2px solid #b8c0ca;
   border-radius: 8px;
-  background: linear-gradient(180deg, #eef0f2, #dfe3e7);
+  background:
+    linear-gradient(180deg, #f2d2a1, #c88b4b),
+    radial-gradient(ellipse at 50% 88%, rgba(92, 54, 27, .18), transparent 54%);
 }
 
 .battle-slot {
   border: 2px solid #c0a98f;
   border-radius: 8px;
   background: #fff4e4;
+  box-shadow:
+    inset 0 0 0 3px rgba(92, 54, 27, .26),
+    inset 0 4px 0 rgba(255, 255, 255, .46),
+    inset 0 -10px 18px rgba(61, 45, 37, .14);
 }
 
 .item-card {
@@ -4001,6 +4038,8 @@ input {
 
 .paper-inventory .slot-grid {
   overflow: hidden;
+  background: var(--wood-grain), var(--wood-frame);
+  box-shadow: var(--wood-shadow);
 }
 
 .paper-inventory .slot-grid::before {
@@ -4012,6 +4051,19 @@ input {
     radial-gradient(circle at 18% 22%, rgba(255, 255, 255, .18) 0 2px, transparent 2.5px),
     radial-gradient(circle at 82% 78%, rgba(61, 45, 37, .09) 0 1px, transparent 1.5px);
   opacity: .75;
+  pointer-events: none;
+}
+
+.paper-inventory .slot-grid::after {
+  content: "";
+  position: absolute;
+  inset: 4px 5px 6px 4px;
+  z-index: 0;
+  border: 2px solid rgba(47, 25, 13, .38);
+  border-radius: 11px;
+  background: var(--rough-ink-edge);
+  opacity: .42;
+  clip-path: polygon(1% 3%, 24% 1%, 48% 2.5%, 71% 0, 99% 2%, 98% 72%, 99% 97%, 76% 99%, 54% 97%, 28% 99%, 0 97%, 1.5% 58%);
   pointer-events: none;
 }
 
