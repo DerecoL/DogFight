@@ -98,10 +98,11 @@ jobs:
           rm -rf "$TEMP_DEPLOY_PATH" "$REMOTE_PACKAGE"
 
           cd "$DEPLOY_PATH"
+          docker compose build --no-cache api caddy
           docker compose up -d --build --remove-orphans
           docker compose ps
           for attempt in $(seq 1 30); do
-            if docker compose exec -T api node --input-type=module -e "const response = await fetch('http://127.0.0.1:4000/api/health'); if (!response.ok) { console.error(await response.text()); process.exit(1); } console.log(await response.text());"; then
+            if docker compose exec -T api node --input-type=module -e "const response = await fetch('http://127.0.0.1:4000/api/health'); const body = await response.json().catch(() => null); if (!response.ok || !body || body.database !== 'ok') { console.error(JSON.stringify(body)); process.exit(1); } console.log(JSON.stringify(body));"; then
               exit 0
             fi
             echo "API health check attempt $attempt failed; waiting..."
