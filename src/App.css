@@ -1560,6 +1560,7 @@ input {
 .battle-item {
   width: 100%;
   height: var(--slot-h);
+  padding-bottom: 26px;
   cursor: pointer;
   text-align: center;
 }
@@ -1589,13 +1590,13 @@ input {
   animation: paperShimmer .72s ease-out 1;
 }
 .battle-item.boom-counter {
-  padding-bottom: 19px;
+  padding-bottom: 43px;
 }
 .boom-counter-meter {
   position: absolute;
   left: 7px;
   right: 7px;
-  bottom: 5px;
+  bottom: 23px;
   height: 14px;
   display: grid;
   place-items: center;
@@ -1640,6 +1641,44 @@ input {
   font-weight: 950;
   pointer-events: none;
   animation: boomCounterFloat .56s ease-out both;
+}
+.trigger-count-stamp {
+  position: absolute;
+  left: 50%;
+  bottom: 5px;
+  z-index: 5;
+  min-width: 34px;
+  padding: 2px 9px 3px;
+  border: 2px solid rgba(61, 45, 37, .82);
+  border-radius: 999px 12px 999px 14px;
+  background: #fff4e4;
+  color: #ef4444;
+  font-size: 13px;
+  font-weight: 950;
+  line-height: 1;
+  text-shadow: 1px 1px 0 rgba(255, 255, 255, .84), -1px 0 0 rgba(255, 255, 255, .5);
+  box-shadow: 0 3px 0 rgba(61, 45, 37, .24), 0 0 0 3px rgba(255, 224, 138, .42);
+  transform: translateX(-50%) rotate(-3deg);
+  pointer-events: none;
+}
+.trigger-count-stamp::after {
+  content: "";
+  position: absolute;
+  left: 7px;
+  right: 7px;
+  bottom: 2px;
+  height: 2px;
+  border-radius: 999px;
+  background: rgba(239, 68, 68, .42);
+  transform: rotate(-2deg);
+}
+.trigger-count-stamp.empty {
+  color: rgba(61, 45, 37, .58);
+  background: rgba(255, 250, 241, .76);
+  box-shadow: 0 2px 0 rgba(61, 45, 37, .16);
+}
+.battle-item.trigger-count-pop .trigger-count-stamp {
+  animation: triggerCountStampPop .48s cubic-bezier(.2, 1.7, .35, 1) 1;
 }
 .battle-stage {
   position: relative;
@@ -3871,6 +3910,11 @@ input {
   35% { opacity: 1; }
   to { opacity: 0; transform: translateY(-18px) rotate(4deg) scale(1.08); }
 }
+@keyframes triggerCountStampPop {
+  0% { transform: translateX(-50%) rotate(-10deg) scale(.8); filter: brightness(1); }
+  48% { transform: translateX(-50%) rotate(6deg) scale(1.28); filter: brightness(1.2); }
+  100% { transform: translateX(-50%) rotate(-3deg) scale(1); filter: brightness(1); }
+}
 @keyframes stickerWiggle {
   0%, 100% { transform: rotate(-8deg) scale(1); }
   50% { transform: rotate(8deg) scale(1.08); }
@@ -4180,6 +4224,54 @@ input {
   border-radius: 8px;
   color: var(--ink);
   font-weight: 900;
+}
+
+[data-tutorial-anchor] {
+  scroll-margin: 120px;
+}
+
+.casual-tutorial-guide {
+  position: fixed;
+  right: 22px;
+  bottom: 22px;
+  z-index: 30;
+  width: min(360px, calc(100vw - 32px));
+  pointer-events: none;
+}
+
+.tutorial-coach-card {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  pointer-events: auto;
+  background:
+    var(--paper-fiber),
+    linear-gradient(180deg, #fffaf1, #ffe8ca);
+  border: 3px solid var(--ink);
+  box-shadow: 8px 9px 0 rgba(61, 45, 37, .2);
+  transform: rotate(-.4deg);
+}
+
+.tutorial-coach-card h2,
+.tutorial-coach-card p {
+  margin: 0;
+}
+
+.tutorial-coach-card strong {
+  color: var(--ink);
+  line-height: 1.45;
+}
+
+.tutorial-replay-button {
+  justify-self: center;
+}
+
+.tutorial-highlight {
+  position: relative;
+  z-index: 20;
+  outline: 4px solid rgba(90, 132, 246, .62);
+  outline-offset: 5px;
+  box-shadow: 0 0 0 9px rgba(90, 132, 246, .16), var(--sketch-shadow-soft);
 }
 @keyframes dicePop {
   50% { transform: translateY(-8px) scale(1.16) rotate(8deg); }

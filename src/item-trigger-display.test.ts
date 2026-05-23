@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { triggerDiceLabel } from './item-trigger-display'
+import { itemTriggerCountLabel, triggerDiceLabel } from './item-trigger-display'
 
 const item = (dice: number[], advancedEffect = 'NONE') => ({ dice, advancedEffect })
 
@@ -15,5 +15,30 @@ describe('item trigger dice display', () => {
 
   it('keeps normal face-triggered items visible', () => {
     expect(triggerDiceLabel(item([4, 5, 6]))).toBe('4/5/6')
+  })
+})
+
+describe('battle item trigger count display', () => {
+  it('uses the latest per-item trigger count from structured battle events', () => {
+    const events = [
+      { kind: 'ITEM', actor: 'player', itemId: 'fang', itemTriggerCount: 1 },
+      { kind: 'ITEM', actor: 'player', itemId: 'fang', itemTriggerCount: 1 },
+      { kind: 'ITEM', actor: 'player', itemId: 'bite', itemTriggerCount: 1 },
+      { kind: 'ITEM', actor: 'player', itemId: 'fang', itemTriggerCount: 2 },
+    ]
+
+    expect(itemTriggerCountLabel(events, 'player', 'fang', 2)).toBe('x1')
+    expect(itemTriggerCountLabel(events, 'player', 'fang', 3)).toBe('x2')
+  })
+
+  it('falls back to counting unique item event groups when older battles have no trigger count', () => {
+    const events = [
+      { kind: 'ITEM', actor: 'player', itemId: 'fang', time: 1, roll: 6, effectType: 'DAMAGE' },
+      { kind: 'ITEM', actor: 'player', itemId: 'fang', time: 1, roll: 6, effectType: 'UTILITY' },
+      { kind: 'ITEM', actor: 'opponent', itemId: 'fang', time: 1, roll: 6, effectType: 'DAMAGE' },
+      { kind: 'ITEM', actor: 'player', itemId: 'fang', time: 2, roll: 1, effectType: 'DAMAGE' },
+    ]
+
+    expect(itemTriggerCountLabel(events, 'player', 'fang', 3)).toBe('x2')
   })
 })

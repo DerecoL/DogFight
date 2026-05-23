@@ -94,6 +94,7 @@ type BattleSideState = {
   adjacentDamageBonus: Record<string, number>
   growthDamageByItemId: Record<string, number>
   lifestealItemIds: string[]
+  itemTriggerCounts: Record<string, number>
   itemEffectBonus: Record<string, Partial<Record<EnchantmentBaseEffect, number>>>
   itemGrantedEffects: Record<string, { effect: EnchantmentGrantEffect; amount: number }[]>
   forcedItemDice: Record<string, number>
@@ -128,6 +129,7 @@ function createSideState(maxHp: number): BattleSideState {
     adjacentDamageBonus: {},
     growthDamageByItemId: {},
     lifestealItemIds: [],
+    itemTriggerCounts: {},
     itemEffectBonus: {},
     itemGrantedEffects: {},
     forcedItemDice: {},
@@ -1069,6 +1071,8 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
       const { item, allowExtraRollFanout } = entry
       const context = matchingContext(fighter, item, roll, fighterState.forcedItemDice)
       processed.count += 1
+      const itemTriggerCount = (fighterState.itemTriggerCounts[item.id] ?? 0) + 1
+      fighterState.itemTriggerCounts[item.id] = itemTriggerCount
       for (const trigger of executeItem(actorSide, fighter, item, time, roll, context.scale, context.note, queue, processed, extra, extraDepth, allowExtraRollFanout)) {
         push({
           time,
@@ -1079,6 +1083,7 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
           itemId: trigger.itemId,
           defId: trigger.defId,
           quality: trigger.quality,
+          itemTriggerCount,
           boomCounterItemId: trigger.boomCounterItemId,
           boomCounterValue: trigger.boomCounterValue,
           boomCounterMax: trigger.boomCounterMax,

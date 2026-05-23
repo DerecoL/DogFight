@@ -47,7 +47,13 @@ import {
   type UiFeedbackEvent,
   type UiFeedbackKind,
 } from './feedback'
+import {
+  playFeedbackSound,
+  soundCueForBattlePresentation,
+  soundCueForUiFeedback,
+} from './sound-feedback'
 import { resolveSlotPlacement } from './placement'
+import { itemTriggerCountLabel } from './item-trigger-display'
 import { triggerDiceLabel } from './item-trigger-display'
 import { TERM_DEFS } from './shared/rule-terms'
 import './App.css'
@@ -127,6 +133,7 @@ type BattleEvent = {
   roll?: number
   itemId?: string
   defId?: string
+  itemTriggerCount?: number
   boomCounterItemId?: string
   boomCounterValue?: number
   boomCounterMax?: number
@@ -224,6 +231,9 @@ type PlayerRunHistory = {
   recentRuns: PlayerRunHistoryEntry[]
 }
 type AuthUser = { id: string; account: string; nickname: string | null }
+type CasualTutorialStepId = 'LOBBY' | 'DOG_SELECT' | 'SHOP_INSPECT' | 'SHOP_BUY' | 'PLACE_ITEM' | 'MATCH' | 'BATTLE_WATCH' | 'CONTINUE'
+type CasualTutorialStatus = 'idle' | 'active' | 'completed' | 'skipped' | 'replaying'
+type CasualTutorialState = { status: CasualTutorialStatus; stepId: CasualTutorialStepId }
 type TipAnchor = { x: number; y: number }
 type StatusTipState = {
   status: BattleStatusEntry
@@ -360,9 +370,132 @@ const dogAssets: Record<DogType, string> = {
 const gameIcon = '/assets/game-icon.png'
 const backgroundMusicSrc = '/assets/audio/the-final-inventory.mp3'
 const musicPreferenceKey = 'dogfight:background-music'
+const casualTutorialStoragePrefix = 'dogfight:tutorial:casual-core:'
+const defaultCasualTutorialState: CasualTutorialState = { status: 'idle', stepId: 'LOBBY' }
+const casualTutorialSteps: Record<CasualTutorialStepId, { title: string; body: string; task: string; anchor: string }> = {
+  LOBBY: {
+    title: '新手引导',
+    body: '先从休闲模式熟悉一局，不影响天梯。',
+    task: '点击开始休闲模式。',
+    anchor: 'mode-casual',
+  },
+  DOG_SELECT: {
+    title: '选择狗狗',
+    body: '每只狗都有被动。第一次可以直接用默认柴犬开始。',
+    task: '选择一只狗，然后开始一局。',
+    anchor: 'dog-select',
+  },
+  SHOP_INSPECT: {
+    title: '查看商品',
+    body: '点商品看触发点数、占格和效果，再决定买不买。',
+    task: '点击任意商品卡。',
+    anchor: 'shop-offers',
+  },
+  SHOP_BUY: {
+    title: '购买装备',
+    body: '买来的装备会先进入背包。',
+    task: '点击购买到背包。',
+    anchor: 'shop-buy',
+  },
+  PLACE_ITEM: {
+    title: '摆到装备栏',
+    body: '装备放进装备栏才会在战斗中生效；从左到右展示。',
+    task: '把新买的装备拖到装备栏，或者直接匹配继续。',
+    anchor: 'equipment-board',
+  },
+  MATCH: {
+    title: '匹配对手',
+    body: '准备好后找一个接近强度的对手。',
+    task: '点击匹配。',
+    anchor: 'match-button',
+  },
+  BATTLE_WATCH: {
+    title: '观看自动战斗',
+    body: '战斗自动播放，骰子点数会触发对应装备。',
+    task: '点击开始战斗，然后观察骰子和装备高亮。',
+    anchor: 'battle-start',
+  },
+  CONTINUE: {
+    title: '进入下一回合',
+    body: '战斗后会获得金币并进入下一回合，重复购买、摆放、匹配。',
+    task: '点击继续。',
+    anchor: 'battle-continue',
+  },
+}
 
 function createDefaultAccount() {
   return `player-${Math.floor(100000 + Math.random() * 900000)}`
+}
+
+function casualTutorialStorageKey(userId: string) {
+  return `${casualTutorialStoragePrefix}${userId}`
+}
+
+function readCasualTutorialState(userId: string): CasualTutorialState {
+  try {
+    const raw = window.localStorage.getItem(casualTutorialStorageKey(userId))
+    if (!raw) return defaultCasualTutorialState
+    const parsed = JSON.parse(raw) as Partial<CasualTutorialState>
+    if (!parsed.status || !parsed.stepId) return defaultCasualTutorialState
+    if (!Object.keys(casualTutorialSteps).includes(parsed.stepId)) return defaultCasualTutorialState
+    if (!['idle', 'active', 'completed', 'skipped', 'replaying'].includes(parsed.status)) return defaultCasualTutorialState
+    return { status: parsed.status, stepId: parsed.stepId }
+  } catch {
+    return defaultCasualTutorialState
+  }
+}
+
+function saveCasualTutorialState(userId: string, nextState: CasualTutorialState) {
+  window.localStorage.setItem(casualTutorialStorageKey(userId), JSON.stringify(nextState))
+}
+
+function shouldAutoStartCasualTutorial(userId: string) {
+  const state = readCasualTutorialState(userId)
+  return state.status !== 'completed' && state.status !== 'skipped'
+}
+
+function isCasualTutorialRunning(state: CasualTutorialState) {
+  return state.status === 'active' || state.status === 'replaying'
+}
+
+function isStarterItem(item: Item) {
+  return item.defId.startsWith('starter-')
+}
+
+function hasBoughtTutorialItem(run: Run | null) {
+  return Boolean(run?.items.some((item) => !isStarterItem(item)))
+}
+
+function hasPlacedTutorialItem(run: Run | null) {
+  return Boolean(run?.items.some((item) => !isStarterItem(item) && item.area === 'EQUIPMENT'))
+}
+
+function battlePlaybackFinished(battle: Battle | null, eventIndex: number) {
+  return Boolean(battle && eventIndex >= battle.events.length - 1)
+}
+
+function resolveCasualTutorialStep(input: {
+  appScreen: AppScreen
+  run: Run | null
+  battle: Battle | null
+  eventIndex: number
+  offerInspected: boolean
+  bought: boolean
+  placed: boolean
+}): CasualTutorialStepId {
+  if (input.appScreen === 'LOBBY') return 'LOBBY'
+  if (!input.run) return 'DOG_SELECT'
+  if (input.battle && battlePlaybackFinished(input.battle, input.eventIndex)) return 'CONTINUE'
+  if (input.battle || input.run.phase === 'MATCH' || input.run.phase === 'BATTLE') return 'BATTLE_WATCH'
+  if (input.run.phase === 'PREP') return 'MATCH'
+  if (input.run.phase === 'SHOP') {
+    if (!input.offerInspected) return 'SHOP_INSPECT'
+    if (!input.bought && !hasBoughtTutorialItem(input.run)) return 'SHOP_BUY'
+    if (!input.placed && !hasPlacedTutorialItem(input.run)) return 'PLACE_ITEM'
+    return 'MATCH'
+  }
+  if (input.run.phase === 'CLASS_REWARD' || input.run.phase === 'RELIC_CHOICE' || input.run.phase === 'ENCHANT_CHOICE' || input.run.phase === 'CHOICE') return 'MATCH'
+  return 'MATCH'
 }
 const shopNames: Record<ShopType, string> = {
   GENERAL: '通用商店',
@@ -884,6 +1017,10 @@ export default function App() {
   const [runHistory, setRunHistory] = useState<PlayerRunHistory>(emptyRunHistory)
   const [ladderProfile, setLadderProfile] = useState<LadderProfile | null>(null)
   const [historyOverlayOpen, setHistoryOverlayOpen] = useState(false)
+  const [casualTutorialState, setCasualTutorialState] = useState<CasualTutorialState>(defaultCasualTutorialState)
+  const [tutorialOfferInspected, setTutorialOfferInspected] = useState(false)
+  const [tutorialBought, setTutorialBought] = useState(false)
+  const [tutorialPlaced, setTutorialPlaced] = useState(false)
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
   const hasBattle = Boolean(battle)
@@ -902,12 +1039,41 @@ export default function App() {
     api<{ user: AuthUser; activeRun: Run | null }>('/me')
       .then((data) => {
         setUser(data.user)
+        setCasualTutorialState(data.user ? readCasualTutorialState(data.user.id) : defaultCasualTutorialState)
         setRun(data.activeRun)
         void loadRunHistory().catch(() => undefined)
         void loadLadderProfile().catch(() => undefined)
       })
       .catch(() => undefined)
   }, [loadLadderProfile, loadRunHistory])
+
+  useEffect(() => {
+    if (!run) {
+      setTutorialOfferInspected(false)
+      setTutorialBought(false)
+      setTutorialPlaced(false)
+      return
+    }
+    setTutorialBought(hasBoughtTutorialItem(run))
+    setTutorialPlaced(hasPlacedTutorialItem(run))
+  }, [run])
+
+  useEffect(() => {
+    if (!user || !isCasualTutorialRunning(casualTutorialState)) return
+    const stepId = resolveCasualTutorialStep({
+      appScreen,
+      run: run?.mode === 'CASUAL' ? run : null,
+      battle,
+      eventIndex,
+      offerInspected: tutorialOfferInspected,
+      bought: tutorialBought,
+      placed: tutorialPlaced,
+    })
+    if (stepId === casualTutorialState.stepId) return
+    const nextState = { ...casualTutorialState, stepId }
+    setCasualTutorialState(nextState)
+    saveCasualTutorialState(user.id, nextState)
+  }, [appScreen, battle, casualTutorialState, eventIndex, run, tutorialBought, tutorialOfferInspected, tutorialPlaced, user])
 
   useEffect(() => {
     if (!battle) return
@@ -974,11 +1140,64 @@ export default function App() {
 
   const pushUiFeedback = useCallback((kind: UiFeedbackKind, label?: string) => {
     const feedback = createUiFeedbackEvent(kind, label)
+    playFeedbackSound(soundCueForUiFeedback(kind), { enabled: musicEnabled })
     setUiFeedbacks((current) => [...current.slice(-3), feedback])
     window.setTimeout(() => {
       setUiFeedbacks((current) => current.filter((entry) => entry.id !== feedback.id))
     }, feedback.durationMs)
-  }, [])
+  }, [musicEnabled])
+
+  function setSavedCasualTutorialState(nextState: CasualTutorialState) {
+    setCasualTutorialState(nextState)
+    if (user) saveCasualTutorialState(user.id, nextState)
+  }
+
+  function startCasualTutorial() {
+    if (!user) return
+    const status: CasualTutorialStatus = shouldAutoStartCasualTutorial(user.id) ? 'active' : 'replaying'
+    const nextState: CasualTutorialState = {
+      status,
+      stepId: resolveCasualTutorialStep({
+        appScreen,
+        run: run?.mode === 'CASUAL' ? run : null,
+        battle,
+        eventIndex,
+        offerInspected: tutorialOfferInspected,
+        bought: tutorialBought,
+        placed: tutorialPlaced,
+      }),
+    }
+    setSavedCasualTutorialState(nextState)
+  }
+
+  function skipCasualTutorial() {
+    setSavedCasualTutorialState({ status: 'skipped', stepId: casualTutorialState.stepId })
+  }
+
+  function completeCasualTutorial() {
+    if (!isCasualTutorialRunning(casualTutorialState)) return
+    setSavedCasualTutorialState({ status: 'completed', stepId: 'CONTINUE' })
+  }
+
+  function handleEnterCasual() {
+    if (user && shouldAutoStartCasualTutorial(user.id)) {
+      const nextState: CasualTutorialState = { status: 'active', stepId: 'DOG_SELECT' }
+      setSavedCasualTutorialState(nextState)
+    }
+    setAppScreen('CASUAL')
+  }
+
+  function markOfferInspectedForTutorial() {
+    if (isCasualTutorialRunning(casualTutorialState)) setTutorialOfferInspected(true)
+  }
+
+  function markBoughtForTutorial() {
+    if (isCasualTutorialRunning(casualTutorialState)) setTutorialBought(true)
+  }
+
+  function markPlacedForTutorial() {
+    if (isCasualTutorialRunning(casualTutorialState)) setTutorialPlaced(true)
+  }
 
   const action = async (
     fn: () => Promise<{ run: Run; battle?: Battle } | { user: AuthUser | null; activeRun?: Run | null; needsNickname?: boolean }>,
@@ -992,10 +1211,12 @@ export default function App() {
         setAppScreen('LOBBY')
         if (!data.user) {
           setRun(null)
+          setCasualTutorialState(defaultCasualTutorialState)
           setRunHistory(emptyRunHistory)
           setLadderProfile(null)
         } else if ('activeRun' in data) {
           setRun(data.activeRun ?? null)
+          setCasualTutorialState(readCasualTutorialState(data.user.id))
         }
         setNeedsNicknameSetup(Boolean(data.user && data.needsNickname))
         if (data.user) {
@@ -1026,6 +1247,8 @@ export default function App() {
       pushUiFeedback('place-failed')
       return
     }
+    const movingItem = run.items.find((item) => item.id === itemId)
+    if (placement.area === 'EQUIPMENT' && movingItem && !isStarterItem(movingItem)) markPlacedForTutorial()
     void action(
       () => api(`/runs/${run.id}/items/move`, { method: 'POST', body: JSON.stringify({ itemId, area: placement.area, x: placement.x, y: placement.y }) }),
       { success: 'place-success', failure: 'place-failed' },
@@ -1067,6 +1290,7 @@ export default function App() {
       setRun(data.run)
       setBattle(null)
       setEventIndex(0)
+      completeCasualTutorial()
       void loadRunHistory().catch(() => undefined)
     } catch (err) {
       setError(err instanceof Error ? err.message : '操作失败')
@@ -1091,6 +1315,7 @@ export default function App() {
   }
 
   const onInspectOffer = (offerId: string, element: HTMLElement) => {
+    markOfferInspectedForTutorial()
     setSelectedOfferId(offerId)
     setSelectedItemId(null)
     setTipAnchor(getFloatingTipPosition(element))
@@ -1165,6 +1390,16 @@ export default function App() {
     else pushUiFeedback('place-failed')
   }
 
+  const tutorialGuide = user && isCasualTutorialRunning(casualTutorialState) ? (
+    <CasualTutorialGuide
+      state={casualTutorialState}
+      run={run}
+      battle={battle}
+      eventIndex={eventIndex}
+      onSkip={skipCasualTutorial}
+    />
+  ) : null
+
   if (!user) {
     return (
       <main className="auth-shell">
@@ -1201,8 +1436,9 @@ export default function App() {
     return (
       <Shell feedbacks={uiFeedbacks} run={run ?? undefined} error={error} musicEnabled={musicEnabled} musicBlocked={musicBlocked} onToggleMusic={toggleMusic} onLogout={() => action(() => api('/auth/logout', { method: 'POST' }).then(() => ({ user: null })))}>
         <PlayerRunHistoryPanel history={runHistory} ladderProfile={ladderProfile} onOpen={() => setHistoryOverlayOpen(true)} />
-        <ModeLobby run={run} runHistory={runHistory} onOpen={() => setHistoryOverlayOpen(true)} onEnterCasual={() => setAppScreen('CASUAL')} onEnterLadder={() => setAppScreen('LADDER')} onEnterDogfight={() => setAppScreen('DOGFIGHT')} onEnterPeak={() => setAppScreen('PEAK')} />
+        <ModeLobby run={run} runHistory={runHistory} onOpen={() => setHistoryOverlayOpen(true)} onEnterCasual={handleEnterCasual} onReplayTutorial={startCasualTutorial} onEnterLadder={() => setAppScreen('LADDER')} onEnterDogfight={() => setAppScreen('DOGFIGHT')} onEnterPeak={() => setAppScreen('PEAK')} />
         {historyOverlayOpen && <PlayerHistoryOverlay history={runHistory} onClose={() => setHistoryOverlayOpen(false)} />}
+        {tutorialGuide}
       </Shell>
     )
   }
@@ -1211,6 +1447,7 @@ export default function App() {
     return (
       <Shell feedbacks={uiFeedbacks} run={run ?? undefined} error={error} musicEnabled={musicEnabled} musicBlocked={musicBlocked} onToggleMusic={toggleMusic} onOpenLobby={() => setAppScreen('LOBBY')} onLogout={() => action(() => api('/auth/logout', { method: 'POST' }).then(() => ({ user: null })))}>
         <LadderHome onStart={(choice) => action(() => api('/runs', { method: 'POST', body: JSON.stringify({ ...choice, mode: 'LADDER' }) }))} />
+        {tutorialGuide}
       </Shell>
     )
   }
@@ -1218,7 +1455,8 @@ export default function App() {
   if (appScreen === 'DOGFIGHT') {
     return (
       <Shell feedbacks={uiFeedbacks} run={run ?? undefined} error={error} musicEnabled={musicEnabled} musicBlocked={musicBlocked} onToggleMusic={toggleMusic} onOpenLobby={() => setAppScreen('LOBBY')} onLogout={() => action(() => api('/auth/logout', { method: 'POST' }).then(() => ({ user: null })))}>
-        <DogfightLobby />
+        <DogfightLobby soundEnabled={musicEnabled} />
+        {tutorialGuide}
       </Shell>
     )
   }
@@ -1227,6 +1465,7 @@ export default function App() {
     return (
       <Shell feedbacks={uiFeedbacks} run={run ?? undefined} error={error} musicEnabled={musicEnabled} musicBlocked={musicBlocked} onToggleMusic={toggleMusic} onOpenLobby={() => setAppScreen('LOBBY')} onLogout={() => action(() => api('/auth/logout', { method: 'POST' }).then(() => ({ user: null })))}>
         <ApexArena />
+        {tutorialGuide}
       </Shell>
     )
   }
@@ -1235,6 +1474,7 @@ export default function App() {
     return (
       <Shell feedbacks={uiFeedbacks} error={error} musicEnabled={musicEnabled} musicBlocked={musicBlocked} onToggleMusic={toggleMusic} onOpenLobby={() => setAppScreen('LOBBY')} onLogout={() => action(() => api('/auth/logout', { method: 'POST' }).then(() => ({ user: null })))}>
         <DogSelect onPick={(choice) => action(() => api('/runs', { method: 'POST', body: JSON.stringify(choice) }))} />
+        {tutorialGuide}
       </Shell>
     )
   }
@@ -1323,7 +1563,11 @@ export default function App() {
               offer={selectedOffer}
               anchor={tipAnchor}
               onClose={closeShopTip}
-              onBuy={() => selectedOffer && action(() => api(`/runs/${run.id}/shop/buy`, { method: 'POST', body: JSON.stringify({ offerId: selectedOffer.offerId, area: 'BAG' }) }), { success: 'buy-success', failure: 'gold-shortage' })}
+              onBuy={() => {
+                if (!selectedOffer) return
+                markBoughtForTutorial()
+                void action(() => api(`/runs/${run.id}/shop/buy`, { method: 'POST', body: JSON.stringify({ offerId: selectedOffer.offerId, area: 'BAG' }) }), { success: 'buy-success', failure: 'gold-shortage' })
+              }}
               onSell={() => selectedItem && action(() => api(`/runs/${run.id}/shop/sell`, { method: 'POST', body: JSON.stringify({ itemId: selectedItem.id }) }), { success: 'sell-success' })}
               onUpgrade={selectedItem && canUpgradeItem(selectedItem, run.items) ? () => upgradeItem(selectedItem.id) : null}
             />
@@ -1336,7 +1580,7 @@ export default function App() {
 
       {!battle && (run.phase === 'MATCH' || run.phase === 'PREP') && (
         <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd}>
-          <section className="match-panel">
+          <section className="match-panel" data-tutorial-anchor="battle-start">
             {run.phase === 'MATCH' ? (
               <>
                 <img className="dog-avatar large" src={dogAssets[run.matchedGhost?.dogType ?? 'SHIBA']} alt="" />
@@ -1360,7 +1604,7 @@ export default function App() {
               onSell={null}
               onUpgrade={selectedItem && canUpgradeItem(selectedItem, run.items) ? () => upgradeItem(selectedItem.id) : null}
             />
-            <button className="primary action-button" onClick={() => action(() => api(run.phase === 'PREP' ? `/runs/${run.id}/battle/match` : `/runs/${run.id}/battle/start`, { method: 'POST' }), { success: 'battle-start' })}>
+            <button className="primary action-button" data-tutorial-anchor={run.phase === 'MATCH' ? 'battle-start' : 'match-button'} onClick={() => action(() => api(run.phase === 'PREP' ? `/runs/${run.id}/battle/match` : `/runs/${run.id}/battle/start`, { method: 'POST' }), { success: 'battle-start' })}>
               <Dice5 size={18} /> {run.phase === 'PREP' ? '匹配对手' : '开始战斗'}
             </button>
           </section>
@@ -1378,6 +1622,7 @@ export default function App() {
           eventIndex={eventIndex}
           speed={speed}
           score={score}
+          soundEnabled={musicEnabled}
           onSpeed={setSpeed}
           onContinue={() => void finishBattle()}
           onRestart={() => setRun(null)}
@@ -1386,6 +1631,7 @@ export default function App() {
       {!battle && !showClassRewardCeremony && run.status === 'ACTIVE' && run.phase !== 'BATTLE' && (
         <ForfeitRunAction run={run} onForfeit={() => void settleRun()} />
       )}
+      {tutorialGuide}
     </Shell>
   )
 }
@@ -1427,7 +1673,40 @@ const modeCards: Array<{
   },
 ]
 
-function ModeLobby({ run, runHistory, onOpen, onEnterCasual, onEnterLadder, onEnterDogfight, onEnterPeak }: { run: Run | null; runHistory: PlayerRunHistory; onOpen: () => void; onEnterCasual: () => void; onEnterLadder: () => void; onEnterDogfight: () => void; onEnterPeak: () => void }) {
+function CasualTutorialGuide({ state, run, battle, eventIndex, onSkip }: { state: CasualTutorialState; run: Run | null; battle: Battle | null; eventIndex: number; onSkip: () => void }) {
+  const step = casualTutorialSteps[state.stepId]
+  const battleFinished = battlePlaybackFinished(battle, eventIndex)
+  const advancedPhase = run?.phase === 'CLASS_REWARD' || run?.phase === 'RELIC_CHOICE' || run?.phase === 'ENCHANT_CHOICE'
+  const body = advancedPhase
+    ? '这是进阶奖励，选择一个适合当前装备的即可。'
+    : state.stepId === 'BATTLE_WATCH' && battle && !battle.events.slice(0, eventIndex + 1).some((event) => event.kind === 'ITEM')
+      ? '如果这次掷骰没有触发装备，就是一次空过；继续看下一次骰子。'
+      : step.body
+  const anchor = state.stepId === 'BATTLE_WATCH' && battle ? 'battle-stage' : step.anchor
+
+  useEffect(() => {
+    const highlighted = [...document.querySelectorAll('.tutorial-highlight')]
+    highlighted.forEach((element) => element.classList.remove('tutorial-highlight'))
+    const target = document.querySelector(`[data-tutorial-anchor="${anchor}"]`)
+    target?.classList.add('tutorial-highlight')
+    target?.scrollIntoView({ block: 'center', inline: 'center', behavior: 'smooth' })
+    return () => target?.classList.remove('tutorial-highlight')
+  }, [anchor])
+
+  return (
+    <aside className="casual-tutorial-guide" aria-live="polite">
+      <div className="tutorial-coach-card paper-card">
+        <span className="tip-tag">{state.status === 'replaying' ? '重看引导' : '新手引导'}</span>
+        <h2>{step.title}</h2>
+        <p>{body}</p>
+        <strong>{battleFinished ? casualTutorialSteps.CONTINUE.task : step.task}</strong>
+        <button className="secondary action-button" type="button" onClick={onSkip}>跳过引导</button>
+      </div>
+    </aside>
+  )
+}
+
+function ModeLobby({ run, runHistory, onOpen, onEnterCasual, onReplayTutorial, onEnterLadder, onEnterDogfight, onEnterPeak }: { run: Run | null; runHistory: PlayerRunHistory; onOpen: () => void; onEnterCasual: () => void; onReplayTutorial: () => void; onEnterLadder: () => void; onEnterDogfight: () => void; onEnterPeak: () => void }) {
   const casualAction = run?.mode === 'CASUAL' ? '继续休闲模式' : '开始休闲模式'
   const ladderAction = run?.mode === 'LADDER' ? '继续天梯模式' : '进入天梯模式'
   return (
@@ -1436,6 +1715,7 @@ function ModeLobby({ run, runHistory, onOpen, onEnterCasual, onEnterLadder, onEn
         <h2>模式大厅</h2>
         <p>选择本次要进入的竞技方式。休闲或天梯完成后的狗可以送入巅峰竞技场。</p>
       </div>
+        <button className="secondary action-button tutorial-replay-button" type="button" onClick={onReplayTutorial}>新手引导</button>
       <div className="mode-grid">
         {modeCards.map((mode) => (
           <article key={mode.id} className={`mode-card paper-card sticker-card ${mode.locked ? 'locked' : 'available'}`}>
@@ -1451,7 +1731,7 @@ function ModeLobby({ run, runHistory, onOpen, onEnterCasual, onEnterLadder, onEn
               <p>{mode.description}</p>
             </div>
             {mode.id === 'CASUAL' ? (
-              <button className="primary action-button mode-action" onClick={onEnterCasual}>{casualAction}</button>
+              <button className="primary action-button mode-action" data-tutorial-anchor="mode-casual" onClick={onEnterCasual}>{casualAction}</button>
             ) : mode.id === 'LADDER' ? (
               <button className="primary action-button mode-action" onClick={onEnterLadder}>{ladderAction}</button>
             ) : mode.id === 'DOGFIGHT' ? (
@@ -1687,7 +1967,7 @@ function HistoryRunDetails({ entry, inspectedItem, tipAnchor, onInspectItem, onC
   )
 }
 
-function DogfightLobby() {
+function DogfightLobby({ soundEnabled }: { soundEnabled: boolean }) {
   const [rooms, setRooms] = useState<DogfightRoomSummary[]>([])
   const [room, setRoom] = useState<DogfightRoom | null>(null)
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null)
@@ -1776,7 +2056,7 @@ function DogfightLobby() {
   }
 
   if (room) {
-    return <DogfightRoomView room={room} onRoomChange={setRoom} onLeave={() => void leaveRoom()} />
+    return <DogfightRoomView room={room} onRoomChange={setRoom} onLeave={() => void leaveRoom()} soundEnabled={soundEnabled} />
   }
 
   return (
@@ -1827,7 +2107,7 @@ function DogfightLobby() {
   )
 }
 
-function DogfightRoomView({ room, onRoomChange, onLeave }: { room: DogfightRoom; onRoomChange: (room: DogfightRoom) => void; onLeave: () => void }) {
+function DogfightRoomView({ room, onRoomChange, onLeave, soundEnabled }: { room: DogfightRoom; onRoomChange: (room: DogfightRoom) => void; onLeave: () => void; soundEnabled: boolean }) {
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
   const [selectedOfferId, setSelectedOfferId] = useState<string | null>(null)
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null)
@@ -2064,7 +2344,7 @@ function DogfightRoomView({ room, onRoomChange, onLeave }: { room: DogfightRoom;
 
         <main className="dogfight-play-area">
           {battle && battleRun ? (
-            <BattleView run={battleRun} battle={battle} currentEvent={battle.events[eventIndex]} eventIndex={eventIndex} speed={speed} score={0} onSpeed={setSpeed} onContinue={() => finishDogfightBattleReplay()} onRestart={() => dismissDogfightBattleReplay()} />
+            <BattleView run={battleRun} battle={battle} currentEvent={battle.events[eventIndex]} eventIndex={eventIndex} speed={speed} score={0} soundEnabled={soundEnabled} onSpeed={setSpeed} onContinue={() => finishDogfightBattleReplay()} onRestart={() => dismissDogfightBattleReplay()} />
           ) : room.phase === 'DOG_SELECT' && !run ? (
             <section className="dogfight-dog-select sketch-panel">
               <div className="section-title">
@@ -2576,7 +2856,7 @@ function DogSelect({ onPick }: { onPick: (choice: { dogType: DogType; luckyNumbe
     onPick(selectedDog === 'EMPEROR' ? { dogType: selectedDog, luckyNumber } : { dogType: selectedDog })
   }
   return (
-    <section className="dog-select-screen">
+    <section className="dog-select-screen" data-tutorial-anchor="dog-select">
       <div className="screen-heading">
         <h2>选择你的狗狗伙伴</h2>
         <p>每个狗狗都有独特的被动特性和策略玩法</p>
@@ -2943,7 +3223,7 @@ function RelicChoiceSelect({ choices, onPick }: { choices: RelicChoice[]; onPick
 
 function ShopShelf({ run, selectedOfferId, draggingItemId, onInspectOffer, onReroll, onMatch }: { run: Run; selectedOfferId: string | null; draggingItemId: string | null; onInspectOffer: (offerId: string, element: HTMLElement) => void; onReroll: () => void; onMatch: () => void }) {
   return (
-    <section className="shop-shelf sketch-panel">
+    <section className="shop-shelf sketch-panel" data-tutorial-anchor="shop-offers">
       <div className="section-title">
         <div>
           <h2>{shopNames[run.shopType]}</h2>
@@ -2962,7 +3242,7 @@ function ShopShelf({ run, selectedOfferId, draggingItemId, onInspectOffer, onRer
           <ShopCard key={offer.offerId} offer={offer} selected={selectedOfferId === offer.offerId} ownedCount={shopOfferOwnedCount(run, offer)} onClick={(element) => onInspectOffer(offer.offerId, element)} />
         ))}
       </div>
-      <button className="primary action-button match-button" onClick={onMatch}>
+      <button className="primary action-button match-button" data-tutorial-anchor="match-button" onClick={onMatch}>
         <Swords size={18} /> 匹配
       </button>
     </section>
@@ -3013,10 +3293,10 @@ function InventoryBoard({ run, selectedItemId, draggingItemId, onSellRelic, onSe
   const equipmentSlots = equipmentSlotCount(run.relics)
   return (
     <section className="inventory-board expanded paper-inventory">
-      <GridPanel title="装备栏" subtitle={`${equipmentSlots} 格单行，从左向右触发`} icon={<Grid3X3 size={18} />} area="EQUIPMENT" w={equipmentSlots} h={1} items={run.items} selectedItemId={selectedItemId} draggingItemId={draggingItemId} onSelectItem={onSelectItem} onSlotClick={onSlotClick} />
+      <GridPanel title="装备栏" subtitle={`${equipmentSlots} 格单行，从左向右触发`} icon={<Grid3X3 size={18} />} area="EQUIPMENT" tutorialAnchor="equipment-board" w={equipmentSlots} h={1} items={run.items} selectedItemId={selectedItemId} draggingItemId={draggingItemId} onSelectItem={onSelectItem} onSlotClick={onSlotClick} />
       <div className="bag-relic-row">
         <RelicRail relics={run.relics ?? []} onSellRelic={onSellRelic ?? null} />
-        <GridPanel title="背包" subtitle={`${BASE_EQUIPMENT_SLOT_COUNT} 格单行，战斗中默认不生效`} icon={<Backpack size={18} />} area="BAG" w={BASE_EQUIPMENT_SLOT_COUNT} h={1} items={run.items} selectedItemId={selectedItemId} draggingItemId={draggingItemId} onSelectItem={onSelectItem} onSlotClick={onSlotClick} />
+        <GridPanel title="背包" subtitle={`${BASE_EQUIPMENT_SLOT_COUNT} 格单行，战斗中默认不生效`} icon={<Backpack size={18} />} area="BAG" tutorialAnchor="bag-board" w={BASE_EQUIPMENT_SLOT_COUNT} h={1} items={run.items} selectedItemId={selectedItemId} draggingItemId={draggingItemId} onSelectItem={onSelectItem} onSlotClick={onSlotClick} />
       </div>
     </section>
   )
@@ -3099,9 +3379,9 @@ function RelicFloatingTip({ relic, anchor, onClose, onSell }: { relic: Relic | n
   )
 }
 
-function GridPanel({ title, subtitle, icon, area, w, h, items, selectedItemId, draggingItemId, onSelectItem, onSlotClick }: { title: string; subtitle: string; icon: React.ReactNode; area: Area; w: number; h: number; items: Item[]; selectedItemId: string | null; draggingItemId: string | null; onSelectItem: (itemId: string, element: HTMLElement) => void; onSlotClick: (area: Area, x: number, y: number) => void }) {
+function GridPanel({ title, subtitle, icon, area, tutorialAnchor, w, h, items, selectedItemId, draggingItemId, onSelectItem, onSlotClick }: { title: string; subtitle: string; icon: React.ReactNode; area: Area; tutorialAnchor?: string; w: number; h: number; items: Item[]; selectedItemId: string | null; draggingItemId: string | null; onSelectItem: (itemId: string, element: HTMLElement) => void; onSlotClick: (area: Area, x: number, y: number) => void }) {
   return (
-    <div className="grid-panel">
+    <div className="grid-panel" data-tutorial-anchor={tutorialAnchor}>
       <div className="grid-heading">
         <h3>{icon}{title}</h3>
         <p>{subtitle}</p>
@@ -3230,7 +3510,7 @@ function FloatingTip({ run, item, offer, anchor, descriptionOverride, onClose, o
       )}
       <div className="tip-actions">
         {isOffer && onBuy ? (
-          <button className="primary action-button wide" disabled={!canAfford} onClick={onBuy}>
+          <button className="primary action-button wide" data-tutorial-anchor="shop-buy" disabled={!canAfford} onClick={onBuy}>
             <PackagePlus size={18} /> 购买到背包
           </button>
         ) : (
@@ -3305,7 +3585,7 @@ function ForfeitRunAction({ run, onForfeit }: { run: Run; onForfeit: () => void 
   )
 }
 
-function BattleView({ run, battle, currentEvent, eventIndex, speed, score, onSpeed, onContinue, onRestart }: { run: Run; battle: Battle | null; currentEvent?: BattleEvent; eventIndex: number; speed: number; score: number; onSpeed: (speed: number) => void; onContinue: () => void; onRestart: () => void }) {
+function BattleView({ run, battle, currentEvent, eventIndex, speed, score, soundEnabled, onSpeed, onContinue, onRestart }: { run: Run; battle: Battle | null; currentEvent?: BattleEvent; eventIndex: number; speed: number; score: number; soundEnabled: boolean; onSpeed: (speed: number) => void; onContinue: () => void; onRestart: () => void }) {
   const [logOpen, setLogOpen] = useState(false)
   const [battleTip, setBattleTip] = useState<{ item: Item; owner: 'player' | 'opponent'; anchor: TipAnchor } | null>(null)
   const playback = battle ?? run.lastBattle
@@ -3333,6 +3613,11 @@ function BattleView({ run, battle, currentEvent, eventIndex, speed, score, onSpe
   }
   const lastRollEvent = events.slice(0, displayIndex + 1).reverse().find((entry) => entry.kind === 'ROLL')
   const isFinished = Boolean(playback && (!battle || eventIndex >= events.length - 1))
+
+  useEffect(() => {
+    if (!presentation) return
+    playFeedbackSound(soundCueForBattlePresentation(presentation.kind), { enabled: soundEnabled })
+  }, [displayIndex, presentation?.kind, soundEnabled])
 
   return (
     <section className="battle-panel visual-battle sketch-panel">
@@ -3382,7 +3667,7 @@ function BattleView({ run, battle, currentEvent, eventIndex, speed, score, onSpe
          </div>
       ) : run.phase === 'BATTLE' && isFinished && (
         <div className="battle-continue-row">
-          <button className="primary action-button" onClick={onContinue}>
+          <button className="primary action-button" data-tutorial-anchor="battle-continue" onClick={onContinue}>
             <ArrowRight size={18} /> 继续
           </button>
         </div>
@@ -3426,11 +3711,13 @@ function BattleEquipmentRow({ owner, snapshot, events, displayIndex, activeEvent
           const growthText = growthDamageTextForBattleItem(item, owner, events, displayIndex)
           const boomCounterState = boomCounterStateForBattleItem(item, owner, events, displayIndex, activeEvent)
           const triggerDice = triggerDiceLabel(item.def)
+          const triggerCountLabel = itemTriggerCountLabel(events, owner, item.id, displayIndex)
+          const triggerCountPopping = activeItemId === item.id
           return (
           <button
             type="button"
             key={item.id}
-            className={`battle-item item-card paper-item-card ${itemTone(item.def)} ${qualityClass(item.quality)} ${activeItemId === item.id ? `active battle-item-trigger vfx-trigger-${activeVfxKind}` : ''} ${boomCounterState ? 'boom-counter' : ''} ${boomCounterState?.popping ? 'boom-counter-pop' : ''}`}
+            className={`battle-item item-card paper-item-card ${itemTone(item.def)} ${qualityClass(item.quality)} ${activeItemId === item.id ? `active battle-item-trigger vfx-trigger-${activeVfxKind}` : ''} ${boomCounterState ? 'boom-counter' : ''} ${boomCounterState?.popping ? 'boom-counter-pop' : ''} ${triggerCountPopping ? 'trigger-count-pop' : ''}`}
             data-vfx-kind={battleVfxKind(activeEvent)}
             style={{
               gridColumn: `${item.x + 1} / span ${item.def.width}`,
@@ -3451,6 +3738,9 @@ function BattleEquipmentRow({ owner, snapshot, events, displayIndex, activeEvent
                 <b>{boomCounterState?.count}/{boomCounterState.max}</b>
               </span>
             )}
+            <span className={`trigger-count-stamp ${triggerCountLabel === 'x0' ? 'empty' : ''}`} aria-label={`褰撳眬瑙﹀彂娆℃暟 ${triggerCountLabel}`}>
+              {triggerCountLabel}
+            </span>
           </button>
           )
         })}
@@ -3473,7 +3763,7 @@ function BattleStage({ player, opponent, event, presentation, lastRoll, speed, f
   const opponentShield = event?.opponentShield ?? 0
   const activePresentationKind = presentation?.kind ?? 'none'
   return (
-    <div className="battle-stage handdrawn-stage" data-presentation-kind={activePresentationKind}>
+    <div className="battle-stage handdrawn-stage" data-tutorial-anchor="battle-stage" data-presentation-kind={activePresentationKind}>
       <BattleFxStage event={event} presentation={presentation} speed={speed} />
       <BattleDog
         side="opponent"

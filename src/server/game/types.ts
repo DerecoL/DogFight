@@ -201,6 +201,7 @@ export type BattleEvent = {
   itemId?: string
   defId?: string
   quality?: ItemQuality
+  itemTriggerCount?: number
   boomCounterItemId?: string
   boomCounterValue?: number
   boomCounterMax?: number

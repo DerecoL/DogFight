@@ -1126,6 +1126,7 @@ describe('battle simulation', () => {
     expect(itemEvent).toMatchObject({
       itemId: 'left-copy',
       defId: 'starter-1',
+      itemTriggerCount: 1,
       effectType: 'DAMAGE',
       amount: 5,
       target: 'opponent',
@@ -1264,6 +1265,8 @@ describe('battle simulation', () => {
       ['bone', 'UTILITY', 1],
       ['bite-6', 'DAMAGE', 6],
     ])
+    expect(firstRollEvents.filter((event) => event.itemId === 'bone').map((event) => event.itemTriggerCount)).toEqual([1, 1])
+    expect(firstRollEvents.find((event) => event.itemId === 'bite-6')?.itemTriggerCount).toBe(1)
     expect(firstRollEvents[1].playerStatuses?.positive).toContainEqual(expect.objectContaining({ type: 'fury', stacks: 1 }))
   })
 

@@ -485,6 +485,17 @@ describe('selection screen structure', () => {
     expect(css).toContain('.topbar-actions')
   })
 
+  it('wires feedback sounds into UI toast and battle playback paths', () => {
+    expect(app).toContain("from './sound-feedback'")
+    expect(app).toContain('soundCueForUiFeedback(kind)')
+    expect(app).toContain('soundCueForBattlePresentation(presentation.kind)')
+    expect(app).toContain('playFeedbackSound')
+    expect(app).toContain('soundEnabled={musicEnabled}')
+    expect(app).toContain('function BattleView({ run, battle, currentEvent, eventIndex, speed, score, soundEnabled, onSpeed, onContinue, onRestart }')
+    expect(app).toContain('<DogfightLobby soundEnabled={musicEnabled} />')
+    expect(app).toContain('<DogfightRoomView room={room} onRoomChange={setRoom} onLeave={() => void leaveRoom()} soundEnabled={soundEnabled} />')
+  })
+
   it('exposes stable hooks for the handdrawn polish pass', () => {
     expect(app).toContain('auth-panel paper-card sticker-card')
     expect(app).toContain('topbar paper-card')
