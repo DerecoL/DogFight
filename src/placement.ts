@@ -20,8 +20,15 @@ export function resolveSlotPlacement(
   const moving = items.find((item) => item.id === movingItemId)
   if (!moving) return null
 
+  const isInBounds = (x: number, y: number) => (
+    x >= 0
+    && y >= 0
+    && x + moving.def.width <= gridWidth
+    && y + moving.def.height <= gridHeight
+  )
+
   const canPlaceAt = (x: number, y: number) => {
-    if (x < 0 || y < 0 || x + moving.def.width > gridWidth || y + moving.def.height > gridHeight) return false
+    if (!isInBounds(x, y)) return false
     const occupied = new Set<string>()
     for (const item of items) {
       if (item.id === moving.id || item.area !== area) continue
@@ -38,6 +45,7 @@ export function resolveSlotPlacement(
   }
 
   if (canPlaceAt(targetX, targetY)) return { area, x: targetX, y: targetY }
+  if (area === 'EQUIPMENT' && isInBounds(targetX, targetY)) return { area, x: targetX, y: targetY }
 
   const firstCandidateX = Math.max(0, targetX - moving.def.width + 1)
   const lastCandidateX = Math.min(targetX, gridWidth - moving.def.width)

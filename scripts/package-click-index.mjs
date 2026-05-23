@@ -1474,6 +1474,19 @@ async function currentMockApiScript(buildId) {
     const opponentOpeningThorns = relicWithEffect(opponent, 'OPENING_THORNS');
     if (playerOpeningThorns) state.player.thorns += relicOpeningThorns(playerOpeningThorns.relicId, playerOpeningThorns.quality);
     if (opponentOpeningThorns) state.opponent.thorns += relicOpeningThorns(opponentOpeningThorns.relicId, opponentOpeningThorns.quality);
+    const applyBloodContractAura = (side, fighter) => {
+      for (const item of equippedWithEffect(fighter, 'GRANT_LIFESTEAL_ADJACENT')) {
+        const def = defs[item.defId];
+        const quality = normalizeQuality(item.quality);
+        const recipients = bloodContractAdjacentItems(fighter, item, quality);
+        for (const recipient of recipients) {
+          if (!state[side].lifestealItemIds.includes(recipient.id)) state[side].lifestealItemIds.push(recipient.id);
+        }
+        if (recipients.length > 0) push({ actor: side, kind: 'ITEM', itemId: item.id, defId: item.defId, effectType: 'UTILITY', amount: recipients.length, target: side, text: def.name + ' 光环使' + (quality === 'DIAMOND' ? '左右相邻' : '左侧') + '装备获得【吸血】。' });
+      }
+    };
+    applyBloodContractAura('player', run);
+    applyBloodContractAura('opponent', opponent);
     push({ actor: 'system', kind: 'ROLL', target: 'none', text: '战斗开始，双方自动掷骰。' });
     for (let round = 0; round < 10 && playerHp > 0 && opponentHp > 0; round += 1) {
       for (const side of ['player', 'opponent']) {
@@ -1485,6 +1498,7 @@ async function currentMockApiScript(buildId) {
         for (const item of equippedOf(fighter)) {
           const def = defs[item.defId];
           if (!def || !def.dice.includes(roll)) continue;
+          if ((def.advancedEffect || 'NONE') === 'GRANT_LIFESTEAL_ADJACENT') continue;
           if (state[side].disabledItemIds.includes(item.id)) {
             state[side].disabledItemIds = state[side].disabledItemIds.filter((id) => id !== item.id);
             push({ actor: side, kind: 'ITEM', itemId: item.id, defId: item.defId, effectType: 'UTILITY', amount: 0, target: 'none', text: def.name + ' 被【失效】抵消。' });
@@ -1518,13 +1532,7 @@ async function currentMockApiScript(buildId) {
           if (advanced === 'GROWTH_DAMAGE') amount = state[side].growthDamageByItemId[item.id] ?? growthDamageBase(quality);
           if (state[side].furyStacks > 0 && def.effect?.type === 'DAMAGE') amount += state[side].furyStacks;
           time += 0.25;
-          if (advanced === 'GRANT_LIFESTEAL_ADJACENT') {
-            const recipients = bloodContractAdjacentItems(fighter, item, quality);
-            for (const recipient of recipients) {
-              if (!state[side].lifestealItemIds.includes(recipient.id)) state[side].lifestealItemIds.push(recipient.id);
-            }
-            push({ actor: side, kind: 'ITEM', itemId: item.id, defId: item.defId, effectType: 'UTILITY', amount: recipients.length, target: side, text: def.name + ' 使' + recipients.length + '件相邻装备获得吸血。' });
-          } else if (advanced === 'PURGE_ENEMY_BUFFS') {
+          if (advanced === 'PURGE_ENEMY_BUFFS') {
             const removed = purgePositiveBuffs(target, amount);
             const recoveryBlocked = time <= 10 && equippedWithEffect(fighter, 'DOUBLE_RATE_FIRST_TEN').length > 0;
             if (removed > 0 && !recoveryBlocked) {

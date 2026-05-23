@@ -3118,6 +3118,7 @@ function DraggableItem({ item, selected, dragging, upgradeable, onSelect }: { it
     gridColumn: `${item.x + 1} / span ${item.def.width}`,
     gridRow: `${item.y + 1} / span ${item.def.height}`,
   }
+  const triggerDice = triggerDiceLabel(item.def)
   return (
     <button
       ref={setNodeRef}
@@ -3127,7 +3128,7 @@ function DraggableItem({ item, selected, dragging, upgradeable, onSelect }: { it
         event.stopPropagation()
         onSelect(event.currentTarget)
       }}
-      title={`${qualityLabel[normalizeQuality(item.quality)]} ${item.def.name} · ${item.def.size}格 · 点数 ${item.def.dice.join('/')}`}
+      title={`${qualityLabel[normalizeQuality(item.quality)]} ${item.def.name} · ${item.def.size}格${triggerDice ? ` · 点数 ${triggerDice}` : ''}`}
       {...listeners}
       {...attributes}
     >
@@ -3137,6 +3138,7 @@ function DraggableItem({ item, selected, dragging, upgradeable, onSelect }: { it
 }
 
 function ItemCardContent({ item, upgradeable = false }: { item: Item; upgradeable?: boolean }) {
+  const triggerDice = triggerDiceLabel(item.def)
   return (
     <>
       <span className="quality-chip">{qualityLabel[normalizeQuality(item.quality)]}</span>
@@ -3145,7 +3147,7 @@ function ItemCardContent({ item, upgradeable = false }: { item: Item; upgradeabl
       <span>{item.def.name}</span>
       {item.enchant && <span className="enchant-badge"><Sparkles size={12} />附魔</span>}
       <SizePreview size={item.def.size} />
-      <small><Dice5 size={12} /> {item.def.dice.join('/')}</small>
+      {triggerDice && <small><Dice5 size={12} /> {triggerDice}</small>}
       <small className="item-effect">{effectText(item.def, normalizeQuality(item.quality))}</small>
       {item.enchant && <small className="item-effect enchant-text">{enchantmentText(item.enchant)}</small>}
     </>

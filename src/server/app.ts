@@ -676,11 +676,9 @@ export function buildApp() {
     if (!canPlace(gameItems, moving, body.area, body.x, body.y, placementOptions)) {
       const covered = body.area === 'EQUIPMENT' ? overlappingItems(gameItems, moving, body.area, body.x, body.y) : []
       const remainingItems = gameItems.filter((entry) => !covered.some((coveredItem) => coveredItem.id === entry.id))
-      const bagMoves = covered.length > 0
-        && canPlace(remainingItems, moving, body.area, body.x, body.y, placementOptions)
-        ? replacementBagMoves(gameItems, moving, covered)
-        : null
-      if (bagMoves) {
+      if (covered.length > 0 && canPlace(remainingItems, moving, body.area, body.x, body.y, placementOptions)) {
+        const bagMoves = replacementBagMoves(gameItems, moving, covered)
+        if (!bagMoves) return reply.code(400).send({ error: '背包空间不足，请先整理' })
         await prisma.$transaction([
           prisma.itemInstance.update({ where: { id: item.id }, data: { area: body.area, x: body.x, y: body.y } }),
           ...bagMoves.map((move) => prisma.itemInstance.update({ where: { id: move.id }, data: { area: 'BAG', x: move.x, y: move.y } })),
