@@ -5,6 +5,7 @@ dist
 .codex-logs
 .superpowers
 docs/superpowers
+picture
 *.log
 .env
 .env.*

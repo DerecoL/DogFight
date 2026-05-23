@@ -22,7 +22,16 @@ jobs:
         timeout-minutes: 2
         run: |
           SOURCE_PACKAGE="$RUNNER_TEMP/dogfight-source-${GITHUB_SHA}.tar.gz"
-          tar --exclude=.git --exclude=node_modules --exclude=.env.production -czf "$SOURCE_PACKAGE" .
+          tar \
+            --exclude=.git \
+            --exclude=node_modules \
+            --exclude=dist \
+            --exclude=dist-click \
+            --exclude=.env.production \
+            --exclude=.superpowers \
+            --exclude=docs/superpowers \
+            --exclude=picture \
+            -czf "$SOURCE_PACKAGE" .
           echo "SOURCE_PACKAGE=$SOURCE_PACKAGE" >> "$GITHUB_ENV"
           echo "REMOTE_PACKAGE=/tmp/dogfight-source-${GITHUB_SHA}.tar.gz" >> "$GITHUB_ENV"
 
@@ -35,11 +44,13 @@ jobs:
           ssh-keyscan -T 20 -H "${{ secrets.SERVER_HOST }}" >> ~/.ssh/known_hosts
 
       - name: Upload source package
-        timeout-minutes: 5
+        timeout-minutes: 15
         run: |
           scp -i ~/.ssh/dogfight_deploy_key \
             -o BatchMode=yes \
             -o ConnectTimeout=20 \
+            -o ServerAliveInterval=15 \
+            -o ServerAliveCountMax=4 \
             "$SOURCE_PACKAGE" \
             "${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:$REMOTE_PACKAGE"
 
