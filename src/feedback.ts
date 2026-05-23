@@ -1,5 +1,16 @@
 export type FeedbackSide = 'player' | 'opponent' | 'system'
-export type FeedbackAnchor = 'item' | 'dice' | 'dog' | 'hp' | 'status' | 'log' | 'screen'
+export type FeedbackAnchor =
+  | 'item'
+  | 'dice'
+  | 'dog'
+  | 'dog-avatar'
+  | 'hp'
+  | 'status'
+  | 'status-positive'
+  | 'status-negative'
+  | 'equipment-row'
+  | 'log'
+  | 'screen'
 export type PresentationKind = 'none' | 'roll' | 'damage' | 'heal' | 'shield' | 'poison' | 'weak' | 'freeze' | 'thorns' | 'miss' | 'utility'
 export type FxPhase = 'source' | 'trail' | 'impact' | 'result' | 'log'
 export type UiFeedbackTone = 'success' | 'danger' | 'info' | 'reward'
@@ -172,9 +183,10 @@ function battlePresentationTarget(event: BattleEventLike | null | undefined, kin
   if (kind === 'roll') return { anchor: 'dice', side: normalizeSide(event?.actor) }
   const targetSide = battlePresentationTargetSide(event, kind)
   if (!targetSide) return { anchor: 'screen', side: 'system' }
-  if (kind === 'shield') return { anchor: 'hp', side: targetSide }
-  if (kind === 'poison' || kind === 'weak' || kind === 'freeze' || kind === 'thorns') return { anchor: 'status', side: targetSide }
-  return { anchor: 'dog', side: targetSide }
+  if (kind === 'heal' || kind === 'shield') return { anchor: 'hp', side: targetSide }
+  if (kind === 'poison' || kind === 'weak' || kind === 'freeze') return { anchor: 'status-negative', side: targetSide }
+  if (kind === 'thorns') return { anchor: 'status-positive', side: targetSide }
+  return { anchor: 'dog-avatar', side: targetSide }
 }
 
 export function battlePresentationTargetSide(event?: BattleEventLike | null, kind = battlePresentationKind(event)): 'player' | 'opponent' | null {

@@ -30,7 +30,7 @@ describe('feedback presentation mapping', () => {
 
     expect(presentation.kind).toBe('damage')
     expect(presentation.source).toEqual({ anchor: 'item', side: 'player', id: 'item-1' })
-    expect(presentation.target).toEqual({ anchor: 'dog', side: 'opponent' })
+    expect(presentation.target).toEqual({ anchor: 'dog-avatar', side: 'opponent' })
     expect(presentation.amount).toBe(4)
     expect(presentation.statusChanged).toEqual([])
     expect(presentation.logTone).toBe('damage')
@@ -53,6 +53,22 @@ describe('feedback presentation mapping', () => {
 
     for (const [patch, expected] of cases) {
       expect(createBattlePresentation({ ...baseEvent, ...patch }).kind).toBe(expected)
+    }
+  })
+
+  it('maps battle effect types to precise visual target anchors', () => {
+    const cases = [
+      [{ effectType: 'DAMAGE', targetHpDelta: -3, target: 'opponent' }, { anchor: 'dog-avatar', side: 'opponent' }],
+      [{ effectType: 'DAMAGE', targetHpDelta: 0, target: 'opponent' }, { anchor: 'dog-avatar', side: 'opponent' }],
+      [{ effectType: 'HEAL', target: 'player' }, { anchor: 'hp', side: 'player' }],
+      [{ effectType: 'UTILITY', playerStatuses: { positive: [{ type: 'shield', label: '护盾', tone: 'positive' }] }, target: 'player' }, { anchor: 'hp', side: 'player' }],
+      [{ effectType: 'POISON', target: 'opponent' }, { anchor: 'status-negative', side: 'opponent' }],
+      [{ effectType: 'UTILITY', opponentStatuses: { positive: [], negative: [{ type: 'weak', label: '虚弱', tone: 'negative' }] }, target: 'opponent' }, { anchor: 'status-negative', side: 'opponent' }],
+      [{ effectType: 'UTILITY', playerStatuses: { positive: [{ type: 'thorns', label: '荆棘', tone: 'positive' }], negative: [] }, target: 'player' }, { anchor: 'status-positive', side: 'player' }],
+    ] as const
+
+    for (const [patch, expectedTarget] of cases) {
+      expect(createBattlePresentation({ ...baseEvent, ...patch }).target).toEqual(expectedTarget)
     }
   })
 
