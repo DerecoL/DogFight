@@ -1410,6 +1410,10 @@ export default function App() {
         setError('职业装备不可使用药水')
         return
       }
+      if (item?.def.advancedEffect === 'BOOM_COUNTER') {
+        setError('爆鸣计数器只能通过计数触发')
+        return
+      }
       if (item) {
         applyPotionChoice(itemId)
         return
