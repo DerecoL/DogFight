@@ -69,6 +69,7 @@ type HistoryModeTab = 'ALL' | 'CASUAL' | 'DOGFIGHT' | 'PEAK' | 'LADDER'
 type HistoryRunMode = Exclude<HistoryModeTab, 'ALL'>
 type RunMode = 'CASUAL' | 'LADDER'
 type LadderTier = 'BRONZE' | 'SILVER' | 'GOLD' | 'PLATINUM' | 'DIAMOND' | 'MASTER' | 'DOG_KING'
+type VisualThemeId = 'dogPark' | 'backAlley' | 'royalKennel'
 
 type ItemDef = {
   id: string
@@ -367,6 +368,12 @@ const dogAssets: Record<DogType, string> = {
   BULLY: '/assets/dogs/bully.webp',
   EMPEROR: '/assets/dogs/emperor.webp',
 }
+const visualThemeAssets: Record<VisualThemeId, string> = {
+  dogPark: '/assets/backgrounds/storybook-dog-park.webp',
+  backAlley: '/assets/backgrounds/storybook-back-alley.webp',
+  royalKennel: '/assets/backgrounds/storybook-royal-kennel.webp',
+}
+const visualThemeOrder: VisualThemeId[] = ['dogPark', 'backAlley', 'royalKennel']
 const gameIcon = '/assets/game-icon.png'
 const backgroundMusicSrc = '/assets/audio/the-final-inventory.mp3'
 const musicPreferenceKey = 'dogfight:background-music'
@@ -460,6 +467,15 @@ function isCasualTutorialRunning(state: CasualTutorialState) {
 
 function isStarterItem(item: Item) {
   return item.defId.startsWith('starter-')
+}
+
+function visualThemeForRound(round: number): VisualThemeId {
+  const normalizedRound = Math.max(1, Math.floor(Number.isFinite(round) ? round : 1))
+  return visualThemeOrder[(normalizedRound - 1) % visualThemeOrder.length]
+}
+
+function visualThemeStyle(visualTheme: VisualThemeId) {
+  return { '--theme-bg': `url("${visualThemeAssets[visualTheme]}")` } as React.CSSProperties
 }
 
 function hasBoughtTutorialItem(run: Run | null) {
@@ -764,15 +780,15 @@ function battleVfxTargetSide(event?: BattleEvent): 'player' | 'opponent' | null 
 const battleVfxStyles: Record<BattleVfxKind, BattleVfxStyle> = {
   none: { kind: 'none', color: '#8b735d', accent: '#fff4e4', prefix: '', particleCount: 0 },
   roll: { kind: 'roll', color: '#5a84f6', accent: '#ffe08a', prefix: '', particleCount: 18 },
-  damage: { kind: 'damage', color: '#ef4444', accent: '#fbbf24', prefix: '-', particleCount: 26 },
-  heal: { kind: 'heal', color: '#16a34a', accent: '#86efac', prefix: '+', particleCount: 24 },
-  shield: { kind: 'shield', color: '#2563eb', accent: '#93c5fd', prefix: '+', particleCount: 22 },
-  poison: { kind: 'poison', color: '#22c55e', accent: '#a7f3d0', prefix: '+', particleCount: 32 },
-  weak: { kind: 'weak', color: '#7c3aed', accent: '#ddd6fe', prefix: '', particleCount: 20 },
-  freeze: { kind: 'freeze', color: '#38bdf8', accent: '#dbeafe', prefix: '', particleCount: 22 },
-  thorns: { kind: 'thorns', color: '#b7791f', accent: '#fde68a', prefix: '+', particleCount: 24 },
-  miss: { kind: 'miss', color: '#8b735d', accent: '#e7d7c4', prefix: '', particleCount: 12 },
-  utility: { kind: 'utility', color: '#5a84f6', accent: '#bfdbfe', prefix: '', particleCount: 18 },
+  damage: { kind: 'damage', color: '#ef4444', accent: '#fbbf24', prefix: '-', particleCount: 40 },
+  heal: { kind: 'heal', color: '#16a34a', accent: '#86efac', prefix: '+', particleCount: 34 },
+  shield: { kind: 'shield', color: '#2563eb', accent: '#93c5fd', prefix: '+', particleCount: 32 },
+  poison: { kind: 'poison', color: '#22c55e', accent: '#a7f3d0', prefix: '+', particleCount: 46 },
+  weak: { kind: 'weak', color: '#7c3aed', accent: '#ddd6fe', prefix: '', particleCount: 30 },
+  freeze: { kind: 'freeze', color: '#38bdf8', accent: '#dbeafe', prefix: '', particleCount: 32 },
+  thorns: { kind: 'thorns', color: '#b7791f', accent: '#fde68a', prefix: '+', particleCount: 34 },
+  miss: { kind: 'miss', color: '#8b735d', accent: '#e7d7c4', prefix: '', particleCount: 18 },
+  utility: { kind: 'utility', color: '#5a84f6', accent: '#bfdbfe', prefix: '', particleCount: 28 },
 }
 
 function createBattleFxStyle(event: BattleEvent) {
@@ -1497,6 +1513,7 @@ export default function App() {
           <section className="reward-workbench">
             <ClassRewardSelect
               choices={run.classRewardChoices}
+              visualTheme={visualThemeForRound(run.round)}
               onPick={(defId) => action(() => api(`/runs/${run.id}/class-reward/select`, { method: 'POST', body: JSON.stringify({ defId }) }), { success: 'reward-picked' })}
             />
             <InventoryBoard
@@ -1521,7 +1538,7 @@ export default function App() {
 
       {!battle && run.phase === 'ENCHANT_CHOICE' && !showEnchantCeremony && (
         <section className="reward-workbench enchant-workbench">
-          <EnchantChoiceSelect choices={run.enchantChoices} selectedId={selectedEnchant?.id ?? ''} onSelect={setSelectedEnchantId} />
+          <EnchantChoiceSelect choices={run.enchantChoices} selectedId={selectedEnchant?.id ?? ''} visualTheme={visualThemeForRound(run.round)} onSelect={setSelectedEnchantId} />
           <InventoryBoard
             run={run}
             selectedItemId={selectedItemId}
@@ -1535,7 +1552,7 @@ export default function App() {
       )}
 
       {!battle && run.phase === 'RELIC_CHOICE' && (
-        <RelicChoiceSelect choices={run.relicChoices} onPick={(relicId) => action(() => api(`/runs/${run.id}/relic/select`, { method: 'POST', body: JSON.stringify({ relicId }) }), { success: 'relic-picked' })} />
+        <RelicChoiceSelect choices={run.relicChoices} visualTheme={visualThemeForRound(run.round)} onPick={(relicId) => action(() => api(`/runs/${run.id}/relic/select`, { method: 'POST', body: JSON.stringify({ relicId }) }), { success: 'relic-picked' })} />
       )}
 
       {!battle && run.phase === 'SHOP' && (
@@ -2430,7 +2447,7 @@ function DogfightRunWorkbench({ run, selectedItemId, selectedOfferId, draggingIt
   if (run.phase === 'CLASS_REWARD') {
     return (
       <section className="reward-workbench">
-        <ClassRewardSelect choices={run.classRewardChoices} onPick={onClassReward} />
+        <ClassRewardSelect choices={run.classRewardChoices} visualTheme={visualThemeForRound(run.round)} onPick={onClassReward} />
         <InventoryBoard run={run} selectedItemId={selectedItemId} draggingItemId={draggingItemId} onSellRelic={onSellRelic} onSelectItem={onInspectItem} onSlotClick={(area, x, y) => selectedItemId && onMoveItem(selectedItemId, area, x, y)} />
         <FloatingTip run={run} item={selectedItem} offer={null} anchor={tipAnchor} onClose={onCloseTip} onBuy={null} onSell={null} onUpgrade={onUpgrade} />
       </section>
@@ -2439,13 +2456,13 @@ function DogfightRunWorkbench({ run, selectedItemId, selectedOfferId, draggingIt
   if (run.phase === 'ENCHANT_CHOICE') {
     return (
       <section className="reward-workbench enchant-workbench">
-        <EnchantChoiceSelect choices={run.enchantChoices} selectedId={selectedEnchantId} onSelect={onEnchantChoice} />
+        <EnchantChoiceSelect choices={run.enchantChoices} selectedId={selectedEnchantId} visualTheme={visualThemeForRound(run.round)} onSelect={onEnchantChoice} />
         <InventoryBoard run={run} selectedItemId={selectedItemId} draggingItemId={draggingItemId} onSellRelic={onSellRelic} onSelectItem={onInspectItem} onSlotClick={() => undefined} />
         <FloatingTip run={run} item={selectedItem} offer={null} anchor={tipAnchor} onClose={onCloseTip} onBuy={null} onSell={null} onUpgrade={null} />
       </section>
     )
   }
-  if (run.phase === 'RELIC_CHOICE') return <RelicChoiceSelect choices={run.relicChoices} onPick={onRelic} />
+  if (run.phase === 'RELIC_CHOICE') return <RelicChoiceSelect choices={run.relicChoices} visualTheme={visualThemeForRound(run.round)} onPick={onRelic} />
   return (
     <section className="shop-workbench dogfight-workbench">
       {run.phase === 'SHOP' && <ShopShelf run={run} selectedOfferId={selectedOfferId} draggingItemId={draggingItemId} onInspectOffer={onInspectOffer} onReroll={onReroll} onMatch={() => undefined} />}
@@ -2917,12 +2934,15 @@ function DogSelect({ onPick }: { onPick: (choice: { dogType: DogType; luckyNumbe
 }
 
 function Shell({ children, run, error, feedbacks = [], musicEnabled, musicBlocked, onToggleMusic, onOpenLobby, onLogout }: { children: React.ReactNode; run?: Run; error?: string; feedbacks?: UiFeedbackEvent[]; musicEnabled: boolean; musicBlocked: boolean; onToggleMusic: () => void; onOpenLobby?: () => void; onLogout: () => void }) {
+  const visualTheme = run ? visualThemeForRound(run.round) : 'dogPark'
   return (
     <main className="app-shell">
       <TopBar run={run} musicEnabled={musicEnabled} musicBlocked={musicBlocked} onToggleMusic={onToggleMusic} onOpenLobby={onOpenLobby} onLogout={onLogout} />
       {error && <p className="error">{error}</p>}
-      <div className="screen-content">{children}</div>
-      <FeedbackLayer feedbacks={feedbacks} />
+      <div className={`app-visual-layer visual-theme-${visualTheme} high-impact-vfx`} data-visual-theme={visualTheme} style={visualThemeStyle(visualTheme)}>
+        <div className="screen-content">{children}</div>
+        <FeedbackLayer feedbacks={feedbacks} />
+      </div>
     </main>
   )
 }
@@ -3073,6 +3093,7 @@ function handleChoiceCardKeyDown(event: KeyboardEvent<HTMLElement>, onChoose: ()
 }
 
 function ClassRewardCeremony({ run, choices, onDismiss }: { run: Run; choices: ClassRewardChoice[]; onDismiss: () => void }) {
+  const visualTheme = visualThemeForRound(run.round)
   const finalAwakening = run.round >= 6
   const title = finalAwakening ? '终阶觉醒' : '职业觉醒'
   const subtitle = finalAwakening ? '终阶职业装备已经解锁，构筑的核心能力将在这一回合定型。' : '职业路线开始成型，选择一件专属装备改变接下来的战斗节奏。'
@@ -3086,7 +3107,9 @@ function ClassRewardCeremony({ run, choices, onDismiss }: { run: Run; choices: C
 
   return (
     <section
-      className="class-reward-ceremony"
+      className={`class-reward-ceremony visual-theme-surface visual-theme-${visualTheme}`}
+      data-visual-theme={visualTheme}
+      style={visualThemeStyle(visualTheme)}
       role="button"
       tabIndex={0}
       onClick={onDismiss}
@@ -3118,10 +3141,10 @@ function ClassRewardCeremony({ run, choices, onDismiss }: { run: Run; choices: C
   )
 }
 
-function ClassRewardSelect({ choices, onPick }: { choices: ClassRewardChoice[]; onPick: (defId: string) => void }) {
+function ClassRewardSelect({ choices, visualTheme, onPick }: { choices: ClassRewardChoice[]; visualTheme: VisualThemeId; onPick: (defId: string) => void }) {
   const [selected, setSelected] = useState(choices[0]?.defId ?? '')
   return (
-    <section className="reward-panel paper-card">
+    <section className={`reward-panel paper-card visual-theme-surface visual-theme-${visualTheme}`} data-visual-theme={visualTheme} style={visualThemeStyle(visualTheme)}>
       <div className="screen-heading centered">
         <h2>选择职业装备</h2>
         <p>先整理背包，再选择一个职业装备放入背包。</p>
@@ -3145,9 +3168,12 @@ function ClassRewardSelect({ choices, onPick }: { choices: ClassRewardChoice[]; 
 }
 
 function EnchantCeremony({ run, choices, onDismiss }: { run: Run; choices: EnchantmentChoice[]; onDismiss: () => void }) {
+  const visualTheme = visualThemeForRound(run.round)
   return (
     <section
-      className="class-reward-ceremony enchant-ceremony"
+      className={`class-reward-ceremony enchant-ceremony visual-theme-surface visual-theme-${visualTheme}`}
+      data-visual-theme={visualTheme}
+      style={visualThemeStyle(visualTheme)}
       role="button"
       tabIndex={0}
       onClick={onDismiss}
@@ -3176,9 +3202,9 @@ function EnchantCeremony({ run, choices, onDismiss }: { run: Run; choices: Encha
   )
 }
 
-function EnchantChoiceSelect({ choices, selectedId, onSelect }: { choices: EnchantmentChoice[]; selectedId: string; onSelect: (id: string) => void }) {
+function EnchantChoiceSelect({ choices, selectedId, visualTheme, onSelect }: { choices: EnchantmentChoice[]; selectedId: string; visualTheme: VisualThemeId; onSelect: (id: string) => void }) {
   return (
-    <section className="reward-panel paper-card enchant-panel">
+    <section className={`reward-panel paper-card visual-theme-surface visual-theme-${visualTheme} enchant-panel`} data-visual-theme={visualTheme} style={visualThemeStyle(visualTheme)}>
       <div className="screen-heading centered">
         <h2>选择附魔</h2>
         <p>选中一个附魔后，点击装备栏或背包中的任意装备施加。</p>
@@ -3198,10 +3224,10 @@ function EnchantChoiceSelect({ choices, selectedId, onSelect }: { choices: Encha
   )
 }
 
-function RelicChoiceSelect({ choices, onPick }: { choices: RelicChoice[]; onPick: (relicId: string) => void }) {
+function RelicChoiceSelect({ choices, visualTheme, onPick }: { choices: RelicChoice[]; visualTheme: VisualThemeId; onPick: (relicId: string) => void }) {
   const [selected, setSelected] = useState(choices[0]?.relicId ?? '')
   return (
-    <section className="shop-choice-screen">
+    <section className={`shop-choice-screen reward-panel visual-theme-surface visual-theme-${visualTheme}`} data-visual-theme={visualTheme} style={visualThemeStyle(visualTheme)}>
       <div className="screen-heading centered">
         <h2>选择遗物</h2>
         <p>免费选择一个遗物；重复遗物会直接升级。</p>
@@ -3222,8 +3248,9 @@ function RelicChoiceSelect({ choices, onPick }: { choices: RelicChoice[]; onPick
 }
 
 function ShopShelf({ run, selectedOfferId, draggingItemId, onInspectOffer, onReroll, onMatch }: { run: Run; selectedOfferId: string | null; draggingItemId: string | null; onInspectOffer: (offerId: string, element: HTMLElement) => void; onReroll: () => void; onMatch: () => void }) {
+  const visualTheme = visualThemeForRound(run.round)
   return (
-    <section className="shop-shelf sketch-panel" data-tutorial-anchor="shop-offers">
+    <section className={`shop-shelf sketch-panel visual-theme-surface visual-theme-${visualTheme}`} data-visual-theme={visualTheme} style={visualThemeStyle(visualTheme)} data-tutorial-anchor="shop-offers">
       <div className="section-title">
         <div>
           <h2>{shopNames[run.shopType]}</h2>
@@ -3291,8 +3318,9 @@ function SizePreview({ size }: { size: number }) {
 
 function InventoryBoard({ run, selectedItemId, draggingItemId, onSellRelic, onSelectItem, onSlotClick }: { run: Run; selectedItemId: string | null; draggingItemId: string | null; onSellRelic?: ((relicId: string) => void) | null; onSelectItem: (itemId: string, element: HTMLElement) => void; onSlotClick: (area: Area, x: number, y: number) => void }) {
   const equipmentSlots = equipmentSlotCount(run.relics)
+  const visualTheme = visualThemeForRound(run.round)
   return (
-    <section className="inventory-board expanded paper-inventory">
+    <section className={`inventory-board expanded paper-inventory visual-theme-surface visual-theme-${visualTheme}`} data-visual-theme={visualTheme} style={visualThemeStyle(visualTheme)}>
       <GridPanel title="装备栏" subtitle={`${equipmentSlots} 格单行，从左向右触发`} icon={<Grid3X3 size={18} />} area="EQUIPMENT" tutorialAnchor="equipment-board" w={equipmentSlots} h={1} items={run.items} selectedItemId={selectedItemId} draggingItemId={draggingItemId} onSelectItem={onSelectItem} onSlotClick={onSlotClick} />
       <div className="bag-relic-row">
         <RelicRail relics={run.relics ?? []} onSellRelic={onSellRelic ?? null} />
@@ -3589,6 +3617,7 @@ function BattleView({ run, battle, currentEvent, eventIndex, speed, score, sound
   const [logOpen, setLogOpen] = useState(false)
   const [battleTip, setBattleTip] = useState<{ item: Item; owner: 'player' | 'opponent'; anchor: TipAnchor } | null>(null)
   const playback = battle ?? run.lastBattle
+  const visualTheme = visualThemeForRound(run.round)
   const events = playback?.events ?? []
   const displayIndex = battle ? eventIndex : Math.max(0, events.length - 1)
   const event = currentEvent ?? events[Math.min(displayIndex, Math.max(0, events.length - 1))]
@@ -3620,7 +3649,7 @@ function BattleView({ run, battle, currentEvent, eventIndex, speed, score, sound
   }, [displayIndex, presentation?.kind, soundEnabled])
 
   return (
-    <section className="battle-panel visual-battle sketch-panel">
+    <section className={`battle-panel visual-battle sketch-panel visual-theme-${visualTheme}`} data-visual-theme={visualTheme} style={visualThemeStyle(visualTheme)}>
       <div className="battle-toolbar">
         <div className="battle-status">
           <h2>自动战斗</h2>
@@ -3641,6 +3670,7 @@ function BattleView({ run, battle, currentEvent, eventIndex, speed, score, sound
         speed={speed}
         finished={isFinished}
         winner={playback?.winner}
+        visualTheme={visualTheme}
       />
       <BattleEquipmentRow owner="player" snapshot={playerSnapshot} events={events} displayIndex={displayIndex} activeEvent={event} onInspect={(item, element) => setBattleTip({ item, owner: 'player', anchor: getFloatingTipPosition(element) })} />
       {battleTip && (
@@ -3658,7 +3688,7 @@ function BattleView({ run, battle, currentEvent, eventIndex, speed, score, sound
       )}
 
        {run.phase === 'COMPLETE' ? (
-         <div className="result handdrawn-result paper-card">
+         <div className={`result handdrawn-result paper-card visual-theme-surface visual-theme-${visualTheme}`} data-visual-theme={visualTheme} style={visualThemeStyle(visualTheme)}>
            <Trophy size={32} />
            <h2>跑局结束</h2>
            <p>{run.wins} 胜 / {run.losses} 败 · 积分 {score}</p>
@@ -3749,7 +3779,7 @@ function BattleEquipmentRow({ owner, snapshot, events, displayIndex, activeEvent
   )
 }
 
-function BattleStage({ player, opponent, event, presentation, lastRoll, speed, finished, winner }: { player: BattleSnapshot; opponent: BattleSnapshot; event?: BattleEvent; presentation: PresentationEvent | null; lastRoll?: BattleEvent; speed: number; finished: boolean; winner?: string }) {
+function BattleStage({ player, opponent, event, presentation, lastRoll, speed, finished, winner, visualTheme }: { player: BattleSnapshot; opponent: BattleSnapshot; event?: BattleEvent; presentation: PresentationEvent | null; lastRoll?: BattleEvent; speed: number; finished: boolean; winner?: string; visualTheme: VisualThemeId }) {
   const [statusTip, setStatusTip] = useState<StatusTipState | null>(null)
   const inspectStatus = (status: BattleStatusEntry, side: 'player' | 'opponent', polarity: 'positive' | 'negative', element: HTMLElement) => {
     setStatusTip({ status, side, polarity, anchor: getFloatingTipPosition(element) })
@@ -3763,7 +3793,7 @@ function BattleStage({ player, opponent, event, presentation, lastRoll, speed, f
   const opponentShield = event?.opponentShield ?? 0
   const activePresentationKind = presentation?.kind ?? 'none'
   return (
-    <div className="battle-stage handdrawn-stage" data-tutorial-anchor="battle-stage" data-presentation-kind={activePresentationKind}>
+    <div className={`battle-stage handdrawn-stage visual-theme-surface visual-theme-${visualTheme}`} data-visual-theme={visualTheme} style={visualThemeStyle(visualTheme)} data-tutorial-anchor="battle-stage" data-presentation-kind={activePresentationKind}>
       <BattleFxStage event={event} presentation={presentation} speed={speed} />
       <BattleDog
         side="opponent"
@@ -3944,7 +3974,7 @@ function BattleFxStage({ event, presentation, speed }: { event?: BattleEvent; pr
     const centerY = rect.height * 0.5
     const particles = createBattleParticles(event, fx, targetX, centerY)
     const started = performance.now()
-    const duration = Math.max(260, 760 / speed)
+    const duration = Math.max(320, 860 / speed)
     let frame = 0
 
     const draw = (now: number) => {
@@ -3996,11 +4026,11 @@ function drawBattleFxTrail(context: CanvasRenderingContext2D, actorX: number, ta
   const currentX = actorX + (targetX - actorX) * progress
   const lift = fx.kind === 'heal' || fx.kind === 'shield' ? -42 : -26
   context.save()
-  context.globalAlpha = Math.max(0, .78 - t * .55)
+  context.globalAlpha = Math.max(0, .92 - t * .6)
   context.strokeStyle = fx.color
-  context.lineWidth = 4
+  context.lineWidth = 7
   context.lineCap = 'round'
-  context.setLineDash([10, 9])
+  context.setLineDash([14, 7])
   context.beginPath()
   context.moveTo(actorX, centerY + 4)
   context.quadraticCurveTo((actorX + targetX) / 2, centerY + lift, currentX, centerY)
@@ -4008,7 +4038,7 @@ function drawBattleFxTrail(context: CanvasRenderingContext2D, actorX: number, ta
   context.setLineDash([])
   context.fillStyle = fx.accent
   context.beginPath()
-  context.arc(currentX, centerY - 4, 7 + 4 * (1 - t), 0, Math.PI * 2)
+  context.arc(currentX, centerY - 4, 11 + 6 * (1 - t), 0, Math.PI * 2)
   context.fill()
   context.restore()
 }
@@ -4018,12 +4048,12 @@ function drawHandwrittenBattleNumber(context: CanvasRenderingContext2D, event: B
   const label = fx.kind === 'weak' ? '弱' : fx.kind === 'freeze' ? '冻' : fx.kind === 'miss' ? '抵消' : `${fx.prefix}${event.amount}`
   context.save()
   context.globalAlpha = Math.max(0, 1 - t)
-  context.font = '900 28px Inter, Microsoft YaHei, sans-serif'
+  context.font = '950 36px Inter, Microsoft YaHei, sans-serif'
   context.textAlign = 'center'
-  context.lineWidth = 5
+  context.lineWidth = 7
   context.strokeStyle = 'rgba(255, 250, 241, .92)'
   context.fillStyle = fx.color
-  const y = centerY - 46 - t * 34
+  const y = centerY - 48 - t * 42
   context.translate(targetX, y)
   context.rotate((fx.kind === 'damage' ? -2 : 1.2) * Math.PI / 180)
   context.strokeText(label, 0, 0)
@@ -4037,15 +4067,15 @@ function createBattleParticles(event: BattleEvent, fx: BattleVfxStyle, x: number
   const count = fx.particleCount
   for (let index = 0; index < count; index += 1) {
     const angle = (Math.PI * 2 * index) / count
-    const distance = 30 + (index % 5) * 12
+    const distance = 42 + (index % 5) * 15
     particles.push({
-      x: x + Math.cos(angle) * 12,
-      y: y + Math.sin(angle) * 8,
+      x: x + Math.cos(angle) * 16,
+      y: y + Math.sin(angle) * 10,
       vx: Math.cos(angle) * distance,
       vy: Math.sin(angle) * distance - (index % 3) * 10,
-      size: fx.kind === 'poison' ? 9 + (index % 4) : fx.kind === 'freeze' ? 5 + (index % 3) : 3 + (index % 5),
-      grow: fx.kind === 'poison' ? 16 : fx.kind === 'heal' || fx.kind === 'shield' ? 10 : 4,
-      alpha: fx.kind === 'poison' ? 0.32 : fx.kind === 'miss' ? 0.5 : 0.82,
+      size: fx.kind === 'poison' ? 10 + (index % 5) : fx.kind === 'freeze' ? 6 + (index % 4) : 4 + (index % 5),
+      grow: fx.kind === 'poison' ? 20 : fx.kind === 'heal' || fx.kind === 'shield' ? 14 : 7,
+      alpha: fx.kind === 'poison' ? 0.42 : fx.kind === 'miss' ? 0.58 : 0.9,
       color: palette[index % palette.length],
       kind: fx.kind === 'damage' && index % 4 === 0 ? 'slash' : 'dot',
     })
