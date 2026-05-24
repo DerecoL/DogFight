@@ -21,7 +21,6 @@ import {
   Flag,
   Gamepad2,
   Grid3X3,
-  HeartPulse,
   House,
   Lock,
   LogOut,
@@ -57,9 +56,31 @@ import {
 import { resolveSlotPlacement } from './placement'
 import { itemTriggerCountLabel } from './item-trigger-display'
 import { triggerDiceLabel } from './item-trigger-display'
+import { itemVisualProfile } from './item-visual-profile'
+import { ALL_ITEM_DEFS } from './server/game/data'
 import { queryBattleFxAnchor, resolveBattleFxPoints } from './battle-vfx-coordinates'
 import { TERM_DEFS } from './shared/rule-terms'
+import {
+  BoneHealthBar,
+  ChoiceCard as HanddrawnChoiceCard,
+  DogBadge,
+  DynamicDice,
+  FloatingPaperTip,
+  HanddrawnButton,
+  HanddrawnFrame,
+  HanddrawnListButton,
+  HanddrawnNumberButton,
+  HanddrawnSlotButton,
+  HanddrawnTabButton,
+  HanddrawnTextButton,
+  IconButton as HanddrawnIconButton,
+  ItemFrame,
+  RelicIconButton,
+  ResourcePill as HanddrawnResourcePill,
+  StatusChip,
+} from './ui'
 import './App.css'
+import './ui/handdrawn.css'
 
 type DogType = 'SHIBA' | 'SAMOYED' | 'MUTT' | 'BULLY' | 'EMPEROR'
 type Phase = 'SHOP' | 'CHOICE' | 'CLASS_REWARD' | 'ENCHANT_CHOICE' | 'RELIC_CHOICE' | 'UPGRADE_CHOICE' | 'POTION_CHOICE' | 'PREP' | 'MATCH' | 'BATTLE' | 'COMPLETE'
@@ -788,15 +809,15 @@ async function api<T>(url: string, options: RequestInit = {}): Promise<T> {
 }
 
 function itemTone(def: ItemDef) {
-  if (def.tags.includes('starter')) return 'starter'
-  if (def.tags.includes('heal')) return 'heal'
-  if (def.tags.includes('large')) return 'large'
-  if (def.tags.includes('big')) return 'big'
-  return 'utility'
+  return itemVisualProfile(def).className
 }
 
 function itemIcon(def: ItemDef) {
   return itemIcons[def.id] ?? '/assets/items/bite.svg'
+}
+
+function isItemArtDebugRoute() {
+  return typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('itemArtGallery')
 }
 
 function relicIcon(def: RelicDef) {
@@ -1147,7 +1168,7 @@ function RuleText({ text }: { text: string }) {
         if (!entry) return <strong key={`${term}-${index}`}>【{term}】</strong>
         return (
           <span className="rule-term-wrap" key={`${term}-${index}`} onClick={(event) => event.stopPropagation()}>
-            <button
+            <HanddrawnTextButton
               type="button"
               className="rule-term"
               onClick={(event) => {
@@ -1161,7 +1182,7 @@ function RuleText({ text }: { text: string }) {
               onKeyDown={(event) => event.stopPropagation()}
             >
               【{term}】
-            </button>
+            </HanddrawnTextButton>
           </span>
         )
       })}
@@ -1187,6 +1208,8 @@ function RuleTermFloatingTip({ tip }: { tip: RuleTermTipState | null }) {
 }
 
 export default function App() {
+  if (isItemArtDebugRoute()) return <ItemArtDebugGallery />
+
   const [account, setAccount] = useState(createDefaultAccount)
   const [password, setPassword] = useState('dogdice')
   const [appScreen, setAppScreen] = useState<AppScreen>('LOBBY')
@@ -1641,7 +1664,7 @@ export default function App() {
   if (!user) {
     return (
       <main className="auth-shell">
-        <section className="auth-panel paper-card sticker-card">
+        <HanddrawnFrame as="section" variant="panel" ornament="corner" className="auth-panel paper-card sticker-card">
           <div className="brand-block">
             <img className="game-logo" src={gameIcon} alt="" />
             <div>
@@ -1653,10 +1676,10 @@ export default function App() {
           <label>密码<input type="password" value={password} onChange={(e) => setPassword(e.target.value)} /></label>
           {error && <p className="error">{error}</p>}
           <div className="row">
-            <button className="action-button" onClick={() => action(() => api('/auth/login', { method: 'POST', body: JSON.stringify({ account, password }) }))}>登录</button>
-            <button className="secondary action-button" onClick={() => action(() => api('/auth/register', { method: 'POST', body: JSON.stringify({ account, password }) }))}>注册</button>
+            <ActionButton onClick={() => action(() => api('/auth/login', { method: 'POST', body: JSON.stringify({ account, password }) }))}>登录</ActionButton>
+            <ActionButton variant="secondary" onClick={() => action(() => api('/auth/register', { method: 'POST', body: JSON.stringify({ account, password }) }))}>注册</ActionButton>
           </div>
-        </section>
+        </HanddrawnFrame>
         <FeedbackLayer feedbacks={uiFeedbacks} />
       </main>
     )
@@ -1852,7 +1875,7 @@ export default function App() {
           <section className="match-panel" data-tutorial-anchor="battle-start">
             {run.phase === 'MATCH' ? (
               <>
-                <img className="dog-avatar large" src={dogAssets[run.matchedGhost?.dogType ?? 'SHIBA']} alt="" />
+                <DogBadge dogType={run.matchedGhost?.dogType ?? 'SHIBA'} src={dogAssets[run.matchedGhost?.dogType ?? 'SHIBA']} size="lg" className="dog-avatar large" />
                 <h2>匹配到 {run.matchedGhost?.name}</h2>
                 <p>{dogNames[run.matchedGhost?.dogType ?? 'SHIBA']} · {run.matchedGhost?.wins}胜 {run.matchedGhost?.losses}败 · 第 {run.matchedGhost?.round} 回合</p>
               </>
@@ -1873,9 +1896,9 @@ export default function App() {
               onSell={null}
               onUpgrade={selectedItem && canUpgradeItem(selectedItem, run.items) ? () => upgradeItem(selectedItem.id) : null}
             />
-            <button className="primary action-button" data-tutorial-anchor={run.phase === 'MATCH' ? 'battle-start' : 'match-button'} onClick={() => action(() => api(run.phase === 'PREP' ? `/runs/${run.id}/battle/match` : `/runs/${run.id}/battle/start`, { method: 'POST' }), { success: 'battle-start' })}>
+            <ActionButton data-tutorial-anchor={run.phase === 'MATCH' ? 'battle-start' : 'match-button'} onClick={() => action(() => api(run.phase === 'PREP' ? `/runs/${run.id}/battle/match` : `/runs/${run.id}/battle/start`, { method: 'POST' }), { success: 'battle-start' })}>
               <Dice5 size={18} /> {run.phase === 'PREP' ? '匹配对手' : '开始战斗'}
-            </button>
+            </ActionButton>
           </section>
           <DragOverlay dropAnimation={null} zIndex={1000}>
             <DraggingItemOverlay item={draggingItem} relics={run.relics} />
@@ -1969,7 +1992,7 @@ function CasualTutorialGuide({ state, run, battle, eventIndex, onSkip }: { state
         <h2>{step.title}</h2>
         <p>{body}</p>
         <strong>{battleFinished ? casualTutorialSteps.CONTINUE.task : step.task}</strong>
-        <button className="secondary action-button" type="button" onClick={onSkip}>跳过引导</button>
+        <ActionButton variant="secondary" type="button" onClick={onSkip}>跳过引导</ActionButton>
       </div>
     </aside>
   )
@@ -1984,10 +2007,10 @@ function ModeLobby({ run, runHistory, onOpen, onEnterCasual, onReplayTutorial, o
         <h2>模式大厅</h2>
         <p>选择本次要进入的竞技方式。休闲或天梯完成后的狗可以送入巅峰竞技场。</p>
       </div>
-        <button className="secondary action-button tutorial-replay-button" type="button" onClick={onReplayTutorial}>新手引导</button>
+        <ActionButton variant="secondary" className="tutorial-replay-button" type="button" onClick={onReplayTutorial}>新手引导</ActionButton>
       <div className="mode-grid">
         {modeCards.map((mode) => (
-          <article key={mode.id} className={`mode-card paper-card sticker-card ${mode.locked ? 'locked' : 'available'}`}>
+          <HanddrawnFrame as="article" variant="card" ornament="corner" key={mode.id} className={`mode-card paper-card sticker-card ${mode.locked ? 'locked' : 'available'}`}>
             <span className="mode-icon">{mode.icon}</span>
             {mode.locked && (
               <span className="lock-chain" aria-label={`${mode.title}未解锁`}>
@@ -2000,19 +2023,19 @@ function ModeLobby({ run, runHistory, onOpen, onEnterCasual, onReplayTutorial, o
               <p>{mode.description}</p>
             </div>
             {mode.id === 'CASUAL' ? (
-              <button className="primary action-button mode-action" data-tutorial-anchor="mode-casual" onClick={onEnterCasual}>{casualAction}</button>
+              <ActionButton className="mode-action" data-tutorial-anchor="mode-casual" onClick={onEnterCasual}>{casualAction}</ActionButton>
             ) : mode.id === 'LADDER' ? (
-              <button className="primary action-button mode-action" onClick={onEnterLadder}>{ladderAction}</button>
+              <ActionButton className="mode-action" onClick={onEnterLadder}>{ladderAction}</ActionButton>
             ) : mode.id === 'DOGFIGHT' ? (
-              <button className="primary action-button mode-action" onClick={onEnterDogfight}>进入斗狗模式</button>
+              <ActionButton className="mode-action" onClick={onEnterDogfight}>进入斗狗模式</ActionButton>
             ) : mode.id === 'PEAK' ? (
-              <button className="primary action-button mode-action" onClick={onEnterPeak}>进入巅峰模式</button>
+              <ActionButton className="mode-action" onClick={onEnterPeak}>进入巅峰模式</ActionButton>
             ) : (
-              <button className="secondary action-button mode-action" disabled>
+              <ActionButton variant="secondary" className="mode-action" disabled>
                 <Lock size={18} /> 未解锁
-              </button>
+              </ActionButton>
             )}
-          </article>
+          </HanddrawnFrame>
         ))}
       </div>
     </section>
@@ -2134,7 +2157,7 @@ function PlayerHistoryOverlay({ history, onClose }: { history: PlayerRunHistory;
           <section className="history-run-browser" aria-label="历史对局列表">
             {runs.length > 0 ? runs.map((entry) => (
               <button key={entry.id} type="button" className={`history-detail-row ${selectedRun?.id === entry.id ? 'selected' : ''}`} onClick={() => { setSelectedRunId(entry.id); closeTip() }}>
-                <img className="dog-avatar small" src={dogAssets[entry.dogType]} alt="" />
+                <DogBadge dogType={entry.dogType} src={dogAssets[entry.dogType]} size="sm" className="dog-avatar small" />
                 <span>{dogNames[entry.dogType]}</span>
                 <strong>{entry.wins}胜 {entry.losses}败</strong>
                 <small>{runStatusText(entry.status)} · 第 {entry.round} 回合 · 装备 {entry.items.length}</small>
@@ -2209,9 +2232,9 @@ function HistoryRunDetails({ entry, inspectedItem, tipAnchor, onInspectItem, onC
         <div className="battle-slot-grid" style={{ gridTemplateColumns: `repeat(${equipmentSlotCount(entry.relics)}, minmax(0, 1fr))` }}>
           {Array.from({ length: equipmentSlotCount(entry.relics) }).map((_, x) => <i key={x} className="battle-slot" style={{ gridColumn: x + 1, gridRow: 1 }} />)}
           {equipment.map((item) => {
-            const triggerDice = triggerDiceLabel(itemTriggerDisplay(item), entry.relics)
             return (
-            <button
+            <ItemFrame
+              as="button"
               type="button"
               key={item.id}
               className={`battle-item item-card ${itemTone(item.def)} ${qualityClass(item.quality)}`}
@@ -2219,11 +2242,8 @@ function HistoryRunDetails({ entry, inspectedItem, tipAnchor, onInspectItem, onC
               title={`${qualityLabel[normalizeQuality(item.quality)]} ${item.def.name} · ${effectText(item.def, normalizeQuality(item.quality))}`}
               onClick={(event) => onInspectItem(item, event.currentTarget)}
             >
-              <img className="item-icon" src={itemIcon(item.def)} alt="" />
-              <span className="quality-chip">{qualityLabel[normalizeQuality(item.quality)]}</span>
-              <span>{item.def.name}</span>
-              {triggerDice && <small><Dice5 size={12} /> {triggerDice}</small>}
-            </button>
+              <ItemCardContent item={item} relics={entry.relics} />
+            </ItemFrame>
             )
           })}
         </div>
@@ -2338,15 +2358,15 @@ function DogfightLobby({ soundEnabled }: { soundEnabled: boolean }) {
       {error && <p className="error">{error}</p>}
       <div className="dogfight-layout">
         <aside className="dogfight-actions">
-          <button className="primary action-button" onClick={() => void enterRoom('CREATE')}><House size={18} /> 创建房间</button>
-          <button className="secondary action-button" disabled={!selectedRoomId} onClick={() => void enterRoom('JOIN')}><Swords size={18} /> 加入房间</button>
-          <button className="primary action-button" onClick={() => void enterRoom('MATCH')}><RadioTower size={18} /> 随机匹配</button>
+          <ActionButton onClick={() => void enterRoom('CREATE')}><House size={18} /> 创建房间</ActionButton>
+          <ActionButton variant="secondary" disabled={!selectedRoomId} onClick={() => void enterRoom('JOIN')}><Swords size={18} /> 加入房间</ActionButton>
+          <ActionButton onClick={() => void enterRoom('MATCH')}><RadioTower size={18} /> 随机匹配</ActionButton>
           <p className="muted-note">玩家席位先进入房间，开局后统一 15 秒选择斗狗；不足 8 人由机器人补齐。</p>
         </aside>
         <section className="dogfight-room-list">
           <div className="panel-heading">
             <h3>房间列表</h3>
-            <button className="secondary action-button" onClick={() => void loadRooms()} disabled={loading}><RefreshCcw size={18} /> 刷新</button>
+            <ActionButton variant="secondary" onClick={() => void loadRooms()} disabled={loading}><RefreshCcw size={18} /> 刷新</ActionButton>
           </div>
           {rooms.length === 0 ? (
             <p className="apex-empty">暂无房间，创建一个斗狗房间开始。</p>
@@ -2356,8 +2376,7 @@ function DogfightLobby({ soundEnabled }: { soundEnabled: boolean }) {
                 <strong>{room.hostName} 的房间</strong>
                 <p>{room.status === 'WAITING' ? '等待中' : room.status === 'ACTIVE' ? `${dogfightPhaseLabel(room.phase)} · 第 ${room.currentRound} 回合` : '已结束'} · 真人 {room.memberCount}/{room.maxPlayers} · 存活 {room.aliveCount}/{room.targetPlayerCount}</p>
               </div>
-              <button
-                className="primary action-button"
+              <ActionButton
                 onClick={() => {
                   if (room.status === 'WAITING') {
                     setSelectedRoomId(room.id)
@@ -2368,7 +2387,7 @@ function DogfightLobby({ soundEnabled }: { soundEnabled: boolean }) {
                 }}
               >
                 {room.status === 'WAITING' ? '加入房间' : '观战'}
-              </button>
+              </ActionButton>
             </article>
           ))}
         </section>
@@ -2598,8 +2617,8 @@ function DogfightRoomView({ room, onRoomChange, onLeave, soundEnabled }: { room:
   return (
     <section className="dogfight-room-view">
       <div className="dogfight-room-toolbar">
-        <button className="secondary action-button" onClick={onLeave}><House size={18} /> 返回房间列表</button>
-        <button className="secondary action-button" onClick={() => void refreshRoom()}><RefreshCcw size={18} /> 刷新房间</button>
+        <ActionButton variant="secondary" onClick={onLeave}><House size={18} /> 返回房间列表</ActionButton>
+        <ActionButton variant="secondary" onClick={() => void refreshRoom()}><RefreshCcw size={18} /> 刷新房间</ActionButton>
       </div>
       {error && <p className="error">{error}</p>}
       <div className="dogfight-room-status">
@@ -2619,9 +2638,9 @@ function DogfightRoomView({ room, onRoomChange, onLeave, soundEnabled }: { room:
           </div>
         )}
         {currentMember && <span className="resource-pill safe"><Shield size={16} /> 剩余存活 {dogfightLives(currentMember)}</span>}
-        {room.isHost && room.status === 'WAITING' && <button className="primary action-button" onClick={startRoom}>开始房间</button>}
-        {run && room.phase === 'SHOP' && !currentMember?.ready && !currentMember?.eliminated && <button className="primary action-button" onClick={readyRoom}>完成本回合</button>}
-        {run && room.phase === 'BATTLE' && !currentMember?.ready && !currentMember?.eliminated && <button className="primary action-button" onClick={readyRoom}>完成本回合</button>}
+        {room.isHost && room.status === 'WAITING' && <ActionButton onClick={startRoom}>开始房间</ActionButton>}
+        {run && room.phase === 'SHOP' && !currentMember?.ready && !currentMember?.eliminated && <ActionButton onClick={readyRoom}>完成本回合</ActionButton>}
+        {run && room.phase === 'BATTLE' && !currentMember?.ready && !currentMember?.eliminated && <ActionButton onClick={readyRoom}>完成本回合</ActionButton>}
       </div>
 
       <div className="dogfight-room-columns">
@@ -2636,7 +2655,7 @@ function DogfightRoomView({ room, onRoomChange, onLeave, soundEnabled }: { room:
                 if (member.currentBattleId) void loadBattle(member.currentBattleId)
               }}
             >
-              {member.dogType ? <img className="dog-avatar small" src={dogAssets[member.dogType]} alt="" /> : <PawPrint size={28} />}
+              {member.dogType ? <DogBadge dogType={member.dogType} src={dogAssets[member.dogType]} size="sm" className="dog-avatar small" /> : <PawPrint size={28} />}
               <div>
                 <strong>{member.nickname}{member.isHost ? ' · 房主' : ''}</strong>
                 <p>{member.dogType ? dogNames[member.dogType] : '等待选狗'} · {member.kind === 'BOT' ? '参赛者' : '玩家'} · {member.wins}胜 {member.losses}败</p>
@@ -2882,9 +2901,9 @@ function ApexArena() {
         <p>保存战斗结束后的死数据，自动从榜尾向上挑战，失败后固定在当前名次。</p>
       </div>
       <div className="apex-toolbar">
-        <button className="secondary action-button" onClick={() => void loadApex()} disabled={loading}>
+        <ActionButton variant="secondary" onClick={() => void loadApex()} disabled={loading}>
           <RefreshCcw size={18} /> 刷新
-        </button>
+        </ActionButton>
       </div>
       {error && <p className="error">{error}</p>}
       {reports && submittedEntries && (
@@ -2909,14 +2928,14 @@ function ApexArena() {
               <p className="apex-empty">先在休闲模式完成一局，再回来冲榜。</p>
             ) : candidates.map((candidate) => (
               <article className="apex-candidate-card" key={candidate.id}>
-                <img className="dog-avatar small" src={dogAssets[candidate.dogType]} alt="" />
+                <DogBadge dogType={candidate.dogType} src={dogAssets[candidate.dogType]} size="sm" className="dog-avatar small" />
                 <div>
                   <strong>{dogNames[candidate.dogType]} · {candidate.wins}胜{candidate.losses}败</strong>
                   <p>第 {candidate.round} 回合 · 遗物 {candidate.relics.length} · 装备 {candidate.items.length}</p>
                 </div>
-                <button className="primary action-button" disabled={Boolean(submittingRunId)} onClick={() => void submitRun(candidate.id)}>
+                <ActionButton disabled={Boolean(submittingRunId)} onClick={() => void submitRun(candidate.id)}>
                   <Crown size={18} /> {submittingRunId === candidate.id ? '挑战中' : '投入巅峰'}
-                </button>
+                </ActionButton>
               </article>
             ))}
           </div>
@@ -2935,16 +2954,16 @@ function ApexArena() {
               <div className="apex-rank-entry" key={entry.id}>
                 <article className={`apex-rank-row ${entry.isSeed ? 'seed' : ''} ${entry.isMine ? 'player-entry' : ''}`}>
                   <b>#{entry.rank}</b>
-                  <img className="dog-avatar small" src={dogAssets[entry.dogType]} alt="" />
+                  <DogBadge dogType={entry.dogType} src={dogAssets[entry.dogType]} size="sm" className="dog-avatar small" />
                   <div>
                     <strong>{entry.name}</strong>
                     <p>{dogNames[entry.dogType]} · {entry.wins}胜{entry.losses}败 · 第 {entry.round} 回合</p>
                   </div>
                   {entry.isMine && <span className="apex-self-marker">我的记录</span>}
                   <span>{entry.isSeed ? '种子' : `防守连胜 ${entry.challengeWins}`}</span>
-                  <button className="secondary action-button apex-config-toggle" onClick={() => setExpandedEntryId(expandedEntryId === entry.id ? null : entry.id)}>
+                  <ActionButton variant="secondary" className="apex-config-toggle" onClick={() => setExpandedEntryId(expandedEntryId === entry.id ? null : entry.id)}>
                     {expandedEntryId === entry.id ? '收起配置' : '查看配置'}
-                  </button>
+                  </ActionButton>
                 </article>
                 {expandedEntryId === entry.id && <ApexSnapshotDetails entry={entry} />}
               </div>
@@ -3005,9 +3024,9 @@ function ApexSnapshotDetails({ entry }: { entry: ApexEntry }) {
         <div className="battle-slot-grid" style={{ gridTemplateColumns: 'repeat(12, minmax(0, 1fr))' }}>
           {Array.from({ length: 12 }).map((_, x) => <i key={x} className="battle-slot" style={{ gridColumn: x + 1, gridRow: 1 }} />)}
           {equipment.map((item) => {
-            const triggerDice = triggerDiceLabel(itemTriggerDisplay(item), entry.relics)
             return (
-            <button
+            <ItemFrame
+              as="button"
               type="button"
               key={item.id}
               className={`battle-item item-card ${itemTone(item.def)} ${qualityClass(item.quality)}`}
@@ -3015,11 +3034,8 @@ function ApexSnapshotDetails({ entry }: { entry: ApexEntry }) {
               title={`${qualityLabel[normalizeQuality(item.quality)]} ${item.def.name} · ${effectText(item.def, normalizeQuality(item.quality))}`}
               onClick={(event) => setInspectedItemWithAnchor(item, event.currentTarget)}
             >
-              <img className="item-icon" src={itemIcon(item.def)} alt="" />
-              <span className="quality-chip">{qualityLabel[normalizeQuality(item.quality)]}</span>
-              <span>{item.def.name}</span>
-              {triggerDice && <small><Dice5 size={12} /> {triggerDice}</small>}
-            </button>
+              <ItemCardContent item={item} relics={entry.relics} />
+            </ItemFrame>
             )
           })}
         </div>
@@ -3121,7 +3137,7 @@ function LadderHome({ onStart }: { onStart: (choice: { dogType: DogType; luckyNu
             {slots.map((dog, index) => dog ? (
               <div key={dog} role="button" tabIndex={0} className={`dog-card paper-card paper-dog-card ${selectedDog === dog ? 'selected' : ''}`} onClick={() => setSelectedDog(dog)} onKeyDown={(event) => handleChoiceCardKeyDown(event, () => setSelectedDog(dog))}>
                 <span className="dog-art-frame">
-                  <img className="dog-avatar" src={dogAssets[dog]} alt="" />
+                  <DogBadge dogType={dog} src={dogAssets[dog]} selected={selectedDog === dog} className="dog-avatar" />
                 </span>
                 <strong>{dogNames[dog]}</strong>
                 <small className="card-copy"><RuleText text={dogTraits[dog]} /></small>
@@ -3132,7 +3148,7 @@ function LadderHome({ onStart }: { onStart: (choice: { dogType: DogType; luckyNu
           </div>
           <aside className="dog-detail-panel paper-card">
             <span className="dog-detail-art">
-              <img className="dog-avatar large" src={dogAssets[selectedDog]} alt="" />
+              <DogBadge dogType={selectedDog} src={dogAssets[selectedDog]} size="lg" className="dog-avatar large" />
             </span>
             <h2>{dogNames[selectedDog]}</h2>
             <p><RuleText text={dogStrategies[selectedDog]} /></p>
@@ -3146,7 +3162,7 @@ function LadderHome({ onStart }: { onStart: (choice: { dogType: DogType; luckyNu
                 </div>
               </div>
             )}
-            <button className="primary action-button" onClick={startRun}>开始天梯</button>
+            <ActionButton onClick={startRun}>开始天梯</ActionButton>
           </aside>
         </div>
       </section>
@@ -3196,7 +3212,7 @@ function DogSelect({ onPick }: { onPick: (choice: { dogType: DogType; luckyNumbe
           {slots.map((dog, index) => dog ? (
             <div key={dog} role="button" tabIndex={0} className={`dog-card paper-card paper-dog-card ${selectedDog === dog ? 'selected' : ''}`} onClick={() => setSelectedDog(dog)} onKeyDown={(event) => handleChoiceCardKeyDown(event, () => setSelectedDog(dog))}>
               <span className="dog-art-frame">
-                <img className="dog-avatar" src={dogAssets[dog]} alt="" />
+                <DogBadge dogType={dog} src={dogAssets[dog]} selected={selectedDog === dog} className="dog-avatar" />
               </span>
               <strong>{dogNames[dog]}</strong>
               <small className="card-copy"><RuleText text={dogTraits[dog]} /></small>
@@ -3208,7 +3224,7 @@ function DogSelect({ onPick }: { onPick: (choice: { dogType: DogType; luckyNumbe
         </div>
         <aside className="dog-detail-panel paper-card">
           <span className="dog-detail-art">
-            <img className="dog-avatar large" src={dogAssets[selectedDog]} alt="" />
+            <DogBadge dogType={selectedDog} src={dogAssets[selectedDog]} size="lg" className="dog-avatar large" />
           </span>
           <h2>{dogNames[selectedDog]}</h2>
           <div className="detail-box">
@@ -3239,7 +3255,7 @@ function DogSelect({ onPick }: { onPick: (choice: { dogType: DogType; luckyNumbe
               </div>
             </div>
           )}
-          <button className="primary action-button" onClick={startRun}>开始一局</button>
+          <ActionButton onClick={startRun}>开始一局</ActionButton>
         </aside>
       </div>
     </section>
@@ -3340,22 +3356,33 @@ function NicknameSetup({ onSubmit }: { onSubmit: (nickname: string) => void | Pr
           昵称
           <input value={nickname} maxLength={16} onChange={(event) => setNickname(event.target.value)} autoFocus />
         </label>
-        <button className="primary action-button wide" disabled={trimmed.length < 2}>确认</button>
+        <ActionButton wide disabled={trimmed.length < 2}>确认</ActionButton>
       </form>
     </section>
   )
 }
 
 function ResourcePill({ icon, label, value, tone }: { icon: React.ReactNode; label: string; value: string | number; tone: string }) {
-  return (
-    <span className={`resource-pill ${tone}`} title={label}>
-      {icon}<small>{label}</small><b>{value}</b>
-    </span>
-  )
+  return <HanddrawnResourcePill icon={icon} label={label} value={value} tone={tone} />
 }
 
 function IconButton({ children, title, onClick, disabled }: { children: React.ReactNode; title: string; onClick: () => void; disabled?: boolean }) {
-  return <button className="icon-button" title={title} aria-label={title} disabled={disabled} onClick={onClick}>{children}</button>
+  return <HanddrawnIconButton title={title} aria-label={title} disabled={disabled} onClick={onClick}>{children}</HanddrawnIconButton>
+}
+
+function ActionButton({ children, className, variant = 'primary', wide = false, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'primary' | 'secondary' | 'danger' | 'ghost'; wide?: boolean }) {
+  const legacyClass = variant === 'danger'
+    ? 'danger-button'
+    : variant === 'secondary'
+      ? 'secondary action-button'
+      : variant === 'ghost'
+        ? 'ghost action-button'
+        : 'primary action-button'
+  return (
+    <HanddrawnButton variant={variant} wide={wide} className={`${legacyClass} ${wide ? 'wide' : ''} ${className ?? ''}`.trim()} {...props}>
+      {children}
+    </HanddrawnButton>
+  )
 }
 
 function ShopChoiceSelect({ choices, onPick }: { choices: ShopType[]; onPick: (shopType: ShopType) => void }) {
@@ -3369,18 +3396,18 @@ function ShopChoiceSelect({ choices, onPick }: { choices: ShopType[]; onPick: (s
       </div>
       <div className="choice-grid">
         {slots.map((choice, index) => choice ? (
-          <div key={choice} role="button" tabIndex={0} className={`choice paper-card sticker-card ${selectedChoice === choice ? 'selected' : ''}`} onClick={() => setSelectedChoice(choice)} onKeyDown={(event) => handleChoiceCardKeyDown(event, () => setSelectedChoice(choice))}>
+          <HanddrawnChoiceCard key={choice} role="button" tabIndex={0} selected={selectedChoice === choice} onClick={() => setSelectedChoice(choice)} onKeyDown={(event) => handleChoiceCardKeyDown(event, () => setSelectedChoice(choice))}>
             <span className="choice-icon">{shopChoiceIcon(choice)}</span>
             <strong>{shopNames[choice]}</strong>
             <span className="choice-copy"><RuleText text={shopDescriptions[choice]} /></span>
-          </div>
+          </HanddrawnChoiceCard>
         ) : (
           <div className="choice placeholder paper-card sticker-card" key={`choice-placeholder-${index}`} aria-hidden="true" />
         ))}
       </div>
-      <button className="primary action-button choice-submit" disabled={!selectedChoice} onClick={() => selectedChoice && onPick(selectedChoice)}>
+      <ActionButton className="choice-submit" disabled={!selectedChoice} onClick={() => selectedChoice && onPick(selectedChoice)}>
         进入 {selectedChoice ? shopNames[selectedChoice] : '商店'}
-      </button>
+      </ActionButton>
     </section>
   )
 }
@@ -3430,7 +3457,7 @@ function ClassRewardCeremony({ run, choices, onDismiss }: { run: Run; choices: C
     >
       <div className="ceremony-stage">
         <div className="ceremony-round-badge">第 {run.round} 回合</div>
-        <img className="ceremony-dog-avatar" src={dogAssets[run.dogType]} alt="" />
+        <DogBadge dogType={run.dogType} src={dogAssets[run.dogType]} size="lg" className="ceremony-dog-avatar" />
         <div className="ceremony-copy">
           <span>{dogNames[run.dogType]} 专属装备授予</span>
           <h2>{title}</h2>
@@ -3456,7 +3483,7 @@ function ClassRewardCeremony({ run, choices, onDismiss }: { run: Run; choices: C
 function ClassRewardSelect({ choices, visualTheme, onPick }: { choices: ClassRewardChoice[]; visualTheme: VisualThemeId; onPick: (defId: string) => void }) {
   const [selected, setSelected] = useState(choices[0]?.defId ?? '')
   return (
-    <section className={`reward-panel paper-card visual-theme-surface visual-theme-${visualTheme}`} data-visual-theme={visualTheme} style={visualThemeStyle(visualTheme)}>
+    <HanddrawnFrame as="section" variant="panel" ornament="corner" className={`reward-panel paper-card visual-theme-surface visual-theme-${visualTheme}`} data-visual-theme={visualTheme} style={visualThemeStyle(visualTheme)}>
       <div className="screen-heading centered">
         <h2>选择职业装备</h2>
         <p>先整理背包，再选择一个职业装备放入背包。</p>
@@ -3465,17 +3492,17 @@ function ClassRewardSelect({ choices, visualTheme, onPick }: { choices: ClassRew
         {choices.map((choice) => {
           const triggerDice = triggerDiceLabel(choice.def)
           return (
-          <div key={choice.defId} role="button" tabIndex={0} className={`choice paper-card sticker-card reward-choice ${selected === choice.defId ? 'selected' : ''}`} onClick={() => setSelected(choice.defId)} onKeyDown={(event) => handleChoiceCardKeyDown(event, () => setSelected(choice.defId))}>
+          <HanddrawnChoiceCard key={choice.defId} role="button" tabIndex={0} className="reward-choice" selected={selected === choice.defId} onClick={() => setSelected(choice.defId)} onKeyDown={(event) => handleChoiceCardKeyDown(event, () => setSelected(choice.defId))}>
             <strong>{choice.def.name}</strong>
             <span className={`tip-tag ${qualityClass(choice.quality)}`}>{qualityLabel[choice.quality]}</span>
             <span>{choice.def.size}格{triggerDice ? ` · ${triggerDice}` : ''}</span>
             <span className="choice-copy"><RuleText text={choice.def.description ?? effectText(choice.def, choice.quality)} /></span>
-          </div>
+          </HanddrawnChoiceCard>
           )
         })}
       </div>
-      <button className="primary action-button choice-submit" disabled={!selected} onClick={() => selected && onPick(selected)}>领取职业装备</button>
-    </section>
+      <ActionButton className="choice-submit" disabled={!selected} onClick={() => selected && onPick(selected)}>领取职业装备</ActionButton>
+    </HanddrawnFrame>
   )
 }
 
@@ -3523,12 +3550,12 @@ function EnchantChoiceSelect({ choices, selectedId, visualTheme, onSelect }: { c
       </div>
       <div className="reward-choice-grid">
         {choices.map((choice) => (
-          <div key={choice.id} role="button" tabIndex={0} className={`choice paper-card sticker-card reward-choice enchant-choice ${selectedId === choice.id ? 'selected' : ''}`} onClick={() => onSelect(choice.id)} onKeyDown={(event) => handleChoiceCardKeyDown(event, () => onSelect(choice.id))}>
+          <HanddrawnChoiceCard key={choice.id} role="button" tabIndex={0} className="reward-choice enchant-choice" selected={selectedId === choice.id} onClick={() => onSelect(choice.id)} onKeyDown={(event) => handleChoiceCardKeyDown(event, () => onSelect(choice.id))}>
             <Sparkles size={28} />
             <strong>{choice.enchant.label}</strong>
             <span className="tip-tag">免费</span>
             <span className="choice-copy"><RuleText text={choice.description} /></span>
-          </div>
+          </HanddrawnChoiceCard>
         ))}
       </div>
       <small className="disabled-reason">当前选中：{choices.find((choice) => choice.id === selectedId)?.enchant.label ?? '请选择附魔'}</small>
@@ -3546,15 +3573,15 @@ function RelicChoiceSelect({ choices, visualTheme, onPick }: { choices: RelicCho
       </div>
       <div className="choice-grid relic-choice-grid">
         {choices.map((choice) => (
-          <div key={choice.relicId} role="button" tabIndex={0} className={`choice paper-card sticker-card relic-choice ${selected === choice.relicId ? 'selected' : ''}`} onClick={() => setSelected(choice.relicId)} onKeyDown={(event) => handleChoiceCardKeyDown(event, () => setSelected(choice.relicId))}>
+          <HanddrawnChoiceCard key={choice.relicId} role="button" tabIndex={0} className="relic-choice" selected={selected === choice.relicId} onClick={() => setSelected(choice.relicId)} onKeyDown={(event) => handleChoiceCardKeyDown(event, () => setSelected(choice.relicId))}>
             <RelicGlyph relic={choice} size={44} />
             <strong>{choice.def.name}</strong>
             <span className={`tip-tag ${qualityClass(choice.quality)}`}>{qualityLabel[choice.quality]}</span>
             <span className="choice-copy"><RuleText text={choice.def.description} /></span>
-          </div>
+          </HanddrawnChoiceCard>
         ))}
       </div>
-      <button className="primary action-button choice-submit" disabled={!selected} onClick={() => selected && onPick(selected)}>获得遗物</button>
+      <ActionButton className="choice-submit" disabled={!selected} onClick={() => selected && onPick(selected)}>获得遗物</ActionButton>
     </section>
   )
 }
@@ -3562,20 +3589,20 @@ function RelicChoiceSelect({ choices, visualTheme, onPick }: { choices: RelicCho
 function UpgradeChoiceSelect({ run, visualTheme }: { run: Run; visualTheme: VisualThemeId }) {
   const upgradeableCount = run.items.filter(canFreeUpgradeItem).length
   return (
-    <section className={`reward-panel paper-card visual-theme-surface visual-theme-${visualTheme} upgrade-panel`} data-visual-theme={visualTheme} style={visualThemeStyle(visualTheme)}>
+    <HanddrawnFrame as="section" variant="panel" ornament="corner" className={`reward-panel paper-card visual-theme-surface visual-theme-${visualTheme} upgrade-panel`} data-visual-theme={visualTheme} style={visualThemeStyle(visualTheme)}>
       <div className="screen-heading centered">
         <h2>选择升级装备</h2>
         <p>点击装备栏或背包里任意未达到钻石的装备，免费提升 1 个品质。</p>
       </div>
       <div className="reward-choice-grid">
-        <div className="choice paper-card sticker-card reward-choice enchant-choice selected">
+        <HanddrawnChoiceCard className="reward-choice enchant-choice" selected>
           <PackagePlus size={28} />
           <strong>免费升级</strong>
           <span className="tip-tag">可升级 {upgradeableCount} 件</span>
           <span className="choice-copy">钻石品质已经满级，不能继续提升。</span>
-        </div>
+        </HanddrawnChoiceCard>
       </div>
-    </section>
+    </HanddrawnFrame>
   )
 }
 
@@ -3588,12 +3615,12 @@ function PotionChoiceSelect({ choices, selectedId, visualTheme, onSelect }: { ch
       </div>
       <div className="reward-choice-grid">
         {choices.map((choice) => (
-          <div key={choice.id} role="button" tabIndex={0} className={`choice paper-card sticker-card reward-choice enchant-choice ${selectedId === choice.id ? 'selected' : ''}`} onClick={() => onSelect(choice.id)} onKeyDown={(event) => handleChoiceCardKeyDown(event, () => onSelect(choice.id))}>
+          <HanddrawnChoiceCard key={choice.id} role="button" tabIndex={0} className="reward-choice enchant-choice" selected={selectedId === choice.id} onClick={() => onSelect(choice.id)} onKeyDown={(event) => handleChoiceCardKeyDown(event, () => onSelect(choice.id))}>
             <Sparkles size={28} />
             <strong>{choice.description}</strong>
             <span className="tip-tag">药水</span>
             <span className="choice-copy">修改基础触发点数；之后仍会被遗物和其他道具影响。</span>
-          </div>
+          </HanddrawnChoiceCard>
         ))}
       </div>
       <small className="disabled-reason">职业装备不可使用药水</small>
@@ -3604,7 +3631,7 @@ function PotionChoiceSelect({ choices, selectedId, visualTheme, onSelect }: { ch
 function ShopShelf({ run, selectedOfferId, draggingItemId, onInspectOffer, onReroll, onMatch }: { run: Run; selectedOfferId: string | null; draggingItemId: string | null; onInspectOffer: (offerId: string, element: HTMLElement) => void; onReroll: () => void; onMatch: () => void }) {
   const visualTheme = visualThemeForRound(run.round)
   return (
-    <section className={`shop-shelf sketch-panel visual-theme-surface visual-theme-${visualTheme}`} data-visual-theme={visualTheme} style={visualThemeStyle(visualTheme)} data-tutorial-anchor="shop-offers">
+    <HanddrawnFrame as="section" variant="tray" ornament="wood" className={`shop-shelf sketch-panel visual-theme-surface visual-theme-${visualTheme}`} data-visual-theme={visualTheme} style={visualThemeStyle(visualTheme)} data-tutorial-anchor="shop-offers">
       <div className="section-title">
         <div>
           <h2>{shopNames[run.shopType]}</h2>
@@ -3612,10 +3639,10 @@ function ShopShelf({ run, selectedOfferId, draggingItemId, onInspectOffer, onRer
         </div>
         <div className="shop-actions">
           <SellDropZone active={Boolean(draggingItemId)} />
-          <button className="reroll-button" onClick={onReroll} title={`刷新商店：${run.refreshCost} 金币`}>
+          <HanddrawnButton variant="secondary" className="reroll-button" onClick={onReroll} title={`刷新商店：${run.refreshCost} 金币`}>
             <RefreshCcw size={18} />
             <span className="price-tag"><Coins size={14} />{run.refreshCost}</span>
-          </button>
+          </HanddrawnButton>
         </div>
       </div>
       <div className="offer-row">
@@ -3623,10 +3650,10 @@ function ShopShelf({ run, selectedOfferId, draggingItemId, onInspectOffer, onRer
           <ShopCard key={offer.offerId} offer={offer} selected={selectedOfferId === offer.offerId} ownedCount={shopOfferOwnedCount(run, offer)} affordable={run.gold >= offer.price} onClick={(element) => onInspectOffer(offer.offerId, element)} />
         ))}
       </div>
-      <button className="primary action-button match-button" data-tutorial-anchor="match-button" onClick={onMatch}>
+      <ActionButton className="match-button" data-tutorial-anchor="match-button" onClick={onMatch}>
         <Swords size={18} /> 匹配
-      </button>
-    </section>
+      </ActionButton>
+    </HanddrawnFrame>
   )
 }
 
@@ -3645,20 +3672,28 @@ function ShopCard({ offer, selected, ownedCount, affordable, onClick }: { offer:
   const quality = normalizeQuality(offer.quality)
   const owned = ownedCount > 0
   const triggerDice = def ? triggerDiceLabel(def) : null
+  const visual = def ? itemVisualProfile(def) : null
   return (
-    <button className={`shop-card paper-shop-card paper-card ${qualityClass(offer.quality)} ${owned ? 'shop-card-owned' : ''} ${affordable ? '' : 'shop-card-unaffordable'} ${selected ? 'selected' : ''}`} onClick={(event) => onClick(event.currentTarget)}>
+    <ItemFrame as="button" className={`shop-card paper-shop-card paper-card ${visual?.className ?? 'item-tone-utility'} ${qualityClass(offer.quality)} ${owned ? 'shop-card-owned' : ''} ${affordable ? '' : 'shop-card-unaffordable'} ${selected ? 'selected' : ''}`} onClick={(event) => onClick(event.currentTarget)}>
       <span className="quality-chip shop-quality-chip">{qualityLabel[quality]}</span>
       {owned && <span className="owned-badge" aria-label={`已拥有 ${ownedCount} 件同名装备`}>已拥有 x{ownedCount}</span>}
-      {def && <img className="shop-item-icon" src={itemIcon(def)} alt="" />}
+      {def && visual && (
+        <span className={`item-art-window shop-card-art ${visual.className} ${visual.hasCustomArt ? 'has-custom-art' : 'generated-art'}`} data-art-aspect={visual.artAspect}>
+          {visual.artSrc ? <img className="item-card-art" src={visual.artSrc} alt="" /> : <span className="item-card-art-fallback" aria-hidden="true" />}
+          <span className="item-icon-badge">
+            <img className="shop-item-icon" src={itemIcon(def)} alt="" />
+          </span>
+        </span>
+      )}
       <div className="shop-card-main">
-        <span className={`size-badge ${def ? itemTone(def) : 'utility'}`}>{def?.size ?? '?'}格</span>
+        <span className={`size-badge ${visual?.className ?? 'item-tone-utility'}`}>{def?.size ?? '?'}格</span>
         <strong>{def?.name ?? offer.defId}</strong>
       </div>
       {def && <SizePreview size={def.size} />}
       {triggerDice && <span className="dice-line"><Dice5 size={15} /> {triggerDice}</span>}
       <span className="effect-line">{def ? effectText(def, quality) : '未知效果'}</span>
       <span className="price-tag"><Coins size={14} />{offer.price}{offer.discount < 1 ? ` · ${Math.round(offer.discount * 10)}折` : ''}</span>
-    </button>
+    </ItemFrame>
   )
 }
 
@@ -3738,7 +3773,7 @@ function RelicFloatingTip({ relic, anchor, onClose, onSell }: { relic: Relic | n
   if (!relic) return null
   const style = anchor ? { '--tip-x': `${anchor.x}px`, '--tip-y': `${anchor.y}px` } as React.CSSProperties : undefined
   return (
-    <aside className="relic-floating-tip floating-tip paper-card" style={style}>
+    <FloatingPaperTip className="relic-floating-tip" style={style}>
       <div className="tip-tags">
         <span className={`tip-tag ${qualityClass(relic.quality)}`}>{qualityLabel[relic.quality]}</span>
         {relic.def.tags.map((tag) => <span key={tag} className="tip-tag">{tag}</span>)}
@@ -3752,12 +3787,12 @@ function RelicFloatingTip({ relic, anchor, onClose, onSell }: { relic: Relic | n
       <p className="tip-description"><RuleText text={relic.def.description} /></p>
       {onSell && (
         <div className="tip-actions">
-          <button className="danger-button wide" onClick={() => onSell(relic.id)}>
+          <ActionButton variant="danger" wide onClick={() => onSell(relic.id)}>
             <BadgeDollarSign size={18} /> 出售 +0
-          </button>
+          </ActionButton>
         </div>
       )}
-    </aside>
+    </FloatingPaperTip>
   )
 }
 
@@ -3800,7 +3835,8 @@ function DraggableItem({ item, relics, selected, dragging, upgradeable, onSelect
   }
   const triggerDice = triggerDiceLabel(itemTriggerDisplay(item), relics)
   return (
-    <button
+    <ItemFrame
+      as="button"
       ref={setNodeRef}
       className={`item-card paper-item-card ${itemTone(item.def)} ${qualityClass(item.quality)} ${selected ? 'selected' : ''} ${dragging ? 'dragging' : ''} ${upgradeable ? 'can-upgrade' : ''} ${isOver ? 'upgrade-over' : ''}`}
       style={style}
@@ -3813,36 +3849,106 @@ function DraggableItem({ item, relics, selected, dragging, upgradeable, onSelect
       {...attributes}
     >
       <ItemCardContent item={item} relics={relics} upgradeable={upgradeable} />
-    </button>
+    </ItemFrame>
   )
 }
 
 function ItemCardContent({ item, relics = [], upgradeable = false }: { item: Item; relics?: Relic[]; upgradeable?: boolean }) {
   const triggerDice = triggerDiceLabel(itemTriggerDisplay(item), relics)
+  const visual = itemVisualProfile(item.def)
   return (
     <>
       <span className="quality-chip">{qualityLabel[normalizeQuality(item.quality)]}</span>
+      <ItemArt def={item.def} visual={visual} />
+      <span className="item-card-copy">
       {upgradeable && <span className="upgrade-indicator" title="可升级">↑</span>}
-      <img className="item-icon" src={itemIcon(item.def)} alt="" />
       <span>{item.def.name}</span>
       {item.enchant && <span className="enchant-badge"><Sparkles size={12} />附魔</span>}
       <SizePreview size={item.def.size} />
       {triggerDice && <small><Dice5 size={12} /> {triggerDice}</small>}
       <small className="item-effect">{effectText(item.def, normalizeQuality(item.quality))}</small>
       {item.enchant && <small className="item-effect enchant-text">{enchantmentText(item.enchant)}</small>}
+      </span>
     </>
+  )
+}
+
+function ItemArt({ def, visual = itemVisualProfile(def) }: { def: ItemDef; visual?: ReturnType<typeof itemVisualProfile> }) {
+  return (
+    <span className={`item-art-window ${visual.className} ${visual.hasCustomArt ? 'has-custom-art' : 'generated-art'}`} data-art-aspect={visual.artAspect}>
+      {visual.artSrc ? <img className="item-card-art" src={visual.artSrc} alt="" /> : <span className="item-card-art-fallback" aria-hidden="true" />}
+      <span className="item-icon-badge">
+        <img className="item-icon" src={itemIcon(def)} alt="" />
+      </span>
+    </span>
+  )
+}
+
+const itemArtToneLabels: Record<ReturnType<typeof itemVisualProfile>['tone'], string> = {
+  damage: '攻击',
+  poison: '毒',
+  shield: '护盾',
+  heal: '治疗',
+  weak: '虚弱/控制',
+  freeze: '冻结',
+  thorns: '荆棘',
+  economy: '经济',
+  growth: '成长',
+  counter: '计数爆发',
+  trigger: '功能触发',
+  utility: '通用',
+}
+
+function ItemArtDebugGallery() {
+  const toneCounts = ALL_ITEM_DEFS.reduce<Record<string, number>>((counts, def) => {
+    const visual = itemVisualProfile(def)
+    counts[visual.tone] = (counts[visual.tone] ?? 0) + 1
+    return counts
+  }, {})
+  return (
+    <main className="item-art-debug-gallery">
+      <header className="item-art-debug-header">
+        <div>
+          <span className="tip-tag">开发调试</span>
+          <h1>装备卡面画芯画廊</h1>
+          <p>集中检查 tone、画芯画幅、首批 WebP 和缺图回退；访问参数：?itemArtGallery=1。</p>
+        </div>
+        <div className="item-art-debug-stats">
+          {Object.entries(toneCounts).map(([tone, count]) => (
+            <span key={tone} className={`tip-tag item-tone-${tone}`}>{itemArtToneLabels[tone as keyof typeof itemArtToneLabels] ?? tone} {count}</span>
+          ))}
+        </div>
+      </header>
+      <section className="item-art-debug-grid">
+        {ALL_ITEM_DEFS.map((def) => {
+          const visual = itemVisualProfile(def)
+          const quality = normalizeQuality(def.defaultQuality)
+          return (
+            <article key={def.id} className={`item-art-debug-card paper-card ${visual.className} ${qualityClass(quality)}`}>
+              <ItemArt def={def} visual={visual} />
+              <div className="item-art-debug-copy">
+                <strong>{def.name}</strong>
+                <span>{def.size}格 · {itemArtToneLabels[visual.tone]} · {visual.hasCustomArt ? 'WebP' : '回退纹理'}</span>
+                <small>{def.id}</small>
+                <small><RuleText text={def.description ?? effectText(def, quality)} /></small>
+              </div>
+            </article>
+          )
+        })}
+      </section>
+    </main>
   )
 }
 
 function DraggingItemOverlay({ item, relics = [] }: { item: Item | null; relics?: Relic[] }) {
   if (!item) return null
   return (
-    <div
+    <ItemFrame
       className={`drag-overlay-item item-card paper-item-card ${itemTone(item.def)} ${qualityClass(item.quality)}`}
       style={{ width: `calc(${item.def.width} * var(--slot-w))`, height: `calc(${item.def.height} * var(--board-slot-h))` }}
     >
       <ItemCardContent item={item} relics={relics} />
-    </div>
+    </ItemFrame>
   )
 }
 
@@ -3856,17 +3962,21 @@ function FloatingTip({ run, item, offer, anchor, descriptionOverride, relicsOver
   const sellValue = item ? sellValueForItem(item) : null
   const style = anchor ? { '--tip-x': `${anchor.x}px`, '--tip-y': `${anchor.y}px` } as React.CSSProperties : undefined
   const tipTriggerDice = triggerDiceLabel(item ? itemTriggerDisplay(item) : def, item ? (relicsOverride ?? run.relics) : [])
+  const visual = itemVisualProfile(def)
   return (
-    <aside className="floating-tip paper-card" style={style}>
+    <FloatingPaperTip className="floating-tip paper-card" style={style}>
       <div className="tip-tags">
-        <span className={`size-badge ${itemTone(def)}`}>{def.size}格</span>
+        <span className={`size-badge ${visual.className}`}>{def.size}格</span>
         <span className={`tip-tag ${qualityClass(quality)}`}>{qualityLabel[quality]}</span>
         <span className="tip-tag">{diceToneText(def)}</span>
         <span className="tip-tag">{effectToneText(def)}</span>
       </div>
       <div className="tip-body">
         <div className="tip-identity">
-          <span className={`tip-icon-frame ${itemTone(def)}`}>
+          <span className={`tip-icon-frame ${visual.className}`}>
+            <span className={`item-art-window tip-art-preview ${visual.className} ${visual.hasCustomArt ? 'has-custom-art' : 'generated-art'}`} data-art-aspect={visual.artAspect}>
+              {visual.artSrc ? <img className="item-card-art" src={visual.artSrc} alt="" /> : <span className="item-card-art-fallback" aria-hidden="true" />}
+            </span>
             <img className="tip-icon" src={itemIcon(def)} alt="" />
           </span>
           <h3>{def.name}</h3>
@@ -3892,20 +4002,20 @@ function FloatingTip({ run, item, offer, anchor, descriptionOverride, relicsOver
       )}
       <div className="tip-actions">
         {isOffer && onBuy ? (
-          <button className="primary action-button wide" data-tutorial-anchor="shop-buy" disabled={!canAfford} onClick={onBuy}>
+          <ActionButton className="wide" data-tutorial-anchor="shop-buy" disabled={!canAfford} onClick={onBuy}>
             <PackagePlus size={18} /> 购买到背包
-          </button>
+          </ActionButton>
         ) : (
           <>
             {onUpgrade && (
-              <button className="primary action-button wide" onClick={onUpgrade}>
+              <ActionButton className="wide" onClick={onUpgrade}>
                 <PackagePlus size={18} /> 升级
-              </button>
+              </ActionButton>
             )}
             {onSell ? (
-              <button className="danger-button wide" onClick={onSell}>
+              <ActionButton variant="danger" wide onClick={onSell}>
                 <BadgeDollarSign size={18} /> 出售 +{sellValue}
-              </button>
+              </ActionButton>
             ) : !onUpgrade ? (
               <small className="disabled-reason">战斗中仅查看物品详情</small>
             ) : null}
@@ -3913,7 +4023,7 @@ function FloatingTip({ run, item, offer, anchor, descriptionOverride, relicsOver
         )}
         {!canAfford && <small className="disabled-reason">金币不足，还差 {(offer?.price ?? 0) - run.gold} 金币。</small>}
       </div>
-    </aside>
+    </FloatingPaperTip>
   )
 }
 
@@ -3937,7 +4047,7 @@ function StatusFloatingTip({ statusTip, onClose }: { statusTip: StatusTipState |
   }
   const style = { '--tip-x': `${anchor.x}px`, '--tip-y': `${anchor.y}px` } as React.CSSProperties
   return (
-    <aside id={statusTipId} className="floating-tip paper-card status-floating-tip" style={style} role="tooltip">
+    <FloatingPaperTip id={statusTipId} className="status-floating-tip" style={style} role="tooltip">
       <div className="status-tip-title">
         <strong>{status.label}</strong>
         <span className={`tip-tag ${status.type}`}>{detail.polarity}</span>
@@ -3949,7 +4059,7 @@ function StatusFloatingTip({ statusTip, onClose }: { statusTip: StatusTipState |
       <p className="status-tip-description"><RuleText text={detail.description} /></p>
       <small><RuleText text={detail.timing} /></small>
       <small><RuleText text={detail.source} /></small>
-    </aside>
+    </FloatingPaperTip>
   )
 }
 
@@ -3960,9 +4070,9 @@ function ForfeitRunAction({ run, onForfeit }: { run: Run; onForfeit: () => void 
         <strong>当前 {run.wins} 胜 {run.losses} 败</strong>
         <span>放弃后立即按当前记录结算，不会额外增加失败。</span>
       </div>
-      <button className="danger-button action-button" type="button" onClick={onForfeit}>
+      <ActionButton variant="danger" type="button" onClick={onForfeit}>
         <Flag size={18} /> 放弃并结算
-      </button>
+      </ActionButton>
     </section>
   )
 }
@@ -4047,9 +4157,9 @@ function BattleView({ run, battle, currentEvent, eventIndex, speed, score, sound
         <SettlementView run={run} score={score} onRestart={onRestart} />
       ) : run.phase === 'BATTLE' && isFinished && (
         <div className="battle-continue-row">
-          <button className="primary action-button" data-tutorial-anchor="battle-continue" onClick={onContinue}>
+          <ActionButton data-tutorial-anchor="battle-continue" onClick={onContinue}>
             <ArrowRight size={18} /> 继续
-          </button>
+          </ActionButton>
         </div>
       )}
 
@@ -4062,7 +4172,7 @@ function SettlementView({ run, score, onRestart }: { run: Run; score: number; on
   const visualTheme = visualThemeForRound(run.round)
   return (
     <section className="settlement-page surprise-surface" style={surpriseBackgroundStyle('settlement')}>
-      <div className={`result handdrawn-result paper-card settlement-card visual-theme-surface visual-theme-${visualTheme}`} data-visual-theme={visualTheme} style={{ ...visualThemeStyle(visualTheme), ...surpriseBackgroundStyle('settlement') }}>
+      <HanddrawnFrame as="div" variant="panel" ornament="ribbon" className={`result handdrawn-result paper-card settlement-card visual-theme-surface visual-theme-${visualTheme}`} data-visual-theme={visualTheme} style={{ ...visualThemeStyle(visualTheme), ...surpriseBackgroundStyle('settlement') }}>
         <Trophy size={32} />
         <h2>跑局结束</h2>
         <div className="settlement-score-grid">
@@ -4080,8 +4190,8 @@ function SettlementView({ run, score, onRestart }: { run: Run; score: number; on
           </span>
         </div>
         {run.ladderSettlement && <LadderSettlementSummary settlement={run.ladderSettlement} />}
-        <button className="primary action-button" onClick={onRestart}>重新选择狗狗</button>
-      </div>
+        <ActionButton onClick={onRestart}>重新选择狗狗</ActionButton>
+      </HanddrawnFrame>
     </section>
   )
 }
@@ -4122,7 +4232,8 @@ function BattleEquipmentRow({ owner, snapshot, events, displayIndex, activeEvent
           const triggerCountLabel = itemTriggerCountLabel(events, owner, item.id, displayIndex)
           const triggerCountPopping = activeItemId === item.id
           return (
-          <button
+          <ItemFrame
+            as="button"
             type="button"
             key={item.id}
             className={`battle-item item-card paper-item-card ${itemTone(item.def)} ${qualityClass(item.quality)} ${activeItemId === item.id ? `active battle-item-trigger vfx-trigger-${activeVfxKind}` : ''} ${targetItemIds.includes(item.id) ? 'battle-item-vfx-target' : ''} ${boomCounterState ? 'boom-counter' : ''} ${boomCounterState?.popping ? 'boom-counter-pop' : ''} ${triggerCountPopping ? 'trigger-count-pop' : ''}`}
@@ -4150,7 +4261,7 @@ function BattleEquipmentRow({ owner, snapshot, events, displayIndex, activeEvent
             <span className={`trigger-count-stamp ${triggerCountLabel === 'x0' ? 'empty' : ''}`} aria-label={`褰撳眬瑙﹀彂娆℃暟 ${triggerCountLabel}`}>
               {triggerCountLabel}
             </span>
-          </button>
+          </ItemFrame>
           )
         })}
       </div>
@@ -4224,24 +4335,28 @@ function BattleDog({ side, snapshot, hp, maxHp, shield, event, finished, winner,
   const poisonPreviewLeft = Math.max(0, Math.min(100, hpPercent - poisonPreviewPercent))
   return (
     <div className={`battle-dog ${side} ${isActor ? 'attacking' : ''} ${isTarget && event?.effectType !== 'HEAL' ? 'hit' : ''} ${healing ? 'healing' : ''} ${isVfxTarget ? `vfx-target-${battleVfxKind(event)}` : ''} ${shieldValue > 0 ? 'status-shield' : ''} ${poisonStatus ? 'poisoned status-poison' : ''} ${won ? 'winner' : ''} ${lost ? 'loser' : ''}`} data-vfx-side={side}>
-      <div className="hp" {...battleVfxAnchorAttrs('hp', side)}>
-        <span><HeartPulse size={16} /> {snapshot.name}</span>
-        <StatusEffectRow tone="positive" side={side} statuses={positiveStatuses} onStatusInspect={onStatusInspect} activeStatusKey={activeStatusKey} />
-        <div className="hp-bar">
-          {shieldValue > 0 && <i className="hp-shield" style={{ width: `${Math.max(6, Math.min(100, shieldPercent))}%` }} />}
-          <i className="hp-current" style={{ width: `${Math.max(0, Math.min(100, hpPercent))}%` }} />
-          {poisonPreviewPercent > 0 && <i className="hp-preview poison" style={{ left: `${poisonPreviewLeft}%`, width: `${Math.max(3, Math.min(100, poisonPreviewPercent))}%` }} />}
-        </div>
-        <StatusEffectRow tone="negative" side={side} statuses={negativeStatuses} onStatusInspect={onStatusInspect} activeStatusKey={activeStatusKey} />
-        <b>{Math.max(0, Math.round(hp))}/{maxHp}</b>
+      <BoneHealthBar
+        name={snapshot.name}
+        hp={hp}
+        maxHp={maxHp}
+        shield={shieldValue}
+        poisonPreviewDamage={poisonStatus?.tickDamage ?? 0}
+        side={side}
+        data-hp-percent={hpPercent}
+        data-poison-preview-left={poisonPreviewLeft}
+        data-poison-preview-percent={poisonPreviewPercent}
+        statusSlotTop={<StatusEffectRow tone="positive" side={side} statuses={positiveStatuses} onStatusInspect={onStatusInspect} activeStatusKey={activeStatusKey} />}
+        statusSlotBottom={<StatusEffectRow tone="negative" side={side} statuses={negativeStatuses} onStatusInspect={onStatusInspect} activeStatusKey={activeStatusKey} />}
+        {...battleVfxAnchorAttrs('hp', side)}
+      >
         {shieldValue > 0 && (
           <div className="shield-bar" aria-label={`护盾 ${shieldValue}`}>
             <i style={{ width: `${Math.max(6, Math.min(100, shieldPercent))}%` }} />
             <span><Shield size={13} /> 护盾 {shieldValue}</span>
           </div>
         )}
-      </div>
-      <img className="battle-dog-img" src={dogAssets[snapshot.dogType]} alt="" {...battleVfxAnchorAttrs('dog-avatar', side)} />
+      </BoneHealthBar>
+      <DogBadge dogType={snapshot.dogType} src={dogAssets[snapshot.dogType]} size="battle" side={side} status={poisonStatus ? 'poison' : shieldValue > 0 ? 'shield' : won ? 'winner' : lost ? 'loser' : undefined} className="battle-dog-img" {...battleVfxAnchorAttrs('dog-avatar', side)} />
       <strong>{dogNames[snapshot.dogType]}</strong>
     </div>
   )
@@ -4255,7 +4370,7 @@ function StatusEffectRow({ tone, side, statuses, onStatusInspect, activeStatusKe
       {visible.map((status) => {
         const isActive = activeStatusKey === statusTipKey(status, side, tone)
         return (
-          <button
+          <StatusChip
             key={`${tone}-${status.type}`}
             type="button"
             className={`status-chip handdrawn-status-chip ${status.type}`}
@@ -4267,7 +4382,7 @@ function StatusEffectRow({ tone, side, statuses, onStatusInspect, activeStatusKe
             onClick={(event) => onStatusInspect(status, side, tone, event.currentTarget)}
           >
             {statusText(status)}
-          </button>
+          </StatusChip>
         )
       })}
       {hidden > 0 && <span className="status-chip handdrawn-status-chip more" title={statuses.map(statusText).join(' / ')}>+{hidden}</span>}
@@ -4318,11 +4433,13 @@ function BattleDice({ event, lastRoll }: { event?: BattleEvent; lastRoll?: Battl
   const actor = event?.kind === 'ROLL' ? event.actor : lastRoll?.actor ?? event?.actor
   const roll = event?.roll ?? lastRoll?.roll
   return (
-    <div className={`battle-dice handdrawn-dice ${event?.kind === 'ROLL' ? 'rolling' : ''}`}>
-      <Dice5 size={32} />
-      <b>{roll ?? '-'}</b>
-      <span>{actor === 'opponent' ? '对手掷骰' : actor === 'player' ? '玩家掷骰' : '战斗结算'}</span>
-    </div>
+    <DynamicDice
+      roll={roll}
+      actor={actor === 'opponent' || actor === 'player' ? actor : 'system'}
+      rolling={event?.kind === 'ROLL'}
+      label={actor === 'opponent' ? '对手掷骰' : actor === 'player' ? '玩家掷骰' : '战斗结算'}
+      className="battle-dice handdrawn-dice"
+    />
   )
 }
 

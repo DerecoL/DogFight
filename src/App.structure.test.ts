@@ -4,6 +4,8 @@ import { describe, expect, it } from 'vitest'
 const app = readFileSync(new URL('./App.tsx', import.meta.url), 'utf8')
 const css = readFileSync(new URL('./App.css', import.meta.url), 'utf8')
 const data = readFileSync(new URL('./server/game/data.ts', import.meta.url), 'utf8')
+const uiIndexUrl = new URL('./ui/index.ts', import.meta.url)
+const uiCssUrl = new URL('./ui/handdrawn.css', import.meta.url)
 
 function mappedAssetIds(recordName: string) {
   const start = app.indexOf(`const ${recordName}: Record<string, string> = {`)
@@ -27,6 +29,124 @@ function relicDefIds() {
 }
 
 describe('selection screen structure', () => {
+  it('exposes a reusable handdrawn UI component layer', () => {
+    expect(existsSync(uiIndexUrl)).toBe(true)
+    expect(existsSync(uiCssUrl)).toBe(true)
+
+    const uiIndex = readFileSync(uiIndexUrl, 'utf8')
+    for (const exportName of [
+      'HanddrawnFrame',
+      'HanddrawnButton',
+      'IconButton',
+      'ResourcePill',
+      'HanddrawnTextButton',
+      'HanddrawnTabButton',
+      'HanddrawnListButton',
+      'HanddrawnNumberButton',
+      'HanddrawnSlotButton',
+      'RelicIconButton',
+      'ChoiceCard',
+      'ItemFrame',
+      'DogBadge',
+      'BoneHealthBar',
+      'DynamicDice',
+      'StatusChip',
+      'FloatingPaperTip',
+    ]) {
+      expect(uiIndex).toContain(exportName)
+    }
+
+    expect(app).toContain("from './ui'")
+    expect(app).toContain("import './ui/handdrawn.css'")
+  })
+
+  it('routes high-frequency tips, chips, choices, and action buttons through UI primitives', () => {
+    expect(app).toContain('function ActionButton')
+    expect(app).toContain('<HanddrawnButton')
+    expect(app).toContain('<HanddrawnChoiceCard')
+    expect(app).toContain('<FloatingPaperTip')
+    expect(app).toContain('<StatusChip')
+    expect(app).toContain('className="floating-tip paper-card"')
+    expect(app).toContain('className={`status-chip handdrawn-status-chip ${status.type}`}')
+  })
+
+  it('routes command buttons through the handdrawn action wrapper', () => {
+    expect(app).toContain('function ActionButton')
+    expect(app).toContain('<ActionButton')
+    expect(app).toContain('<HanddrawnButton variant="secondary" className="reroll-button"')
+    for (const rawButtonClass of [
+      '<button className="action-button"',
+      '<button className="primary action-button"',
+      '<button className="secondary action-button"',
+      '<button className="danger-button action-button"',
+      '<button className="primary action-button wide"',
+      '<button className="danger-button wide"',
+    ]) {
+      expect(app).not.toContain(rawButtonClass)
+    }
+  })
+
+  it('routes major panels through the handdrawn frame primitive', () => {
+    expect(app).toContain('<HanddrawnFrame')
+    expect(app).toContain('className="auth-panel paper-card sticker-card"')
+    expect(app).toContain('className={`mode-card paper-card sticker-card ${mode.locked ? \'locked\' : \'available\'}`}')
+    expect(app).toContain('className={`shop-shelf sketch-panel visual-theme-surface visual-theme-${visualTheme}`}')
+    expect(app).toContain('className={`reward-panel paper-card visual-theme-surface visual-theme-${visualTheme}`}')
+    expect(app).toContain('variant="tray" ornament="wood"')
+  })
+
+  it('routes item and shop card surfaces through the item frame primitive', () => {
+    const uiPrimitives = readFileSync(new URL('./ui/primitives.tsx', import.meta.url), 'utf8')
+    expect(uiPrimitives).toContain('forwardRef')
+    expect(uiPrimitives).toContain("as?: 'div' | 'button'")
+    expect(uiPrimitives).toContain('handdrawn-item-frame')
+    expect(app).toContain('ItemFrame,')
+    expect(app).toContain('<ItemFrame as="button"')
+    expect(app).toContain('ref={setNodeRef}')
+    expect(app).toContain('className={`shop-card paper-shop-card paper-card')
+    expect(app).toContain('className={`battle-item item-card paper-item-card')
+    expect(app).toContain('className={`item-card paper-item-card')
+    expect(app).toContain('className={`drag-overlay-item item-card paper-item-card')
+  })
+
+  it('routes remaining low-frequency controls through handdrawn primitives', () => {
+    const uiPrimitives = readFileSync(new URL('./ui/primitives.tsx', import.meta.url), 'utf8')
+    for (const exportName of [
+      'HanddrawnTextButton',
+      'HanddrawnTabButton',
+      'HanddrawnListButton',
+      'HanddrawnNumberButton',
+      'HanddrawnSlotButton',
+      'RelicIconButton',
+    ]) {
+      expect(uiPrimitives).toContain(`export function ${exportName}`)
+    }
+
+    expect(app).toContain('<HanddrawnTextButton')
+    expect(app).toContain('<HanddrawnTabButton')
+    expect(app).toContain('<HanddrawnListButton')
+    expect(app).toContain('<HanddrawnNumberButton')
+    expect(app).toContain('<HanddrawnSlotButton')
+    expect(app).toContain('<RelicIconButton')
+    expect(app).toContain('className="history-open-action"')
+    expect(app).toContain('className="dogfight-battle-row"')
+    expect(app).toContain('className="log-toggle"')
+
+    for (const rawButton of [
+      '<button className="history-open-action"',
+      '<button className="icon-button"',
+      '<button key={tab.id}',
+      '<button key={entry.id} type="button" className={`history-detail-row',
+      '<button key={entry.id} className="dogfight-battle-row"',
+      '<button type="button" role="tab"',
+      '<button key={number}',
+      '<button ref={setNodeRef}',
+      '<button className="log-toggle"',
+    ]) {
+      expect(app).not.toContain(rawButton)
+    }
+  })
+
   it('renders a mode lobby and opens the peak arena screen from the peak card', () => {
     expect(app).toContain("type GameMode = 'CASUAL' | 'LADDER' | 'DOGFIGHT' | 'PEAK'")
     expect(app).toContain("type AppScreen = 'LOBBY' | 'CASUAL' | 'LADDER' | 'DOGFIGHT' | 'PEAK'")
@@ -182,7 +302,7 @@ describe('selection screen structure', () => {
     expect(app).toContain('SHOP_CHOICE_SLOT_COUNT = shopChoiceOrder.length')
     expect(app).toContain('choice placeholder')
     expect(app).toContain('ShopChoiceSelect')
-    expect(app).toContain('role="button" tabIndex={0} className={`choice paper-card sticker-card ${selectedChoice === choice ? \'selected\' : \'\'}`}')
+    expect(app).toContain('<HanddrawnChoiceCard key={choice} role="button" tabIndex={0} selected={selectedChoice === choice}')
     expect(app).toContain('onKeyDown={(event) => handleChoiceCardKeyDown(event, () => setSelectedChoice(choice))}')
     expect(app).toContain('<span className="choice-copy"><RuleText text={shopDescriptions[choice]} /></span>')
     expect(app).toContain("进入 {selectedChoice ? shopNames[selectedChoice] : '商店'}")
@@ -334,6 +454,8 @@ describe('selection screen structure', () => {
     expect(app).toContain('playerMaxHp')
     expect(app).toContain('opponentMaxHp')
     expect(app).toContain('const hpPercent = maxHp > 0 ? (hp / maxHp) * 100 : 0')
+    expect(app).toContain('<BoneHealthBar')
+    expect(app).toContain('poisonPreviewDamage={poisonStatus?.tickDamage ?? 0}')
   })
 
   it('renders battle shield bars from playback event shield values', () => {
@@ -343,6 +465,7 @@ describe('selection screen structure', () => {
     expect(app).toContain('shield={playerShield}')
     expect(app).toContain('className="shield-bar"')
     expect(css).toContain('.shield-bar')
+    expect(app).toContain('shield={shieldValue}')
   })
 
   it('renders positive statuses above health and negative statuses below with poison preview damage', () => {
@@ -374,6 +497,22 @@ describe('selection screen structure', () => {
     expect(app).toContain('className="item-effect"')
     expect(app).toContain('effectText(item.def, normalizeQuality(item.quality))')
     expect(css).toContain('.item-effect')
+  })
+
+  it('renders equipment cards with shared visual profiles and art windows', () => {
+    expect(app).toContain("from './item-visual-profile'")
+    expect(app).toContain('itemVisualProfile(def)')
+    expect(app).toContain('itemVisualProfile(item.def)')
+    expect(app).toContain('className={`item-art-window ${visual.className} ${visual.hasCustomArt ? \'has-custom-art\' : \'generated-art\'}`}')
+    expect(app).toContain('data-art-aspect={visual.artAspect}')
+    expect(app).toContain('{visual.artSrc ? <img className="item-card-art" src={visual.artSrc} alt="" /> : <span className="item-card-art-fallback" aria-hidden="true" />}')
+    expect(app).toContain('<span className="item-icon-badge">')
+    expect(app).toContain('className={`tip-icon-frame ${visual.className}`}')
+    expect(app).toContain('className={`size-badge ${visual.className}`}')
+    expect(app).toContain("new URLSearchParams(window.location.search).has('itemArtGallery')")
+    expect(app).toContain('function ItemArtDebugGallery')
+    expect(app).toContain('ALL_ITEM_DEFS.map((def)')
+    expect(app).toContain('item-art-debug-gallery')
   })
 
   it('hides full-range trigger dice on direct-trigger item surfaces', () => {
@@ -429,7 +568,7 @@ describe('selection screen structure', () => {
     expect(app).toContain('<RelicGlyph relic={relic} size={compact ? 24 : 30} />')
     expect(app).toContain('<RelicGlyph relic={relic} size={44} />')
     expect(app).toContain('<RelicFloatingTip')
-    expect(app).toContain('relic-floating-tip floating-tip')
+    expect(app).toContain('<FloatingPaperTip className="relic-floating-tip"')
     expect(app).toContain('setSelectedRelicId(selectedRelicId === relic.id ? null : relic.id)')
 
     const relicRailStart = app.indexOf('function RelicRail')
@@ -470,8 +609,8 @@ describe('selection screen structure', () => {
     expect(app).toContain('className={`dog-card paper-card paper-dog-card ${selectedDog === dog ? \'selected\' : \'\'}`}')
     expect(app).toContain('onKeyDown={(event) => handleChoiceCardKeyDown(event, () => setSelectedDog(dog))}')
     expect(app).toContain('<small className="card-copy"><RuleText text={dogTraits[dog]} /></small>')
-    expect(app).toContain('<div key={choice.defId} role="button"')
-    expect(app).toContain('<div key={choice.relicId} role="button"')
+    expect(app).toContain('<HanddrawnChoiceCard key={choice.defId} role="button"')
+    expect(app).toContain('<HanddrawnChoiceCard key={choice.relicId} role="button"')
     expect(app).toContain('onKeyDown={(event) => event.stopPropagation()}')
     expect(app).not.toContain('<button key={choice.defId} className={`choice reward-choice')
     expect(app).not.toContain('<button key={choice.relicId} className={`choice relic-choice')
@@ -547,7 +686,7 @@ describe('selection screen structure', () => {
     expect(app).toContain('mode-card paper-card sticker-card')
     expect(app).toContain('dog-card paper-card paper-dog-card')
     expect(app).toContain('dog-detail-panel paper-card')
-    expect(app).toContain('choice paper-card sticker-card')
+    expect(app).toContain('<HanddrawnChoiceCard')
     expect(app).toContain('reward-panel paper-card')
     expect(app).toContain('shop-shelf sketch-panel')
     expect(app).toContain('inventory-board expanded paper-inventory')
@@ -560,6 +699,8 @@ describe('selection screen structure', () => {
     expect(app).toContain('battle-fx-canvas handdrawn-fx-canvas')
     expect(app).toContain('battle-item item-card paper-item-card')
     expect(app).toContain('battle-dice handdrawn-dice')
+    expect(app).toContain('<DynamicDice')
+    expect(app).toContain('<DogBadge')
     expect(app).toContain('result handdrawn-result paper-card')
     expect(app).toContain('status-chip handdrawn-status-chip')
     expect(app).toContain('rule-tip paper-card')

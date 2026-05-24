@@ -3,6 +3,9 @@ import { describe, expect, it } from 'vitest'
 
 const css = readFileSync(new URL('./App.css', import.meta.url), 'utf8')
 const app = readFileSync(new URL('./App.tsx', import.meta.url), 'utf8')
+const uiCss = existsSync(new URL('./ui/handdrawn.css', import.meta.url))
+  ? readFileSync(new URL('./ui/handdrawn.css', import.meta.url), 'utf8')
+  : ''
 const dogBrawlTownBackgroundUrl = new URL('../public/assets/backgrounds/dog-brawl-town.jpg', import.meta.url)
 
 function cssVariablePx(name: string) {
@@ -16,6 +19,12 @@ function cssRule(selector: string) {
   return match?.[1] ?? ''
 }
 
+function uiCssRule(selector: string) {
+  const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const match = uiCss.match(new RegExp(`${escaped}\\s*\\{([^}]*)\\}`, 's'))
+  return match?.[1] ?? ''
+}
+
 function cssVariableValue(name: string) {
   const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   const match = css.match(new RegExp(`${escaped}:\\s*([\\s\\S]*?);\\s*--`, 's'))
@@ -23,6 +32,52 @@ function cssVariableValue(name: string) {
 }
 
 describe('equipment layout scale', () => {
+  it('defines reusable handdrawn UI tokens and ornamental frame variants', () => {
+    expect(uiCss).toContain('--handdrawn-frame-border')
+    expect(uiCss).toContain('--handdrawn-inner-line')
+    expect(uiCss).toContain('--handdrawn-corner-ornament')
+    expect(uiCssRule('.handdrawn-frame')).toContain('border: var(--handdrawn-frame-border) solid')
+    expect(uiCssRule('.handdrawn-frame::before')).toContain('var(--handdrawn-corner-ornament)')
+    expect(uiCssRule('.handdrawn-frame-wood')).toContain('var(--wood-frame)')
+    expect(uiCssRule('.handdrawn-button:active, .handdrawn-button.pressed')).toContain('translateY')
+    expect(uiCssRule('.floating-paper-tip')).toContain('border')
+    expect(uiCssRule('.handdrawn-status-chip')).toContain('border')
+    expect(uiCssRule('.handdrawn-choice-card')).toContain('position: relative')
+    expect(uiCssRule('.handdrawn-item-frame')).toContain('position: relative')
+    expect(uiCssRule('.handdrawn-item-frame:where(button)')).toContain('cursor: pointer')
+    expect(uiCssRule('.handdrawn-text-button')).toContain('cursor: pointer')
+    expect(uiCssRule('.handdrawn-tab-button.active, .handdrawn-list-button.selected, .handdrawn-number-button.selected')).toContain('translateY')
+    expect(uiCssRule('.handdrawn-slot-button')).toContain('cursor: pointer')
+    expect(uiCssRule('.handdrawn-relic-icon-button')).toContain('border-radius: 999px')
+  })
+
+  it('styles global dog avatars as circular handdrawn badges', () => {
+    expect(uiCssRule('.dog-badge')).toContain('border-radius: 999px')
+    expect(uiCssRule('.dog-badge')).toContain('border')
+    expect(uiCssRule('.dog-badge::before')).toContain('radial-gradient')
+    expect(uiCssRule('.dog-badge img')).toContain('border-radius: 999px')
+    expect(css).toContain('.dog-avatar')
+  })
+
+  it('styles battle health as a bone framed bar with shield and poison layers', () => {
+    expect(uiCssRule('.bone-health-bar')).toContain('border-radius: 999px')
+    expect(uiCssRule('.bone-health-bar::before')).toContain('box-shadow')
+    expect(uiCssRule('.bone-health-knob.left')).toContain('border-radius: 999px')
+    expect(uiCssRule('.bone-health-fill')).toContain('transition: width')
+    expect(uiCssRule('.bone-health-shield')).toContain('background')
+    expect(uiCssRule('.bone-health-poison')).toContain('background')
+  })
+
+  it('styles the center dice as a CSS 3D handdrawn component', () => {
+    expect(uiCssRule('.dynamic-dice')).toContain('perspective')
+    expect(uiCssRule('.dynamic-dice-cube')).toContain('transform-style: preserve-3d')
+    expect(uiCssRule('.dynamic-dice-face.front')).toContain('translateZ')
+    expect(uiCssRule('.dynamic-dice-face.top')).toContain('rotateX')
+    expect(uiCssRule('.dynamic-dice-face.side')).toContain('rotateY')
+    expect(uiCssRule('.dynamic-dice.rolling .dynamic-dice-cube')).toContain('animation')
+    expect(uiCss).toContain('@keyframes handdrawnDiceRoll')
+  })
+
   it('keeps equipment and bag slots large enough to be the core play surface', () => {
     expect(cssVariablePx('--slot-w')).toBeGreaterThanOrEqual(84)
     expect(cssVariablePx('--slot-h')).toBeGreaterThanOrEqual(102)
@@ -558,6 +613,35 @@ describe('equipment layout scale', () => {
     expect(cssRule('@keyframes qualityBorderShimmer')).toContain('background-position')
     expect(cssRule('@keyframes qualityBorderShimmer')).not.toContain('transform')
     expect(cssRule('@media (prefers-reduced-motion: reduce)')).toContain('.item-card::after')
+  })
+
+  it('adds tone-driven item card art windows with readable text bands', () => {
+    for (const tone of ['damage', 'poison', 'shield', 'heal', 'weak', 'freeze', 'thorns', 'economy', 'growth', 'counter', 'trigger', 'utility']) {
+      expect(cssRule(`.item-tone-${tone}`)).toContain('--item-tone-main')
+      expect(cssRule(`.item-tone-${tone}`)).toContain('--item-tone-soft')
+      expect(cssRule(`.item-tone-${tone}`)).toContain('--item-tone-ink')
+      expect(cssRule(`.item-tone-${tone}`)).toContain('--item-art-glow')
+    }
+    expect(cssRule('.item-tone-heal')).toContain('--item-tone-main: #86efac')
+    expect(cssRule('.item-tone-heal')).toContain('--item-tone-soft: #ecfdf5')
+    expect(cssRule('.item-tone-poison')).toContain('--item-tone-main: #166534')
+    expect(cssRule('.item-tone-poison')).toContain('--item-tone-ink: #052e16')
+
+    expect(cssRule('.item-card')).toContain('background: var(--paper-grain)')
+    expect(cssRule('.item-art-window')).toContain('aspect-ratio')
+    expect(cssRule('.item-art-window')).toContain('background')
+    expect(cssRule('.item-art-window.generated-art::before')).toContain('var(--item-tone-main)')
+    expect(cssRule('.item-card-art')).toContain('object-fit: cover')
+    expect(cssRule('.item-icon-badge')).toContain('position: absolute')
+    expect(cssRule('.item-card-copy')).toContain('background')
+    expect(cssRule('.size-badge[class*="item-tone-"]')).toContain('var(--item-tone-soft)')
+    expect(cssRule('.tip-icon-frame[class*="item-tone-"]')).toContain('var(--item-tone-soft)')
+    expect(cssRule('.battle-item .item-art-window')).toContain('min-height')
+    expect(cssRule('.shop-card-art')).toContain('background')
+    expect(cssRule('.tip-art-preview')).toContain('background')
+    expect(cssRule('.item-art-debug-gallery')).toContain('min-height')
+    expect(cssRule('.item-art-debug-grid')).toContain('repeat(auto-fill')
+    expect(cssRule('.item-art-debug-card')).toContain('grid-template-columns')
   })
 
   it('turns equipment and bag grids into wooden handdrawn trays', () => {
