@@ -73,6 +73,8 @@ describe('production deployment assets', () => {
     expect(workflow).toContain('--exclude=dist-click')
     expect(workflow).toContain('--exclude=picture')
     expect(workflow).toContain('name: Upload source package')
+    expect(workflow).toMatch(/deploy:\s+.*?timeout-minutes: 70/s)
+    expect(workflow).toMatch(/name: Upload source package\s+timeout-minutes: 30/s)
     expect(workflow).toContain('REMOTE_ENV_FILE=')
     expect(workflow).toContain('REMOTE_SCRIPT=')
     expect(workflow).toContain('PRODUCTION_ENV_FILE=')
