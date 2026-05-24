@@ -1,4 +1,4 @@
-{$DOMAIN} {
+www.torcharena.online {
   encode zstd gzip
   root * /srv
 

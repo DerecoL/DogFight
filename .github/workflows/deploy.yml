@@ -18,6 +18,22 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
+      - name: Build frontend deployment marker
+        timeout-minutes: 5
+        run: |
+          npm ci
+          NODE_ENV=production npm run build
+          EXPECTED_JS="$(sed -n 's/.*src="\/\(assets\/index-[^"]*\.js\)".*/\1/p' dist/index.html | head -n 1)"
+          EXPECTED_CSS="$(sed -n 's/.*href="\/\(assets\/index-[^"]*\.css\)".*/\1/p' dist/index.html | head -n 1)"
+          if [ -z "$EXPECTED_JS" ] || [ -z "$EXPECTED_CSS" ]; then
+            echo "Could not derive expected frontend assets from dist/index.html"
+            cat dist/index.html
+            exit 1
+          fi
+          echo "EXPECTED_JS=$EXPECTED_JS" >> "$GITHUB_ENV"
+          echo "EXPECTED_CSS=$EXPECTED_CSS" >> "$GITHUB_ENV"
+          echo "Expected frontend assets: $EXPECTED_JS / $EXPECTED_CSS"
+
       - name: Package source
         timeout-minutes: 2
         run: |
@@ -63,7 +79,7 @@ jobs:
             -o ServerAliveInterval=15 \
             -o ServerAliveCountMax=4 \
             "${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}" \
-            "DEPLOY_PATH='${{ secrets.DEPLOY_PATH }}' REMOTE_PACKAGE='$REMOTE_PACKAGE' GITHUB_SHA='${{ github.sha }}' bash -s" <<'REMOTE'
+            "DEPLOY_PATH='${{ secrets.DEPLOY_PATH }}' REMOTE_PACKAGE='$REMOTE_PACKAGE' GITHUB_SHA='${{ github.sha }}' EXPECTED_JS='$EXPECTED_JS' EXPECTED_CSS='$EXPECTED_CSS' bash -s" <<'REMOTE'
           set -euo pipefail
 
           TEMP_DEPLOY_PATH="${DEPLOY_PATH}.repo-tmp"
@@ -119,12 +135,20 @@ jobs:
           fi
 
           frontend_index="$(docker compose exec -T caddy cat /srv/index.html)"
-          public_domain="$(grep -E '^DOMAIN=' .env.production | tail -n 1 | cut -d= -f2- | tr -d '"')"
           js_asset="$(printf '%s\n' "$frontend_index" | sed -n 's/.*src="\/\(assets\/index-[^"]*\.js\)".*/\1/p' | head -n 1)"
           css_asset="$(printf '%s\n' "$frontend_index" | sed -n 's/.*href="\/\(assets\/index-[^"]*\.css\)".*/\1/p' | head -n 1)"
 
-          if [ -z "$public_domain" ] || [ -z "$js_asset" ] || [ -z "$css_asset" ]; then
+          if [ -z "$js_asset" ] || [ -z "$css_asset" ]; then
             echo "Could not derive public frontend verification inputs."
+            printf '%s\n' "$frontend_index"
+            docker compose logs --tail=200 api caddy
+            exit 1
+          fi
+
+          if [ "$js_asset" != "$EXPECTED_JS" ] || [ "$css_asset" != "$EXPECTED_CSS" ]; then
+            echo "Caddy image does not match expected frontend assets."
+            echo "Expected: $EXPECTED_JS / $EXPECTED_CSS"
+            echo "Actual:   $js_asset / $css_asset"
             printf '%s\n' "$frontend_index"
             docker compose logs --tail=200 api caddy
             exit 1
@@ -132,7 +156,7 @@ jobs:
 
           echo "Caddy image contains $js_asset and $css_asset"
           for attempt in $(seq 1 30); do
-            public_index="$(curl -fsSL -H 'Cache-Control: no-cache' "https://${public_domain}/?deploy=${GITHUB_SHA}-${attempt}" || true)"
+            public_index="$(curl -fsSL -H 'Cache-Control: no-cache' "https://www.torcharena.online/?deploy=${GITHUB_SHA}-${attempt}" || true)"
             if printf '%s\n' "$public_index" | grep -Fq "$js_asset" && printf '%s\n' "$public_index" | grep -Fq "$css_asset"; then
               echo "Public frontend switched to $js_asset and $css_asset"
               exit 0
