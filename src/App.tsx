@@ -1232,7 +1232,7 @@ function RuleTermFloatingTip({ tip }: { tip: RuleTermTipState | null }) {
 export default function App() {
   if (isItemArtDebugRoute()) return <ItemArtDebugGallery />
 
-  const { t } = useLanguage()
+  const { t, language } = useLanguage()
   const [account, setAccount] = useState(createDefaultAccount)
   const [password, setPassword] = useState('dogdice')
   const [appScreen, setAppScreen] = useState<AppScreen>('LOBBY')
@@ -1699,7 +1699,7 @@ export default function App() {
           <LanguageSelector />
           <label>账号<input value={account} autoCapitalize="none" onChange={(e) => setAccount(e.target.value)} /></label>
           <label>密码<input type="password" value={password} onChange={(e) => setPassword(e.target.value)} /></label>
-          {error && <p className="error">{error}</p>}
+          {error && <p className="error">{localizeServerError(error, language)}</p>}
           <div className="row">
             <ActionButton onClick={() => action(() => api('/auth/login', { method: 'POST', body: JSON.stringify({ account, password }) }))}>登录</ActionButton>
             <ActionButton variant="secondary" onClick={() => action(() => api('/auth/register', { method: 'POST', body: JSON.stringify({ account, password }) }))}>注册</ActionButton>
@@ -3293,11 +3293,12 @@ function DogSelect({ onPick }: { onPick: (choice: { dogType: DogType; luckyNumbe
 }
 
 function Shell({ children, run, error, feedbacks = [], musicEnabled, musicBlocked, onToggleMusic, onOpenLobby, onLogout }: { children: React.ReactNode; run?: Run; error?: string; feedbacks?: UiFeedbackEvent[]; musicEnabled: boolean; musicBlocked: boolean; onToggleMusic: () => void; onOpenLobby?: () => void; onLogout: () => void }) {
+  const { language } = useLanguage()
   const visualTheme = run ? visualThemeForRound(run.round) : 'dogPark'
   return (
     <main className="app-shell">
       <TopBar run={run} musicEnabled={musicEnabled} musicBlocked={musicBlocked} onToggleMusic={onToggleMusic} onOpenLobby={onOpenLobby} onLogout={onLogout} />
-      {error && <p className="error">{error}</p>}
+      {error && <p className="error">{localizeServerError(error, language)}</p>}
       <div className={`app-visual-layer visual-theme-${visualTheme} high-impact-vfx`} data-visual-theme={visualTheme} style={visualThemeStyle(visualTheme)}>
         <div className="screen-content">{children}</div>
         <FeedbackLayer feedbacks={feedbacks} />
@@ -4880,10 +4881,4 @@ function CollapsedBattleLog({ events, eventIndex, open, onToggle }: { events: Ba
         {visible.map((event, index) => {
           const absoluteIndex = startIndex + index
           return (
-            <p key={`${event.time}-${index}-${event.text}`} className={`${event.actor} ${event.effectType === 'POISON' ? 'poison' : ''} ${absoluteIndex === eventIndex ? 'active-feedback' : ''}`}>{event.time}s · {event.text}</p>
-          )
-        })}
-      </div>
-    </div>
-  )
-}
+            <p key={`${event.time}-${index}-${event.text}`} className={`${event.actor} ${event.effectType === 'POISON' ? 'poison' : ''} ${absoluteIndex === eventIndex ? 'active-feedback' : ''}`}>{event.time}s · {event.text
