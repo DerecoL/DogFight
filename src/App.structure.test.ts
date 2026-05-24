@@ -807,10 +807,21 @@ describe('selection screen structure', () => {
   it('renders completed runs through a dedicated settlement page', () => {
     expect(app).toContain('function SettlementView')
     expect(app).toContain("run.phase === 'COMPLETE'")
-    expect(app).toContain('<SettlementView run={run} score={score} onRestart={onRestart} />')
+    expect(app).toContain('<SettlementView run={run} score={score} onReturnLobby={onRestart} onHide={() => setSettlementHidden(true)} />')
     expect(app).toContain("surpriseBackgroundStyle('settlement')")
     expect(css).toContain('.settlement-page')
     expect(css).toContain('.settlement-card')
     expect(css).toContain('.settlement-score-grid')
+  })
+
+  it('renders the completed run settlement as a hideable full-screen overlay that returns to the lobby', () => {
+    expect(app).toContain('const [settlementHidden, setSettlementHidden] = useState(false)')
+    expect(app).toContain('onReturnLobby={onRestart}')
+    expect(app).toContain('onHide={() => setSettlementHidden(true)}')
+    expect(app).toContain('title="隐藏结算"')
+    expect(app).toContain('title="显示结算"')
+    expect(app).toContain('返回大厅')
+    expect(css).toContain('.settlement-show-button')
+    expect(css).toContain('.settlement-hide-button')
   })
 })

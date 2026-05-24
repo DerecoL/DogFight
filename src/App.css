@@ -1896,12 +1896,28 @@ input {
   z-index: 1;
 }
 .settlement-page {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
   width: 100%;
-  min-height: 320px;
+  min-height: 100vh;
   display: grid;
   place-items: center;
   padding: 18px;
-  border-radius: 14px;
+  border-radius: 0;
+  overflow: auto;
+}
+.settlement-hide-button {
+  position: absolute;
+  top: clamp(14px, 3vw, 30px);
+  right: clamp(14px, 3vw, 30px);
+  z-index: 3;
+}
+.settlement-show-button {
+  position: fixed;
+  top: clamp(14px, 3vw, 30px);
+  right: clamp(14px, 3vw, 30px);
+  z-index: 91;
 }
 .settlement-card {
   width: min(560px, 100%);
@@ -2326,7 +2342,7 @@ input {
   filter: drop-shadow(0 18px 24px rgba(112, 72, 30, .20)) drop-shadow(0 0 16px rgba(52, 211, 153, .5));
 }
 .battle-dog.vfx-target-heal .hp::after,
-.battle-dog.vfx-target-shield .hp::after {
+.battle-dog.vfx-target-shield .battle-dog-img::after {
   content: "";
   position: absolute;
   inset: -6px;
@@ -2441,12 +2457,14 @@ input {
 }
 
 .battle-dog.status-shield::after {
+  content: none;
+}
+
+.battle-dog.status-shield .battle-dog-img::after {
   content: "";
   position: absolute;
-  z-index: 1;
-  width: 150px;
-  height: 150px;
-  top: 38%;
+  z-index: 2;
+  inset: -18px;
   border: 3px solid rgba(117, 189, 242, .62);
   border-radius: 999px;
   box-shadow: inset 0 0 24px rgba(117, 189, 242, .18), 0 0 18px rgba(117, 189, 242, .18);
@@ -5066,17 +5084,34 @@ input {
 }
 
 .settlement-page {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
   width: min(1280px, 100%);
-  min-height: min(760px, calc(100vh - 150px));
+  min-height: 100vh;
   display: grid;
   place-items: center;
   padding: clamp(18px, 4vw, 42px);
-  margin: 0 auto;
+  margin: 0;
   border: 4px solid var(--ink);
-  border-radius: 14px;
+  border-radius: 0;
   box-shadow: 10px 12px 0 rgba(61, 45, 37, .22), 0 24px 60px rgba(112, 72, 30, .18);
-  overflow: hidden;
+  overflow: auto;
   isolation: isolate;
+}
+
+.settlement-hide-button {
+  position: absolute;
+  top: clamp(14px, 3vw, 30px);
+  right: clamp(14px, 3vw, 30px);
+  z-index: 3;
+}
+
+.settlement-show-button {
+  position: fixed;
+  top: clamp(14px, 3vw, 30px);
+  right: clamp(14px, 3vw, 30px);
+  z-index: 91;
 }
 
 .settlement-hero {
@@ -5818,9 +5853,9 @@ input {
   .ceremony-dog-avatar { width: 112px; height: 112px; }
   .ceremony-reward-preview { grid-template-columns: 1fr; }
   .settlement-page {
-    min-height: calc(100vh - 172px);
+    min-height: 100vh;
     padding: 14px;
-    border-width: 3px;
+    border-width: 0;
   }
   .settlement-card {
     gap: 12px;

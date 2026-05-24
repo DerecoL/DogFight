@@ -18,6 +18,8 @@ import {
   Coins,
   Crown,
   Dice5,
+  Eye,
+  EyeOff,
   Flag,
   Gamepad2,
   Grid3X3,
@@ -1917,7 +1919,10 @@ export default function App() {
           soundEnabled={musicEnabled}
           onSpeed={setSpeed}
           onContinue={() => void finishBattle()}
-          onRestart={() => setRun(null)}
+          onRestart={() => {
+            setRun(null)
+            setAppScreen('LOBBY')
+          }}
         />
       )}
       {!battle && !showClassRewardCeremony && run.status === 'ACTIVE' && run.phase !== 'BATTLE' && (
@@ -4081,6 +4086,7 @@ function ForfeitRunAction({ run, onForfeit }: { run: Run; onForfeit: () => void 
 function BattleView({ run, battle, currentEvent, eventIndex, speed, score, soundEnabled, onSpeed, onContinue, onRestart }: { run: Run; battle: Battle | null; currentEvent?: BattleEvent; eventIndex: number; speed: number; score: number; soundEnabled: boolean; onSpeed: (speed: number) => void; onContinue: () => void; onRestart: () => void }) {
   const [logOpen, setLogOpen] = useState(false)
   const [battleTip, setBattleTip] = useState<{ item: Item; owner: 'player' | 'opponent'; anchor: TipAnchor } | null>(null)
+  const [settlementHidden, setSettlementHidden] = useState(false)
   const playback = battle ?? run.lastBattle
   const visualTheme = visualThemeForRound(run.round)
   const events = playback?.events ?? []
@@ -4113,6 +4119,10 @@ function BattleView({ run, battle, currentEvent, eventIndex, speed, score, sound
     if (!presentation) return
     playFeedbackSound(soundCueForBattlePresentation(presentation.kind), { enabled: soundEnabled })
   }, [displayIndex, presentation?.kind, soundEnabled])
+
+  useEffect(() => {
+    setSettlementHidden(false)
+  }, [run.id, run.phase])
 
   return (
     <section className={`battle-panel visual-battle sketch-panel visual-theme-${visualTheme}`} data-visual-theme={visualTheme} style={visualThemeStyle(visualTheme)}>
@@ -4155,7 +4165,13 @@ function BattleView({ run, battle, currentEvent, eventIndex, speed, score, sound
       )}
 
       {run.phase === 'COMPLETE' ? (
-        <SettlementView run={run} score={score} onRestart={onRestart} />
+        settlementHidden ? (
+          <IconButton className="settlement-show-button" title="显示结算" onClick={() => setSettlementHidden(false)}>
+            <Eye size={18} />
+          </IconButton>
+        ) : (
+          <SettlementView run={run} score={score} onReturnLobby={onRestart} onHide={() => setSettlementHidden(true)} />
+        )
       ) : run.phase === 'BATTLE' && isFinished && (
         <div className="battle-continue-row">
           <ActionButton data-tutorial-anchor="battle-continue" onClick={onContinue}>
@@ -4169,10 +4185,13 @@ function BattleView({ run, battle, currentEvent, eventIndex, speed, score, sound
   )
 }
 
-function SettlementView({ run, score, onRestart }: { run: Run; score: number; onRestart: () => void }) {
+function SettlementView({ run, score, onReturnLobby, onHide }: { run: Run; score: number; onReturnLobby: () => void; onHide: () => void }) {
   const visualTheme = visualThemeForRound(run.round)
   return (
     <section className="settlement-page surprise-surface" style={surpriseBackgroundStyle('settlement')}>
+      <IconButton className="settlement-hide-button" title="隐藏结算" onClick={onHide}>
+        <EyeOff size={18} />
+      </IconButton>
       <HanddrawnFrame as="div" variant="panel" ornament="ribbon" className={`result handdrawn-result paper-card settlement-card visual-theme-surface visual-theme-${visualTheme}`} data-visual-theme={visualTheme} style={{ ...visualThemeStyle(visualTheme), ...surpriseBackgroundStyle('settlement') }}>
         <Trophy size={32} />
         <h2>跑局结束</h2>
@@ -4191,7 +4210,7 @@ function SettlementView({ run, score, onRestart }: { run: Run; score: number; on
           </span>
         </div>
         {run.ladderSettlement && <LadderSettlementSummary settlement={run.ladderSettlement} />}
-        <ActionButton onClick={onRestart}>重新选择狗狗</ActionButton>
+        <ActionButton onClick={onReturnLobby}>返回大厅</ActionButton>
       </HanddrawnFrame>
     </section>
   )

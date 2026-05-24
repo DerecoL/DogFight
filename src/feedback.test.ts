@@ -61,7 +61,7 @@ describe('feedback presentation mapping', () => {
       [{ effectType: 'DAMAGE', targetHpDelta: -3, target: 'opponent' }, { anchor: 'dog-avatar', side: 'opponent' }],
       [{ effectType: 'DAMAGE', targetHpDelta: 0, target: 'opponent' }, { anchor: 'dog-avatar', side: 'opponent' }],
       [{ effectType: 'HEAL', target: 'player' }, { anchor: 'hp', side: 'player' }],
-      [{ effectType: 'UTILITY', statusChanged: ['shield'], playerStatuses: { positive: [{ type: 'shield', label: '护盾', tone: 'positive' }] }, target: 'player' }, { anchor: 'hp', side: 'player' }],
+      [{ effectType: 'UTILITY', statusChanged: ['shield'], playerStatuses: { positive: [{ type: 'shield', label: '护盾', tone: 'positive' }] }, target: 'player' }, { anchor: 'dog-avatar', side: 'player' }],
       [{ effectType: 'POISON', target: 'opponent' }, { anchor: 'status-negative', side: 'opponent' }],
       [{ effectType: 'UTILITY', statusChanged: ['weak'], opponentStatuses: { positive: [], negative: [{ type: 'weak', label: '虚弱', tone: 'negative' }] }, target: 'opponent' }, { anchor: 'status-negative', side: 'opponent' }],
       [{ effectType: 'UTILITY', statusChanged: ['thorns'], playerStatuses: { positive: [{ type: 'thorns', label: '荆棘', tone: 'positive' }], negative: [] }, target: 'player' }, { anchor: 'status-positive', side: 'player' }],
@@ -102,7 +102,7 @@ describe('feedback presentation mapping', () => {
     })
 
     expect(shieldPresentation.kind).toBe('shield')
-    expect(shieldPresentation.target).toEqual({ anchor: 'hp', side: 'player' })
+    expect(shieldPresentation.target).toEqual({ anchor: 'dog-avatar', side: 'player' })
   })
 
   it('does not classify utility events from stale status snapshots alone', () => {
