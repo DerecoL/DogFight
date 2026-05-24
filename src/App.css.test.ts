@@ -423,6 +423,13 @@ describe('equipment layout scale', () => {
     expect(cssRule('.ceremony-skip-hint')).toContain('letter-spacing: 0')
   })
 
+  it('keeps ceremony manuscript art inside the selection frame layer', () => {
+    expect(cssRule('.class-reward-ceremony.surprise-surface::before, .class-reward-ceremony.surprise-surface::after')).toContain('content: none')
+    expect(cssRule('.class-reward-ceremony.surprise-surface .ceremony-stage')).toContain('overflow: hidden')
+    expect(cssRule('.class-reward-ceremony.surprise-surface .ceremony-stage::before')).toContain('var(--surprise-bg)')
+    expect(cssRule('.class-reward-ceremony.surprise-surface .ceremony-stage > *')).toContain('z-index: 1')
+  })
+
   it('lays out dogfight as an autochess room with ranked player frames and phase controls', () => {
     expect(cssRule('.dogfight-phase-track')).toContain('grid-template-columns')
     expect(cssRule('.dogfight-survivor-board')).toContain('display: grid')
