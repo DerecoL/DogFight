@@ -47,6 +47,12 @@ describe('item detail tooltip interactions', () => {
     expect(css).toContain('.tip-body')
     expect(css).toContain('.tip-dice')
     expect(css).toContain('.tip-description')
+    expect(cssRule('.tip-icon-frame')).toContain('position: relative')
+    expect(cssRule('.tip-icon-frame')).toContain('isolation: isolate')
+    expect(cssRule('.tip-art-preview')).toContain('grid-area: 1 / 1')
+    expect(cssRule('.tip-art-preview')).toContain('max-width: none')
+    expect(cssRule('.tip-icon')).toContain('grid-area: 1 / 1')
+    expect(cssRule('.tip-icon')).toContain('z-index: 2')
   })
 
   it('shows the sell value next to the sell action for inspected items', () => {

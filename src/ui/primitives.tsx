@@ -265,8 +265,14 @@ export type DynamicDiceProps = HTMLAttributes<HTMLDivElement> & {
 }
 
 export function DynamicDice({ roll, actor = 'system', rolling = false, label, className, ...props }: DynamicDiceProps) {
+  const rollLabel = roll == null ? label : `${label}：${roll}点`
   return (
-    <div className={joinClasses('battle-dice', 'handdrawn-dice', 'dynamic-dice', rolling && 'rolling', `dynamic-dice-${actor}`, className)} {...props}>
+    <div
+      className={joinClasses('battle-dice', 'handdrawn-dice', 'dynamic-dice', rolling && 'rolling', `dynamic-dice-${actor}`, className)}
+      role="img"
+      aria-label={rollLabel}
+      {...props}
+    >
       <div className="dynamic-dice-cube" aria-hidden="true">
         <span className="dynamic-dice-face front"><DicePips roll={roll} /></span>
         <span className="dynamic-dice-face top"><DicePips roll={roll ? ((roll % 6) + 1) : undefined} /></span>

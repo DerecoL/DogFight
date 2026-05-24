@@ -62,6 +62,7 @@ import { itemVisualProfile } from './item-visual-profile'
 import { ALL_ITEM_DEFS } from './server/game/data'
 import { queryBattleFxAnchor, resolveBattleFxPoints } from './battle-vfx-coordinates'
 import { TERM_DEFS } from './shared/rule-terms'
+import { LANGUAGE_STORAGE_KEY, useLanguage, type Language } from './i18n'
 import {
   BoneHealthBar,
   ChoiceCard as HanddrawnChoiceCard,
@@ -1224,6 +1225,7 @@ function RuleTermFloatingTip({ tip }: { tip: RuleTermTipState | null }) {
 export default function App() {
   if (isItemArtDebugRoute()) return <ItemArtDebugGallery />
 
+  const { t } = useLanguage()
   const [account, setAccount] = useState(createDefaultAccount)
   const [password, setPassword] = useState('dogdice')
   const [appScreen, setAppScreen] = useState<AppScreen>('LOBBY')
@@ -1682,10 +1684,11 @@ export default function App() {
           <div className="brand-block">
             <img className="game-logo" src={gameIcon} alt="" />
             <div>
-              <h1>狗骰对战</h1>
-              <p>摆好装备，掷骰触发，挑战异步狗狗对手。</p>
+              <h1>{t('appTitle')}</h1>
+              <p>{t('appSubtitle')}</p>
             </div>
           </div>
+          <LanguageSelector />
           <label>账号<input value={account} autoCapitalize="none" onChange={(e) => setAccount(e.target.value)} /></label>
           <label>密码<input type="password" value={password} onChange={(e) => setPassword(e.target.value)} /></label>
           {error && <p className="error">{error}</p>}
@@ -3293,6 +3296,30 @@ function Shell({ children, run, error, feedbacks = [], musicEnabled, musicBlocke
   )
 }
 
+function LanguageSelector() {
+  const { language, setLanguage, t } = useLanguage()
+  const options: Array<{ value: Language; label: string }> = [
+    { value: 'zh-CN', label: t('chinese') },
+    { value: 'en-US', label: t('english') },
+  ]
+
+  return (
+    <div className="language-selector" aria-label={t('language')} data-storage-key={LANGUAGE_STORAGE_KEY}>
+      {options.map((option) => (
+        <button
+          key={option.value}
+          type="button"
+          className={option.value === language ? 'active' : ''}
+          aria-pressed={option.value === language}
+          onClick={() => setLanguage(option.value)}
+        >
+          {option.label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
 function FeedbackLayer({ feedbacks }: { feedbacks: UiFeedbackEvent[] }) {
   return (
     <div className="feedback-layer" aria-live="polite" aria-atomic="false">
@@ -3325,6 +3352,7 @@ function TopBar({ run, musicEnabled, musicBlocked, onToggleMusic, onOpenLobby, o
         </div>
       )}
       <div className="topbar-actions">
+        <LanguageSelector />
         {onOpenLobby && (
           <IconButton title="模式大厅" aria-label="模式大厅" onClick={onOpenLobby}>
             <House size={18} />

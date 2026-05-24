@@ -68,12 +68,15 @@ describe('equipment layout scale', () => {
     expect(uiCssRule('.bone-health-poison')).toContain('background')
   })
 
-  it('styles the center dice as a CSS 3D handdrawn component', () => {
-    expect(uiCssRule('.dynamic-dice')).toContain('perspective')
-    expect(uiCssRule('.dynamic-dice-cube')).toContain('transform-style: preserve-3d')
-    expect(uiCssRule('.dynamic-dice-face.front')).toContain('translateZ')
-    expect(uiCssRule('.dynamic-dice-face.top')).toContain('rotateX')
-    expect(uiCssRule('.dynamic-dice-face.side')).toContain('rotateY')
+  it('styles the center dice as a readable front-facing handdrawn die', () => {
+    expect(uiCssRule('.dynamic-dice')).toContain('--dice-size')
+    expect(uiCssRule('.dynamic-dice')).not.toContain('perspective')
+    expect(uiCssRule('.dynamic-dice-cube')).toContain('width: var(--dice-size)')
+    expect(uiCssRule('.dynamic-dice-cube')).not.toContain('transform-style: preserve-3d')
+    expect(uiCssRule('.dynamic-dice-face.front')).toContain('position: relative')
+    expect(uiCssRule('.dynamic-dice-face.top, .dynamic-dice-face.side')).toContain('display: none')
+    expect(uiCssRule('.dynamic-dice-value')).toContain('display: none')
+    expect(uiCssRule('.dynamic-dice-pips i.active')).toContain('transform: scale')
     expect(uiCssRule('.dynamic-dice.rolling .dynamic-dice-cube')).toContain('animation')
     expect(uiCss).toContain('@keyframes handdrawnDiceRoll')
   })

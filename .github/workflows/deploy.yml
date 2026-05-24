@@ -73,7 +73,17 @@ jobs:
           git init "$BOOTSTRAP_PATH"
           cd "$BOOTSTRAP_PATH"
           git remote add origin "$REPO_URL"
-          git fetch --depth 1 origin "$GITHUB_SHA"
+          git sparse-checkout init --cone
+          git sparse-checkout set deploy prisma public scripts src Caddyfile Dockerfile compose.yml index.html package-lock.json package.json tsconfig.app.json tsconfig.json tsconfig.node.json tsconfig.server.json vite.config.ts
+          fetch_attempt=1
+          until git fetch --filter=blob:none --depth 1 origin "$GITHUB_SHA"; do
+            if [ "$fetch_attempt" -ge 5 ]; then
+              exit 1
+            fi
+            echo "git fetch attempt $fetch_attempt failed; retrying"
+            fetch_attempt=$((fetch_attempt + 1))
+            sleep 10
+          done
           git checkout --detach "$GITHUB_SHA"
           SOURCE_PATH="$BOOTSTRAP_PATH" bash deploy/remote-deploy.sh
           REMOTE_BOOTSTRAP
