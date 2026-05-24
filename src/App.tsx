@@ -182,6 +182,18 @@ type BattleEvent = {
 type BattleVfxKind = PresentationKind
 type BattleVfxStyle = { kind: BattleVfxKind; color: string; accent: string; prefix: string; particleCount: number }
 type MeteorCue = { delay: number; duration: number; lane: number; lift: number; size: number; alpha: number }
+type MeteorSparkParticle = { x: number; y: number; vx: number; vy: number; size: number; grow: number; alpha: number; color: string; kind: 'dot' | 'slash' }
+type BattleFxInstance = {
+  id: string
+  key: string
+  event: BattleEvent
+  presentation: PresentationEvent
+  fx: BattleVfxStyle
+  startedAt: number
+  durationMs: number
+  particles: MeteorSparkParticle[]
+  particlesReady: boolean
+}
 type BattleVfxAnchorAttrs = {
   'data-vfx-anchor': FeedbackAnchor
   'data-vfx-side': 'player' | 'opponent' | 'system'
@@ -4136,7 +4148,7 @@ function BattleView({ run, battle, currentEvent, eventIndex, speed, score, sound
         </div>
       </div>
 
-      <BattleFxStage event={event} presentation={presentation} speed={speed} />
+      <BattleFxStage event={event} eventIndex={displayIndex} presentation={presentation} speed={speed} />
       <BattleEquipmentRow owner="opponent" snapshot={opponentSnapshot} events={events} displayIndex={displayIndex} activeEvent={event} targetItemIds={targetEquipment.owner === 'opponent' ? targetEquipment.itemIds : []} onInspect={(item, element) => setBattleTip({ item, owner: 'opponent', anchor: getFloatingTipPosition(element) })} />
       <BattleStage
         player={playerSnapshot}
@@ -4466,16 +4478,44 @@ function BattleDice({ event, lastRoll }: { event?: BattleEvent; lastRoll?: Battl
   )
 }
 
-function BattleFxStage({ event, presentation, speed }: { event?: BattleEvent; presentation: PresentationEvent | null; speed: number }) {
+function BattleFxStage({ event, eventIndex, presentation, speed }: { event?: BattleEvent; eventIndex: number; presentation: PresentationEvent | null; speed: number }) {
   const stageRef = useRef<HTMLDivElement | null>(null)
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
+  const [activeFxInstances, setActiveFxInstances] = useState<BattleFxInstance[]>([])
+  const instancesRef = useRef<BattleFxInstance[]>([])
+  const lastCueKeyRef = useRef<string | null>(null)
   const reducedMotion = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
   const timeline = presentation ? buildFxTimeline(presentation, Boolean(reducedMotion)) : []
+  const cueKey = event && presentation ? battleFxCueKey(event, presentation, eventIndex) : null
+
+  useEffect(() => {
+    if (!cueKey || !event || !presentation || presentation.kind === 'none') {
+      if (!cueKey) lastCueKeyRef.current = null
+      return
+    }
+    if (lastCueKeyRef.current === cueKey) return
+    const startedAt = typeof performance !== 'undefined' ? performance.now() : Date.now()
+    const instance: BattleFxInstance = {
+      id: `${cueKey}-${Math.round(startedAt)}`,
+      key: cueKey,
+      event,
+      presentation,
+      fx: createBattleFxStyle(event),
+      startedAt,
+      durationMs: battleFxInstanceDuration(speed),
+      particles: [],
+      particlesReady: false,
+    }
+    const nextInstances = [...instancesRef.current, instance].slice(-14)
+    instancesRef.current = nextInstances
+    lastCueKeyRef.current = cueKey
+    setActiveFxInstances(nextInstances)
+  }, [cueKey, speed])
 
   useEffect(() => {
     const stage = stageRef.current
     const canvas = canvasRef.current
-    if (!stage || !canvas || !event || !presentation) return
+    if (!stage || !canvas || activeFxInstances.length === 0) return
     const context = canvas.getContext('2d')
     if (!context) return
 
@@ -4488,63 +4528,91 @@ function BattleFxStage({ event, presentation, speed }: { event?: BattleEvent; pr
       return rect
     }
     let rect = resize()
-    const fx = createBattleFxStyle(event)
-    const anchorRoot = stage.parentElement ?? stage
-    const sourceElement = queryBattleFxAnchor(anchorRoot, presentation.source)
-    const targetElement = queryBattleFxAnchor(anchorRoot, presentation.target)
-    const started = performance.now()
-    const duration = Math.max(560, 1160 / Math.sqrt(speed))
     let frame = 0
-    let particles = createMeteorSparkParticles(event, fx, rect.width * 0.5, rect.height * 0.5)
-    let particlesReady = false
 
     const draw = (now: number) => {
       rect = resize()
-      const points = resolveBattleFxPoints(stage, presentation, (anchor) => anchor === presentation.source ? sourceElement : targetElement)
-      if (!particlesReady) {
-        particles = createMeteorSparkParticles(event, fx, points.target.x, points.target.y)
-        particlesReady = true
-      }
-      const t = Math.min(1, (now - started) / duration)
       context.clearRect(0, 0, rect.width, rect.height)
-      drawMeteorBattleFxTrail(context, points.source.x, points.source.y, points.target.x, points.target.y, t, fx)
-      for (const particle of particles) {
-        const x = particle.x + particle.vx * t
-        const y = particle.y + particle.vy * t
-        context.globalAlpha = Math.max(0, 1 - t) * particle.alpha
-        context.fillStyle = particle.color
-        context.strokeStyle = particle.color
-        context.lineWidth = particle.size
-        if (particle.kind === 'slash') {
-          context.beginPath()
-          context.moveTo(x - 18, y - 8)
-          context.lineTo(x + 18, y + 8)
-          context.stroke()
-        } else {
-          context.beginPath()
-          context.arc(x, y, particle.size + t * particle.grow, 0, Math.PI * 2)
-          context.fill()
+      const anchorRoot = stage.parentElement ?? stage
+      const survivors: BattleFxInstance[] = []
+      for (const instance of instancesRef.current) {
+        const t = Math.min(1, (now - instance.startedAt) / instance.durationMs)
+        if (t >= 1) continue
+        const sourceElement = queryBattleFxAnchor(anchorRoot, instance.presentation.source)
+        const targetElement = queryBattleFxAnchor(anchorRoot, instance.presentation.target)
+        const points = resolveBattleFxPoints(stage, instance.presentation, (anchor) => anchor === instance.presentation.source ? sourceElement : targetElement)
+        if (!instance.particlesReady) {
+          instance.particles = createMeteorSparkParticles(instance.event, instance.fx, points.target.x, points.target.y)
+          instance.particlesReady = true
         }
+        drawMeteorBattleFxTrail(context, points.source.x, points.source.y, points.target.x, points.target.y, t, instance.fx)
+        for (const particle of instance.particles) {
+          const x = particle.x + particle.vx * t
+          const y = particle.y + particle.vy * t
+          context.globalAlpha = Math.max(0, 1 - t) * particle.alpha
+          context.fillStyle = particle.color
+          context.strokeStyle = particle.color
+          context.lineWidth = particle.size
+          if (particle.kind === 'slash') {
+            context.beginPath()
+            context.moveTo(x - 18, y - 8)
+            context.lineTo(x + 18, y + 8)
+            context.stroke()
+          } else {
+            context.beginPath()
+            context.arc(x, y, particle.size + t * particle.grow, 0, Math.PI * 2)
+            context.fill()
+          }
+        }
+        drawMeteorImpactFlash(context, points.target.x, points.target.y, t, instance.fx)
+        drawHandwrittenBattleNumber(context, instance.event, instance.fx, points.target.x, points.target.y, t)
+        survivors.push(instance)
       }
-      drawMeteorImpactFlash(context, points.target.x, points.target.y, t, fx)
-      drawHandwrittenBattleNumber(context, event, fx, points.target.x, points.target.y, t)
       context.globalAlpha = 1
-      if (t < 1) frame = window.requestAnimationFrame(draw)
+      if (survivors.length !== instancesRef.current.length) {
+        instancesRef.current = survivors
+        setActiveFxInstances(survivors)
+      }
+      if (survivors.length > 0) frame = window.requestAnimationFrame(draw)
     }
     frame = window.requestAnimationFrame(draw)
     return () => window.cancelAnimationFrame(frame)
-  }, [event, presentation, speed])
+  }, [activeFxInstances.length])
 
   return (
     <div ref={stageRef} className="battle-fx-stage" data-vfx-kind={battleVfxKind(event)} data-timeline={timeline.map((step) => step.phase).join(' ')}>
       <canvas ref={canvasRef} className="battle-fx-canvas handdrawn-fx-canvas" data-vfx-kind={battleVfxKind(event)} aria-hidden="true" />
-      {presentation && presentation.kind !== 'none' && (
-        <span className={`battle-feedback-burst ${presentation.kind}`} aria-hidden="true">
-          {presentation.kind === 'roll' ? '掷' : presentation.amount ?? ''}
+      {activeFxInstances.map((instance) => (
+        <span key={instance.id} className={`battle-feedback-burst ${instance.presentation.kind}`} aria-hidden="true">
+          {instance.presentation.kind === 'roll' ? '掷' : instance.presentation.amount ?? ''}
         </span>
-      )}
+      ))}
     </div>
   )
+}
+
+function battleFxCueKey(event: BattleEvent, presentation: PresentationEvent, eventIndex: number) {
+  return [
+    eventIndex,
+    event.time,
+    event.actor,
+    event.kind,
+    event.itemId ?? '',
+    event.targetItemId ?? '',
+    event.effectType ?? '',
+    event.amount ?? '',
+    presentation.kind,
+    presentation.source.anchor,
+    presentation.source.side,
+    presentation.source.id ?? '',
+    presentation.target.anchor,
+    presentation.target.side,
+    presentation.target.id ?? '',
+  ].join('|')
+}
+
+function battleFxInstanceDuration(speed: number) {
+  return Math.max(560, 1160 / Math.sqrt(speed))
 }
 
 function drawMeteorBattleFxTrail(context: CanvasRenderingContext2D, actorX: number, actorY: number, targetX: number, targetY: number, t: number, fx: BattleVfxStyle) {
@@ -4698,8 +4766,8 @@ function drawHandwrittenBattleNumber(context: CanvasRenderingContext2D, event: B
   context.restore()
 }
 
-function createMeteorSparkParticles(event: BattleEvent, fx: BattleVfxStyle, x: number, y: number) {
-  const particles: Array<{ x: number; y: number; vx: number; vy: number; size: number; grow: number; alpha: number; color: string; kind: 'dot' | 'slash' }> = []
+function createMeteorSparkParticles(event: BattleEvent, fx: BattleVfxStyle, x: number, y: number): MeteorSparkParticle[] {
+  const particles: MeteorSparkParticle[] = []
   const palette = ['#ffffff', fx.accent, fx.color, event.kind === 'ROLL' ? '#ffffff' : '#fff4e4']
   const count = fx.particleCount + 7
   for (let index = 0; index < count; index += 1) {

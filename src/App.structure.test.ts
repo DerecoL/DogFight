@@ -784,6 +784,16 @@ describe('selection screen structure', () => {
     expect(app).toContain('for (const meteor of meteorVolleyCues(fx))')
   })
 
+  it('keeps overlapping battle vfx instances alive until their own duration ends', () => {
+    expect(app).toContain('type BattleFxInstance')
+    expect(app).toContain('useState<BattleFxInstance[]>')
+    expect(app).toContain('instancesRef.current')
+    expect(app).toContain('battleFxCueKey(event, presentation, eventIndex)')
+    expect(app).toContain('setActiveFxInstances')
+    expect(app).toContain('activeFxInstances.map')
+    expect(app).toContain('survivors')
+  })
+
   it('exposes boom counter accumulation hooks on battle equipment cards', () => {
     expect(app).toContain('function boomCounterStateForBattleItem')
     expect(app).toContain('boom-counter')
