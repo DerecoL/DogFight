@@ -1,5 +1,16 @@
 export type FeedbackSide = 'player' | 'opponent' | 'system'
-export type FeedbackAnchor = 'item' | 'dice' | 'dog' | 'hp' | 'status' | 'log' | 'screen'
+export type FeedbackAnchor =
+  | 'item'
+  | 'dice'
+  | 'dog'
+  | 'dog-avatar'
+  | 'hp'
+  | 'status'
+  | 'status-positive'
+  | 'status-negative'
+  | 'equipment-row'
+  | 'log'
+  | 'screen'
 export type PresentationKind = 'none' | 'roll' | 'damage' | 'heal' | 'shield' | 'poison' | 'weak' | 'freeze' | 'thorns' | 'miss' | 'utility'
 export type FxPhase = 'source' | 'trail' | 'impact' | 'result' | 'log'
 export type UiFeedbackTone = 'success' | 'danger' | 'info' | 'reward'
@@ -55,7 +66,9 @@ type BattleEventLike = {
   time?: number
   actor?: FeedbackSide | string
   kind?: string
+  text?: string
   itemId?: string
+  targetItemId?: string
   effectType?: string
   amount?: number
   target?: 'player' | 'opponent' | 'both' | 'none' | string
@@ -64,7 +77,7 @@ type BattleEventLike = {
   opponentShield?: number
   playerStatuses?: StatusRowsLike
   opponentStatuses?: StatusRowsLike
-  statusChanged?: string[]
+  statusChanged?: readonly string[]
 }
 
 export const uiFeedbackDurationMs = 560
@@ -112,7 +125,7 @@ export function createBattlePresentation(event?: BattleEventLike | null): Presen
     source,
     target,
     amount: typeof event?.amount === 'number' ? event.amount : null,
-    statusChanged: event?.statusChanged ?? [],
+    statusChanged: [...(event?.statusChanged ?? [])],
     logTone: kind,
     timeline: [],
   }
@@ -151,14 +164,22 @@ function battlePresentationKind(event?: BattleEventLike | null): PresentationKin
   if (event.effectType === 'HEAL') return 'heal'
   if (event.effectType === 'POISON' || event.kind === 'POISON') return 'poison'
   if (event.effectType === 'UTILITY') {
-    if (eventHasStatus(event, 'shield') || shieldValueForActor(event) > 0) return 'shield'
-    if (eventHasStatus(event, 'weak')) return 'weak'
-    if (eventHasStatus(event, 'freeze')) return 'freeze'
-    if (eventHasStatus(event, 'thorns')) return 'thorns'
-    if (eventHasStatus(event, 'disabled')) return 'miss'
+    if (event.target === 'none') return 'utility'
+    const eventKind = utilityKindFromEvent(event)
+    if (eventKind) return eventKind
     return 'utility'
   }
   return event.kind === 'END' ? 'none' : 'utility'
+}
+
+function utilityKindFromEvent(event: BattleEventLike): PresentationKind | null {
+  const text = event.text ?? ''
+  if (text.includes('护盾') || event.statusChanged?.includes('shield')) return 'shield'
+  if (text.includes('虚弱') || event.statusChanged?.includes('weak')) return 'weak'
+  if (text.includes('冻结') || event.statusChanged?.includes('freeze')) return 'freeze'
+  if (text.includes('荆棘') || event.statusChanged?.includes('thorns')) return 'thorns'
+  if (text.includes('失效') || text.toLowerCase().includes('control') || event.statusChanged?.includes('disabled') || event.statusChanged?.includes('control')) return 'freeze'
+  return null
 }
 
 function battlePresentationSource(event: BattleEventLike | null | undefined, kind: PresentationKind): FxAnchor {
@@ -172,32 +193,35 @@ function battlePresentationTarget(event: BattleEventLike | null | undefined, kin
   if (kind === 'roll') return { anchor: 'dice', side: normalizeSide(event?.actor) }
   const targetSide = battlePresentationTargetSide(event, kind)
   if (!targetSide) return { anchor: 'screen', side: 'system' }
-  if (kind === 'shield') return { anchor: 'hp', side: targetSide }
-  if (kind === 'poison' || kind === 'weak' || kind === 'freeze' || kind === 'thorns') return { anchor: 'status', side: targetSide }
-  return { anchor: 'dog', side: targetSide }
+  if (event?.targetItemId) return { anchor: 'equipment-row', side: targetSide, id: event.targetItemId }
+  if (kind === 'heal' || kind === 'shield') return { anchor: 'hp', side: targetSide }
+  if (kind === 'poison' || kind === 'weak' || kind === 'freeze') return { anchor: 'status-negative', side: targetSide }
+  if (kind === 'thorns') return { anchor: 'status-positive', side: targetSide }
+  if (kind === 'utility' && isPositiveStatusUtilityEvent(event)) return { anchor: 'status-positive', side: targetSide }
+  return { anchor: 'dog-avatar', side: targetSide }
 }
 
 export function battlePresentationTargetSide(event?: BattleEventLike | null, kind = battlePresentationKind(event)): 'player' | 'opponent' | null {
   if (!event) return null
   if (event.target === 'player' || event.target === 'opponent') return event.target
+  if (event.target === 'none') return null
   const actor = normalizeSide(event.actor)
+  if (kind === 'utility' && isPositiveStatusUtilityEvent(event) && (actor === 'player' || actor === 'opponent')) return actor
   if ((kind === 'heal' || kind === 'shield' || kind === 'thorns') && (actor === 'player' || actor === 'opponent')) return actor
   if (actor === 'player') return 'opponent'
   if (actor === 'opponent') return 'player'
   return null
 }
 
-function eventHasStatus(event: BattleEventLike, type: string) {
-  return [event.playerStatuses, event.opponentStatuses].some((row) => {
-    const statuses = [...(row?.positive ?? []), ...(row?.negative ?? [])]
-    return statuses.some((status) => status.type === type)
-  })
-}
-
-function shieldValueForActor(event: BattleEventLike) {
-  if (event.actor === 'player') return event.playerShield ?? 0
-  if (event.actor === 'opponent') return event.opponentShield ?? 0
-  return Math.max(event.playerShield ?? 0, event.opponentShield ?? 0)
+function isPositiveStatusUtilityEvent(event?: BattleEventLike | null) {
+  const positiveStatusTypes = new Set(['thorns', 'extraRoll', 'fury'])
+  const text = event?.text ?? ''
+  return event?.effectType === 'UTILITY' && (
+    (event.statusChanged ?? []).some((status) => positiveStatusTypes.has(status))
+    || text.includes('荆棘')
+    || text.includes('激昂')
+    || text.includes('加速')
+  )
 }
 
 function normalizeSide(side: string | undefined): FeedbackSide {

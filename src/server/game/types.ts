@@ -216,6 +216,7 @@ export type BattleEvent = {
   statusChanged?: BattleStatusType[]
   roll?: number
   itemId?: string
+  targetItemId?: string
   defId?: string
   quality?: ItemQuality
   itemTriggerCount?: number

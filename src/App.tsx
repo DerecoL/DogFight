@@ -43,6 +43,7 @@ import {
   battlePresentationTargetSide,
   createBattlePresentation,
   createUiFeedbackEvent,
+  type FeedbackAnchor,
   type PresentationEvent,
   type PresentationKind,
   type UiFeedbackEvent,
@@ -56,6 +57,7 @@ import {
 import { resolveSlotPlacement } from './placement'
 import { itemTriggerCountLabel } from './item-trigger-display'
 import { triggerDiceLabel } from './item-trigger-display'
+import { queryBattleFxAnchor, resolveBattleFxPoints } from './battle-vfx-coordinates'
 import { TERM_DEFS } from './shared/rule-terms'
 import './App.css'
 
@@ -140,6 +142,7 @@ type BattleEvent = {
   statusChanged?: string[]
   roll?: number
   itemId?: string
+  targetItemId?: string
   defId?: string
   itemTriggerCount?: number
   boomCounterItemId?: string
@@ -154,6 +157,12 @@ type BattleEvent = {
 }
 type BattleVfxKind = PresentationKind
 type BattleVfxStyle = { kind: BattleVfxKind; color: string; accent: string; prefix: string; particleCount: number }
+type MeteorCue = { delay: number; duration: number; lane: number; lift: number; size: number; alpha: number }
+type BattleVfxAnchorAttrs = {
+  'data-vfx-anchor': FeedbackAnchor
+  'data-vfx-side': 'player' | 'opponent' | 'system'
+  'data-vfx-item-id'?: string
+}
 type Battle = {
   winner: string
   duration: number
@@ -804,12 +813,92 @@ function itemTriggerDisplay(item: Item) {
   return { ...item.def, triggerDiceOverride: item.triggerDiceOverride }
 }
 
+function battleEquipmentItems(snapshot: BattleSnapshot) {
+  return snapshot.items.filter((item) => item.area === 'EQUIPMENT').sort((left, right) => left.x - right.x || left.y - right.y)
+}
+
+function adjacentBattleItems(snapshot: BattleSnapshot, source: Item) {
+  return battleEquipmentItems(snapshot).filter((item) => item.id !== source.id && Math.abs(item.x - source.x) <= source.def.width)
+}
+
+function touchingAdjacentBattleItems(snapshot: BattleSnapshot, source: Item) {
+  const sourceLeft = source.x
+  const sourceRight = source.x + source.def.width
+  return battleEquipmentItems(snapshot).filter((item) => {
+    if (item.id === source.id) return false
+    const itemLeft = item.x
+    const itemRight = item.x + item.def.width
+    return itemRight === sourceLeft || itemLeft === sourceRight
+  })
+}
+
+function leftAdjacentBattleItems(snapshot: BattleSnapshot, source: Item) {
+  const sourceLeft = source.x
+  return battleEquipmentItems(snapshot).filter((item) => item.id !== source.id && item.x + item.def.width === sourceLeft)
+}
+
+function rightmostBattleItem(snapshot: BattleSnapshot) {
+  return battleEquipmentItems(snapshot).at(-1) ?? null
+}
+
+function targetEquipmentItemsForBattleEvent(event: BattleEvent, player: BattleSnapshot, opponent: BattleSnapshot): { owner: 'player' | 'opponent' | null; itemIds: string[] } {
+  if (event.kind !== 'ITEM' || !event.itemId) return { owner: null, itemIds: [] }
+  const actorSnapshot = event.actor === 'player' ? player : event.actor === 'opponent' ? opponent : null
+  const targetOwner = event.target === 'player' || event.target === 'opponent'
+    ? event.target
+    : event.actor === 'player'
+      ? 'opponent'
+      : event.actor === 'opponent'
+        ? 'player'
+        : null
+  const targetSnapshot = targetOwner === 'player' ? player : targetOwner === 'opponent' ? opponent : null
+  const sourceItem = actorSnapshot?.items.find((item) => item.id === event.itemId) ?? null
+  const advancedEffect = sourceItem?.def.advancedEffect
+
+  if (event.targetItemId && targetOwner) return { owner: targetOwner, itemIds: [event.targetItemId] }
+
+  if (targetSnapshot && event.text.includes('最右侧装备')) {
+    const rightmost = rightmostBattleItem(targetSnapshot)
+    return rightmost ? { owner: targetOwner, itemIds: [rightmost.id] } : { owner: null, itemIds: [] }
+  }
+
+  if (actorSnapshot && sourceItem && advancedEffect === 'GRANT_LIFESTEAL_ADJACENT') {
+    const owner = event.actor === 'player' || event.actor === 'opponent' ? event.actor : null
+    const targets = normalizeQuality(sourceItem.quality) === 'DIAMOND' ? touchingAdjacentBattleItems(actorSnapshot, sourceItem) : leftAdjacentBattleItems(actorSnapshot, sourceItem)
+    return { owner, itemIds: targets.map((item) => item.id) }
+  }
+
+  if (actorSnapshot && sourceItem && (advancedEffect === 'TRIGGER_ADJACENT' || event.text.includes('相邻'))) {
+    const owner = event.actor === 'player' || event.actor === 'opponent' ? event.actor : null
+    return { owner, itemIds: adjacentBattleItems(actorSnapshot, sourceItem).map((item) => item.id) }
+  }
+
+  return { owner: null, itemIds: [] }
+}
+
+function battlePresentationWithEquipmentTarget(presentation: PresentationEvent | null, targetEquipment: { owner: 'player' | 'opponent' | null; itemIds: string[] }): PresentationEvent | null {
+  const targetItemId = targetEquipment.itemIds[0]
+  if (!presentation || !targetEquipment.owner || !targetItemId) return presentation
+  return {
+    ...presentation,
+    target: { anchor: 'equipment-row', side: targetEquipment.owner, id: targetItemId },
+  }
+}
+
 function battleVfxKind(event?: BattleEvent): BattleVfxKind {
   return createBattlePresentation(event).kind
 }
 
 function battleVfxTargetSide(event?: BattleEvent): 'player' | 'opponent' | null {
   return battlePresentationTargetSide(event, battleVfxKind(event))
+}
+
+function battleVfxAnchorAttrs(anchor: FeedbackAnchor, side: 'player' | 'opponent' | 'system', itemId?: string): BattleVfxAnchorAttrs {
+  return {
+    'data-vfx-anchor': anchor,
+    'data-vfx-side': side,
+    ...(itemId ? { 'data-vfx-item-id': itemId } : {}),
+  }
 }
 
 const battleVfxStyles: Record<BattleVfxKind, BattleVfxStyle> = {
@@ -3876,7 +3965,6 @@ function BattleView({ run, battle, currentEvent, eventIndex, speed, score, sound
   const events = playback?.events ?? []
   const displayIndex = battle ? eventIndex : Math.max(0, events.length - 1)
   const event = currentEvent ?? events[Math.min(displayIndex, Math.max(0, events.length - 1))]
-  const presentation = event ? createBattlePresentation(event) : null
   const playerSnapshot = playback?.playerSnapshot ?? {
     name: '你的狗狗',
     dogType: run.dogType,
@@ -3897,6 +3985,8 @@ function BattleView({ run, battle, currentEvent, eventIndex, speed, score, sound
   }
   const lastRollEvent = events.slice(0, displayIndex + 1).reverse().find((entry) => entry.kind === 'ROLL')
   const isFinished = Boolean(playback && (!battle || eventIndex >= events.length - 1))
+  const targetEquipment = event && playback ? targetEquipmentItemsForBattleEvent(event, playerSnapshot, opponentSnapshot) : { owner: null, itemIds: [] }
+  const presentation = battlePresentationWithEquipmentTarget(event ? createBattlePresentation(event) : null, targetEquipment)
 
   useEffect(() => {
     if (!presentation) return
@@ -3915,19 +4005,19 @@ function BattleView({ run, battle, currentEvent, eventIndex, speed, score, sound
         </div>
       </div>
 
-      <BattleEquipmentRow owner="opponent" snapshot={opponentSnapshot} events={events} displayIndex={displayIndex} activeEvent={event} onInspect={(item, element) => setBattleTip({ item, owner: 'opponent', anchor: getFloatingTipPosition(element) })} />
+      <BattleFxStage event={event} presentation={presentation} speed={speed} />
+      <BattleEquipmentRow owner="opponent" snapshot={opponentSnapshot} events={events} displayIndex={displayIndex} activeEvent={event} targetItemIds={targetEquipment.owner === 'opponent' ? targetEquipment.itemIds : []} onInspect={(item, element) => setBattleTip({ item, owner: 'opponent', anchor: getFloatingTipPosition(element) })} />
       <BattleStage
         player={playerSnapshot}
         opponent={opponentSnapshot}
         event={event}
         presentation={presentation}
         lastRoll={lastRollEvent}
-        speed={speed}
         finished={isFinished}
         winner={playback?.winner}
         visualTheme={visualTheme}
       />
-      <BattleEquipmentRow owner="player" snapshot={playerSnapshot} events={events} displayIndex={displayIndex} activeEvent={event} onInspect={(item, element) => setBattleTip({ item, owner: 'player', anchor: getFloatingTipPosition(element) })} />
+      <BattleEquipmentRow owner="player" snapshot={playerSnapshot} events={events} displayIndex={displayIndex} activeEvent={event} targetItemIds={targetEquipment.owner === 'player' ? targetEquipment.itemIds : []} onInspect={(item, element) => setBattleTip({ item, owner: 'player', anchor: getFloatingTipPosition(element) })} />
       {battleTip && (
         <FloatingTip
           run={run}
@@ -3980,7 +4070,7 @@ function LadderSettlementSummary({ settlement }: { settlement: LadderSettlement 
   )
 }
 
-function BattleEquipmentRow({ owner, snapshot, events, displayIndex, activeEvent, onInspect }: { owner: 'player' | 'opponent'; snapshot: BattleSnapshot; events: BattleEvent[]; displayIndex: number; activeEvent?: BattleEvent; onInspect: (item: Item, element: HTMLElement) => void }) {
+function BattleEquipmentRow({ owner, snapshot, events, displayIndex, activeEvent, targetItemIds = [], onInspect }: { owner: 'player' | 'opponent'; snapshot: BattleSnapshot; events: BattleEvent[]; displayIndex: number; activeEvent?: BattleEvent; targetItemIds?: string[]; onInspect: (item: Item, element: HTMLElement) => void }) {
   const items = snapshot.items.filter((item) => item.area === 'EQUIPMENT')
   const activeItemId = activeEvent?.actor === owner && activeEvent.kind === 'ITEM' ? activeEvent.itemId : null
   const activeVfxKind = battleVfxKind(activeEvent)
@@ -4003,7 +4093,8 @@ function BattleEquipmentRow({ owner, snapshot, events, displayIndex, activeEvent
           <button
             type="button"
             key={item.id}
-            className={`battle-item item-card paper-item-card ${itemTone(item.def)} ${qualityClass(item.quality)} ${activeItemId === item.id ? `active battle-item-trigger vfx-trigger-${activeVfxKind}` : ''} ${boomCounterState ? 'boom-counter' : ''} ${boomCounterState?.popping ? 'boom-counter-pop' : ''} ${triggerCountPopping ? 'trigger-count-pop' : ''}`}
+            className={`battle-item item-card paper-item-card ${itemTone(item.def)} ${qualityClass(item.quality)} ${activeItemId === item.id ? `active battle-item-trigger vfx-trigger-${activeVfxKind}` : ''} ${targetItemIds.includes(item.id) ? 'battle-item-vfx-target' : ''} ${boomCounterState ? 'boom-counter' : ''} ${boomCounterState?.popping ? 'boom-counter-pop' : ''} ${triggerCountPopping ? 'trigger-count-pop' : ''}`}
+            {...battleVfxAnchorAttrs('equipment-row', owner, item.id)}
             data-vfx-kind={battleVfxKind(activeEvent)}
             style={{
               gridColumn: `${item.x + 1} / span ${item.def.width}`,
@@ -4036,7 +4127,7 @@ function BattleEquipmentRow({ owner, snapshot, events, displayIndex, activeEvent
   )
 }
 
-function BattleStage({ player, opponent, event, presentation, lastRoll, speed, finished, winner, visualTheme }: { player: BattleSnapshot; opponent: BattleSnapshot; event?: BattleEvent; presentation: PresentationEvent | null; lastRoll?: BattleEvent; speed: number; finished: boolean; winner?: string; visualTheme: VisualThemeId }) {
+function BattleStage({ player, opponent, event, presentation, lastRoll, finished, winner, visualTheme }: { player: BattleSnapshot; opponent: BattleSnapshot; event?: BattleEvent; presentation: PresentationEvent | null; lastRoll?: BattleEvent; finished: boolean; winner?: string; visualTheme: VisualThemeId }) {
   const [statusTip, setStatusTip] = useState<StatusTipState | null>(null)
   const inspectStatus = (status: BattleStatusEntry, side: 'player' | 'opponent', polarity: 'positive' | 'negative', element: HTMLElement) => {
     setStatusTip({ status, side, polarity, anchor: getFloatingTipPosition(element) })
@@ -4051,7 +4142,6 @@ function BattleStage({ player, opponent, event, presentation, lastRoll, speed, f
   const activePresentationKind = presentation?.kind ?? 'none'
   return (
     <div className={`battle-stage handdrawn-stage visual-theme-surface visual-theme-${visualTheme}`} data-visual-theme={visualTheme} style={visualThemeStyle(visualTheme)} data-tutorial-anchor="battle-stage" data-presentation-kind={activePresentationKind}>
-      <BattleFxStage event={event} presentation={presentation} speed={speed} />
       <BattleDog
         side="opponent"
         snapshot={opponent}
@@ -4101,8 +4191,8 @@ function BattleDog({ side, snapshot, hp, maxHp, shield, event, finished, winner,
   const poisonPreviewPercent = maxHp > 0 ? ((poisonStatus?.tickDamage ?? 0) / maxHp) * 100 : 0
   const poisonPreviewLeft = Math.max(0, Math.min(100, hpPercent - poisonPreviewPercent))
   return (
-    <div className={`battle-dog ${side} ${isActor ? 'attacking' : ''} ${isTarget && event?.effectType !== 'HEAL' ? 'hit' : ''} ${healing ? 'healing' : ''} ${isVfxTarget ? `vfx-target-${battleVfxKind(event)}` : ''} ${shieldValue > 0 ? 'status-shield' : ''} ${poisonStatus ? 'poisoned status-poison' : ''} ${won ? 'winner' : ''} ${lost ? 'loser' : ''}`}>
-      <div className="hp">
+    <div className={`battle-dog ${side} ${isActor ? 'attacking' : ''} ${isTarget && event?.effectType !== 'HEAL' ? 'hit' : ''} ${healing ? 'healing' : ''} ${isVfxTarget ? `vfx-target-${battleVfxKind(event)}` : ''} ${shieldValue > 0 ? 'status-shield' : ''} ${poisonStatus ? 'poisoned status-poison' : ''} ${won ? 'winner' : ''} ${lost ? 'loser' : ''}`} data-vfx-side={side}>
+      <div className="hp" {...battleVfxAnchorAttrs('hp', side)}>
         <span><HeartPulse size={16} /> {snapshot.name}</span>
         <StatusEffectRow tone="positive" side={side} statuses={positiveStatuses} onStatusInspect={onStatusInspect} activeStatusKey={activeStatusKey} />
         <div className="hp-bar">
@@ -4119,7 +4209,7 @@ function BattleDog({ side, snapshot, hp, maxHp, shield, event, finished, winner,
           </div>
         )}
       </div>
-      <img className="battle-dog-img" src={dogAssets[snapshot.dogType]} alt="" />
+      <img className="battle-dog-img" src={dogAssets[snapshot.dogType]} alt="" {...battleVfxAnchorAttrs('dog-avatar', side)} />
       <strong>{dogNames[snapshot.dogType]}</strong>
     </div>
   )
@@ -4129,7 +4219,7 @@ function StatusEffectRow({ tone, side, statuses, onStatusInspect, activeStatusKe
   const visible = statuses.slice(0, 3)
   const hidden = statuses.length - visible.length
   return (
-    <div className={`status-effects ${tone}`}>
+    <div className={`status-effects ${tone}`} {...battleVfxAnchorAttrs(tone === 'positive' ? 'status-positive' : 'status-negative', side)}>
       {visible.map((status) => {
         const isActive = activeStatusKey === statusTipKey(status, side, tone)
         return (
@@ -4205,13 +4295,15 @@ function BattleDice({ event, lastRoll }: { event?: BattleEvent; lastRoll?: Battl
 }
 
 function BattleFxStage({ event, presentation, speed }: { event?: BattleEvent; presentation: PresentationEvent | null; speed: number }) {
+  const stageRef = useRef<HTMLDivElement | null>(null)
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const reducedMotion = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
   const timeline = presentation ? buildFxTimeline(presentation, Boolean(reducedMotion)) : []
 
   useEffect(() => {
+    const stage = stageRef.current
     const canvas = canvasRef.current
-    if (!canvas || !event) return
+    if (!stage || !canvas || !event || !presentation) return
     const context = canvas.getContext('2d')
     if (!context) return
 
@@ -4225,20 +4317,25 @@ function BattleFxStage({ event, presentation, speed }: { event?: BattleEvent; pr
     }
     let rect = resize()
     const fx = createBattleFxStyle(event)
-    const targetSide = battleVfxTargetSide(event)
-    const targetX = targetSide === 'player' ? rect.width * 0.74 : targetSide === 'opponent' ? rect.width * 0.26 : rect.width * 0.5
-    const actorX = event.actor === 'player' ? rect.width * 0.74 : event.actor === 'opponent' ? rect.width * 0.26 : rect.width * 0.5
-    const centerY = rect.height * 0.5
-    const particles = createBattleParticles(event, fx, targetX, centerY)
+    const anchorRoot = stage.parentElement ?? stage
+    const sourceElement = queryBattleFxAnchor(anchorRoot, presentation.source)
+    const targetElement = queryBattleFxAnchor(anchorRoot, presentation.target)
     const started = performance.now()
-    const duration = Math.max(320, 860 / speed)
+    const duration = Math.max(560, 1160 / Math.sqrt(speed))
     let frame = 0
+    let particles = createMeteorSparkParticles(event, fx, rect.width * 0.5, rect.height * 0.5)
+    let particlesReady = false
 
     const draw = (now: number) => {
       rect = resize()
+      const points = resolveBattleFxPoints(stage, presentation, (anchor) => anchor === presentation.source ? sourceElement : targetElement)
+      if (!particlesReady) {
+        particles = createMeteorSparkParticles(event, fx, points.target.x, points.target.y)
+        particlesReady = true
+      }
       const t = Math.min(1, (now - started) / duration)
       context.clearRect(0, 0, rect.width, rect.height)
-      drawBattleFxTrail(context, actorX, targetX, centerY, t, fx)
+      drawMeteorBattleFxTrail(context, points.source.x, points.source.y, points.target.x, points.target.y, t, fx)
       for (const particle of particles) {
         const x = particle.x + particle.vx * t
         const y = particle.y + particle.vy * t
@@ -4257,16 +4354,17 @@ function BattleFxStage({ event, presentation, speed }: { event?: BattleEvent; pr
           context.fill()
         }
       }
-      drawHandwrittenBattleNumber(context, event, fx, targetX, centerY, t)
+      drawMeteorImpactFlash(context, points.target.x, points.target.y, t, fx)
+      drawHandwrittenBattleNumber(context, event, fx, points.target.x, points.target.y, t)
       context.globalAlpha = 1
       if (t < 1) frame = window.requestAnimationFrame(draw)
     }
     frame = window.requestAnimationFrame(draw)
     return () => window.cancelAnimationFrame(frame)
-  }, [event, speed])
+  }, [event, presentation, speed])
 
   return (
-    <div className="battle-fx-stage" data-vfx-kind={battleVfxKind(event)} data-timeline={timeline.map((step) => step.phase).join(' ')}>
+    <div ref={stageRef} className="battle-fx-stage" data-vfx-kind={battleVfxKind(event)} data-timeline={timeline.map((step) => step.phase).join(' ')}>
       <canvas ref={canvasRef} className="battle-fx-canvas handdrawn-fx-canvas" data-vfx-kind={battleVfxKind(event)} aria-hidden="true" />
       {presentation && presentation.kind !== 'none' && (
         <span className={`battle-feedback-burst ${presentation.kind}`} aria-hidden="true">
@@ -4277,26 +4375,136 @@ function BattleFxStage({ event, presentation, speed }: { event?: BattleEvent; pr
   )
 }
 
-function drawBattleFxTrail(context: CanvasRenderingContext2D, actorX: number, targetX: number, centerY: number, t: number, fx: BattleVfxStyle) {
-  if (fx.kind === 'none' || fx.kind === 'roll' || actorX === targetX) return
-  const progress = Math.min(1, t * 1.35)
-  const currentX = actorX + (targetX - actorX) * progress
-  const lift = fx.kind === 'heal' || fx.kind === 'shield' ? -42 : -26
+function drawMeteorBattleFxTrail(context: CanvasRenderingContext2D, actorX: number, actorY: number, targetX: number, targetY: number, t: number, fx: BattleVfxStyle) {
+  if (fx.kind === 'none' || fx.kind === 'roll') return
+  const palette = meteorPaletteForFx(fx)
+  for (const meteor of meteorVolleyCues(fx)) {
+    drawSingleMeteorProjectile(context, actorX, actorY, targetX, targetY, t, fx, meteor, palette)
+  }
+}
+
+function drawSingleMeteorProjectile(context: CanvasRenderingContext2D, actorX: number, actorY: number, targetX: number, targetY: number, t: number, fx: BattleVfxStyle, meteor: MeteorCue, palette: string[]) {
+  const localT = Math.max(0, Math.min(1, (t - meteor.delay) / meteor.duration))
+  if (localT <= 0 || localT >= 1) return
+  const distanceX = targetX - actorX
+  const distanceY = targetY - actorY
+  const distance = Math.max(1, Math.hypot(distanceX, distanceY))
+  const normalX = -distanceY / distance
+  const normalY = distanceX / distance
+  const startX = actorX + normalX * meteor.lane * 8
+  const startY = actorY + normalY * meteor.lane * 8
+  const endX = targetX + normalX * meteor.lane * 4
+  const endY = targetY + normalY * meteor.lane * 4
+  const controlX = (startX + endX) * 0.5 + normalX * meteor.lane * 22
+  const controlY = Math.min(startY, endY) - meteor.lift
+  const progress = localT
+  const tailProgress = Math.max(0, progress - 0.28)
+  const currentX = quadraticPoint(startX, controlX, endX, progress)
+  const currentY = quadraticPoint(startY, controlY, endY, progress)
+  const tailX = quadraticPoint(startX, controlX, endX, tailProgress)
+  const tailY = quadraticPoint(startY, controlY, endY, tailProgress)
+  const midTailX = quadraticPoint(startX, controlX, endX, Math.max(0, progress - 0.14))
+  const midTailY = quadraticPoint(startY, controlY, endY, Math.max(0, progress - 0.14))
+  const primary = palette[Math.abs(Math.round(meteor.lane)) % palette.length] ?? fx.color
+  const secondary = palette[(Math.abs(Math.round(meteor.lane)) + 1) % palette.length] ?? fx.accent
+  const meteorPulse = 1 + Math.sin((t + meteor.delay) * Math.PI * 10) * 0.1
+  const tailLayers = [
+    { width: 26 * meteor.size, alpha: 0.2 * meteor.alpha, color: primary },
+    { width: 15 * meteor.size, alpha: 0.46 * meteor.alpha, color: secondary },
+    { width: 6 * meteor.size, alpha: 0.96 * meteor.alpha, color: '#ffffff' },
+  ]
   context.save()
-  context.globalAlpha = Math.max(0, .92 - t * .6)
-  context.strokeStyle = fx.color
-  context.lineWidth = 7
   context.lineCap = 'round'
-  context.setLineDash([14, 7])
+  context.lineJoin = 'round'
+  for (const layer of tailLayers) {
+    const gradient = context.createLinearGradient(tailX, tailY, currentX, currentY)
+    gradient.addColorStop(0, 'rgba(255, 255, 255, 0)')
+    gradient.addColorStop(0.38, layer.color)
+    gradient.addColorStop(1, '#ffffff')
+    context.globalAlpha = layer.alpha
+    context.strokeStyle = gradient
+    context.lineWidth = layer.width
+    context.shadowColor = layer.color
+    context.shadowBlur = 24 + layer.width
+    context.beginPath()
+    context.moveTo(tailX, tailY)
+    context.quadraticCurveTo(midTailX, midTailY, currentX, currentY)
+    context.stroke()
+  }
+  const aura = context.createRadialGradient(currentX, currentY, 2, currentX, currentY, 24 * meteor.size * meteorPulse)
+  aura.addColorStop(0, 'rgba(255, 255, 255, .98)')
+  aura.addColorStop(0.2, secondary)
+  aura.addColorStop(0.6, primary)
+  aura.addColorStop(1, 'rgba(255, 255, 255, 0)')
+  context.globalAlpha = 0.98 * meteor.alpha
+  context.fillStyle = aura
+  context.shadowColor = secondary
+  context.shadowBlur = 34
   context.beginPath()
-  context.moveTo(actorX, centerY + 4)
-  context.quadraticCurveTo((actorX + targetX) / 2, centerY + lift, currentX, centerY)
-  context.stroke()
-  context.setLineDash([])
-  context.fillStyle = fx.accent
-  context.beginPath()
-  context.arc(currentX, centerY - 4, 11 + 6 * (1 - t), 0, Math.PI * 2)
+  context.arc(currentX, currentY, 25 * meteor.size * meteorPulse, 0, Math.PI * 2)
   context.fill()
+  context.fillStyle = '#ffffff'
+  context.shadowBlur = 16
+  context.beginPath()
+  context.arc(currentX, currentY, 5.5 * meteor.size * meteorPulse, 0, Math.PI * 2)
+  context.fill()
+  if (localT > 0.78) {
+    drawMeteorImpactFlash(context, endX, endY, (localT - 0.78) / 0.22, fx, meteor.size, primary, secondary)
+  }
+  context.restore()
+}
+
+function meteorVolleyCues(fx: BattleVfxStyle): MeteorCue[] {
+  const meteorVolley = [
+    { delay: 0.00, duration: 0.48, lane: -2.4, lift: 94, size: 1.08, alpha: 0.95 },
+    { delay: 0.08, duration: 0.45, lane: 1.6, lift: 68, size: 0.86, alpha: 0.88 },
+    { delay: 0.17, duration: 0.5, lane: -0.7, lift: 118, size: 1.0, alpha: 0.94 },
+    { delay: 0.27, duration: 0.43, lane: 2.8, lift: 82, size: 0.78, alpha: 0.86 },
+    { delay: 0.39, duration: 0.47, lane: 0.3, lift: 106, size: 1.16, alpha: 0.98 },
+    { delay: 0.52, duration: 0.38, lane: -1.7, lift: 74, size: 0.84, alpha: 0.9 },
+  ]
+  if (fx.kind === 'miss') return meteorVolley.slice(0, 3)
+  if (fx.kind === 'poison' || fx.kind === 'damage') return meteorVolley
+  return meteorVolley.slice(0, 5)
+}
+
+function meteorPaletteForFx(fx: BattleVfxStyle) {
+  if (fx.kind === 'damage') return ['#ff1744', '#ff7a18', '#ffd166']
+  if (fx.kind === 'heal') return ['#00e676', '#69f0ae', '#d7ff73']
+  if (fx.kind === 'shield') return ['#1e88ff', '#72d7ff', '#e3f2ff']
+  if (fx.kind === 'poison') return ['#39ff14', '#00c853', '#b9f6ca']
+  if (fx.kind === 'weak') return ['#b026ff', '#7c4dff', '#f0abfc']
+  if (fx.kind === 'freeze') return ['#00d9ff', '#7dd3fc', '#ffffff']
+  if (fx.kind === 'thorns') return ['#f59e0b', '#facc15', '#fff3b0']
+  if (fx.kind === 'utility') return ['#38bdf8', '#818cf8', '#ffffff']
+  return [fx.color, fx.accent, '#ffffff']
+}
+
+function drawMeteorImpactFlash(context: CanvasRenderingContext2D, targetX: number, targetY: number, t: number, fx: BattleVfxStyle, size = 1, primary = fx.color, secondary = fx.accent) {
+  if (fx.kind === 'none' || fx.kind === 'roll' || t < 0.52) return
+  const impactT = Math.min(1, t)
+  const radius = (18 + impactT * 46) * size
+  const alpha = Math.max(0, 1 - impactT)
+  const gradient = context.createRadialGradient(targetX, targetY, 2, targetX, targetY, radius)
+  gradient.addColorStop(0, 'rgba(255, 255, 255, .95)')
+  gradient.addColorStop(0.22, secondary)
+  gradient.addColorStop(0.56, primary)
+  gradient.addColorStop(1, 'rgba(255, 255, 255, 0)')
+  context.save()
+  context.globalAlpha = alpha * 0.72
+  context.fillStyle = gradient
+  context.shadowColor = secondary
+  context.shadowBlur = 38 * size
+  context.beginPath()
+  context.arc(targetX, targetY, radius, 0, Math.PI * 2)
+  context.fill()
+  context.globalAlpha = alpha * 0.76
+  context.strokeStyle = secondary
+  context.lineWidth = 3
+  context.setLineDash([10, 8])
+  context.beginPath()
+  context.arc(targetX, targetY, radius * 0.72, 0, Math.PI * 2)
+  context.stroke()
   context.restore()
 }
 
@@ -4318,26 +4526,31 @@ function drawHandwrittenBattleNumber(context: CanvasRenderingContext2D, event: B
   context.restore()
 }
 
-function createBattleParticles(event: BattleEvent, fx: BattleVfxStyle, x: number, y: number) {
+function createMeteorSparkParticles(event: BattleEvent, fx: BattleVfxStyle, x: number, y: number) {
   const particles: Array<{ x: number; y: number; vx: number; vy: number; size: number; grow: number; alpha: number; color: string; kind: 'dot' | 'slash' }> = []
-  const palette = [fx.color, fx.accent, event.kind === 'ROLL' ? '#ffffff' : '#fff4e4']
-  const count = fx.particleCount
+  const palette = ['#ffffff', fx.accent, fx.color, event.kind === 'ROLL' ? '#ffffff' : '#fff4e4']
+  const count = fx.particleCount + 7
   for (let index = 0; index < count; index += 1) {
     const angle = (Math.PI * 2 * index) / count
-    const distance = 42 + (index % 5) * 15
+    const distance = 54 + (index % 7) * 18
     particles.push({
       x: x + Math.cos(angle) * 16,
       y: y + Math.sin(angle) * 10,
       vx: Math.cos(angle) * distance,
       vy: Math.sin(angle) * distance - (index % 3) * 10,
-      size: fx.kind === 'poison' ? 10 + (index % 5) : fx.kind === 'freeze' ? 6 + (index % 4) : 4 + (index % 5),
-      grow: fx.kind === 'poison' ? 20 : fx.kind === 'heal' || fx.kind === 'shield' ? 14 : 7,
-      alpha: fx.kind === 'poison' ? 0.42 : fx.kind === 'miss' ? 0.58 : 0.9,
+      size: fx.kind === 'poison' ? 9 + (index % 5) : fx.kind === 'freeze' ? 6 + (index % 4) : 3 + (index % 5),
+      grow: fx.kind === 'poison' ? 24 : fx.kind === 'heal' || fx.kind === 'shield' ? 17 : 10,
+      alpha: fx.kind === 'poison' ? 0.52 : fx.kind === 'miss' ? 0.68 : 0.96,
       color: palette[index % palette.length],
       kind: fx.kind === 'damage' && index % 4 === 0 ? 'slash' : 'dot',
     })
   }
   return particles
+}
+
+function quadraticPoint(start: number, control: number, end: number, t: number) {
+  const inverse = 1 - t
+  return inverse * inverse * start + 2 * inverse * t * control + t * t * end
 }
 
 function CollapsedBattleLog({ events, eventIndex, open, onToggle }: { events: BattleEvent[]; eventIndex: number; open: boolean; onToggle: () => void }) {

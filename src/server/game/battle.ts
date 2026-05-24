@@ -66,6 +66,7 @@ type ItemTrigger = {
   targetHpDelta: number
   text: string
   roll?: number
+  targetItemId?: string
   boomCounterItemId?: string
   boomCounterValue?: number
   boomCounterMax?: number
@@ -928,7 +929,7 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
       const rightmost = triggerOrder(targetFighter.items).at(-1)
       if (rightmost) {
         targetState.disabledItemIds.push(rightmost.id)
-        triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'UTILITY', amount: 1, target: targetSide, sourceHp: getHp(actorSide), targetHp: getHp(targetSide), sourceHpDelta: 0, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 使敌方最右侧装备【失效】一次` })
+        triggers.push({ itemId: item.id, targetItemId: rightmost.id, defId: item.defId, quality, effectType: 'UTILITY', amount: 1, target: targetSide, sourceHp: getHp(actorSide), targetHp: getHp(targetSide), sourceHpDelta: 0, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 使敌方最右侧装备【失效】一次` })
       }
     }
     if (!sacrificeReplacesSmallEffect && advanced === 'GAIN_THORNS' && rng() < 0.5) {
@@ -1169,6 +1170,7 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
           text: trigger.text,
           roll: trigger.roll,
           itemId: trigger.itemId,
+          targetItemId: trigger.targetItemId,
           defId: trigger.defId,
           quality: trigger.quality,
           itemTriggerCount,

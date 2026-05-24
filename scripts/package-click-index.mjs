@@ -1604,7 +1604,10 @@ async function currentMockApiScript(buildId) {
             if (addPoison(target, amount)) push({ actor: side, kind: 'ITEM', itemId: item.id, defId: item.defId, effectType: 'POISON', amount, target, text: def.name + ' 叠加 ' + amount + ' 层【中毒】。' });
             if (advanced === 'POISON_AND_DISABLE_RIGHTMOST') {
               const rightmost = equippedOf(fighterOf(target)).at(-1);
-              if (rightmost) state[target].disabledItemIds.push(rightmost.id);
+              if (rightmost) {
+                state[target].disabledItemIds.push(rightmost.id);
+                push({ actor: side, kind: 'ITEM', itemId: item.id, targetItemId: rightmost.id, defId: item.defId, effectType: 'UTILITY', amount: 1, target, text: def.name + ' 使敌方最右侧装备【失效】一次' });
+              }
             }
           } else {
             const result = applyDamage(target, amount, advanced === 'DOUBLE_SHIELD_DAMAGE' ? amount * 2 : amount);
