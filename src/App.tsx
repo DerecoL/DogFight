@@ -2078,7 +2078,7 @@ function PlayerRunHistoryPanel({ history, ladderProfile, onOpen }: { history: Pl
             <strong>暂无对局</strong>
           )}
         </div>
-        <button className="history-open-action" type="button" onClick={onOpen}>查看详情和装备</button>
+        <HanddrawnTextButton className="history-open-action" onClick={onOpen}>查看详情和装备</HanddrawnTextButton>
       </div>
       <div className="history-run-list" aria-label="最近对局">
         {lobbyRecentRuns.length > 0 ? lobbyRecentRuns.map((entry) => (
