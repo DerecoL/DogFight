@@ -2137,18 +2137,18 @@ function PlayerHistoryOverlay({ history, onClose }: { history: PlayerRunHistory;
             <small>最佳成绩</small>
             <strong>{bestRun ? `${dogNames[bestRun.dogType]} · ${bestRun.wins}胜 ${bestRun.losses}败` : '暂无对局'}</strong>
           </div>
-          <button className="icon-button" title="关闭个人战绩" aria-label="关闭个人战绩" onClick={onClose}>
+          <IconButton title="关闭个人战绩" onClick={onClose}>
             <span aria-hidden="true">×</span>
-          </button>
+          </IconButton>
         </header>
 
         <div className="history-mode-tabs" role="tablist" aria-label="战绩模式">
           {historyModeTabs.map((tab) => {
             const count = tab.id === 'ALL' ? history.recentRuns.length : history.recentRuns.filter((entry) => entry.mode === tab.id).length
             return (
-              <button key={tab.id} type="button" className={activeTab === tab.id ? 'active' : ''} onClick={() => { setActiveTab(tab.id); setSelectedRunId(null); closeTip() }}>
+              <HanddrawnTabButton key={tab.id} active={activeTab === tab.id} onClick={() => { setActiveTab(tab.id); setSelectedRunId(null); closeTip() }}>
                 {tab.label}<small>{count}</small>
-              </button>
+              </HanddrawnTabButton>
             )
           })}
         </div>
@@ -2156,12 +2156,12 @@ function PlayerHistoryOverlay({ history, onClose }: { history: PlayerRunHistory;
         <div className="history-detail-layout">
           <section className="history-run-browser" aria-label="历史对局列表">
             {runs.length > 0 ? runs.map((entry) => (
-              <button key={entry.id} type="button" className={`history-detail-row ${selectedRun?.id === entry.id ? 'selected' : ''}`} onClick={() => { setSelectedRunId(entry.id); closeTip() }}>
+              <HanddrawnListButton key={entry.id} className="history-detail-row" selected={selectedRun?.id === entry.id} onClick={() => { setSelectedRunId(entry.id); closeTip() }}>
                 <DogBadge dogType={entry.dogType} src={dogAssets[entry.dogType]} size="sm" className="dog-avatar small" />
                 <span>{dogNames[entry.dogType]}</span>
                 <strong>{entry.wins}胜 {entry.losses}败</strong>
                 <small>{runStatusText(entry.status)} · 第 {entry.round} 回合 · 装备 {entry.items.length}</small>
-              </button>
+              </HanddrawnListButton>
             )) : (
               <div className="history-empty-state">
                 <strong>{historyModeTabs.find((tab) => tab.id === activeTab)?.label}暂无记录</strong>
@@ -2647,9 +2647,10 @@ function DogfightRoomView({ room, onRoomChange, onLeave, soundEnabled }: { room:
         <aside className="dogfight-survivor-board">
           <h3>房间玩家</h3>
           {sortedDogfightMembers(room.members).map((member) => (
-            <button
+            <HanddrawnListButton
               key={member.id}
               className={`dogfight-player-frame ${member.kind.toLowerCase()} ${member.eliminated ? 'eliminated' : ''} ${selectedBattleMemberId === member.id ? 'selected' : ''}`}
+              selected={selectedBattleMemberId === member.id}
               onClick={() => {
                 setSelectedMemberId(member.id)
                 if (member.currentBattleId) void loadBattle(member.currentBattleId)
@@ -2661,7 +2662,7 @@ function DogfightRoomView({ room, onRoomChange, onLeave, soundEnabled }: { room:
                 <p>{member.dogType ? dogNames[member.dogType] : '等待选狗'} · {member.kind === 'BOT' ? '参赛者' : '玩家'} · {member.wins}胜 {member.losses}败</p>
               </div>
               <b>{dogfightLives(member)}</b>
-            </button>
+            </HanddrawnListButton>
           ))}
         </aside>
 
@@ -2719,9 +2720,9 @@ function DogfightRoomView({ room, onRoomChange, onLeave, soundEnabled }: { room:
         <section className="dogfight-battle-dock">
           <h3>本轮场次</h3>
           {room.battles.length === 0 ? <p className="apex-empty">暂无战报</p> : room.battles.slice().reverse().map((entry) => (
-            <button key={entry.id} className="dogfight-battle-row" onClick={() => void loadBattle(entry.id)}>
+            <HanddrawnListButton key={entry.id} className="dogfight-battle-row" onClick={() => void loadBattle(entry.id)}>
               第 {entry.round} 回合 · {entry.opponentKind === 'PLAYER' ? '玩家对战' : '离线训练'} · 回放
-            </button>
+            </HanddrawnListButton>
           ))}
         </section>
       </div>
@@ -2945,8 +2946,8 @@ function ApexArena() {
             <h3>{activeBoardLabel}</h3>
             <p>{activeApexBoard === 'daily' ? `每日 05:00 更新 · ${overview?.dailyBoardKey ?? ''}` : '初始50个种子数据会随着玩家提交逐步被挤下去。'}</p>
             <div className="apex-tabs" role="tablist" aria-label="巅峰榜切换">
-              <button type="button" role="tab" aria-selected={activeApexBoard === 'overall'} className={activeApexBoard === 'overall' ? 'active' : ''} onClick={() => setActiveApexBoard('overall')}>总榜</button>
-              <button type="button" role="tab" aria-selected={activeApexBoard === 'daily'} className={activeApexBoard === 'daily' ? 'active' : ''} onClick={() => setActiveApexBoard('daily')}>当日榜</button>
+              <HanddrawnTabButton role="tab" aria-selected={activeApexBoard === 'overall'} active={activeApexBoard === 'overall'} onClick={() => setActiveApexBoard('overall')}>总榜</HanddrawnTabButton>
+              <HanddrawnTabButton role="tab" aria-selected={activeApexBoard === 'daily'} active={activeApexBoard === 'daily'} onClick={() => setActiveApexBoard('daily')}>当日榜</HanddrawnTabButton>
             </div>
           </div>
           <div className="apex-rank-list">
@@ -3157,7 +3158,7 @@ function LadderHome({ onStart }: { onStart: (choice: { dogType: DogType; luckyNu
                 <strong>幸运数字</strong>
                 <div>
                   {[1, 2, 3, 4, 5, 6].map((number) => (
-                    <button key={number} type="button" className={luckyNumber === number ? 'selected' : ''} onClick={() => setLuckyNumber(number)}>{number}</button>
+                    <HanddrawnNumberButton key={number} selected={luckyNumber === number} onClick={() => setLuckyNumber(number)}>{number}</HanddrawnNumberButton>
                   ))}
                 </div>
               </div>
@@ -3243,14 +3244,13 @@ function DogSelect({ onPick }: { onPick: (choice: { dogType: DogType; luckyNumbe
               <strong>幸运数字</strong>
               <div>
                 {[1, 2, 3, 4, 5, 6].map((number) => (
-                  <button
+                  <HanddrawnNumberButton
                     key={number}
-                    type="button"
-                    className={luckyNumber === number ? 'selected' : ''}
+                    selected={luckyNumber === number}
                     onClick={() => setLuckyNumber(number)}
                   >
                     {number}
-                  </button>
+                  </HanddrawnNumberButton>
                 ))}
               </div>
             </div>
@@ -3309,9 +3309,9 @@ function TopBar({ run, musicEnabled, musicBlocked, onToggleMusic, onOpenLobby, o
       )}
       <div className="topbar-actions">
         {onOpenLobby && (
-          <button className="icon-button" title="模式大厅" aria-label="模式大厅" onClick={onOpenLobby}>
+          <IconButton title="模式大厅" aria-label="模式大厅" onClick={onOpenLobby}>
             <House size={18} />
-          </button>
+          </IconButton>
         )}
         <IconButton title={musicTitle} onClick={onToggleMusic}>
           {musicEnabled ? <Music size={18} /> : <VolumeX size={18} />}
@@ -3366,8 +3366,8 @@ function ResourcePill({ icon, label, value, tone }: { icon: React.ReactNode; lab
   return <HanddrawnResourcePill icon={icon} label={label} value={value} tone={tone} />
 }
 
-function IconButton({ children, title, onClick, disabled }: { children: React.ReactNode; title: string; onClick: () => void; disabled?: boolean }) {
-  return <HanddrawnIconButton title={title} aria-label={title} disabled={disabled} onClick={onClick}>{children}</HanddrawnIconButton>
+function IconButton({ children, title, onClick, disabled, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { children: React.ReactNode; title: string; onClick: () => void; disabled?: boolean }) {
+  return <HanddrawnIconButton title={title} aria-label={title} disabled={disabled} onClick={onClick} {...props}>{children}</HanddrawnIconButton>
 }
 
 function ActionButton({ children, className, variant = 'primary', wide = false, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'primary' | 'secondary' | 'danger' | 'ghost'; wide?: boolean }) {
@@ -3739,8 +3739,7 @@ function RelicRail({ relics, onSellRelic, compact = false }: { relics: Relic[]; 
           return (
             <div key={index} className={`relic-slot ${relic ? qualityClass(relic.quality) : ''}`}>
               {relic ? (
-                <button
-                  type="button"
+                <RelicIconButton
                   className="relic-icon-button"
                   aria-label={`${qualityLabel[relic.quality]}遗物：${relic.def.name}`}
                   aria-pressed={selectedRelicId === relic.id}
@@ -3753,7 +3752,7 @@ function RelicRail({ relics, onSellRelic, compact = false }: { relics: Relic[]; 
                 >
                   <RelicGlyph relic={relic} size={compact ? 24 : 30} />
                   <span className="relic-quality-dot" aria-hidden="true" />
-                </button>
+                </RelicIconButton>
               ) : <span className="relic-empty-mark" aria-hidden="true" />}
             </div>
           )
@@ -3819,7 +3818,7 @@ function GridPanel({ title, subtitle, icon, area, tutorialAnchor, w, h, items, r
 
 function Slot({ id, x, y, title, onClick }: { id: string; x: number; y: number; title: string; onClick: () => void }) {
   const { isOver, setNodeRef } = useDroppable({ id })
-  return <button ref={setNodeRef} style={{ gridColumn: x + 1, gridRow: y + 1 }} className={`slot ${isOver ? 'over' : ''}`} onClick={onClick} aria-label={title} title={title} />
+  return <HanddrawnSlotButton nodeRef={setNodeRef} over={isOver} style={{ gridColumn: x + 1, gridRow: y + 1 }} onClick={onClick} aria-label={title} title={title} />
 }
 
 function DraggableItem({ item, relics, selected, dragging, upgradeable, onSelect }: { item: Item; relics: Relic[]; selected: boolean; dragging: boolean; upgradeable: boolean; onSelect: (element: HTMLElement) => void }) {
@@ -4046,8 +4045,8 @@ function StatusFloatingTip({ statusTip, onClose }: { statusTip: StatusTipState |
     source: '来源：装备、职业道具或遗物效果。',
   }
   const style = { '--tip-x': `${anchor.x}px`, '--tip-y': `${anchor.y}px` } as React.CSSProperties
-  return (
-    <FloatingPaperTip id={statusTipId} className="status-floating-tip" style={style} role="tooltip">
+  const tip = (
+    <FloatingPaperTip id={statusTipId} className="status-floating-tip" style={style} role="tooltip" onPointerDown={(event) => event.stopPropagation()}>
       <div className="status-tip-title">
         <strong>{status.label}</strong>
         <span className={`tip-tag ${status.type}`}>{detail.polarity}</span>
@@ -4061,6 +4060,8 @@ function StatusFloatingTip({ statusTip, onClose }: { statusTip: StatusTipState |
       <small><RuleText text={detail.source} /></small>
     </FloatingPaperTip>
   )
+  if (typeof document === 'undefined') return tip
+  return createPortal(tip, document.body)
 }
 
 function ForfeitRunAction({ run, onForfeit }: { run: Run; onForfeit: () => void }) {
@@ -4121,7 +4122,7 @@ function BattleView({ run, battle, currentEvent, eventIndex, speed, score, sound
           <p>{event ? `${event.time}s · ${event.text}` : '准备播放战斗结果'}</p>
         </div>
         <div className="speed-row" aria-label="战斗速度">
-          {[1, 2, 4].map((value) => <button key={value} className={speed === value ? 'active' : ''} onClick={() => onSpeed(value)}>{value}x</button>)}
+          {[1, 2, 4].map((value) => <HanddrawnTabButton key={value} active={speed === value} onClick={() => onSpeed(value)}>{value}x</HanddrawnTabButton>)}
         </div>
       </div>
 
@@ -4379,7 +4380,10 @@ function StatusEffectRow({ tone, side, statuses, onStatusInspect, activeStatusKe
             aria-expanded={isActive}
             aria-controls={statusTipId}
             title={statusDescription(status)}
-            onClick={(event) => onStatusInspect(status, side, tone, event.currentTarget)}
+            onClick={(event) => {
+              event.stopPropagation()
+              onStatusInspect(status, side, tone, event.currentTarget)
+            }}
           >
             {statusText(status)}
           </StatusChip>
@@ -4707,7 +4711,7 @@ function CollapsedBattleLog({ events, eventIndex, open, onToggle }: { events: Ba
   const visible = events.slice(startIndex, eventIndex + 1)
   return (
     <div className={`battle-log-shell ${open ? 'open' : ''}`}>
-      <button className="log-toggle" onClick={onToggle}>{open ? '收起日志' : '展开日志'}</button>
+      <HanddrawnTextButton className="log-toggle" onClick={onToggle}>{open ? '收起日志' : '展开日志'}</HanddrawnTextButton>
       <div className="battle-log">
         {visible.map((event, index) => {
           const absoluteIndex = startIndex + index
