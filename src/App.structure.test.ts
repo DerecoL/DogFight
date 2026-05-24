@@ -630,12 +630,17 @@ describe('selection screen structure', () => {
 
   it('draws battle vfx as meteor trails with glow, tail, sparks, and impact flash', () => {
     expect(app).toContain('function drawMeteorBattleFxTrail')
+    expect(app).toContain('function drawSingleMeteorProjectile')
+    expect(app).toContain('function meteorVolleyCues')
+    expect(app).toContain('function meteorPaletteForFx')
     expect(app).toContain('function drawMeteorImpactFlash')
     expect(app).toContain('function createMeteorSparkParticles')
+    expect(app).toContain('const meteorVolley = [')
     expect(app).toContain('const tailLayers = [')
     expect(app).toContain('context.shadowBlur')
     expect(app).toContain('context.createRadialGradient')
     expect(app).toContain('meteorPulse')
+    expect(app).toContain('for (const meteor of meteorVolleyCues(fx))')
   })
 
   it('exposes boom counter accumulation hooks on battle equipment cards', () => {

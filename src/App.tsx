@@ -155,6 +155,7 @@ type BattleEvent = {
 }
 type BattleVfxKind = PresentationKind
 type BattleVfxStyle = { kind: BattleVfxKind; color: string; accent: string; prefix: string; particleCount: number }
+type MeteorCue = { delay: number; duration: number; lane: number; lift: number; size: number; alpha: number }
 type BattleVfxAnchorAttrs = {
   'data-vfx-anchor': FeedbackAnchor
   'data-vfx-side': 'player' | 'opponent' | 'system'
@@ -4274,7 +4275,7 @@ function BattleFxStage({ event, presentation, speed }: { event?: BattleEvent; pr
     const sourceElement = queryBattleFxAnchor(anchorRoot, presentation.source)
     const targetElement = queryBattleFxAnchor(anchorRoot, presentation.target)
     const started = performance.now()
-    const duration = Math.max(320, 860 / speed)
+    const duration = Math.max(560, 1160 / Math.sqrt(speed))
     let frame = 0
     let particles = createMeteorSparkParticles(event, fx, rect.width * 0.5, rect.height * 0.5)
     let particlesReady = false
@@ -4330,84 +4331,129 @@ function BattleFxStage({ event, presentation, speed }: { event?: BattleEvent; pr
 
 function drawMeteorBattleFxTrail(context: CanvasRenderingContext2D, actorX: number, actorY: number, targetX: number, targetY: number, t: number, fx: BattleVfxStyle) {
   if (fx.kind === 'none' || fx.kind === 'roll') return
-  const progress = Math.min(1, t * 1.22)
-  const lift = fx.kind === 'heal' || fx.kind === 'shield' ? -72 : -54
-  const controlX = (actorX + targetX) * 0.5
-  const controlY = Math.min(actorY, targetY) + lift
-  const currentX = quadraticPoint(actorX, controlX, targetX, progress)
-  const currentY = quadraticPoint(actorY, controlY, targetY, progress)
-  const meteorPulse = 1 + Math.sin(t * Math.PI * 6) * 0.08
+  const palette = meteorPaletteForFx(fx)
+  for (const meteor of meteorVolleyCues(fx)) {
+    drawSingleMeteorProjectile(context, actorX, actorY, targetX, targetY, t, fx, meteor, palette)
+  }
+}
+
+function drawSingleMeteorProjectile(context: CanvasRenderingContext2D, actorX: number, actorY: number, targetX: number, targetY: number, t: number, fx: BattleVfxStyle, meteor: MeteorCue, palette: string[]) {
+  const localT = Math.max(0, Math.min(1, (t - meteor.delay) / meteor.duration))
+  if (localT <= 0 || localT >= 1) return
+  const distanceX = targetX - actorX
+  const distanceY = targetY - actorY
+  const distance = Math.max(1, Math.hypot(distanceX, distanceY))
+  const normalX = -distanceY / distance
+  const normalY = distanceX / distance
+  const startX = actorX + normalX * meteor.lane * 8
+  const startY = actorY + normalY * meteor.lane * 8
+  const endX = targetX + normalX * meteor.lane * 4
+  const endY = targetY + normalY * meteor.lane * 4
+  const controlX = (startX + endX) * 0.5 + normalX * meteor.lane * 22
+  const controlY = Math.min(startY, endY) - meteor.lift
+  const progress = localT
+  const tailProgress = Math.max(0, progress - 0.28)
+  const currentX = quadraticPoint(startX, controlX, endX, progress)
+  const currentY = quadraticPoint(startY, controlY, endY, progress)
+  const tailX = quadraticPoint(startX, controlX, endX, tailProgress)
+  const tailY = quadraticPoint(startY, controlY, endY, tailProgress)
+  const midTailX = quadraticPoint(startX, controlX, endX, Math.max(0, progress - 0.14))
+  const midTailY = quadraticPoint(startY, controlY, endY, Math.max(0, progress - 0.14))
+  const primary = palette[Math.abs(Math.round(meteor.lane)) % palette.length] ?? fx.color
+  const secondary = palette[(Math.abs(Math.round(meteor.lane)) + 1) % palette.length] ?? fx.accent
+  const meteorPulse = 1 + Math.sin((t + meteor.delay) * Math.PI * 10) * 0.1
   const tailLayers = [
-    { width: 24, alpha: 0.14, lag: 0.36, color: fx.color },
-    { width: 15, alpha: 0.28, lag: 0.24, color: fx.accent },
-    { width: 7, alpha: 0.82, lag: 0.11, color: '#fff8e8' },
+    { width: 26 * meteor.size, alpha: 0.2 * meteor.alpha, color: primary },
+    { width: 15 * meteor.size, alpha: 0.46 * meteor.alpha, color: secondary },
+    { width: 6 * meteor.size, alpha: 0.96 * meteor.alpha, color: '#ffffff' },
   ]
   context.save()
   context.lineCap = 'round'
   context.lineJoin = 'round'
   for (const layer of tailLayers) {
-    const tailProgress = Math.max(0, progress - layer.lag)
-    const tailX = quadraticPoint(actorX, controlX, targetX, tailProgress)
-    const tailY = quadraticPoint(actorY, controlY, targetY, tailProgress)
     const gradient = context.createLinearGradient(tailX, tailY, currentX, currentY)
     gradient.addColorStop(0, 'rgba(255, 255, 255, 0)')
-    gradient.addColorStop(0.45, layer.color)
+    gradient.addColorStop(0.38, layer.color)
     gradient.addColorStop(1, '#ffffff')
-    context.globalAlpha = Math.max(0, layer.alpha * (1 - t * 0.24))
+    context.globalAlpha = layer.alpha
     context.strokeStyle = gradient
     context.lineWidth = layer.width
     context.shadowColor = layer.color
-    context.shadowBlur = 18 + layer.width
+    context.shadowBlur = 24 + layer.width
     context.beginPath()
     context.moveTo(tailX, tailY)
-    context.quadraticCurveTo(
-      quadraticPoint(actorX, controlX, targetX, Math.max(0, progress - layer.lag * 0.45)),
-      quadraticPoint(actorY, controlY, targetY, Math.max(0, progress - layer.lag * 0.45)),
-      currentX,
-      currentY,
-    )
+    context.quadraticCurveTo(midTailX, midTailY, currentX, currentY)
     context.stroke()
   }
-  const aura = context.createRadialGradient(currentX, currentY, 2, currentX, currentY, 28 * meteorPulse)
+  const aura = context.createRadialGradient(currentX, currentY, 2, currentX, currentY, 24 * meteor.size * meteorPulse)
   aura.addColorStop(0, 'rgba(255, 255, 255, .98)')
-  aura.addColorStop(0.22, fx.accent)
-  aura.addColorStop(0.58, fx.color)
+  aura.addColorStop(0.2, secondary)
+  aura.addColorStop(0.6, primary)
   aura.addColorStop(1, 'rgba(255, 255, 255, 0)')
-  context.globalAlpha = Math.max(0, 0.96 - t * 0.32)
+  context.globalAlpha = 0.98 * meteor.alpha
   context.fillStyle = aura
-  context.shadowColor = fx.accent
-  context.shadowBlur = 28
+  context.shadowColor = secondary
+  context.shadowBlur = 34
   context.beginPath()
-  context.arc(currentX, currentY, 26 * meteorPulse, 0, Math.PI * 2)
+  context.arc(currentX, currentY, 25 * meteor.size * meteorPulse, 0, Math.PI * 2)
   context.fill()
   context.fillStyle = '#ffffff'
-  context.shadowBlur = 12
+  context.shadowBlur = 16
   context.beginPath()
-  context.arc(currentX, currentY, 5.5 * meteorPulse, 0, Math.PI * 2)
+  context.arc(currentX, currentY, 5.5 * meteor.size * meteorPulse, 0, Math.PI * 2)
   context.fill()
+  if (localT > 0.78) {
+    drawMeteorImpactFlash(context, endX, endY, (localT - 0.78) / 0.22, fx, meteor.size, primary, secondary)
+  }
   context.restore()
 }
 
-function drawMeteorImpactFlash(context: CanvasRenderingContext2D, targetX: number, targetY: number, t: number, fx: BattleVfxStyle) {
+function meteorVolleyCues(fx: BattleVfxStyle): MeteorCue[] {
+  const meteorVolley = [
+    { delay: 0.00, duration: 0.48, lane: -2.4, lift: 94, size: 1.08, alpha: 0.95 },
+    { delay: 0.08, duration: 0.45, lane: 1.6, lift: 68, size: 0.86, alpha: 0.88 },
+    { delay: 0.17, duration: 0.5, lane: -0.7, lift: 118, size: 1.0, alpha: 0.94 },
+    { delay: 0.27, duration: 0.43, lane: 2.8, lift: 82, size: 0.78, alpha: 0.86 },
+    { delay: 0.39, duration: 0.47, lane: 0.3, lift: 106, size: 1.16, alpha: 0.98 },
+    { delay: 0.52, duration: 0.38, lane: -1.7, lift: 74, size: 0.84, alpha: 0.9 },
+  ]
+  if (fx.kind === 'miss') return meteorVolley.slice(0, 3)
+  if (fx.kind === 'poison' || fx.kind === 'damage') return meteorVolley
+  return meteorVolley.slice(0, 5)
+}
+
+function meteorPaletteForFx(fx: BattleVfxStyle) {
+  if (fx.kind === 'damage') return ['#ff1744', '#ff7a18', '#ffd166']
+  if (fx.kind === 'heal') return ['#00e676', '#69f0ae', '#d7ff73']
+  if (fx.kind === 'shield') return ['#1e88ff', '#72d7ff', '#e3f2ff']
+  if (fx.kind === 'poison') return ['#39ff14', '#00c853', '#b9f6ca']
+  if (fx.kind === 'weak') return ['#b026ff', '#7c4dff', '#f0abfc']
+  if (fx.kind === 'freeze') return ['#00d9ff', '#7dd3fc', '#ffffff']
+  if (fx.kind === 'thorns') return ['#f59e0b', '#facc15', '#fff3b0']
+  if (fx.kind === 'utility') return ['#38bdf8', '#818cf8', '#ffffff']
+  return [fx.color, fx.accent, '#ffffff']
+}
+
+function drawMeteorImpactFlash(context: CanvasRenderingContext2D, targetX: number, targetY: number, t: number, fx: BattleVfxStyle, size = 1, primary = fx.color, secondary = fx.accent) {
   if (fx.kind === 'none' || fx.kind === 'roll' || t < 0.52) return
-  const impactT = Math.min(1, (t - 0.52) / 0.48)
-  const radius = 20 + impactT * 54
+  const impactT = Math.min(1, t)
+  const radius = (18 + impactT * 46) * size
   const alpha = Math.max(0, 1 - impactT)
   const gradient = context.createRadialGradient(targetX, targetY, 2, targetX, targetY, radius)
   gradient.addColorStop(0, 'rgba(255, 255, 255, .95)')
-  gradient.addColorStop(0.22, fx.accent)
-  gradient.addColorStop(0.56, fx.color)
+  gradient.addColorStop(0.22, secondary)
+  gradient.addColorStop(0.56, primary)
   gradient.addColorStop(1, 'rgba(255, 255, 255, 0)')
   context.save()
-  context.globalAlpha = alpha * 0.62
+  context.globalAlpha = alpha * 0.72
   context.fillStyle = gradient
-  context.shadowColor = fx.accent
-  context.shadowBlur = 32
+  context.shadowColor = secondary
+  context.shadowBlur = 38 * size
   context.beginPath()
   context.arc(targetX, targetY, radius, 0, Math.PI * 2)
   context.fill()
   context.globalAlpha = alpha * 0.76
-  context.strokeStyle = fx.accent
+  context.strokeStyle = secondary
   context.lineWidth = 3
   context.setLineDash([10, 8])
   context.beginPath()

@@ -428,7 +428,7 @@ describe('equipment layout scale', () => {
     expect(cssRule('.battle-fx-stage')).toContain('z-index: 80')
     expect(cssRule('.battle-fx-stage')).toContain('overflow: visible')
     expect(cssRule('.battle-fx-canvas')).toContain('z-index: 2')
-    expect(cssRule('.battle-fx-canvas')).toContain('mix-blend-mode: screen')
+    expect(cssRule('.battle-fx-canvas')).toContain('mix-blend-mode: normal')
     expect(cssRule('.battle-feedback-burst')).toContain('z-index: 3')
   })
 
