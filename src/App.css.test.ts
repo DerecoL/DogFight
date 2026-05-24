@@ -540,4 +540,17 @@ describe('equipment layout scale', () => {
     expect(cssRule('.sketch-panel')).toContain('box-shadow: var(--lifted-paper-shadow)')
     expect(cssRule('.shop-shelf::after, .inventory-board::after, .battle-stage::after, .reward-panel::after')).toContain('var(--rough-ink-edge)')
   })
+
+  it('adds layered bevel detail to HUD controls, buttons, and tray slots', () => {
+    expect(cssRule(':root')).toContain('--control-bevel')
+    expect(cssRule(':root')).toContain('--control-top-gloss')
+    expect(cssRule(':root')).toContain('--slot-cavity-shadow')
+    expect(cssRule('.topbar::before')).toContain('var(--control-top-gloss)')
+    expect(cssRule('.resource-pill::before, .dog-trait-summary::before')).toContain('var(--control-bevel)')
+    expect(cssRule('.icon-button::before, .action-button::before, .primary::before, .secondary::before, .danger-button::before, .reroll-button::before, .log-toggle::before, .speed-row button::before')).toContain('var(--control-top-gloss)')
+    expect(cssRule('.speed-row')).toContain('var(--control-bevel)')
+    expect(cssRule('.paper-inventory .slot::before, .battle-slot::before')).toContain('var(--slot-cavity-shadow)')
+    expect(cssRule('.paper-inventory .slot::after, .battle-slot::after')).toContain('linear-gradient(135deg, rgba(255, 255, 255, .42), transparent')
+    expect(cssRule('.battle-slot-grid::before, .paper-inventory .slot-grid::before')).toContain('var(--wood-grain)')
+  })
 })
