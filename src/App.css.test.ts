@@ -300,6 +300,15 @@ describe('equipment layout scale', () => {
     expect(cssRule('.dog-card-grid')).toContain('align-items: stretch')
   })
 
+  it('keeps shop paper edges visibly stroked while preserving paper shadows', () => {
+    expect(cssRule(':root')).toContain('--paper-edge-stroke')
+    expect(cssRule('.paper-card')).toContain('var(--paper-edge-stroke)')
+    expect(cssRule('.paper-shop-card')).toContain('--shop-paper-shadow')
+    expect(cssRule('.paper-shop-card')).toContain('var(--paper-edge-stroke)')
+    expect(cssRule('.paper-shop-card:hover')).toContain('var(--paper-edge-stroke)')
+    expect(cssRule('.paper-shop-card::before')).toContain('border: 1px solid rgba(61, 45, 37, .22)')
+  })
+
   it('adds fourth-pass handdrawn detail to history, tips, relics, and reward choices', () => {
     expect(cssRule('.player-history-panel::before')).toContain('content: ""')
     expect(cssRule('.history-summary')).toContain('grid-template-columns')
