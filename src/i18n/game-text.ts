@@ -1,8 +1,19 @@
-import type { DogType, ItemDef, ItemQuality, RelicDef, ShopType } from '../server/game/types'
+import type { DogType, ItemQuality, ShopType } from '../server/game/types'
 import type { Language } from './types'
 
 type DefText = { name: string; description: string }
 type RuleTermText = { term: string; description: string; note?: string }
+type LocalizableItemDef = {
+  id: string
+  name: string
+  description?: string
+  effect: { type: string; amount: number }
+}
+type LocalizableRelicDef = {
+  id: string
+  name: string
+  description: string
+}
 
 export const qualityText: Record<ItemQuality, Record<Language, string>> = {
   BRONZE: { 'zh-CN': '青铜', 'en-US': 'Bronze' },
@@ -144,12 +155,12 @@ export const ruleTermTextByTerm: Record<string, RuleTermText> = {
   '爆鸣计数': { term: 'Boom Count', description: 'Boom Counter can only trigger by counting. Each allied item trigger adds 1 count. At 50, it clears and deals direct damage.', note: 'Upgrading Boom Counter only increases the damage dealt at 50.' },
 }
 
-export function localizeItemDef(def: ItemDef, language: Language): DefText {
+export function localizeItemDef(def: LocalizableItemDef, language: Language): DefText {
   if (language === 'zh-CN') return { name: def.name, description: def.description ?? baseEffectDescription(def) }
   return itemTextById[def.id] ?? { name: def.name, description: def.description ?? baseEffectDescription(def) }
 }
 
-export function localizeRelicDef(def: RelicDef, language: Language): DefText {
+export function localizeRelicDef(def: LocalizableRelicDef, language: Language): DefText {
   if (language === 'zh-CN') return { name: def.name, description: def.description }
   return relicTextById[def.id] ?? { name: def.name, description: def.description }
 }
@@ -181,7 +192,7 @@ export function localizeShopType(shopType: ShopType, language: Language) {
   return shopTypeText[shopType][language]
 }
 
-function baseEffectDescription(def: ItemDef) {
+function baseEffectDescription(def: LocalizableItemDef) {
   if (def.effect.type === 'DAMAGE') return `造成 ${def.effect.amount} 点伤害。`
   if (def.effect.type === 'HEAL') return `恢复 ${def.effect.amount} 点生命值。`
   if (def.effect.type === 'DAMAGE_SELF_SHIELD') return `造成 ${def.effect.amount} 点伤害。`

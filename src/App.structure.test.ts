@@ -230,7 +230,7 @@ describe('selection screen structure', () => {
   it('keeps the current dog trait visible in the top banner during a run', () => {
     expect(app).toContain('<DogTraitSummary run={run} />')
     expect(app).toContain('function DogTraitSummary')
-    expect(app).toContain('dogTraits[run.dogType]')
+    expect(app).toContain('localizeDog(run.dogType, language)')
     expect(app).toContain('run.dogType === \'EMPEROR\' && run.luckyNumber')
     expect(css).toContain('.dog-trait-summary')
     expect(css).toContain('.dog-trait-summary img')

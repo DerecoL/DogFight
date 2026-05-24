@@ -12,7 +12,7 @@ describe('language provider wiring', () => {
 
   it('renders a language selector using the persisted language key', () => {
     expect(app).toContain('function LanguageSelector')
-    expect(app).toContain('dogfight-language')
+    expect(app).toContain('LANGUAGE_STORAGE_KEY')
     expect(app).toContain('setLanguage')
   })
 })

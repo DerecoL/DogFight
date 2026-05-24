@@ -1242,6 +1242,12 @@ input {
 .item-card.dragging {
   opacity: .35;
 }
+.item-card.input-active,
+.item-card:active {
+  transform: translateY(1px) scale(.985);
+  filter: brightness(.97) saturate(1.08);
+  box-shadow: var(--pressed-sketch-shadow);
+}
 .quality-chip {
   position: absolute;
   left: 4px;

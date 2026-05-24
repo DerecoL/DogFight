@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react'
 import { createPortal } from 'react-dom'
 import {
   DndContext,
@@ -63,6 +63,13 @@ import { ALL_ITEM_DEFS } from './server/game/data'
 import { queryBattleFxAnchor, resolveBattleFxPoints } from './battle-vfx-coordinates'
 import { TERM_DEFS } from './shared/rule-terms'
 import { LANGUAGE_STORAGE_KEY, useLanguage, type Language } from './i18n'
+import {
+  localizeDog,
+  localizeItemDef,
+  localizeQuality,
+  localizeRelicDef,
+  localizeShopType,
+} from './i18n/game-text'
 import {
   BoneHealthBar,
   ChoiceCard as HanddrawnChoiceCard,
@@ -1159,7 +1166,7 @@ function getRuleTermTipPosition(element: HTMLElement): Pick<RuleTermTipState, 'a
 function useOutsideTipDismiss(active: boolean, onClose: () => void) {
   useEffect(() => {
     if (!active) return
-    const onPointerDown = (event: PointerEvent) => {
+    const onPointerDown = (event: globalThis.PointerEvent) => {
       const target = event.target
       if (target instanceof Element && target.closest('.floating-tip, .rule-tip')) return
       onClose()
@@ -1254,7 +1261,7 @@ export default function App() {
   const [tutorialBought, setTutorialBought] = useState(false)
   const [tutorialPlaced, setTutorialPlaced] = useState(false)
   const audioRef = useRef<HTMLAudioElement | null>(null)
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 2 } }))
   const hasBattle = Boolean(battle)
 
   const loadRunHistory = useCallback(async () => {
@@ -1644,6 +1651,7 @@ export default function App() {
       const targetItemId = overId.slice('UPGRADE_ITEM:'.length)
       const sourceItem = run?.items.find((item) => item.id === itemId)
       const targetItem = run?.items.find((item) => item.id === targetItemId)
+      if (targetItem?.id === itemId) return
       if (canUpgradeDrop(sourceItem, targetItem)) {
         upgradeItem(itemId, targetItemId)
       } else if (targetItem && targetItem.id !== itemId) {
@@ -2431,7 +2439,7 @@ function DogfightRoomView({ room, onRoomChange, onLeave, soundEnabled }: { room:
   const [speed, setSpeed] = useState(1)
   const [error, setError] = useState('')
   const [now, setNow] = useState(() => Date.now())
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 2 } }))
   const run = room.currentRun
   const currentMember = room.currentRunMember ?? (run ? room.members.find((member) => member.runId === run.id) ?? null : null)
   const selectedItem = run?.items.find((item) => item.id === selectedItemId) || null
@@ -2615,9 +2623,10 @@ function DogfightRoomView({ room, onRoomChange, onLeave, soundEnabled }: { room:
       const targetItemId = overId.slice('UPGRADE_ITEM:'.length)
       const sourceItem = run.items.find((item) => item.id === itemId)
       const targetItem = run.items.find((item) => item.id === targetItemId)
+      if (targetItem?.id === itemId) return
       if (canUpgradeDrop(sourceItem, targetItem)) {
         upgradeItem(itemId, targetItemId)
-      } else if (targetItem && targetItem.id !== itemId) {
+      } else if (targetItem) {
         moveItem(itemId, targetItem.area, targetItem.x, targetItem.y)
       }
       return
@@ -3216,6 +3225,7 @@ function LadderSettlementLine({ settlement }: { settlement: LadderSettlement }) 
 }
 
 function DogSelect({ onPick }: { onPick: (choice: { dogType: DogType; luckyNumber?: number }) => void }) {
+  const { language } = useLanguage()
   const [selectedDog, setSelectedDog] = useState<DogType>('SHIBA')
   const [luckyNumber, setLuckyNumber] = useState(1)
   const slots = Array.from({ length: DOG_SELECTION_SLOT_COUNT }, (_, index) => dogOptions[index] ?? null)
@@ -3235,8 +3245,8 @@ function DogSelect({ onPick }: { onPick: (choice: { dogType: DogType; luckyNumbe
               <span className="dog-art-frame">
                 <DogBadge dogType={dog} src={dogAssets[dog]} selected={selectedDog === dog} className="dog-avatar" />
               </span>
-              <strong>{dogNames[dog]}</strong>
-              <small className="card-copy"><RuleText text={dogTraits[dog]} /></small>
+              <strong>{localizeDog(dog, language).name}</strong>
+              <small className="card-copy"><RuleText text={localizeDog(dog, language).trait} /></small>
               <span className="tag-row">{dogTags[dog].map((tag) => <b key={tag}>{tag}</b>)}</span>
             </div>
           ) : (
@@ -3247,10 +3257,10 @@ function DogSelect({ onPick }: { onPick: (choice: { dogType: DogType; luckyNumbe
           <span className="dog-detail-art">
             <DogBadge dogType={selectedDog} src={dogAssets[selectedDog]} size="lg" className="dog-avatar large" />
           </span>
-          <h2>{dogNames[selectedDog]}</h2>
+          <h2>{localizeDog(selectedDog, language).name}</h2>
           <div className="detail-box">
             <strong>被动特性</strong>
-            <p><RuleText text={dogTraits[selectedDog]} /></p>
+            <p><RuleText text={localizeDog(selectedDog, language).trait} /></p>
           </div>
           <div className="detail-box">
             <strong>策略说明</strong>
@@ -3368,14 +3378,16 @@ function TopBar({ run, musicEnabled, musicBlocked, onToggleMusic, onOpenLobby, o
 }
 
 function DogTraitSummary({ run }: { run: Run }) {
+  const { language } = useLanguage()
+  const dogText = localizeDog(run.dogType, language)
   const trait = run.dogType === 'EMPEROR' && run.luckyNumber
-    ? `${dogTraits[run.dogType]}（【天命数字】 ${run.luckyNumber}）`
-    : dogTraits[run.dogType]
+    ? language === 'en-US' ? `${dogText.trait} (Destiny Number ${run.luckyNumber})` : `${dogText.trait}（【天命数字】 ${run.luckyNumber}）`
+    : dogText.trait
   return (
-    <span className="dog-trait-summary" title={`${dogNames[run.dogType]}：${trait}`}>
+    <span className="dog-trait-summary" title={`${dogText.name}：${trait}`}>
       <img src={dogAssets[run.dogType]} alt="" />
       <span>当前狗狗</span>
-      <strong>{dogNames[run.dogType]}</strong>
+      <strong>{dogText.name}</strong>
       <p><RuleText text={trait} /></p>
     </span>
   )
@@ -3477,6 +3489,7 @@ function handleChoiceCardKeyDown(event: KeyboardEvent<HTMLElement>, onChoose: ()
 }
 
 function ClassRewardCeremony({ run, choices, onDismiss }: { run: Run; choices: ClassRewardChoice[]; onDismiss: () => void }) {
+  const { language } = useLanguage()
   const visualTheme = visualThemeForRound(run.round)
   const finalAwakening = run.round >= 6
   const title = finalAwakening ? '终阶觉醒' : '职业觉醒'
@@ -3498,13 +3511,13 @@ function ClassRewardCeremony({ run, choices, onDismiss }: { run: Run; choices: C
       tabIndex={0}
       onClick={onDismiss}
       onKeyDown={handleCeremonyKeyDown}
-      aria-label={`${dogNames[run.dogType]}${title}`}
+      aria-label={`${localizeDog(run.dogType, language).name}${title}`}
     >
       <div className="ceremony-stage">
         <div className="ceremony-round-badge">第 {run.round} 回合</div>
         <DogBadge dogType={run.dogType} src={dogAssets[run.dogType]} size="lg" className="ceremony-dog-avatar" />
         <div className="ceremony-copy">
-          <span>{dogNames[run.dogType]} 专属装备授予</span>
+          <span>{localizeDog(run.dogType, language).name} 专属装备授予</span>
           <h2>{title}</h2>
           <p>{subtitle}</p>
         </div>
@@ -3513,7 +3526,7 @@ function ClassRewardCeremony({ run, choices, onDismiss }: { run: Run; choices: C
             const triggerDice = triggerDiceLabel(choice.def)
             return (
             <span key={choice.defId} className={`ceremony-reward-chip ${qualityClass(choice.quality)}`}>
-              <strong>{choice.def.name}</strong>
+              <strong>{localizeItemDef(choice.def, language).name}</strong>
               <small>{choice.def.size}格{triggerDice ? ` · ${triggerDice}` : ''}</small>
             </span>
             )
@@ -3526,6 +3539,7 @@ function ClassRewardCeremony({ run, choices, onDismiss }: { run: Run; choices: C
 }
 
 function ClassRewardSelect({ choices, visualTheme, onPick }: { choices: ClassRewardChoice[]; visualTheme: VisualThemeId; onPick: (defId: string) => void }) {
+  const { language } = useLanguage()
   const [selected, setSelected] = useState(choices[0]?.defId ?? '')
   return (
     <HanddrawnFrame as="section" variant="panel" ornament="corner" className={`reward-panel paper-card visual-theme-surface visual-theme-${visualTheme}`} data-visual-theme={visualTheme} style={visualThemeStyle(visualTheme)}>
@@ -3538,10 +3552,10 @@ function ClassRewardSelect({ choices, visualTheme, onPick }: { choices: ClassRew
           const triggerDice = triggerDiceLabel(choice.def)
           return (
           <HanddrawnChoiceCard key={choice.defId} role="button" tabIndex={0} className="reward-choice" selected={selected === choice.defId} onClick={() => setSelected(choice.defId)} onKeyDown={(event) => handleChoiceCardKeyDown(event, () => setSelected(choice.defId))}>
-            <strong>{choice.def.name}</strong>
-            <span className={`tip-tag ${qualityClass(choice.quality)}`}>{qualityLabel[choice.quality]}</span>
+            <strong>{localizeItemDef(choice.def, language).name}</strong>
+            <span className={`tip-tag ${qualityClass(choice.quality)}`}>{language === 'en-US' ? localizeQuality(choice.quality, language) : qualityLabel[choice.quality]}</span>
             <span>{choice.def.size}格{triggerDice ? ` · ${triggerDice}` : ''}</span>
-            <span className="choice-copy"><RuleText text={choice.def.description ?? effectText(choice.def, choice.quality)} /></span>
+            <span className="choice-copy"><RuleText text={language === 'en-US' ? localizeItemDef(choice.def, language).description : (choice.def.description ?? effectText(choice.def, choice.quality))} /></span>
           </HanddrawnChoiceCard>
           )
         })}
@@ -3609,6 +3623,7 @@ function EnchantChoiceSelect({ choices, selectedId, visualTheme, onSelect }: { c
 }
 
 function RelicChoiceSelect({ choices, visualTheme, onPick }: { choices: RelicChoice[]; visualTheme: VisualThemeId; onPick: (relicId: string) => void }) {
+  const { language } = useLanguage()
   const [selected, setSelected] = useState(choices[0]?.relicId ?? '')
   return (
     <section className={`shop-choice-screen reward-panel visual-theme-surface visual-theme-${visualTheme}`} data-visual-theme={visualTheme} style={visualThemeStyle(visualTheme)}>
@@ -3620,9 +3635,9 @@ function RelicChoiceSelect({ choices, visualTheme, onPick }: { choices: RelicCho
         {choices.map((choice) => (
           <HanddrawnChoiceCard key={choice.relicId} role="button" tabIndex={0} className="relic-choice" selected={selected === choice.relicId} onClick={() => setSelected(choice.relicId)} onKeyDown={(event) => handleChoiceCardKeyDown(event, () => setSelected(choice.relicId))}>
             <RelicGlyph relic={choice} size={44} />
-            <strong>{choice.def.name}</strong>
-            <span className={`tip-tag ${qualityClass(choice.quality)}`}>{qualityLabel[choice.quality]}</span>
-            <span className="choice-copy"><RuleText text={choice.def.description} /></span>
+            <strong>{localizeRelicDef(choice.def, language).name}</strong>
+            <span className={`tip-tag ${qualityClass(choice.quality)}`}>{language === 'en-US' ? localizeQuality(choice.quality, language) : qualityLabel[choice.quality]}</span>
+            <span className="choice-copy"><RuleText text={localizeRelicDef(choice.def, language).description} /></span>
           </HanddrawnChoiceCard>
         ))}
       </div>
@@ -3674,12 +3689,13 @@ function PotionChoiceSelect({ choices, selectedId, visualTheme, onSelect }: { ch
 }
 
 function ShopShelf({ run, selectedOfferId, draggingItemId, onInspectOffer, onReroll, onMatch }: { run: Run; selectedOfferId: string | null; draggingItemId: string | null; onInspectOffer: (offerId: string, element: HTMLElement) => void; onReroll: () => void; onMatch: () => void }) {
+  const { language } = useLanguage()
   const visualTheme = visualThemeForRound(run.round)
   return (
     <HanddrawnFrame as="section" variant="tray" ornament="wood" className={`shop-shelf sketch-panel visual-theme-surface visual-theme-${visualTheme}`} data-visual-theme={visualTheme} style={visualThemeStyle(visualTheme)} data-tutorial-anchor="shop-offers">
       <div className="section-title">
         <div>
-          <h2>{shopNames[run.shopType]}</h2>
+          <h2>{language === 'en-US' ? localizeShopType(run.shopType, language) : shopNames[run.shopType]}</h2>
           <p>点击商品查看详情，确认后再购买。</p>
         </div>
         <div className="shop-actions">
@@ -3713,14 +3729,16 @@ function SellDropZone({ active }: { active: boolean }) {
 }
 
 function ShopCard({ offer, selected, ownedCount, affordable, onClick }: { offer: ShopOffer; selected: boolean; ownedCount: number; affordable: boolean; onClick: (element: HTMLElement) => void }) {
+  const { language } = useLanguage()
   const def = offer.def
   const quality = normalizeQuality(offer.quality)
+  const localizedDef = def ? localizeItemDef(def, language) : null
   const owned = ownedCount > 0
   const triggerDice = def ? triggerDiceLabel(def) : null
   const visual = def ? itemVisualProfile(def) : null
   return (
     <ItemFrame as="button" className={`shop-card paper-shop-card paper-card ${visual?.className ?? 'item-tone-utility'} ${qualityClass(offer.quality)} ${owned ? 'shop-card-owned' : ''} ${affordable ? '' : 'shop-card-unaffordable'} ${selected ? 'selected' : ''}`} onClick={(event) => onClick(event.currentTarget)}>
-      <span className="quality-chip shop-quality-chip">{qualityLabel[quality]}</span>
+      <span className="quality-chip shop-quality-chip">{language === 'en-US' ? localizeQuality(quality, language) : qualityLabel[quality]}</span>
       {owned && <span className="owned-badge" aria-label={`已拥有 ${ownedCount} 件同名装备`}>已拥有 x{ownedCount}</span>}
       {def && visual && (
         <span className={`item-art-window shop-card-art ${visual.className} ${visual.hasCustomArt ? 'has-custom-art' : 'generated-art'}`} data-art-aspect={visual.artAspect}>
@@ -3732,11 +3750,11 @@ function ShopCard({ offer, selected, ownedCount, affordable, onClick }: { offer:
       )}
       <div className="shop-card-main">
         <span className={`size-badge ${visual?.className ?? 'item-tone-utility'}`}>{def?.size ?? '?'}格</span>
-        <strong>{def?.name ?? offer.defId}</strong>
+        <strong>{localizedDef?.name ?? def?.name ?? offer.defId}</strong>
       </div>
       {def && <SizePreview size={def.size} />}
       {triggerDice && <span className="dice-line"><Dice5 size={15} /> {triggerDice}</span>}
-      <span className="effect-line">{def ? effectText(def, quality) : '未知效果'}</span>
+      <span className="effect-line">{def ? (language === 'en-US' ? localizedDef?.description : effectText(def, quality)) : '未知效果'}</span>
       <span className="price-tag"><Coins size={14} />{offer.price}{offer.discount < 1 ? ` · ${Math.round(offer.discount * 10)}折` : ''}</span>
     </ItemFrame>
   )
@@ -3765,6 +3783,7 @@ function InventoryBoard({ run, selectedItemId, draggingItemId, onSellRelic, onSe
 }
 
 function RelicRail({ relics, onSellRelic, compact = false }: { relics: Relic[]; onSellRelic?: ((relicId: string) => void) | null; compact?: boolean }) {
+  const { language } = useLanguage()
   const [selectedRelicId, setSelectedRelicId] = useState<string | null>(null)
   const [relicTipAnchor, setRelicTipAnchor] = useState<TipAnchor | null>(null)
   const selectedRelic = relics.find((relic) => relic.id === selectedRelicId) ?? null
@@ -3781,14 +3800,16 @@ function RelicRail({ relics, onSellRelic, compact = false }: { relics: Relic[]; 
       <div className="relic-slot-grid">
         {Array.from({ length: 6 }).map((_, index) => {
           const relic = relics.find((entry) => entry.slot === index)
+          const localizedRelic = relic ? localizeRelicDef(relic.def, language) : null
+          const qualityText = relic ? (language === 'en-US' ? localizeQuality(relic.quality, language) : qualityLabel[relic.quality]) : ''
           return (
             <div key={index} className={`relic-slot ${relic ? qualityClass(relic.quality) : ''}`}>
               {relic ? (
                 <RelicIconButton
                   className="relic-icon-button"
-                  aria-label={`${qualityLabel[relic.quality]}遗物：${relic.def.name}`}
+                  aria-label={`${qualityText}遗物：${localizedRelic?.name ?? relic.def.name}`}
                   aria-pressed={selectedRelicId === relic.id}
-                  title={`${qualityLabel[relic.quality]} ${relic.def.name}`}
+                  title={`${qualityText} ${localizedRelic?.name ?? relic.def.name}`}
                   onClick={(event) => {
                     event.stopPropagation()
                     setSelectedRelicId(selectedRelicId === relic.id ? null : relic.id)
@@ -3813,22 +3834,25 @@ function RelicGlyph({ relic, size }: { relic: Relic | RelicChoice; size: number 
 }
 
 function RelicFloatingTip({ relic, anchor, onClose, onSell }: { relic: Relic | null; anchor: TipAnchor | null; onClose: () => void; onSell?: ((relicId: string) => void) | null }) {
+  const { language } = useLanguage()
   useOutsideTipDismiss(Boolean(relic), onClose)
   if (!relic) return null
   const style = anchor ? { '--tip-x': `${anchor.x}px`, '--tip-y': `${anchor.y}px` } as React.CSSProperties : undefined
+  const localizedRelic = localizeRelicDef(relic.def, language)
+  const qualityText = language === 'en-US' ? localizeQuality(relic.quality, language) : qualityLabel[relic.quality]
   return (
     <FloatingPaperTip className="relic-floating-tip" style={style}>
       <div className="tip-tags">
-        <span className={`tip-tag ${qualityClass(relic.quality)}`}>{qualityLabel[relic.quality]}</span>
+        <span className={`tip-tag ${qualityClass(relic.quality)}`}>{qualityText}</span>
         {relic.def.tags.map((tag) => <span key={tag} className="tip-tag">{tag}</span>)}
       </div>
       <div className="relic-tip-identity">
         <span className={`relic-tip-icon ${qualityClass(relic.quality)}`}>
           <RelicGlyph relic={relic} size={44} />
         </span>
-        <h3>{relic.def.name}</h3>
+        <h3>{localizedRelic.name}</h3>
       </div>
-      <p className="tip-description"><RuleText text={relic.def.description} /></p>
+      <p className="tip-description"><RuleText text={localizedRelic.description} /></p>
       {onSell && (
         <div className="tip-actions">
           <ActionButton variant="danger" wide onClick={() => onSell(relic.id)}>
@@ -3867,29 +3891,41 @@ function Slot({ id, x, y, title, onClick }: { id: string; x: number; y: number; 
 }
 
 function DraggableItem({ item, relics, selected, dragging, upgradeable, onSelect }: { item: Item; relics: Relic[]; selected: boolean; dragging: boolean; upgradeable: boolean; onSelect: (element: HTMLElement) => void }) {
+  const { language } = useLanguage()
   const { attributes, listeners, setNodeRef: setDraggableNodeRef } = useDraggable({ id: item.id })
   const { isOver, setNodeRef: setDropNodeRef } = useDroppable({ id: `UPGRADE_ITEM:${item.id}` })
+  const [pressed, setPressed] = useState(false)
   const setNodeRef = (node: HTMLElement | null) => {
     setDraggableNodeRef(node)
     setDropNodeRef(node)
+  }
+  const endPress = () => setPressed(false)
+  const handlePointerDown = (event: ReactPointerEvent<HTMLElement>) => {
+    listeners?.onPointerDown?.(event)
+    if (!event.defaultPrevented && event.button === 0) setPressed(true)
   }
   const style = {
     gridColumn: `${item.x + 1} / span ${item.def.width}`,
     gridRow: `${item.y + 1} / span ${item.def.height}`,
   }
   const triggerDice = triggerDiceLabel(itemTriggerDisplay(item), relics)
+  const localizedDef = localizeItemDef(item.def, language)
+  const qualityText = language === 'en-US' ? localizeQuality(normalizeQuality(item.quality), language) : qualityLabel[normalizeQuality(item.quality)]
   return (
     <ItemFrame
       as="button"
       ref={setNodeRef}
-      className={`item-card paper-item-card ${itemTone(item.def)} ${qualityClass(item.quality)} ${selected ? 'selected' : ''} ${dragging ? 'dragging' : ''} ${upgradeable ? 'can-upgrade' : ''} ${isOver ? 'upgrade-over' : ''}`}
+      className={`item-card paper-item-card ${itemTone(item.def)} ${qualityClass(item.quality)} ${selected ? 'selected' : ''} ${dragging ? 'dragging' : ''} ${pressed ? 'input-active' : ''} ${upgradeable ? 'can-upgrade' : ''} ${isOver ? 'upgrade-over' : ''}`}
       style={style}
       onClick={(event) => {
         event.stopPropagation()
         onSelect(event.currentTarget)
       }}
-      title={`${qualityLabel[normalizeQuality(item.quality)]} ${item.def.name} · ${item.def.size}格${triggerDice ? ` · 点数 ${triggerDice}` : ''}`}
-      {...listeners}
+      onPointerDown={handlePointerDown}
+      onPointerUp={endPress}
+      onPointerCancel={endPress}
+      onPointerLeave={endPress}
+      title={`${qualityText} ${localizedDef.name} · ${item.def.size}${language === 'en-US' ? ' slots' : '格'}${triggerDice ? ` · ${language === 'en-US' ? 'Dice' : '点数'} ${triggerDice}` : ''}`}
       {...attributes}
     >
       <ItemCardContent item={item} relics={relics} upgradeable={upgradeable} />
@@ -3898,19 +3934,23 @@ function DraggableItem({ item, relics, selected, dragging, upgradeable, onSelect
 }
 
 function ItemCardContent({ item, relics = [], upgradeable = false }: { item: Item; relics?: Relic[]; upgradeable?: boolean }) {
+  const { language } = useLanguage()
   const triggerDice = triggerDiceLabel(itemTriggerDisplay(item), relics)
   const visual = itemVisualProfile(item.def)
+  const localizedDef = localizeItemDef(item.def, language)
+  const qualityText = language === 'en-US' ? localizeQuality(normalizeQuality(item.quality), language) : qualityLabel[normalizeQuality(item.quality)]
+  const effect = language === 'en-US' ? localizedDef.description : effectText(item.def, normalizeQuality(item.quality))
   return (
     <>
-      <span className="quality-chip">{qualityLabel[normalizeQuality(item.quality)]}</span>
+      <span className="quality-chip">{qualityText}</span>
       <ItemArt def={item.def} visual={visual} />
       <span className="item-card-copy">
       {upgradeable && <span className="upgrade-indicator" title="可升级">↑</span>}
-      <span>{item.def.name}</span>
+      <span>{localizedDef.name}</span>
       {item.enchant && <span className="enchant-badge"><Sparkles size={12} />附魔</span>}
       <SizePreview size={item.def.size} />
       {triggerDice && <small><Dice5 size={12} /> {triggerDice}</small>}
-      <small className="item-effect">{effectText(item.def, normalizeQuality(item.quality))}</small>
+      <small className="item-effect">{effect}</small>
       {item.enchant && <small className="item-effect enchant-text">{enchantmentText(item.enchant)}</small>}
       </span>
     </>
@@ -3997,6 +4037,7 @@ function DraggingItemOverlay({ item, relics = [] }: { item: Item | null; relics?
 }
 
 function FloatingTip({ run, item, offer, anchor, descriptionOverride, relicsOverride, onClose, onBuy, onSell, onUpgrade }: { run: Run; item: Item | null; offer: ShopOffer | null; anchor: TipAnchor | null; descriptionOverride?: string | null; relicsOverride?: Relic[] | null; onClose: () => void; onBuy: (() => void) | null; onSell: (() => void) | null; onUpgrade: (() => void) | null }) {
+  const { language } = useLanguage()
   const def = item?.def ?? offer?.def
   useOutsideTipDismiss(Boolean(def), onClose)
   if (!def) return null
@@ -4007,11 +4048,14 @@ function FloatingTip({ run, item, offer, anchor, descriptionOverride, relicsOver
   const style = anchor ? { '--tip-x': `${anchor.x}px`, '--tip-y': `${anchor.y}px` } as React.CSSProperties : undefined
   const tipTriggerDice = triggerDiceLabel(item ? itemTriggerDisplay(item) : def, item ? (relicsOverride ?? run.relics) : [])
   const visual = itemVisualProfile(def)
+  const localizedDef = localizeItemDef(def, language)
+  const qualityText = language === 'en-US' ? localizeQuality(quality, language) : qualityLabel[quality]
+  const descriptionText = language === 'en-US' ? localizedDef.description : (descriptionOverride ?? def.description ?? effectText(def, quality))
   return (
     <FloatingPaperTip className="floating-tip paper-card" style={style}>
       <div className="tip-tags">
         <span className={`size-badge ${visual.className}`}>{def.size}格</span>
-        <span className={`tip-tag ${qualityClass(quality)}`}>{qualityLabel[quality]}</span>
+        <span className={`tip-tag ${qualityClass(quality)}`}>{qualityText}</span>
         <span className="tip-tag">{diceToneText(def)}</span>
         <span className="tip-tag">{effectToneText(def)}</span>
       </div>
@@ -4023,7 +4067,7 @@ function FloatingTip({ run, item, offer, anchor, descriptionOverride, relicsOver
             </span>
             <img className="tip-icon" src={itemIcon(def)} alt="" />
           </span>
-          <h3>{def.name}</h3>
+          <h3>{localizedDef.name}</h3>
         </div>
         <div className="tip-grid-preview">
           <SizePreview size={def.size} />
@@ -4036,7 +4080,7 @@ function FloatingTip({ run, item, offer, anchor, descriptionOverride, relicsOver
           {tipTriggerDice.split('/').map((face) => <span key={face}>{face}</span>)}
         </div>
       )}
-      <p className="tip-description"><RuleText text={descriptionOverride ?? def.description ?? effectText(def, quality)} /></p>
+      <p className="tip-description"><RuleText text={descriptionText} /></p>
       {item?.enchant && <p className="tip-description enchant-tip"><Sparkles size={16} /> <RuleText text={enchantmentText(item.enchant)} /></p>}
       {isOffer && (
         <div className="tip-price">
@@ -4273,7 +4317,9 @@ function LadderSettlementSummary({ settlement }: { settlement: LadderSettlement 
 }
 
 function BattleEquipmentRow({ owner, snapshot, events, displayIndex, activeEvent, targetItemIds = [], onInspect }: { owner: 'player' | 'opponent'; snapshot: BattleSnapshot; events: BattleEvent[]; displayIndex: number; activeEvent?: BattleEvent; targetItemIds?: string[]; onInspect: (item: Item, element: HTMLElement) => void }) {
+  const { language } = useLanguage()
   const items = snapshot.items.filter((item) => item.area === 'EQUIPMENT')
+  const dogText = localizeDog(snapshot.dogType, language)
   const activeItemId = activeEvent?.actor === owner && activeEvent.kind === 'ITEM' ? activeEvent.itemId : null
   const activeVfxKind = battleVfxKind(activeEvent)
   const slots = equipmentSlotCount(snapshot.relics)
@@ -4281,7 +4327,7 @@ function BattleEquipmentRow({ owner, snapshot, events, displayIndex, activeEvent
     <div className={`battle-equipment-row ${owner} sketch-panel`}>
       <div className="battle-row-title">
         <span>{owner === 'player' ? '你的装备栏' : '对手装备栏'}</span>
-        <small>{snapshot.name} · {dogNames[snapshot.dogType]}</small>
+        <small>{snapshot.name} · {dogText.name}</small>
       </div>
       <div className="battle-slot-grid" style={{ gridTemplateColumns: `repeat(${slots}, minmax(0, 1fr))` }}>
         {Array.from({ length: slots }).map((_, x) => <i key={x} className="battle-slot" style={{ gridColumn: x + 1, gridRow: 1 }} />)}
@@ -4291,6 +4337,9 @@ function BattleEquipmentRow({ owner, snapshot, events, displayIndex, activeEvent
           const triggerDice = triggerDiceLabel(itemTriggerDisplay(item), snapshot.relics ?? [])
           const triggerCountLabel = itemTriggerCountLabel(events, owner, item.id, displayIndex)
           const triggerCountPopping = activeItemId === item.id
+          const localizedDef = localizeItemDef(item.def, language)
+          const qualityText = language === 'en-US' ? localizeQuality(normalizeQuality(item.quality), language) : qualityLabel[normalizeQuality(item.quality)]
+          const itemEffect = language === 'en-US' ? localizedDef.description : (growthText ?? effectText(item.def, normalizeQuality(item.quality)))
           return (
           <ItemFrame
             as="button"
@@ -4303,15 +4352,15 @@ function BattleEquipmentRow({ owner, snapshot, events, displayIndex, activeEvent
               gridColumn: `${item.x + 1} / span ${item.def.width}`,
               gridRow: 1,
             }}
-            title={`${qualityLabel[normalizeQuality(item.quality)]} ${item.def.name} · ${growthText ?? effectText(item.def, normalizeQuality(item.quality))}`}
+            title={`${qualityText} ${localizedDef.name} · ${itemEffect}`}
             onClick={(event) => onInspect(item, event.currentTarget)}
           >
             <img className="item-icon" src={itemIcon(item.def)} alt="" />
-            <span className="quality-chip">{qualityLabel[normalizeQuality(item.quality)]}</span>
-            <span>{item.def.name}</span>
+            <span className="quality-chip">{qualityText}</span>
+            <span>{localizedDef.name}</span>
             {item.enchant && <span className="enchant-badge"><Sparkles size={12} />附魔</span>}
             {triggerDice && <small><Dice5 size={12} /> {triggerDice}</small>}
-            <small className="item-effect">{growthText ?? effectText(item.def, normalizeQuality(item.quality))}</small>
+            <small className="item-effect">{itemEffect}</small>
             {boomCounterState && (
               <span className="boom-counter-meter" aria-label={`爆鸣计数 ${boomCounterState.count}/${boomCounterState.max}`}>
                 <i style={{ width: `${boomCounterState.progress}%` }} />
