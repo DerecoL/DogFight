@@ -34,28 +34,6 @@ jobs:
           echo "EXPECTED_CSS=$EXPECTED_CSS" >> "$GITHUB_ENV"
           echo "Expected frontend assets: $EXPECTED_JS / $EXPECTED_CSS"
 
-      - name: Package source
-        timeout-minutes: 2
-        run: |
-          SOURCE_PACKAGE="$RUNNER_TEMP/dogfight-source-${GITHUB_SHA}.tar.gz"
-          PRODUCTION_ENV_FILE="$RUNNER_TEMP/dogfight-production-${GITHUB_SHA}.env"
-          printf '%s\n' "${{ secrets.PRODUCTION_ENV }}" > "$PRODUCTION_ENV_FILE"
-          tar \
-            --exclude=.git \
-            --exclude=node_modules \
-            --exclude=dist \
-            --exclude=dist-click \
-            --exclude=.env.production \
-            --exclude=.superpowers \
-            --exclude=docs/superpowers \
-            --exclude=picture \
-            -czf "$SOURCE_PACKAGE" .
-          echo "SOURCE_PACKAGE=$SOURCE_PACKAGE" >> "$GITHUB_ENV"
-          echo "PRODUCTION_ENV_FILE=$PRODUCTION_ENV_FILE" >> "$GITHUB_ENV"
-          echo "REMOTE_PACKAGE=/tmp/dogfight-source-${GITHUB_SHA}.tar.gz" >> "$GITHUB_ENV"
-          echo "REMOTE_ENV_FILE=/tmp/dogfight-production-${GITHUB_SHA}.env" >> "$GITHUB_ENV"
-          echo "REMOTE_SCRIPT=/tmp/dogfight-deploy-${GITHUB_SHA}.sh" >> "$GITHUB_ENV"
-
       - name: Configure SSH
         timeout-minutes: 2
         run: |
@@ -64,39 +42,38 @@ jobs:
           chmod 600 ~/.ssh/dogfight_deploy_key
           ssh-keyscan -T 20 -H "${{ secrets.SERVER_HOST }}" >> ~/.ssh/known_hosts
 
-      - name: Upload source package
-        timeout-minutes: 30
-        run: |
-          ls -lh "$SOURCE_PACKAGE" "$PRODUCTION_ENV_FILE" deploy/remote-deploy.sh
-          scp -i ~/.ssh/dogfight_deploy_key \
-            -o BatchMode=yes \
-            -o ConnectTimeout=20 \
-            -o ServerAliveInterval=15 \
-            -o ServerAliveCountMax=4 \
-            "$SOURCE_PACKAGE" \
-            "${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:$REMOTE_PACKAGE"
-          scp -i ~/.ssh/dogfight_deploy_key \
-            -o BatchMode=yes \
-            -o ConnectTimeout=20 \
-            -o ServerAliveInterval=15 \
-            -o ServerAliveCountMax=4 \
-            "$PRODUCTION_ENV_FILE" \
-            "${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:$REMOTE_ENV_FILE"
-          scp -i ~/.ssh/dogfight_deploy_key \
-            -o BatchMode=yes \
-            -o ConnectTimeout=20 \
-            -o ServerAliveInterval=15 \
-            -o ServerAliveCountMax=4 \
-            deploy/remote-deploy.sh \
-            "${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:$REMOTE_SCRIPT"
-
       - name: Deploy to Tencent Cloud
-        timeout-minutes: 35
+        timeout-minutes: 60
+        env:
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+          DEPLOY_REPO_TOKEN: ${{ secrets.DEPLOY_REPO_TOKEN }}
+          PRODUCTION_ENV: ${{ secrets.PRODUCTION_ENV }}
         run: |
+          PRODUCTION_ENV_B64="$(printf '%s\n' "$PRODUCTION_ENV" | base64 -w0)"
           ssh -i ~/.ssh/dogfight_deploy_key \
             -o BatchMode=yes \
             -o ConnectTimeout=20 \
             -o ServerAliveInterval=15 \
             -o ServerAliveCountMax=4 \
             "${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}" \
-            "DEPLOY_PATH='${{ secrets.DEPLOY_PATH }}' REMOTE_PACKAGE='$REMOTE_PACKAGE' REMOTE_ENV_FILE='$REMOTE_ENV_FILE' REMOTE_SCRIPT='$REMOTE_SCRIPT' GITHUB_SHA='${{ github.sha }}' EXPECTED_JS='$EXPECTED_JS' EXPECTED_CSS='$EXPECTED_CSS' bash '$REMOTE_SCRIPT'"
+            "DEPLOY_PATH='$DEPLOY_PATH' GITHUB_SHA='${{ github.sha }}' GITHUB_REPOSITORY='${{ github.repository }}' DEPLOY_REPO_TOKEN='$DEPLOY_REPO_TOKEN' PRODUCTION_ENV_B64='$PRODUCTION_ENV_B64' EXPECTED_JS='$EXPECTED_JS' EXPECTED_CSS='$EXPECTED_CSS' bash -s" <<'REMOTE_BOOTSTRAP'
+          set -euo pipefail
+          : "${GITHUB_SHA:?GITHUB_SHA is required}"
+          : "${GITHUB_REPOSITORY:?GITHUB_REPOSITORY is required}"
+
+          BOOTSTRAP_PATH="/tmp/dogfight-bootstrap-${GITHUB_SHA}"
+          rm -rf "$BOOTSTRAP_PATH"
+          trap 'rm -rf "$BOOTSTRAP_PATH"' EXIT
+
+          REPO_URL="https://github.com/${GITHUB_REPOSITORY}.git"
+          if [ -n "${DEPLOY_REPO_TOKEN:-}" ]; then
+            REPO_URL="https://x-access-token:${DEPLOY_REPO_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          fi
+
+          git init "$BOOTSTRAP_PATH"
+          cd "$BOOTSTRAP_PATH"
+          git remote add origin "$REPO_URL"
+          git fetch --depth 1 origin "$GITHUB_SHA"
+          git checkout --detach "$GITHUB_SHA"
+          SOURCE_PATH="$BOOTSTRAP_PATH" bash deploy/remote-deploy.sh
+          REMOTE_BOOTSTRAP

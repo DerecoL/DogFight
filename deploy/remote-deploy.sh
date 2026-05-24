@@ -2,19 +2,43 @@
 set -euo pipefail
 
 : "${DEPLOY_PATH:?DEPLOY_PATH is required}"
-: "${REMOTE_PACKAGE:?REMOTE_PACKAGE is required}"
-: "${REMOTE_ENV_FILE:?REMOTE_ENV_FILE is required}"
 : "${EXPECTED_JS:?EXPECTED_JS is required}"
 : "${EXPECTED_CSS:?EXPECTED_CSS is required}"
 : "${GITHUB_SHA:?GITHUB_SHA is required}"
 
 TEMP_DEPLOY_PATH="${DEPLOY_PATH}.repo-tmp"
 
+if [ -z "${REMOTE_PACKAGE:-}" ] && [ -z "${SOURCE_PATH:-}" ]; then
+  echo "REMOTE_PACKAGE or SOURCE_PATH is required"
+  exit 1
+fi
+
+if [ -z "${REMOTE_ENV_FILE:-}" ] && [ -z "${PRODUCTION_ENV_B64:-}" ]; then
+  echo "REMOTE_ENV_FILE or PRODUCTION_ENV_B64 is required"
+  exit 1
+fi
+
 mkdir -p "$DEPLOY_PATH"
 rm -rf "$TEMP_DEPLOY_PATH"
 mkdir -p "$TEMP_DEPLOY_PATH"
-tar -xzf "$REMOTE_PACKAGE" -C "$TEMP_DEPLOY_PATH"
-cp "$REMOTE_ENV_FILE" "$TEMP_DEPLOY_PATH/.env.production"
+if [ -n "${SOURCE_PATH:-}" ]; then
+  cp -a "$SOURCE_PATH"/. "$TEMP_DEPLOY_PATH"/
+else
+  tar -xzf "$REMOTE_PACKAGE" -C "$TEMP_DEPLOY_PATH"
+fi
+rm -rf \
+  "$TEMP_DEPLOY_PATH/.git" \
+  "$TEMP_DEPLOY_PATH/dist" \
+  "$TEMP_DEPLOY_PATH/dist-click" \
+  "$TEMP_DEPLOY_PATH/.superpowers" \
+  "$TEMP_DEPLOY_PATH/docs/superpowers" \
+  "$TEMP_DEPLOY_PATH/picture"
+
+if [ -n "${PRODUCTION_ENV_B64:-}" ]; then
+  printf '%s' "$PRODUCTION_ENV_B64" | base64 -d > "$TEMP_DEPLOY_PATH/.env.production"
+else
+  cp "$REMOTE_ENV_FILE" "$TEMP_DEPLOY_PATH/.env.production"
+fi
 
 if ! grep -q '^DATABASE_URL=' "$TEMP_DEPLOY_PATH/.env.production"; then
   echo "PRODUCTION_ENV must include DATABASE_URL"
@@ -34,7 +58,13 @@ fi
 
 find "$DEPLOY_PATH" -mindepth 1 -maxdepth 1 ! -name backups ! -name .env.production -exec rm -rf {} +
 cp -a "$TEMP_DEPLOY_PATH"/. "$DEPLOY_PATH"/
-rm -rf "$TEMP_DEPLOY_PATH" "$REMOTE_PACKAGE" "$REMOTE_ENV_FILE"
+rm -rf "$TEMP_DEPLOY_PATH"
+if [ -n "${REMOTE_PACKAGE:-}" ]; then
+  rm -f "$REMOTE_PACKAGE"
+fi
+if [ -n "${REMOTE_ENV_FILE:-}" ]; then
+  rm -f "$REMOTE_ENV_FILE"
+fi
 if [ -n "${REMOTE_SCRIPT:-}" ]; then
   rm -f "$REMOTE_SCRIPT"
 fi
