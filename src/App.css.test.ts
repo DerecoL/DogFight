@@ -310,6 +310,17 @@ describe('equipment layout scale', () => {
     expect(cssRule('.paper-shop-card::before')).toContain('border: 1px solid rgba(61, 45, 37, .22)')
   })
 
+  it('uses item quality colors for shop card paper strokes', () => {
+    expect(cssRule('.paper-shop-card')).toContain('--shop-quality-frame-width')
+    expect(cssRule('.paper-shop-card')).toContain('border: var(--shop-quality-frame-width) solid var(--shop-quality-frame-ink)')
+    expect(cssRule('.paper-shop-card.quality-bronze')).toContain('--shop-quality-frame-ink: #a76637')
+    expect(cssRule('.paper-shop-card.quality-silver')).toContain('--shop-quality-frame-ink: #c9d4df')
+    expect(cssRule('.paper-shop-card.quality-gold')).toContain('--shop-quality-frame-ink: #f0b429')
+    expect(cssRule('.paper-shop-card.quality-diamond')).toContain('--shop-quality-frame-ink: #66e7ff')
+    expect(css).toMatch(/\.paper-shop-card\.quality-bronze,\s*\.paper-shop-card\.quality-silver,\s*\.paper-shop-card\.quality-gold,\s*\.paper-shop-card\.quality-diamond\s*\{[^}]*border: var\(--shop-quality-frame-width\) solid var\(--shop-quality-frame-ink\)/s)
+    expect(css).not.toMatch(/\.paper-shop-card\.quality-bronze,\s*\.paper-shop-card\.quality-silver,\s*\.paper-shop-card\.quality-gold,\s*\.paper-shop-card\.quality-diamond\s*\{[^}]*border-color: transparent/s)
+  })
+
   it('adds fourth-pass handdrawn detail to history, tips, relics, and reward choices', () => {
     expect(cssRule('.player-history-panel::before')).toContain('content: ""')
     expect(cssRule('.history-summary')).toContain('grid-template-columns')

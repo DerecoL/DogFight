@@ -4480,6 +4480,8 @@ input {
 }
 
 .paper-shop-card {
+  --shop-quality-frame-width: 4px;
+  --shop-quality-frame-ink: #a76637;
   --shop-paper-tone:
     var(--paper-grain),
     radial-gradient(circle at 16% 18%, rgba(255, 255, 255, .55), transparent 24%),
@@ -4487,7 +4489,7 @@ input {
   --shop-paper-shadow: var(--paper-edge-stroke), 0 12px 22px rgba(112, 72, 30, .16), 2px 4px 0 rgba(61, 45, 37, .12);
   transform-origin: 50% 65%;
   transform: translateY(var(--shop-paper-y, 0)) rotate(var(--paper-tilt));
-  border: 0;
+  border: var(--shop-quality-frame-width) solid var(--shop-quality-frame-ink);
   border-radius: var(--shop-paper-radius, 10px 13px 9px 12px);
   background: var(--shop-paper-tone);
   box-shadow: var(--shop-paper-shadow);
@@ -4505,12 +4507,31 @@ input {
   gap: 14px;
 }
 
+.paper-shop-card.quality-bronze {
+  --shop-quality-frame-width: 4px;
+  --shop-quality-frame-ink: #a76637;
+}
+
+.paper-shop-card.quality-silver {
+  --shop-quality-frame-width: 4px;
+  --shop-quality-frame-ink: #c9d4df;
+}
+
+.paper-shop-card.quality-gold {
+  --shop-quality-frame-width: 5px;
+  --shop-quality-frame-ink: #f0b429;
+}
+
+.paper-shop-card.quality-diamond {
+  --shop-quality-frame-width: 5px;
+  --shop-quality-frame-ink: #66e7ff;
+}
+
 .paper-shop-card.quality-bronze,
 .paper-shop-card.quality-silver,
 .paper-shop-card.quality-gold,
 .paper-shop-card.quality-diamond {
-  border-width: 0;
-  border-color: transparent;
+  border: var(--shop-quality-frame-width) solid var(--shop-quality-frame-ink);
   box-shadow: var(--shop-paper-shadow);
 }
 
