@@ -56,16 +56,16 @@ export function potionChoiceText(choice: Pick<PotionChoice, 'category' | 'dice'>
 }
 
 export function createPotionChoices(seed: string): PotionChoice[] {
-  const rng = createRng(seed)
   return Array.from({ length: 3 }, (_, index) => {
-    const category = pickWeightedCategory(rng)
+    const category = pickWeightedCategory(createRng(`${seed}-category-${index}`))
+    const valueRng = createRng(`${seed}-value-${index}`)
     const dice = category === 'ADD_TWO'
-      ? pickUniqueDice(rng, 2)
+      ? pickUniqueDice(valueRng, 2)
       : category === 'REPLACE_RANGE'
-        ? pick(rng, POTION_RANGES).dice
+        ? pick(valueRng, POTION_RANGES).dice
         : category === 'REPLACE_ALL'
           ? ALL_DICE
-          : pickUniqueDice(rng, 1)
+          : pickUniqueDice(valueRng, 1)
     const choice = {
       id: `${seed}-potion-${index}-${category}-${dice.join('-')}`,
       category,

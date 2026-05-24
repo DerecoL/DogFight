@@ -1,8 +1,9 @@
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync, statSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
 const css = readFileSync(new URL('./App.css', import.meta.url), 'utf8')
 const app = readFileSync(new URL('./App.tsx', import.meta.url), 'utf8')
+const dogBrawlTownBackgroundUrl = new URL('../public/assets/backgrounds/dog-brawl-town.jpg', import.meta.url)
 
 function cssVariablePx(name: string) {
   const match = css.match(new RegExp(`${name}:\\s*(\\d+)px`))
@@ -222,15 +223,21 @@ describe('equipment layout scale', () => {
 
   it('adds third-pass handdrawn detail to the shop, inventory, and dog selection surfaces', () => {
     expect(cssRule('.shop-shelf.sketch-panel::before')).toContain('content: ""')
-    expect(cssRule('.shop-shelf.sketch-panel::after')).toContain('linear-gradient')
+    expect(cssRule('.shop-shelf.sketch-panel')).toContain('box-shadow: none')
+    expect(cssRule('.shop-shelf.sketch-panel::after')).toContain('radial-gradient')
     expect(cssRule('.offer-row')).toContain('align-items: stretch')
+    expect(cssRule('.offer-row')).toContain('gap: 14px')
     expect(cssRule('.paper-shop-card')).toContain('transform-origin')
+    expect(cssRule('.paper-shop-card')).toContain('--shop-paper-tone')
+    expect(cssRule('.offer-row .paper-shop-card:nth-child(4)')).toContain('--paper-tilt')
+    expect(cssRule('.offer-row .paper-shop-card:nth-child(5)')).toContain('--shop-paper-cut')
+    expect(cssRule('.paper-shop-card:hover')).toContain('rotate(var(--paper-tilt))')
     expect(cssRule('.paper-shop-card:hover .shop-item-icon')).toContain('rotate')
     expect(cssRule('.shop-card-unaffordable')).toContain('filter: grayscale(.82) brightness(.68) saturate(.55)')
     expect(cssRule('.shop-card-unaffordable:hover')).toContain('transform: none')
     expect(cssRule('.shop-card-owned')).toContain('border-color')
     expect(cssRule('.owned-badge')).toContain('position: absolute')
-    expect(cssRule('.paper-inventory .slot-grid::before')).toContain('radial-gradient')
+    expect(cssRule('.paper-inventory .slot-grid::before')).toContain('linear-gradient(90deg')
     expect(cssRule('.paper-inventory .grid-heading h3::after')).toContain('content: ""')
     expect(cssRule('.paper-dog-card .dog-art-frame')).toContain('position: relative')
     expect(cssRule('.paper-dog-card .dog-art-frame::after')).toContain('border')
@@ -303,7 +310,7 @@ describe('equipment layout scale', () => {
     expect(cssRule('.battle-item')).toContain('overflow: visible')
     expect(cssRule('.battle-item')).toContain('isolation: auto')
     expect(cssRule('.battle-item')).toContain('z-index: auto')
-    expect(css).toContain(".battle-item:hover,\n.battle-item:focus-visible,\n.battle-item.trigger-count-pop {\n  z-index: 8")
+    expect(css).toMatch(/\.battle-item:hover,\s*\.battle-item:focus-visible,\s*\.battle-item\.trigger-count-pop\s*\{\s*z-index: 8/)
     expect(cssRule('.trigger-count-stamp')).toContain('bottom: -17px')
     expect(cssRule('.trigger-count-stamp')).toContain('z-index: 9')
     expect(cssRule('.trigger-count-stamp')).toContain('white-space: nowrap')
@@ -398,9 +405,12 @@ describe('equipment layout scale', () => {
   })
 
   it('adds stable dog brawl town visual themes across battle, shop, inventory, rewards, and results', () => {
-    expect(existsSync(new URL('../public/assets/backgrounds/dog-brawl-town.png', import.meta.url))).toBe(true)
-    expect(app).toContain('/assets/backgrounds/dog-brawl-town.png')
-    expect(css).toContain('/assets/backgrounds/dog-brawl-town.png')
+    expect(existsSync(dogBrawlTownBackgroundUrl)).toBe(true)
+    expect(statSync(dogBrawlTownBackgroundUrl).size).toBeLessThanOrEqual(1_200_000)
+    expect(app).toContain('/assets/backgrounds/dog-brawl-town.jpg')
+    expect(css).toContain('/assets/backgrounds/dog-brawl-town.jpg')
+    expect(app).not.toContain('/assets/backgrounds/dog-brawl-town.png')
+    expect(css).not.toContain('/assets/backgrounds/dog-brawl-town.png')
     expect(app).not.toContain('/assets/backgrounds/storybook-dog-park.webp')
     expect(app).not.toContain('/assets/backgrounds/storybook-back-alley.webp')
     expect(app).not.toContain('/assets/backgrounds/storybook-royal-kennel.webp')
@@ -420,8 +430,10 @@ describe('equipment layout scale', () => {
   })
 
   it('uses the dog brawl town illustration as the readable full-page background', () => {
-    expect(existsSync(new URL('../public/assets/backgrounds/dog-brawl-town.png', import.meta.url))).toBe(true)
-    expect(css).toContain('/assets/backgrounds/dog-brawl-town.png')
+    expect(existsSync(dogBrawlTownBackgroundUrl)).toBe(true)
+    expect(statSync(dogBrawlTownBackgroundUrl).size).toBeLessThanOrEqual(1_200_000)
+    expect(css).toContain('/assets/backgrounds/dog-brawl-town.jpg')
+    expect(css).not.toContain('/assets/backgrounds/dog-brawl-town.png')
     expect(cssRule(':root')).toContain('--app-illustration-bg')
     expect(cssRule('.auth-shell')).toContain('var(--app-illustration-bg)')
     expect(cssRule('.app-shell')).toContain('var(--app-illustration-bg)')
@@ -532,6 +544,9 @@ describe('equipment layout scale', () => {
     expect(cssRule('.item-card::before')).toContain('padding: var(--quality-frame-width)')
     expect(cssRule('.item-card::before')).toContain('mask-composite: exclude')
     expect(cssRule('.item-card::after')).toContain('inset: 0')
+    expect(cssRule('.item-card::after')).toContain('background-size')
+    expect(cssRule('.item-card::after')).toContain('background-position')
+    expect(cssRule('.item-card::after')).not.toContain('transform')
     expect(cssRule('.item-card::after')).toContain('animation: qualityBorderShimmer')
     expect(cssRule('.item-card.quality-gold')).toContain('--quality-frame-width: 5px')
     expect(cssRule('.item-card.quality-gold')).toContain('--quality-frame-material')
@@ -540,6 +555,8 @@ describe('equipment layout scale', () => {
     expect(cssRule('.item-card.quality-gold::after, .item-card.quality-diamond::after')).toContain('opacity')
     expect(cssRule('.item-card.quality-bronze::after, .item-card.quality-silver::after')).toContain('animation: none')
     expect(css).toContain('@keyframes qualityBorderShimmer')
+    expect(cssRule('@keyframes qualityBorderShimmer')).toContain('background-position')
+    expect(cssRule('@keyframes qualityBorderShimmer')).not.toContain('transform')
     expect(cssRule('@media (prefers-reduced-motion: reduce)')).toContain('.item-card::after')
   })
 
@@ -551,11 +568,12 @@ describe('equipment layout scale', () => {
     expect(cssRule('.paper-inventory .slot-grid')).toContain('var(--wood-grain)')
     expect(cssRule('.paper-inventory .slot-grid')).toContain('var(--wood-shadow)')
     expect(cssRule('.paper-inventory .slot-grid::after')).toContain('var(--rough-ink-edge)')
-    expect(cssRule('.paper-inventory .slot')).toContain('inset 0 0 0 3px rgba(92, 54, 27, .28)')
-    expect(cssRule('.paper-inventory .slot')).toContain('linear-gradient(180deg, #f2d2a1, #c88b4b)')
+    expect(cssVariableValue('--wood-grain')).toContain('repeating-linear-gradient(87deg')
+    expect(cssRule('.paper-inventory .slot')).toContain('inset 0 0 0 2px rgba(92, 54, 27, .2)')
+    expect(cssRule('.paper-inventory .slot')).toContain('linear-gradient(180deg, #efd1a3, #d2a066)')
     expect(cssRule('.battle-slot-grid')).toContain('var(--wood-frame)')
     expect(cssRule('.battle-slot-grid')).toContain('var(--wood-grain)')
-    expect(cssRule('.battle-slot')).toContain('inset 0 0 0 3px rgba(92, 54, 27, .26)')
+    expect(cssRule('.battle-slot')).toContain('inset 0 0 0 2px rgba(92, 54, 27, .2)')
   })
 
   it('adds rough layered paper edges so panels feel less mechanically rectangular', () => {
@@ -578,7 +596,7 @@ describe('equipment layout scale', () => {
     expect(cssRule('.icon-button::before, .action-button::before, .primary::before, .secondary::before, .danger-button::before, .reroll-button::before, .log-toggle::before, .speed-row button::before')).toContain('var(--control-top-gloss)')
     expect(cssRule('.speed-row')).toContain('var(--control-bevel)')
     expect(cssRule('.paper-inventory .slot::before, .battle-slot::before')).toContain('var(--slot-cavity-shadow)')
-    expect(cssRule('.paper-inventory .slot::after, .battle-slot::after')).toContain('linear-gradient(135deg, rgba(255, 255, 255, .42), transparent')
+    expect(cssRule('.paper-inventory .slot::after, .battle-slot::after')).toContain('linear-gradient(135deg, rgba(255, 255, 255, .3), transparent')
     expect(cssRule('.battle-slot-grid::before, .paper-inventory .slot-grid::before')).toContain('var(--wood-grain)')
   })
 })

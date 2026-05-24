@@ -13,6 +13,12 @@ describe('potion choices', () => {
     expect(first.every((choice) => choice.dice.length > 0)).toBe(true)
   })
 
+  it('rolls the visible potion option category independently for each slot', () => {
+    const choices = createPotionChoices('potion-seed-2')
+
+    expect(choices.map((choice) => choice.category)).toEqual(['ADD_ONE', 'ADD_ONE', 'ADD_TWO'])
+  })
+
   it('adds dice without duplicate trigger points', () => {
     const choice: PotionChoice = { id: 'potion', category: 'ADD_ONE', dice: [1], description: '增加 1 点触发' }
 

@@ -650,4 +650,26 @@ describe('selection screen structure', () => {
     expect(app).toContain('boomCounterState?.count')
     expect(app).toContain('style={{ width: `${boomCounterState.progress}%` }}')
   })
+
+  it('wires manuscript surprise backgrounds into reward and settlement surfaces', () => {
+    expect(app).toContain('const surpriseBackgrounds')
+    expect(app).toContain("classReward: '/assets/backgrounds/canine-fighting-study.png'")
+    expect(app).toContain("settlement: '/assets/backgrounds/canine-anatomy-run.png'")
+    expect(app).toContain("enchant: '/assets/backgrounds/canine-comparative-anatomy.png'")
+    expect(app).toContain('function surpriseBackgroundStyle')
+    expect(app).toContain('surprise-surface')
+    expect(app).toContain("surpriseBackgroundStyle('classReward')")
+    expect(app).toContain("surpriseBackgroundStyle('enchant')")
+    expect(css).toContain('.surprise-surface')
+  })
+
+  it('renders completed runs through a dedicated settlement page', () => {
+    expect(app).toContain('function SettlementView')
+    expect(app).toContain("run.phase === 'COMPLETE'")
+    expect(app).toContain('<SettlementView run={run} score={score} onRestart={onRestart} />')
+    expect(app).toContain("surpriseBackgroundStyle('settlement')")
+    expect(css).toContain('.settlement-page')
+    expect(css).toContain('.settlement-card')
+    expect(css).toContain('.settlement-score-grid')
+  })
 })

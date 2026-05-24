@@ -88,7 +88,7 @@ describe('item detail tooltip interactions', () => {
     expect(app).toContain('type RuleTermTipState')
     expect(app).toContain('function RuleTermFloatingTip')
     expect(app).toContain('createPortal(')
-    expect(app).toContain('const position = getRuleTermTipPosition(event.currentTarget)\n                setOpenTerm((current) => {')
+    expect(app).toMatch(/const position = getRuleTermTipPosition\(event\.currentTarget\)\s*setOpenTerm\(\(current\) => \{/)
     expect(app).toContain('className={`rule-tip paper-card rule-tip-floating ${tip.placement}`}')
     expect(cssRule('.rule-tip.rule-tip-floating')).toContain('position: fixed')
     expect(cssRule('.rule-tip.rule-tip-floating.above')).toContain('transform: translateY(-100%) rotate(-.35deg)')

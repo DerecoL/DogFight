@@ -73,6 +73,7 @@ type HistoryRunMode = Exclude<HistoryModeTab, 'ALL'>
 type RunMode = 'CASUAL' | 'LADDER'
 type LadderTier = 'BRONZE' | 'SILVER' | 'GOLD' | 'PLATINUM' | 'DIAMOND' | 'MASTER' | 'DOG_KING'
 type VisualThemeId = 'dogPark' | 'backAlley' | 'royalKennel'
+type SurpriseBackgroundId = 'classReward' | 'enchant' | 'settlement'
 
 const BOOM_COUNTER_TRIGGER_THRESHOLD = 50
 const HANDDRAWN_FONT_STACK = '"Comic Sans MS", "Microsoft YaHei", "KaiTi", "Kaiti SC", "DFKai-SB", cursive, sans-serif'
@@ -391,11 +392,16 @@ const dogAssets: Record<DogType, string> = {
   BULLY: '/assets/dogs/bully.webp',
   EMPEROR: '/assets/dogs/emperor.webp',
 }
-const dogBrawlTownBackground = '/assets/backgrounds/dog-brawl-town.png'
+const dogBrawlTownBackground = '/assets/backgrounds/dog-brawl-town.jpg'
 const visualThemeAssets: Record<VisualThemeId, string> = {
   dogPark: dogBrawlTownBackground,
   backAlley: dogBrawlTownBackground,
   royalKennel: dogBrawlTownBackground,
+}
+const surpriseBackgrounds: Record<SurpriseBackgroundId, string> = {
+  classReward: '/assets/backgrounds/canine-fighting-study.png',
+  settlement: '/assets/backgrounds/canine-anatomy-run.png',
+  enchant: '/assets/backgrounds/canine-comparative-anatomy.png',
 }
 const visualThemeOrder: VisualThemeId[] = ['dogPark', 'backAlley', 'royalKennel']
 const gameIcon = '/assets/game-icon.png'
@@ -500,6 +506,10 @@ function visualThemeForRound(round: number): VisualThemeId {
 
 function visualThemeStyle(visualTheme: VisualThemeId) {
   return { '--theme-bg': `url("${visualThemeAssets[visualTheme]}")` } as React.CSSProperties
+}
+
+function surpriseBackgroundStyle(background: SurpriseBackgroundId) {
+  return { '--surprise-bg': `url("${surpriseBackgrounds[background]}")` } as React.CSSProperties
 }
 
 function hasBoughtTutorialItem(run: Run | null) {
@@ -3409,9 +3419,9 @@ function ClassRewardCeremony({ run, choices, onDismiss }: { run: Run; choices: C
 
   return (
     <section
-      className={`class-reward-ceremony visual-theme-surface visual-theme-${visualTheme}`}
+      className={`class-reward-ceremony surprise-surface visual-theme-surface visual-theme-${visualTheme}`}
       data-visual-theme={visualTheme}
-      style={visualThemeStyle(visualTheme)}
+      style={{ ...visualThemeStyle(visualTheme), ...surpriseBackgroundStyle('classReward') }}
       role="button"
       tabIndex={0}
       onClick={onDismiss}
@@ -3473,9 +3483,9 @@ function EnchantCeremony({ run, choices, onDismiss }: { run: Run; choices: Encha
   const visualTheme = visualThemeForRound(run.round)
   return (
     <section
-      className={`class-reward-ceremony enchant-ceremony visual-theme-surface visual-theme-${visualTheme}`}
+      className={`class-reward-ceremony enchant-ceremony surprise-surface visual-theme-surface visual-theme-${visualTheme}`}
       data-visual-theme={visualTheme}
-      style={visualThemeStyle(visualTheme)}
+      style={{ ...visualThemeStyle(visualTheme), ...surpriseBackgroundStyle('enchant') }}
       role="button"
       tabIndex={0}
       onClick={onDismiss}
@@ -4033,14 +4043,8 @@ function BattleView({ run, battle, currentEvent, eventIndex, speed, score, sound
         />
       )}
 
-       {run.phase === 'COMPLETE' ? (
-         <div className={`result handdrawn-result paper-card visual-theme-surface visual-theme-${visualTheme}`} data-visual-theme={visualTheme} style={visualThemeStyle(visualTheme)}>
-           <Trophy size={32} />
-           <h2>跑局结束</h2>
-           <p>{run.wins} 胜 / {run.losses} 败 · 积分 {score}</p>
-           {run.ladderSettlement && <LadderSettlementSummary settlement={run.ladderSettlement} />}
-           <button className="primary action-button" onClick={onRestart}>重新选择狗狗</button>
-         </div>
+      {run.phase === 'COMPLETE' ? (
+        <SettlementView run={run} score={score} onRestart={onRestart} />
       ) : run.phase === 'BATTLE' && isFinished && (
         <div className="battle-continue-row">
           <button className="primary action-button" data-tutorial-anchor="battle-continue" onClick={onContinue}>
@@ -4050,6 +4054,34 @@ function BattleView({ run, battle, currentEvent, eventIndex, speed, score, sound
       )}
 
       <CollapsedBattleLog events={events} eventIndex={displayIndex} open={logOpen} onToggle={() => setLogOpen((value) => !value)} />
+    </section>
+  )
+}
+
+function SettlementView({ run, score, onRestart }: { run: Run; score: number; onRestart: () => void }) {
+  const visualTheme = visualThemeForRound(run.round)
+  return (
+    <section className="settlement-page surprise-surface" style={surpriseBackgroundStyle('settlement')}>
+      <div className={`result handdrawn-result paper-card settlement-card visual-theme-surface visual-theme-${visualTheme}`} data-visual-theme={visualTheme} style={{ ...visualThemeStyle(visualTheme), ...surpriseBackgroundStyle('settlement') }}>
+        <Trophy size={32} />
+        <h2>跑局结束</h2>
+        <div className="settlement-score-grid">
+          <span>
+            <small>胜场</small>
+            <strong>{run.wins}</strong>
+          </span>
+          <span>
+            <small>败场</small>
+            <strong>{run.losses}</strong>
+          </span>
+          <span>
+            <small>积分</small>
+            <strong>{score}</strong>
+          </span>
+        </div>
+        {run.ladderSettlement && <LadderSettlementSummary settlement={run.ladderSettlement} />}
+        <button className="primary action-button" onClick={onRestart}>重新选择狗狗</button>
+      </div>
     </section>
   )
 }
