@@ -1498,9 +1498,9 @@ describe('battle simulation', () => {
     )
 
     expect(firstPlayerRoll?.roll).toBe(6)
-    expect(itemEvents.map((event) => event.itemId)).toEqual(['starter', 'paw', 'collar', 'disc', 'bone'])
-    expect(itemEvents.map((event) => event.targetHpDelta)).toEqual([-5, -12, -8, -10, -16])
-    expect(itemEvents.map((event) => event.opponentHp)).toEqual([95, 83, 75, 65, 49])
+    expect(itemEvents.map((event) => event.itemId)).toEqual(['starter', 'paw', 'paw', 'collar', 'disc', 'disc', 'disc', 'bone'])
+    expect(itemEvents.map((event) => event.targetHpDelta)).toEqual([-5, -5, -5, -8, -3, -3, -3, -16])
+    expect(itemEvents.map((event) => event.opponentHp)).toEqual([95, 90, 85, 77, 74, 71, 68, 52])
   })
 
   it('lets shiba break repeat size-based triggers half the time', () => {
@@ -1523,8 +1523,8 @@ describe('battle simulation', () => {
     )
 
     expect(firstPlayerRoll?.roll).toBe(2)
-    expect(ballEvents).toHaveLength(2)
-    expect(ballEvents.map((event) => event.amount)).toEqual([9, 9])
+    expect(ballEvents).toHaveLength(4)
+    expect(ballEvents.map((event) => event.amount)).toEqual([4, 4, 4, 4])
   })
 
   it('lets dog house steal one thorn buff from the opponent after healing', () => {
@@ -1775,7 +1775,7 @@ describe('battle simulation', () => {
     const result = simulateBattle(player, opponent, 'structured-item-event')
     const mapped = result.events.find((event) => event.kind === 'ITEM' && event.defId === 'lucky-paw' && event.text.includes('点金手·左'))
 
-    expect(mapped).toMatchObject({ roll: 3, amount: 6, targetHpDelta: -6 })
+    expect(mapped).toMatchObject({ roll: 3, amount: 3, targetHpDelta: -3 })
     expect(mapped?.text).toContain('点金手·左')
     expect(result.playerSnapshot.relics?.[0]).toMatchObject({ relicId: 'midas-left', def: { name: '点金手·左' } })
   })
@@ -1797,7 +1797,7 @@ describe('battle simulation', () => {
     const result = simulateBattle(player, opponent, 'structured-item-event')
     const mapped = result.events.find((event) => event.kind === 'ITEM' && event.defId === 'lucky-paw' && event.text.includes('点金手·左'))
 
-    expect(mapped).toMatchObject({ roll: 3, amount: 9, targetHpDelta: -9 })
+    expect(mapped).toMatchObject({ roll: 3, amount: 4, targetHpDelta: -4 })
   })
 
   it('makes carrot shift equipped trigger dice up with wraparound', () => {
@@ -1818,7 +1818,7 @@ describe('battle simulation', () => {
     const shiftedRoll = shifted.events.find((event) => event.kind === 'ROLL' && event.actor === 'player')
     const originalRoll = original.events.find((event) => event.kind === 'ROLL' && event.actor === 'player')
 
-    expect(shifted.events.find((event) => event.time === shiftedRoll?.time && event.kind === 'ITEM' && event.itemId === 'paw')).toMatchObject({ roll: 1, amount: 12 })
+    expect(shifted.events.find((event) => event.time === shiftedRoll?.time && event.kind === 'ITEM' && event.itemId === 'paw')).toMatchObject({ roll: 1, amount: 5 })
     expect(original.events.find((event) => event.time === originalRoll?.time && event.kind === 'ITEM' && event.itemId === 'paw')).toBeUndefined()
   })
 
@@ -1839,7 +1839,7 @@ describe('battle simulation', () => {
     const roll = result.events.find((event) => event.kind === 'ROLL' && event.actor === 'player')
 
     expect(roll?.roll).toBe(2)
-    expect(result.events.find((event) => event.time === roll?.time && event.kind === 'ITEM' && event.itemId === 'paw')).toMatchObject({ roll: 2, amount: 12 })
+    expect(result.events.find((event) => event.time === roll?.time && event.kind === 'ITEM' && event.itemId === 'paw')).toMatchObject({ roll: 2, amount: 5 })
   })
 
   it('makes tissue shift equipped trigger dice down with wraparound', () => {

@@ -60,6 +60,7 @@ import { extraTriggerDiceLabel, itemTriggerCountLabel, triggerDiceLabel } from '
 import { itemVisualProfile } from './item-visual-profile'
 import { ALL_ITEM_DEFS } from './server/game/data'
 import { queryBattleFxAnchor, resolveBattleFxPoints } from './battle-vfx-coordinates'
+import { battleProjectileCues, type BattleProjectileCue } from './battle-vfx-projectiles'
 import { TERM_DEFS } from './shared/rule-terms'
 import { LANGUAGE_STORAGE_KEY, useLanguage, type Language } from './i18n'
 import {
@@ -185,6 +186,8 @@ type BattleEvent = {
   targetItemId?: string
   defId?: string
   itemTriggerCount?: number
+  multiIndex?: number
+  multiTotal?: number
   boomCounterItemId?: string
   boomCounterValue?: number
   boomCounterMax?: number
@@ -197,7 +200,7 @@ type BattleEvent = {
 }
 type BattleVfxKind = PresentationKind
 type BattleVfxStyle = { kind: BattleVfxKind; color: string; accent: string; prefix: string; particleCount: number }
-type MeteorCue = { delay: number; duration: number; lane: number; lift: number; size: number; alpha: number }
+type MeteorCue = BattleProjectileCue
 type MeteorSparkParticle = { x: number; y: number; vx: number; vy: number; size: number; grow: number; alpha: number; color: string; kind: 'dot' | 'slash' }
 type BattleFxInstance = {
   id: string
@@ -631,6 +634,8 @@ const itemIcons: Record<string, string> = {
   'dog-silver-ingot': '/assets/items/dog-silver-ingot.svg',
   'patting-bear': '/assets/items/patting-bear.svg',
   'poisoned-dog-fang': '/assets/items/poisoned-dog-fang.svg',
+  'lotus-sea': '/assets/items/lotus-sea.svg',
+  'kyushu-bracer': '/assets/items/kyushu-bracer.svg',
   'v3-broken-canine': '/assets/items/v3-broken-canine.svg',
   'v3-chew-scratch-post': '/assets/items/v3-chew-scratch-post.svg',
   'v3-cone-collar': '/assets/items/v3-cone-collar.svg',
@@ -4739,13 +4744,12 @@ function battleFxInstanceDuration(speed: number) {
 
 function drawMeteorBattleFxTrail(context: CanvasRenderingContext2D, actorX: number, actorY: number, targetX: number, targetY: number, t: number, fx: BattleVfxStyle) {
   if (fx.kind === 'none' || fx.kind === 'roll') return
-  const palette = meteorPaletteForFx(fx)
   for (const meteor of meteorVolleyCues(fx)) {
-    drawSingleMeteorProjectile(context, actorX, actorY, targetX, targetY, t, fx, meteor, palette)
+    drawSingleMeteorProjectile(context, actorX, actorY, targetX, targetY, t, fx, meteor)
   }
 }
 
-function drawSingleMeteorProjectile(context: CanvasRenderingContext2D, actorX: number, actorY: number, targetX: number, targetY: number, t: number, fx: BattleVfxStyle, meteor: MeteorCue, palette: string[]) {
+function drawSingleMeteorProjectile(context: CanvasRenderingContext2D, actorX: number, actorY: number, targetX: number, targetY: number, t: number, fx: BattleVfxStyle, meteor: MeteorCue) {
   const localT = Math.max(0, Math.min(1, (t - meteor.delay) / meteor.duration))
   if (localT <= 0 || localT >= 1) return
   const distanceX = targetX - actorX
@@ -4767,8 +4771,8 @@ function drawSingleMeteorProjectile(context: CanvasRenderingContext2D, actorX: n
   const tailY = quadraticPoint(startY, controlY, endY, tailProgress)
   const midTailX = quadraticPoint(startX, controlX, endX, Math.max(0, progress - 0.14))
   const midTailY = quadraticPoint(startY, controlY, endY, Math.max(0, progress - 0.14))
-  const primary = palette[Math.abs(Math.round(meteor.lane)) % palette.length] ?? fx.color
-  const secondary = palette[(Math.abs(Math.round(meteor.lane)) + 1) % palette.length] ?? fx.accent
+  const primary = meteor.palette[Math.abs(Math.round(meteor.lane)) % meteor.palette.length] ?? fx.color
+  const secondary = meteor.palette[(Math.abs(Math.round(meteor.lane)) + 1) % meteor.palette.length] ?? fx.accent
   const meteorPulse = 1 + Math.sin((t + meteor.delay) * Math.PI * 10) * 0.1
   const tailLayers = [
     { width: 26 * meteor.size, alpha: 0.2 * meteor.alpha, color: primary },
@@ -4817,29 +4821,12 @@ function drawSingleMeteorProjectile(context: CanvasRenderingContext2D, actorX: n
 }
 
 function meteorVolleyCues(fx: BattleVfxStyle): MeteorCue[] {
-  const meteorVolley = [
-    { delay: 0.00, duration: 0.48, lane: -2.4, lift: 94, size: 1.08, alpha: 0.95 },
-    { delay: 0.08, duration: 0.45, lane: 1.6, lift: 68, size: 0.86, alpha: 0.88 },
-    { delay: 0.17, duration: 0.5, lane: -0.7, lift: 118, size: 1.0, alpha: 0.94 },
-    { delay: 0.27, duration: 0.43, lane: 2.8, lift: 82, size: 0.78, alpha: 0.86 },
-    { delay: 0.39, duration: 0.47, lane: 0.3, lift: 106, size: 1.16, alpha: 0.98 },
-    { delay: 0.52, duration: 0.38, lane: -1.7, lift: 74, size: 0.84, alpha: 0.9 },
-  ]
-  if (fx.kind === 'miss') return meteorVolley.slice(0, 3)
-  if (fx.kind === 'poison' || fx.kind === 'damage') return meteorVolley
-  return meteorVolley.slice(0, 5)
+  const palette = meteorPaletteForFx(fx)
+  return battleProjectileCues(fx.kind).map((cue) => ({ ...cue, palette }))
 }
 
 function meteorPaletteForFx(fx: BattleVfxStyle) {
-  if (fx.kind === 'damage') return ['#ff1744', '#ff7a18', '#ffd166']
-  if (fx.kind === 'heal') return ['#00e676', '#69f0ae', '#d7ff73']
-  if (fx.kind === 'shield') return ['#1e88ff', '#72d7ff', '#e3f2ff']
-  if (fx.kind === 'poison') return ['#39ff14', '#00c853', '#b9f6ca']
-  if (fx.kind === 'weak') return ['#b026ff', '#7c4dff', '#f0abfc']
-  if (fx.kind === 'freeze') return ['#00d9ff', '#7dd3fc', '#ffffff']
-  if (fx.kind === 'thorns') return ['#f59e0b', '#facc15', '#fff3b0']
-  if (fx.kind === 'utility') return ['#38bdf8', '#818cf8', '#ffffff']
-  return [fx.color, fx.accent, '#ffffff']
+  return battleProjectileCues(fx.kind)[0]?.palette ?? [fx.color, fx.accent, '#ffffff']
 }
 
 function drawMeteorImpactFlash(context: CanvasRenderingContext2D, targetX: number, targetY: number, t: number, fx: BattleVfxStyle, size = 1, primary = fx.color, secondary = fx.accent) {

@@ -192,7 +192,7 @@ export const ITEM_DEFS: ItemDef[] = [
     defaultQuality: 'SILVER',
   }),
   slotItem('lotus-sea', '荷叶之海', 2, 11, [], ['multi', 'support', 'aura'], { type: 'UTILITY', amount: 0 }, {
-    description: '光环：左侧相邻【多重】装备的多重值 +1。钻石品质改为左右相邻【多重】装备的多重值 +1。多重最多提高到 5。',
+    description: '光环：左侧【相邻】【多重】装备的【多重】值 +1。钻石品质改为左右【相邻】【多重】装备的【多重】值 +1。【多重】最多提高到 5。',
     advancedEffect: 'MULTI_ADJACENT_BONUS',
     defaultQuality: 'GOLD',
   }),

@@ -51,11 +51,11 @@ export const itemTextById: Record<string, DefText> = {
   'starter-5': { name: '5-Pip Fang Bite', description: 'Deals 5 damage when a 5 is rolled.' },
   'starter-6': { name: '6-Pip Fang Bite', description: 'Deals 5 damage when a 6 is rolled.' },
   'small-bite': { name: 'Small Bite', description: 'Deals 4 damage. On hit, has a 20% chance to apply 1 Weak stack.' },
-  'lucky-paw': { name: 'Lucky Paw Pad', description: 'A compact attack item that hits hard on lucky high rolls.' },
-  'milk-bone': { name: 'Milk Bone', description: 'Restores health on its trigger rolls.' },
-  'rubber-ball': { name: 'Rubber Ball', description: 'A medium attack item with reliable mid-roll pressure.' },
+  'lucky-paw': { name: 'Lucky Paw Pad', description: 'Multi 2. Deals 5 damage twice when triggered.' },
+  'milk-bone': { name: 'Milk Bone', description: 'Multi 2. Restores 3 health twice when triggered.' },
+  'rubber-ball': { name: 'Rubber Ball', description: 'Multi 2. Deals 4 damage twice on reliable mid rolls.' },
   'spiked-collar': { name: 'Spiked Collar', description: 'A medium attack item that favors high rolls.' },
-  'training-disc': { name: 'Training Disc', description: 'Deals damage on edge rolls: 1 and 6.' },
+  'training-disc': { name: 'Training Disc', description: 'Multi 3. Deals 3 damage three times on edge rolls: 1 and 6.' },
   'guard-vest': { name: 'Guard Vest', description: 'Restores health across alternating trigger rolls.' },
   'giant-bone': { name: 'Giant Bone Club', description: 'Deals 16 damage. Attacks have a 50% chance to gain Fury; each Fury stack adds 1 attack damage.' },
   'dog-house': { name: 'Puppy Kennel', description: 'Restores 12 health and steals 1 enemy buff, prioritizing Thorns then Haste. Shield cannot be stolen.' },
@@ -82,6 +82,8 @@ export const itemTextById: Record<string, DefText> = {
   'v4-reverse-fur-comb': { name: 'Reverse-Fur Purifying Comb', description: 'Purges up to 3 enemy buffs. Heal 5 for each removed stack, prioritizing Thorns, Haste, then Shield chunks.' },
   'patting-bear': { name: 'Patting Bear', description: 'Each trigger applies 1 Wound. Wound increases direct attack damage taken by 1 per stack.' },
   'poisoned-dog-fang': { name: 'Poisoned Dog Fang', description: 'No trigger required. Each attack hit applies 1 Poison stack.' },
+  'lotus-sea': { name: 'Lotus Sea', description: 'Aura: the left adjacent Multi item gains +1 Multi. Diamond affects both adjacent Multi items. Multi caps at 5.' },
+  'kyushu-bracer': { name: 'Kyushu Bracer', description: 'Aura: allied Multi attack items gain bonus damage on their 2nd and later trigger, and grant Shield.' },
   'shiba-speed-katana': { name: 'Swift Katana', description: 'Each trigger grants 1 Haste stack, up to 5 stacks, resetting after battle.' },
   'shiba-great-katana': { name: 'Great Katana', description: 'Also triggers one adjacent item once.' },
   'shiba-swallow-katana': { name: 'Swallow Katana', description: 'Has a 20% chance to grant an extra roll. Stacks up to 3 extra rolls.' },
@@ -162,6 +164,7 @@ export const ruleTermTextByTerm: Record<string, RuleTermText> = {
   '爆鸣计数': { term: 'Boom Count', description: 'Boom Counter can only trigger by counting. Each allied item trigger adds 1 count. At 50, it clears and deals direct damage.', note: 'Upgrading Boom Counter only increases the damage dealt at 50.' },
   '蓄水': { term: 'Reservoir', description: 'Frog class timing mechanic. Explicit-dice gear fills over time based on its explicit dice count, then triggers and clears its own reservoir when full.', note: 'The base interval is max(0.5, 6 divided by explicit dice count divided by speed multiplier). Linked triggers do not clear the target reservoir.' },
   '暴雨季': { term: 'Rainy Season', description: 'A temporary Frog class speed window. When triggered, all reservoir gear fills 50% faster for 4 seconds.', note: 'Multiplies with Lily Pad Pump and does not change explicit dice count.' },
+  '多重': { term: 'Multi', description: 'When this item hits, it fully triggers the listed number of times. Multi 2 means two complete trigger resolutions from the same hit.', note: 'Each segment counts as a successful trigger. Each Disabled stack cancels only one segment. Multi caps at 5.' },
 }
 
 export function localizeItemDef(def: LocalizableItemDef, language: Language): DefText {
