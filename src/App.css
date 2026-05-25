@@ -2084,7 +2084,6 @@ input {
   max-width: 100%;
   width: 100%;
   padding: 9px;
-  padding-bottom: 25px;
   border-radius: 16px;
   background: var(--wood-grain), var(--wood-frame);
   box-shadow: var(--wood-shadow);
@@ -2138,10 +2137,9 @@ input {
   width: 100%;
   height: var(--slot-h);
   min-height: 142px;
-  padding-bottom: 12px;
-  overflow: visible;
-  isolation: auto;
-  z-index: auto;
+  padding-bottom: 36px;
+  overflow: hidden;
+  isolation: isolate;
   cursor: pointer;
   text-align: center;
 }
@@ -2288,8 +2286,8 @@ input {
 .trigger-count-stamp {
   position: absolute;
   left: 50%;
-  bottom: -17px;
-  z-index: 9;
+  bottom: 6px;
+  z-index: 6;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -6040,8 +6038,7 @@ input {
   .tip-body { grid-template-columns: 1fr; }
   .slot-grid { gap: 5px; padding: 10px; }
   .battle-slot-grid { gap: 5px; padding: 10px; }
-  .battle-slot-grid { padding-bottom: 25px; }
-  .battle-item { padding-bottom: 8px; }
+  .battle-item { padding-bottom: 30px; }
   .item-card { padding: 6px 4px; font-size: 11px; }
   .item-icon { width: 28px; height: 28px; }
   .shop-card { grid-template-columns: 48px 1fr; }
