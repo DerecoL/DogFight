@@ -28,18 +28,21 @@ describe('item quality upgrade UI', () => {
     expect(app).toContain('升级')
   })
 
-  it('defines four visually distinct mixed quality borders', () => {
+  it('defines four visually distinct quality glows for paper shop cards', () => {
     expect(css).toContain('.quality-bronze')
     expect(css).toContain('.quality-silver')
     expect(css).toContain('.quality-gold')
     expect(css).toContain('.quality-diamond')
-    expect(css).toContain('.shop-card.quality-bronze')
-    expect(css).toContain('.shop-card.quality-silver')
-    expect(css).toContain('.shop-card.quality-gold')
-    expect(css).toContain('.shop-card.quality-diamond')
+    expect(css).toContain('.paper-shop-card.quality-bronze')
+    expect(css).toContain('.paper-shop-card.quality-silver')
+    expect(css).toContain('.paper-shop-card.quality-gold')
+    expect(css).toContain('.paper-shop-card.quality-diamond')
+    expect(css).toContain('--shop-paper-edge-ink: rgba(61, 45, 37, .58)')
+    expect(css).toContain('--shop-quality-glow: rgba(255, 207, 66, .95)')
+    expect(css).toContain('--shop-quality-glow: rgba(102, 231, 255, .96)')
     expect(css).toContain('.upgrade-indicator')
-    expect(css).toContain('linear-gradient(135deg')
-    expect(css).toContain('0 0 18px')
+    expect(css).toContain('drop-shadow(0 0 44px var(--shop-quality-glow-strong))')
+    expect(css).not.toMatch(/\.shop-card\.quality-bronze\s*\{/)
   })
 
   it('keeps inventory and battle slot surfaces distinct from bronze quality borders', () => {
