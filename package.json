@@ -4,7 +4,8 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "concurrently \"npm:dev:server\" \"npm:dev:client\"",
+    "dev": "pglite-server --db=memory:// --max-connections=20 --include-database-url --run \"node scripts/start-local-dev.mjs\"",
+    "dev:app": "concurrently \"npm:dev:server\" \"npm:dev:client\"",
     "dev:client": "vite",
     "dev:server": "tsx watch src/server/index.ts",
     "start": "tsx src/server/index.ts",
@@ -31,6 +32,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@electric-sql/pglite-socket": "^0.1.6",
     "@eslint/js": "^10.0.1",
     "@types/bcryptjs": "^2.4.6",
     "@types/node": "^24.12.3",

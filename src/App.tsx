@@ -865,14 +865,8 @@ function itemIcon(def: ItemDef) {
   return itemIcons[def.id] ?? '/assets/items/bite.svg'
 }
 
-const prewarmedItemArt = new Set<string>()
-
-function prewarmItemArt(src: string | null | undefined) {
-  if (!src || prewarmedItemArt.has(src) || typeof Image === 'undefined') return
-  prewarmedItemArt.add(src)
-  const image = new Image()
-  image.src = src
-  void image.decode?.().catch(() => undefined)
+function ItemArtIcon({ def, className }: { def: ItemDef; className: string }) {
+  return <img className={className} src={itemIcon(def)} alt="" decoding="async" />
 }
 
 function prioritizeDragCollisions(collisions: Collision[]) {
@@ -1345,8 +1339,6 @@ export default function App() {
       setTutorialPlaced(false)
       return
     }
-    run.items.forEach((item) => prewarmItemArt(itemVisualProfile(item.def).artSrc))
-    run.shopItems.forEach((offer) => prewarmItemArt(offer.def ? itemVisualProfile(offer.def).artSrc : null))
     setTutorialBought(hasBoughtTutorialItem(run))
     setTutorialPlaced(hasPlacedTutorialItem(run))
   }, [run])
@@ -2585,12 +2577,6 @@ function DogfightRoomView({ room, onRoomChange, onLeave, soundEnabled }: { room:
     if (room.phase !== 'BATTLE') setDismissedAutoBattleId(null)
   }, [room.phase])
 
-  useEffect(() => {
-    if (!run) return
-    run.items.forEach((item) => prewarmItemArt(itemVisualProfile(item.def).artSrc))
-    run.shopItems.forEach((offer) => prewarmItemArt(offer.def ? itemVisualProfile(offer.def).artSrc : null))
-  }, [run])
-
   const moveItem = (itemId: string, area: Area, x: number, y: number) => {
     if (!run || currentMember?.ready) return
     const placement = resolveRunSlotPlacement(run, itemId, area, x, y)
@@ -3803,12 +3789,7 @@ function ShopCard({ offer, selected, ownedCount, affordable, onClick }: { offer:
       <span className="quality-chip shop-quality-chip">{language === 'en-US' ? localizeQuality(quality, language) : qualityLabel[quality]}</span>
       {owned && <span className="owned-badge" aria-label={`已拥有 ${ownedCount} 件同名装备`}>已拥有 x{ownedCount}</span>}
       {def && visual && (
-        <span className={`item-art-window shop-card-art ${visual.className} ${visual.hasCustomArt ? 'has-custom-art' : 'generated-art'}`} data-art-aspect={visual.artAspect}>
-          {visual.artSrc ? <img className="item-card-art" src={visual.artSrc} alt="" decoding="async" /> : <span className="item-card-art-fallback" aria-hidden="true" />}
-          <span className="item-icon-badge">
-            <img className="shop-item-icon" src={itemIcon(def)} alt="" />
-          </span>
-        </span>
+        <ItemArt def={def} visual={visual} className="shop-card-art" />
       )}
       <div className="shop-card-main">
         <span className={`size-badge ${visual?.className ?? 'item-tone-utility'}`}>{def?.size ?? '?'}格</span>
@@ -4024,13 +4005,10 @@ function ItemCardContent({ item, relics = [], upgradeable = false }: { item: Ite
   )
 }
 
-function ItemArt({ def, visual = itemVisualProfile(def) }: { def: ItemDef; visual?: ReturnType<typeof itemVisualProfile> }) {
+function ItemArt({ def, visual = itemVisualProfile(def), className = '' }: { def: ItemDef; visual?: ReturnType<typeof itemVisualProfile>; className?: string }) {
   return (
-    <span className={`item-art-window ${visual.className} ${visual.hasCustomArt ? 'has-custom-art' : 'generated-art'}`} data-art-aspect={visual.artAspect}>
-      {visual.artSrc ? <img className="item-card-art" src={visual.artSrc} alt="" decoding="async" /> : <span className="item-card-art-fallback" aria-hidden="true" />}
-      <span className="item-icon-badge">
-        <img className="item-icon" src={itemIcon(def)} alt="" />
-      </span>
+    <span className={`item-art-window ${className} ${visual.className} icon-art`} data-art-aspect={visual.artAspect}>
+      <ItemArtIcon def={def} className="item-card-icon-art" />
     </span>
   )
 }
@@ -4079,7 +4057,7 @@ function ItemArtDebugGallery() {
               <ItemArt def={def} visual={visual} />
               <div className="item-art-debug-copy">
                 <strong>{def.name}</strong>
-                <span>{def.size}格 · {itemArtToneLabels[visual.tone]} · {visual.hasCustomArt ? 'WebP' : '回退纹理'}</span>
+                <span>{def.size}格 · {itemArtToneLabels[visual.tone]} · 图标</span>
                 <small>{def.id}</small>
                 <small><RuleText text={def.description ?? effectText(def, quality)} /></small>
               </div>
@@ -4141,10 +4119,7 @@ function FloatingTip({ run, item, offer, anchor, descriptionOverride, relicsOver
       <div className="tip-body">
         <div className="tip-identity">
           <span className={`tip-icon-frame ${visual.className}`}>
-            <span className={`item-art-window tip-art-preview ${visual.className} ${visual.hasCustomArt ? 'has-custom-art' : 'generated-art'}`} data-art-aspect={visual.artAspect}>
-              {visual.artSrc ? <img className="item-card-art" src={visual.artSrc} alt="" decoding="async" /> : <span className="item-card-art-fallback" aria-hidden="true" />}
-            </span>
-            <img className="tip-icon" src={itemIcon(def)} alt="" />
+            <ItemArt def={def} visual={visual} className="tip-art-preview" />
           </span>
           <h3>{localizedDef.name}</h3>
         </div>
