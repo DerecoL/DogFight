@@ -1,4 +1,4 @@
-export type DogType = 'SHIBA' | 'SAMOYED' | 'MUTT' | 'BULLY' | 'EMPEROR'
+export type DogType = 'SHIBA' | 'SAMOYED' | 'MUTT' | 'BULLY' | 'EMPEROR' | 'FROG'
 export type Phase = 'SHOP' | 'CHOICE' | 'CLASS_REWARD' | 'ENCHANT_CHOICE' | 'RELIC_CHOICE' | 'UPGRADE_CHOICE' | 'POTION_CHOICE' | 'PREP' | 'MATCH' | 'BATTLE' | 'COMPLETE'
 export type ShopType = 'GENERAL' | 'LARGE' | 'MEDIUM' | 'SMALL' | 'SMALL_DICE' | 'BIG_DICE' | 'RELIC' | 'UPGRADE' | 'POTION'
 export type Area = 'EQUIPMENT' | 'BAG'
@@ -59,6 +59,12 @@ export type AdvancedEffect =
   | 'PURGE_ENEMY_BUFFS'
   | 'POST_BATTLE_EQUIPPED_SELL_BONUS'
   | 'POST_BATTLE_CARRIED_SELL_BONUS'
+  | 'FROG_RESERVOIR_SPEED'
+  | 'FROG_ROLL_ON_RESERVOIR'
+  | 'FROG_CHARGE_ADJACENT'
+  | 'FROG_ROLL_ECHO'
+  | 'FROG_RAINY_SEASON'
+  | 'FROG_TRIGGER_HIGHEST_RESERVOIR'
 
 export type ItemDef = {
   id: string
@@ -229,6 +235,20 @@ export type BattleEvent = {
   target?: 'player' | 'opponent' | 'both' | 'none'
   sourceHpDelta?: number
   targetHpDelta?: number
+  reservoirs?: BattleReservoirRows
+}
+
+export type BattleReservoirEntry = {
+  itemId: string
+  duration: number
+  progress: number
+  nextAt: number
+  speedMultiplier: number
+}
+
+export type BattleReservoirRows = {
+  player: BattleReservoirEntry[]
+  opponent: BattleReservoirEntry[]
 }
 
 export type BattleResult = {

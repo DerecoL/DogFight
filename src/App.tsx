@@ -93,7 +93,7 @@ import {
 import './App.css'
 import './ui/handdrawn.css'
 
-type DogType = 'SHIBA' | 'SAMOYED' | 'MUTT' | 'BULLY' | 'EMPEROR'
+type DogType = 'SHIBA' | 'SAMOYED' | 'MUTT' | 'BULLY' | 'EMPEROR' | 'FROG'
 type Phase = 'SHOP' | 'CHOICE' | 'CLASS_REWARD' | 'ENCHANT_CHOICE' | 'RELIC_CHOICE' | 'UPGRADE_CHOICE' | 'POTION_CHOICE' | 'PREP' | 'MATCH' | 'BATTLE' | 'COMPLETE'
 type Area = 'EQUIPMENT' | 'BAG'
 type ShopType = 'GENERAL' | 'LARGE' | 'MEDIUM' | 'SMALL' | 'SMALL_DICE' | 'BIG_DICE' | 'RELIC' | 'UPGRADE' | 'POTION'
@@ -159,6 +159,13 @@ type BattleStatusEntry = {
   tickDamage?: number
 }
 type BattleStatusRows = { positive: BattleStatusEntry[]; negative: BattleStatusEntry[] }
+type BattleReservoirEntry = {
+  itemId: string
+  duration: number
+  progress: number
+  nextAt: number
+  speedMultiplier: number
+}
 type BattleEvent = {
   time: number
   actor: BattleActor
@@ -172,6 +179,7 @@ type BattleEvent = {
   opponentShield?: number
   playerStatuses?: BattleStatusRows
   opponentStatuses?: BattleStatusRows
+  reservoirs?: { player: BattleReservoirEntry[]; opponent: BattleReservoirEntry[] }
   statusChanged?: string[]
   roll?: number
   itemId?: string
@@ -421,13 +429,14 @@ type DogfightRoomResponse = { room: DogfightRoom }
 type DogfightLeaveResponse = { room: DogfightRoom | null }
 type DogfightBattleResponse = { battle: { id: string; roomId: string; round: number; opponentKind: string; result: Battle } }
 
-const dogNames: Record<DogType, string> = { SHIBA: '柴犬', SAMOYED: '萨摩耶', MUTT: '土狗', BULLY: '恶霸', EMPEROR: '狗皇帝' }
+const dogNames: Record<DogType, string> = { SHIBA: '柴犬', SAMOYED: '萨摩耶', MUTT: '土狗', BULLY: '恶霸', EMPEROR: '狗皇帝', FROG: '青蛙' }
 const dogTraits: Record<DogType, string> = {
   SHIBA: '20% 概率改掷为【小点】 1/2/3',
   SAMOYED: '20% 概率改掷为【大点】 4/5/6',
   MUTT: '20% 概率【额外投掷】一次',
   BULLY: '40% 概率使本次触发的【大型物品】效果翻倍',
   EMPEROR: '指定【天命数字】，命中时 50% 概率使触发效果翻倍',
+  FROG: '显式点数装备改为【蓄水】触发：间隔 = 6 / 点数数量，可被职业装备提速',
 }
 const dogAssets: Record<DogType, string> = {
   SHIBA: '/assets/dogs/shiba.webp',
@@ -435,6 +444,7 @@ const dogAssets: Record<DogType, string> = {
   MUTT: '/assets/dogs/mutt.webp',
   BULLY: '/assets/dogs/bully.webp',
   EMPEROR: '/assets/dogs/emperor.webp',
+  FROG: '/assets/dogs/frog.svg',
 }
 const dogBrawlTownBackground = '/assets/backgrounds/dog-brawl-town.jpg'
 const visualThemeAssets: Record<VisualThemeId, string> = {
@@ -671,6 +681,12 @@ const itemIcons: Record<string, string> = {
   'emperor-curtain': '/assets/items/emperor-curtain.svg',
   'emperor-edict': '/assets/items/emperor-edict.svg',
   'emperor-fallen': '/assets/items/emperor-fallen.svg',
+  'frog-lily-pump': '/assets/items/frog-lily-pump.svg',
+  'frog-croak-drum': '/assets/items/frog-croak-drum.svg',
+  'frog-raindrop-funnel': '/assets/items/frog-raindrop-funnel.svg',
+  'frog-lotus-echo': '/assets/items/frog-lotus-echo.svg',
+  'frog-rainy-season': '/assets/items/frog-rainy-season.svg',
+  'frog-full-pond-gate': '/assets/items/frog-full-pond-gate.svg',
 }
 const relicIcons: Record<string, string> = {
   'midas-left': '/assets/relics/midas-left.svg',
@@ -733,7 +749,7 @@ const ladderTierLabel: Record<LadderTier, string> = {
   MASTER: '大师',
   DOG_KING: '犬王',
 }
-const dogOptions: DogType[] = ['SHIBA', 'SAMOYED', 'MUTT', 'BULLY', 'EMPEROR']
+const dogOptions: DogType[] = ['SHIBA', 'SAMOYED', 'MUTT', 'BULLY', 'EMPEROR', 'FROG']
 const shopChoiceOrder: ShopType[] = ['GENERAL', 'LARGE', 'MEDIUM', 'SMALL', 'SMALL_DICE', 'BIG_DICE', 'RELIC', 'UPGRADE', 'POTION']
 const SHOP_CHOICE_SLOT_COUNT = shopChoiceOrder.length
 const dogStrategies: Record<DogType, string> = {
@@ -742,6 +758,7 @@ const dogStrategies: Record<DogType, string> = {
   MUTT: '适合随机和连击构筑，上限更高但波动更大',
   BULLY: '适合【大型物品】构筑，围绕 4 格道具打爆发',
   EMPEROR: '适合围绕一个核心点数堆叠道具，命中【天命数字】时有爆发上限',
+  FROG: '适合显式点数装备和水位提速构筑，用稳定计时换取持续触发',
 }
 const dogTags: Record<DogType, string[]> = {
   SHIBA: ['进攻', '简单'],
@@ -749,6 +766,7 @@ const dogTags: Record<DogType, string[]> = {
   MUTT: ['随机', '困难'],
   BULLY: ['大型', '爆发'],
   EMPEROR: ['幸运', '爆发'],
+  FROG: ['蓄水', '稳定'],
 }
 const shopDescriptions: Record<ShopType, string> = {
   GENERAL: '提供各类基础道具，适合补齐构筑短板',
@@ -1018,6 +1036,10 @@ function boomCounterStateForBattleItem(item: Item, owner: 'player' | 'opponent',
   const progress = max > 0 ? Math.round((count / max) * 100) : 0
   const popping = activeEvent?.actor === owner && activeEvent.boomCounterItemId === item.id && activeEvent.boomCounterChanged === true
   return { count, max, progress, popping }
+}
+
+function reservoirStateForBattleItem(event: BattleEvent | undefined, owner: 'player' | 'opponent', itemId: string) {
+  return event?.reservoirs?.[owner]?.find((entry) => entry.itemId === itemId) ?? null
 }
 
 function enchantmentText(enchant?: Enchantment | null) {
@@ -4338,6 +4360,7 @@ function BattleEquipmentRow({ owner, snapshot, events, displayIndex, activeEvent
         {items.map((item) => {
           const growthText = growthDamageTextForBattleItem(item, owner, events, displayIndex)
           const boomCounterState = boomCounterStateForBattleItem(item, owner, events, displayIndex, activeEvent)
+          const reservoirState = reservoirStateForBattleItem(activeEvent, owner, item.id)
           const triggerDice = triggerDiceLabel(itemTriggerDisplay(item), snapshot.relics ?? [])
           const triggerCountLabel = itemTriggerCountLabel(events, owner, item.id, displayIndex)
           const triggerCountPopping = activeItemId === item.id
@@ -4349,7 +4372,7 @@ function BattleEquipmentRow({ owner, snapshot, events, displayIndex, activeEvent
             as="button"
             type="button"
             key={item.id}
-            className={`battle-item item-card paper-item-card ${itemTone(item.def)} ${qualityClass(item.quality)} ${activeItemId === item.id ? `active battle-item-trigger vfx-trigger-${activeVfxKind}` : ''} ${targetItemIds.includes(item.id) ? 'battle-item-vfx-target' : ''} ${boomCounterState ? 'boom-counter' : ''} ${boomCounterState?.popping ? 'boom-counter-pop' : ''} ${triggerCountPopping ? 'trigger-count-pop' : ''}`}
+            className={`battle-item item-card paper-item-card ${itemTone(item.def)} ${qualityClass(item.quality)} ${activeItemId === item.id ? `active battle-item-trigger vfx-trigger-${activeVfxKind}` : ''} ${targetItemIds.includes(item.id) ? 'battle-item-vfx-target' : ''} ${boomCounterState ? 'boom-counter' : ''} ${boomCounterState?.popping ? 'boom-counter-pop' : ''} ${reservoirState ? 'frog-reservoir-card' : ''} ${triggerCountPopping ? 'trigger-count-pop' : ''}`}
             {...battleVfxAnchorAttrs('equipment-row', owner, item.id)}
             data-vfx-kind={battleVfxKind(activeEvent)}
             style={{
@@ -4359,6 +4382,13 @@ function BattleEquipmentRow({ owner, snapshot, events, displayIndex, activeEvent
             title={`${qualityText} ${localizedDef.name} · ${itemEffect}`}
             onClick={(event) => onInspect(item, event.currentTarget)}
           >
+            {reservoirState && (
+              <span
+                className="frog-reservoir-fill"
+                style={{ height: `${Math.round(Math.max(0, Math.min(1, reservoirState.progress)) * 100)}%` }}
+                aria-hidden="true"
+              />
+            )}
             <img className="item-icon" src={itemIcon(item.def)} alt="" />
             <span className="quality-chip">{qualityText}</span>
             <span>{localizedDef.name}</span>

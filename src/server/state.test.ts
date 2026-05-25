@@ -121,6 +121,26 @@ describe('post-battle phase flow', () => {
     expect(phase.enchantThirdLossGranted).toBe(true)
   })
 
+  it('creates frog class reward choices on rounds 3 and 6', () => {
+    const roundThree = nextPhaseData({
+      id: 'frog-run',
+      dogType: 'FROG' as never,
+      losses: 0,
+      enchantThirdLossGranted: false,
+    }, 3, 'frog-round-3')
+    const roundSix = nextPhaseData({
+      id: 'frog-run',
+      dogType: 'FROG' as never,
+      losses: 0,
+      enchantThirdLossGranted: false,
+    }, 6, 'frog-round-6')
+
+    expect(roundThree.phase).toBe('CLASS_REWARD')
+    expect(JSON.parse(roundThree.classRewardChoices)).toEqual(['frog-lily-pump', 'frog-croak-drum', 'frog-raindrop-funnel'])
+    expect(roundSix.phase).toBe('CLASS_REWARD')
+    expect(JSON.parse(roundSix.classRewardChoices)).toEqual(['frog-lotus-echo', 'frog-rainy-season', 'frog-full-pond-gate'])
+  })
+
   it('triggers the third-loss enchant shop once and records that it was granted', () => {
     const phase = nextPhaseData({
       id: 'run-2',

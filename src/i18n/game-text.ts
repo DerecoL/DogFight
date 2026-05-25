@@ -40,6 +40,7 @@ export const dogTextByType: Record<DogType, DefText> = {
   MUTT: { name: 'Mutt', description: '20% chance to gain one extra roll.' },
   BULLY: { name: 'Bully', description: '40% chance to double the effect of the triggered large item.' },
   EMPEROR: { name: 'Dog Emperor', description: 'Choose a destiny number. When it hits, there is a 50% chance to double triggered effects.' },
+  FROG: { name: 'Frog', description: 'Explicit-dice gear fills a reservoir instead of using base rolls. Trigger interval is 6 divided by explicit dice count, and class gear can speed it up.' },
 }
 
 export const itemTextById: Record<string, DefText> = {
@@ -111,6 +112,12 @@ export const itemTextById: Record<string, DefText> = {
   'emperor-curtain': { name: 'Rule Behind the Curtain', description: 'Your original destiny number becomes inactive. Adjacent gear uses the destiny number as its trigger number.' },
   'emperor-edict': { name: 'Tyrannical Edict', description: 'At battle start, forcibly changes the trigger dice of the two leftmost items on both sides to your destiny number.' },
   'emperor-fallen': { name: 'Fallen Monarch', description: 'Only destiny-number gear can take effect, including no-trigger gear, but destiny-number gear triggers twice.' },
+  'frog-lily-pump': { name: 'Lily Pad Pump', description: 'Passive: all reservoir gear fills 15% faster.' },
+  'frog-croak-drum': { name: 'Croak Drum', description: 'After this item triggers from a full reservoir, perform one ordinary roll. That roll cannot request another Croak Drum roll.' },
+  'frog-raindrop-funnel': { name: 'Raindrop Funnel', description: 'After this item triggers from a full reservoir, adjacent reservoir gear gains 50% reservoir progress.' },
+  'frog-lotus-echo': { name: 'Lotus Pond Echo', description: 'The first non-class item hit by an ordinary roll created by class gear triggers one extra time.' },
+  'frog-rainy-season': { name: 'Rainy Season', description: 'After this item triggers from a full reservoir, all reservoir gear fills 50% faster for 4 seconds.' },
+  'frog-full-pond-gate': { name: 'Full Pond Gate', description: 'After this item triggers from a full reservoir, immediately triggers the non-class item with the highest current reservoir progress.' },
 }
 
 export const relicTextById: Record<string, DefText> = {
@@ -153,6 +160,8 @@ export const ruleTermTextByTerm: Record<string, RuleTermText> = {
   '真实伤害': { term: 'True Damage', description: 'Damage that directly reduces health and does not get absorbed by Shield first.', note: 'Broken Canine can deal true damage.' },
   '雪崩': { term: 'Avalanche', description: 'Samoyed class count. Low rolls add stacks. At 5 stacks, they clear and deal damage; each Avalanche doubles the next one.', note: 'Avalanche base damage scales with quality.' },
   '爆鸣计数': { term: 'Boom Count', description: 'Boom Counter can only trigger by counting. Each allied item trigger adds 1 count. At 50, it clears and deals direct damage.', note: 'Upgrading Boom Counter only increases the damage dealt at 50.' },
+  '蓄水': { term: 'Reservoir', description: 'Frog class timing mechanic. Explicit-dice gear fills over time based on its explicit dice count, then triggers and clears its own reservoir when full.', note: 'The base interval is max(0.5, 6 divided by explicit dice count divided by speed multiplier). Linked triggers do not clear the target reservoir.' },
+  '暴雨季': { term: 'Rainy Season', description: 'A temporary Frog class speed window. When triggered, all reservoir gear fills 50% faster for 4 seconds.', note: 'Multiplies with Lily Pad Pump and does not change explicit dice count.' },
 }
 
 export function localizeItemDef(def: LocalizableItemDef, language: Language): DefText {
@@ -173,6 +182,7 @@ export function localizeDog(dogType: DogType, language: Language): { name: strin
       MUTT: { name: '土狗', trait: '20% 概率【额外投掷】一次' },
       BULLY: { name: '恶霸', trait: '40% 概率使本次触发的【大型物品】效果翻倍' },
       EMPEROR: { name: '狗皇帝', trait: '指定【天命数字】（幸运数字），命中时 50% 概率使触发效果翻倍' },
+      FROG: { name: '青蛙', trait: '显式点数装备改为【蓄水】触发：间隔 = 6 / 点数数量，可被职业装备提速' },
     }
     return zhDogText[dogType]
   }

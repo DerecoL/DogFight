@@ -9,6 +9,7 @@ export const DOGS: Record<DogType, { name: string; trait: string }> = {
   MUTT: { name: '土狗', trait: '20% 概率【额外投掷】一次' },
   BULLY: { name: '恶霸', trait: '40% 概率使本次触发的【大型物品】效果翻倍' },
   EMPEROR: { name: '狗皇帝', trait: '指定【天命数字】（幸运数字），命中时 50% 概率使触发效果翻倍' },
+  FROG: { name: '青蛙', trait: '显式点数装备改为【蓄水】触发：间隔 = 6 / 点数数量，可被职业装备提速' },
 }
 
 export const SHIBA_POISON_ON_ROLL_AMOUNT = 6
@@ -226,6 +227,13 @@ export const CLASS_REWARD_DEFS: ItemDef[] = [
   classItem('EMPEROR', 6, 'emperor-curtain', '垂帘听政', 2, [1, 2, 3, 4, 5, 6], ['lucky'], '原【天命数字】无效，该装备【相邻】的装备的触发数字为【天命数字】', 'ADJACENT_USES_LUCKY', 'DIAMOND'),
   classItem('EMPEROR', 6, 'emperor-edict', '蛮横圣旨', 2, [1, 2, 3, 4, 5, 6], ['lucky'], '战斗开始时，强行将敌我双方最左侧的 2 个道具的触发点数，强行篡改为你的【天命数字】', 'OPENING_FORCE_LUCKY', 'DIAMOND'),
   classItem('EMPEROR', 6, 'emperor-fallen', '亡国之君', 1, [1, 2, 3, 4, 5, 6], ['lucky'], '仅【天命数字】的装备才能生效（包含不计入），但是【天命数字】装备生效2次', 'ONLY_LUCKY_DOUBLE', 'DIAMOND'),
+
+  classItem('FROG', 3, 'frog-lily-pump', '荷叶水泵', 1, [], ['reservoir', 'speed'], '被动：所有【蓄水】装备充水速度 +15%。', 'FROG_RESERVOIR_SPEED', 'GOLD'),
+  classItem('FROG', 3, 'frog-croak-drum', '蛙鸣鼓', 1, [1, 2, 3], ['reservoir', 'roll'], '【蓄水】触发后，进行一次普通投骰，按骰点激活装备；该投骰不会再次触发蛙鸣鼓的投骰效果。', 'FROG_ROLL_ON_RESERVOIR', 'GOLD'),
+  classItem('FROG', 3, 'frog-raindrop-funnel', '雨滴漏斗', 1, [1, 2, 3], ['reservoir', 'support'], '【蓄水】触发后，使【相邻】装备立刻获得 50% 水位。', 'FROG_CHARGE_ADJACENT', 'GOLD'),
+  classItem('FROG', 6, 'frog-lotus-echo', '莲池回声', 1, [], ['reservoir', 'roll'], '被动：由职业装备产生的普通投骰，命中的第一件非职业装备额外触发 1 次。', 'FROG_ROLL_ECHO', 'DIAMOND'),
+  classItem('FROG', 6, 'frog-rainy-season', '暴雨季', 2, [1, 2, 3], ['reservoir', 'speed'], '【蓄水】触发后，刷新 4 秒全体充水速度 +50%。', 'FROG_RAINY_SEASON', 'DIAMOND'),
+  classItem('FROG', 6, 'frog-full-pond-gate', '满池闸门', 2, [1, 2, 3], ['reservoir', 'trigger'], '【蓄水】触发后，立即触发当前水位最高的一件非职业装备。', 'FROG_TRIGGER_HIGHEST_RESERVOIR', 'DIAMOND'),
 ]
 
 export const RELIC_DEFS: RelicDef[] = [
@@ -316,6 +324,12 @@ export function itemDescription(itemId: string, quality?: string | null) {
   }
   if (advanced === 'POST_BATTLE_EQUIPPED_SELL_BONUS') return `无需触发。放在装备栏时，参战结束后出售价格 +${POST_BATTLE_EQUIPPED_SELL_BONUS_AMOUNT}。`
   if (advanced === 'POST_BATTLE_CARRIED_SELL_BONUS') return `无需触发。放在装备栏或背包时，参战结束后出售价格 +${POST_BATTLE_CARRIED_SELL_BONUS_AMOUNT}。`
+  if (advanced === 'FROG_RESERVOIR_SPEED') return '被动：所有【蓄水】装备充水速度 +15%。'
+  if (advanced === 'FROG_ROLL_ON_RESERVOIR') return `${baseEffect}【蓄水】触发后，进行一次普通投骰，按骰点激活装备；该投骰不会再次触发蛙鸣鼓的投骰效果。`
+  if (advanced === 'FROG_CHARGE_ADJACENT') return `${baseEffect}【蓄水】触发后，使【相邻】装备立刻获得 50% 水位。`
+  if (advanced === 'FROG_ROLL_ECHO') return '被动：由职业装备产生的普通投骰，命中的第一件非职业装备额外触发 1 次。'
+  if (advanced === 'FROG_RAINY_SEASON') return `${baseEffect}【蓄水】触发后，刷新 4 秒全体充水速度 +50%。`
+  if (advanced === 'FROG_TRIGGER_HIGHEST_RESERVOIR') return `${baseEffect}【蓄水】触发后，立即触发当前水位最高的一件非职业装备。`
   if (advanced === 'POISON_ON_ROLL') return `${baseEffect}每次投掷都会对敌人叠加 ${SHIBA_POISON_ON_ROLL_AMOUNT} 层【中毒】（不随品质提升）。`
   if (advanced === 'GAIN_THORNS') return `${baseEffect}每次触发有 50% 概率获得 ${one} 层【荆棘】。`
   if (advanced === 'APPLY_WEAK') return `${baseEffect}每次触发有 50% 概率给敌人施加 ${one} 层【虚弱】。`

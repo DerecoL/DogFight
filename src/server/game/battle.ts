@@ -34,6 +34,7 @@ import type {
   GameItem,
   ItemDef,
   ItemQuality,
+  BattleReservoirRows,
 } from './types'
 
 type Side = 'player' | 'opponent'
@@ -104,6 +105,7 @@ type BattleSideState = {
   shibaSpeedStacks: number
   furyStacks: number
   boomCountersByItemId: Record<string, number>
+  frogRainyUntil: number
 }
 
 function maxHealthForRound(round: number) {
@@ -140,6 +142,7 @@ function createSideState(maxHp: number): BattleSideState {
     shibaSpeedStacks: 0,
     furyStacks: 0,
     boomCountersByItemId: {},
+    frogRainyUntil: 0,
   }
 }
 
@@ -336,6 +339,13 @@ function roundScaled(amount: number, scale: number) {
   return Math.max(0, Math.round(amount * scale))
 }
 
+type ReservoirRuntime = {
+  item: GameItem
+  nextAt: number
+  duration: number
+  lastResetAt: number
+}
+
 export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapshot, seed: string): BattleResult {
   const rng = createRng(seed)
   const playerMaxHp = maxHealthForRound(player.round)
@@ -346,6 +356,61 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
   const events: BattleEvent[] = []
   const playerSnapshot = toBattleSnapshot(player)
   const opponentSnapshot = toBattleSnapshot(opponent)
+  const reservoirs: Record<Side, Record<string, ReservoirRuntime>> = { player: {}, opponent: {} }
+
+  const reservoirSpeedMultiplier = (side: Side, time: number) => {
+    const fighter = side === 'player' ? player : opponent
+    if (fighter.dogType !== 'FROG') return 1
+    let speed = hasEquippedEffect(fighter, 'FROG_RESERVOIR_SPEED') ? 1.15 : 1
+    if (state[side].frogRainyUntil > time + TIME_EPSILON) speed *= 1.5
+    return speed
+  }
+
+  const reservoirDuration = (side: Side, item: GameItem, time: number) => {
+    const fighter = side === 'player' ? player : opponent
+    const diceCount = triggerDiceContext(fighter, item).dice.length
+    if (diceCount <= 0) return null
+    const speed = reservoirSpeedMultiplier(side, time)
+    return Math.max(0.5, 6 / diceCount / speed)
+  }
+
+  const refreshReservoir = (side: Side, item: GameItem, time: number, progress = 0) => {
+    const duration = reservoirDuration(side, item, time)
+    if (duration == null) return
+    const clampedProgress = Math.max(0, Math.min(0.999, progress))
+    reservoirs[side][item.id] = {
+      item,
+      duration,
+      lastResetAt: roundBattleTime(time - duration * clampedProgress),
+      nextAt: roundBattleTime(time + duration * (1 - clampedProgress)),
+    }
+  }
+
+  const reservoirRows = (time: number): BattleReservoirRows => {
+    const rows = (side: Side) => Object.values(reservoirs[side])
+      .sort((left, right) => left.item.x - right.item.x)
+      .map((entry) => {
+        const duration = reservoirDuration(side, entry.item, time) ?? entry.duration
+        const progress = Math.max(0, Math.min(1, (time - entry.lastResetAt) / entry.duration))
+        return {
+          itemId: entry.item.id,
+          duration: roundBattleTime(duration),
+          progress: roundBattleTime(progress),
+          nextAt: entry.nextAt,
+          speedMultiplier: roundBattleTime(reservoirSpeedMultiplier(side, time)),
+        }
+      })
+    return { player: rows('player'), opponent: rows('opponent') }
+  }
+
+  const resetReservoir = (side: Side, item: GameItem, time: number) => refreshReservoir(side, item, time, 0)
+
+  const chargeReservoir = (side: Side, item: GameItem, time: number, amount: number) => {
+    const entry = reservoirs[side][item.id]
+    if (!entry) return
+    const currentProgress = Math.max(0, Math.min(1, (time - entry.lastResetAt) / entry.duration))
+    refreshReservoir(side, item, time, currentProgress + amount)
+  }
 
   const poisonTickDamage = (side: Side) => {
     if (state[side].poison <= 0) return 0
@@ -384,6 +449,7 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
       opponentShield: Math.max(0, state.opponent.shield),
       playerStatuses: statusRows('player', event.time),
       opponentStatuses: statusRows('opponent', event.time),
+      reservoirs: reservoirRows(event.time),
     })
   }
 
@@ -567,6 +633,12 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
   applyBloodContractAura('player', player)
   applyBloodContractAura('opponent', opponent)
 
+  for (const side of ['player', 'opponent'] as const) {
+    const fighter = side === 'player' ? player : opponent
+    if (fighter.dogType !== 'FROG') continue
+    for (const item of triggerOrder(fighter.items)) refreshReservoir(side, item, 0)
+  }
+
   const executeItem = (
     actorSide: Side,
     actor: FighterSnapshot,
@@ -576,10 +648,11 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
     scale: number,
     note: string,
     queue: TriggerQueueEntry[],
-    processed: { count: number; capped: boolean; extraRollRequests: number },
+    processed: { count: number; capped: boolean; extraRollRequests: number; frogRollRequests: number },
     extra: boolean,
     extraDepth: number,
     allowExtraRollFanout: boolean,
+    frogClassRoll: boolean,
   ): ItemTrigger[] => {
     const targetSide = opponentOf(actorSide)
     const targetFighter = targetSide === 'player' ? player : opponent
@@ -996,6 +1069,29 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
     if (!sacrificeReplacesSmallEffect && advanced === 'ADJACENT_DAMAGE_BONUS') {
       for (const adjacent of adjacentItems(actor, item)) actorState.adjacentDamageBonus[adjacent.id] = (actorState.adjacentDamageBonus[adjacent.id] ?? 0) + qualityAmount(4, quality)
     }
+    if (!sacrificeReplacesSmallEffect && advanced === 'FROG_CHARGE_ADJACENT') {
+      const adjacent = adjacentItems(actor, item)
+      for (const targetItem of adjacent) chargeReservoir(actorSide, targetItem, time, 0.5)
+      triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'UTILITY', amount: adjacent.length, target: actorSide, sourceHp: getHp(actorSide), targetHp: getHp(targetSide), sourceHpDelta: 0, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 使【相邻】装备获得 50% 水位` })
+    }
+    if (!sacrificeReplacesSmallEffect && advanced === 'FROG_RAINY_SEASON') {
+      actorState.frogRainyUntil = Math.max(actorState.frogRainyUntil, time + 4)
+      triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'UTILITY', amount: 4, target: actorSide, sourceHp: getHp(actorSide), targetHp: getHp(targetSide), sourceHpDelta: 0, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 开启【暴雨季】，4 秒内充水速度 +50%` })
+    }
+    if (!sacrificeReplacesSmallEffect && advanced === 'FROG_TRIGGER_HIGHEST_RESERVOIR') {
+      const candidates = Object.values(reservoirs[actorSide])
+        .filter((entry) => entry.item.id !== item.id && itemDef(entry.item.defId).kind !== 'CLASS_EQUIPMENT')
+        .sort((left, right) => ((time - right.lastResetAt) / right.duration) - ((time - left.lastResetAt) / left.duration))
+      const target = candidates[0]?.item
+      if (target) {
+        queueItems(queue, [target])
+        triggers.push({ itemId: item.id, targetItemId: target.id, defId: item.defId, quality, effectType: 'UTILITY', amount: 1, target: actorSide, sourceHp: getHp(actorSide), targetHp: getHp(targetSide), sourceHpDelta: 0, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 立即触发水位最高的装备` })
+      }
+    }
+    if (!sacrificeReplacesSmallEffect && advanced === 'FROG_ROLL_ON_RESERVOIR' && !frogClassRoll) {
+      processed.frogRollRequests = (processed.frogRollRequests ?? 0) + 1
+      triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'ROLL', amount: 1, target: actorSide, sourceHp: getHp(actorSide), targetHp: getHp(targetSide), sourceHpDelta: 0, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 鼓动水声，准备进行一次普通投骰` })
+    }
     if (!sacrificeReplacesSmallEffect && advanced === 'ADJACENT_TEMP_TRIGGER') {
       const adjacent = adjacentItems(actor, item)
       for (let i = 0; i < nightPatrolLightTriggerCount(quality); i += 1) queueItems(queue, adjacent)
@@ -1106,54 +1202,18 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
     return triggers
   }
 
-  const resolveActor = (time: number, actorSide: Side, extra = false, extraDepth = 0) => {
-    const fighter = actorSide === 'player' ? player : opponent
+  const processTriggerQueue = (
+    time: number,
+    actorSide: Side,
+    fighter: FighterSnapshot,
+    roll: number,
+    queue: TriggerQueueEntry[],
+    extra = false,
+    extraDepth = 0,
+    frogClassRoll = false,
+  ) => {
+    const processed = { count: 0, capped: false, extraRollRequests: 0, frogRollRequests: 0 }
     const fighterState = state[actorSide]
-    let roll = rollDog(fighter.dogType, rng)
-    if (triggerOrder(fighter.items).some((item) => itemDef(item.defId).advancedEffect === 'ROLL_TWO_PICK_SMALL')) {
-      const second = rollDog(fighter.dogType, rng)
-      roll = Math.min(roll, second)
-    }
-    if (fighter.dogType === 'EMPEROR' && fighter.luckyNumber && triggerOrder(fighter.items).some((item) => itemDef(item.defId).advancedEffect === 'LUCKY_NUMBER_PITY')) {
-      if (fighterState.missedLucky >= 2) roll = fighter.luckyNumber
-    }
-    roll = biasRollByRelic(fighter, roll, rng)
-    roll = restrictRollByRelic(fighter, roll)
-    fighterState.rollCount += 1
-    if (fighter.dogType === 'EMPEROR' && fighter.luckyNumber) fighterState.missedLucky = roll === fighter.luckyNumber ? 0 : fighterState.missedLucky + 1
-    push({
-      time,
-      actor: actorSide,
-      kind: 'ROLL',
-      roll,
-      effectType: 'ROLL',
-      target: 'none',
-      text: `${fighter.name}${extra ? ' 额外' : ''}掷出 ${roll} 点（${DOGS[fighter.dogType].name}）`,
-    })
-
-    const initialMatches = triggerOrder(fighter.items)
-      .map((item) => ({ item, context: matchingContext(fighter, item, roll, fighterState.forcedItemDice) }))
-      .filter(({ context }) => context.matches)
-    const initialQueue = hasEquippedEffect(fighter, 'ONLY_LUCKY_DOUBLE') && fighter.luckyNumber !== roll
-      ? []
-      : initialMatches.flatMap(({ item, context }) => context.triggeredBySize && rng() < 0.5 ? [item, item] : [item])
-    const emptyRollSafety = relicWithEffect(fighter, 'EMPTY_ROLL_LARGE_SAFETY')
-    const missedBeforeRoll = fighterState.emptyRolls
-    if (initialQueue.length === 0 && emptyRollSafety && missedBeforeRoll >= relicEmptyRollMisses(emptyRollSafety.relicId, emptyRollSafety.quality)) {
-      const safety = triggerOrder(fighter.items).find((item) => isLarge(itemDef(item.defId), fighter))
-        ?? triggerOrder(fighter.items).find((item) => [2, 3].includes(itemDef(item.defId).size))
-      if (safety) initialQueue.push(safety)
-      fighterState.emptyRolls = 0
-    } else if (initialQueue.length === 0) {
-      fighterState.emptyRolls += 1
-    } else {
-      fighterState.emptyRolls = 0
-    }
-    const queuedItems = hasEquippedEffect(fighter, 'ONLY_LUCKY_DOUBLE') && fighter.luckyNumber === roll
-      ? initialQueue.flatMap((item) => [item, item])
-      : initialQueue
-    const queue = queuedItems.map((item) => ({ item, allowExtraRollFanout: true }))
-    const processed = { count: 0, capped: false, extraRollRequests: 0 }
     while (queue.length > 0 && processed.count < TRIGGER_QUEUE_CAP) {
       const entry = queue.shift()
       if (!entry) continue
@@ -1162,7 +1222,7 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
       processed.count += 1
       const itemTriggerCount = (fighterState.itemTriggerCounts[item.id] ?? 0) + 1
       fighterState.itemTriggerCounts[item.id] = itemTriggerCount
-      for (const trigger of executeItem(actorSide, fighter, item, time, roll, context.scale, context.note, queue, processed, extra, extraDepth, allowExtraRollFanout)) {
+      for (const trigger of executeItem(actorSide, fighter, item, time, roll, context.scale, context.note, queue, processed, extra, extraDepth, allowExtraRollFanout, frogClassRoll)) {
         push({
           time,
           actor: actorSide,
@@ -1195,6 +1255,66 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
         effectType: 'UTILITY',
         target: 'none',
       })
+    }
+    return processed
+  }
+
+  const resolveActor = (time: number, actorSide: Side, extra = false, extraDepth = 0, frogClassRoll = false) => {
+    const fighter = actorSide === 'player' ? player : opponent
+    const fighterState = state[actorSide]
+    let roll = rollDog(fighter.dogType, rng)
+    if (triggerOrder(fighter.items).some((item) => itemDef(item.defId).advancedEffect === 'ROLL_TWO_PICK_SMALL')) {
+      const second = rollDog(fighter.dogType, rng)
+      roll = Math.min(roll, second)
+    }
+    if (fighter.dogType === 'EMPEROR' && fighter.luckyNumber && triggerOrder(fighter.items).some((item) => itemDef(item.defId).advancedEffect === 'LUCKY_NUMBER_PITY')) {
+      if (fighterState.missedLucky >= 2) roll = fighter.luckyNumber
+    }
+    roll = biasRollByRelic(fighter, roll, rng)
+    roll = restrictRollByRelic(fighter, roll)
+    fighterState.rollCount += 1
+    if (fighter.dogType === 'EMPEROR' && fighter.luckyNumber) fighterState.missedLucky = roll === fighter.luckyNumber ? 0 : fighterState.missedLucky + 1
+    push({
+      time,
+      actor: actorSide,
+      kind: 'ROLL',
+      roll,
+      effectType: 'ROLL',
+      target: 'none',
+      text: frogClassRoll
+        ? `${fighter.name} 的蛙鸣鼓掷出 ${roll} 点（${DOGS[fighter.dogType].name}）`
+        : `${fighter.name}${extra ? ' 额外' : ''}掷出 ${roll} 点（${DOGS[fighter.dogType].name}）`,
+    })
+
+    const initialMatches = triggerOrder(fighter.items)
+      .map((item) => ({ item, context: matchingContext(fighter, item, roll, fighterState.forcedItemDice) }))
+      .filter(({ context }) => context.matches)
+    const initialQueue = hasEquippedEffect(fighter, 'ONLY_LUCKY_DOUBLE') && fighter.luckyNumber !== roll
+      ? []
+      : initialMatches.flatMap(({ item, context }) => context.triggeredBySize && rng() < 0.5 ? [item, item] : [item])
+    const emptyRollSafety = relicWithEffect(fighter, 'EMPTY_ROLL_LARGE_SAFETY')
+    const missedBeforeRoll = fighterState.emptyRolls
+    if (initialQueue.length === 0 && emptyRollSafety && missedBeforeRoll >= relicEmptyRollMisses(emptyRollSafety.relicId, emptyRollSafety.quality)) {
+      const safety = triggerOrder(fighter.items).find((item) => isLarge(itemDef(item.defId), fighter))
+        ?? triggerOrder(fighter.items).find((item) => [2, 3].includes(itemDef(item.defId).size))
+      if (safety) initialQueue.push(safety)
+      fighterState.emptyRolls = 0
+    } else if (initialQueue.length === 0) {
+      fighterState.emptyRolls += 1
+    } else {
+      fighterState.emptyRolls = 0
+    }
+    const queuedItems = hasEquippedEffect(fighter, 'ONLY_LUCKY_DOUBLE') && fighter.luckyNumber === roll
+      ? initialQueue.flatMap((item) => [item, item])
+      : initialQueue
+    if (frogClassRoll && hasEquippedEffect(fighter, 'FROG_ROLL_ECHO')) {
+      const echoTarget = initialMatches.find(({ item }) => itemDef(item.defId).kind !== 'CLASS_EQUIPMENT')?.item
+      if (echoTarget) queuedItems.push(echoTarget)
+    }
+    const queue = queuedItems.map((item) => ({ item, allowExtraRollFanout: true }))
+    const processed = processTriggerQueue(time, actorSide, fighter, roll, queue, extra, extraDepth, frogClassRoll)
+    for (let index = 0; index < processed.frogRollRequests && index < 3; index += 1) {
+      resolveActor(time, actorSide, false, 0, true)
     }
     return processed.extraRollRequests
   }
@@ -1304,15 +1424,40 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
     return null
   }
 
-  const nextRollAt: Record<Side, number> = { player: 1, opponent: 1 }
+  const nextRollAt: Record<Side, number> = {
+    player: player.dogType === 'FROG' ? Number.POSITIVE_INFINITY : 1,
+    opponent: opponent.dogType === 'FROG' ? Number.POSITIVE_INFINITY : 1,
+  }
   let nextSystemTickAt = 1
+  const nextReservoirAt = () => {
+    const times = [...Object.values(reservoirs.player), ...Object.values(reservoirs.opponent)].map((entry) => entry.nextAt)
+    return times.length > 0 ? Math.min(...times) : Number.POSITIVE_INFINITY
+  }
 
   while (true) {
     const nextRollTime = Math.min(nextRollAt.player, nextRollAt.opponent)
-    const nextTime = Math.min(nextRollTime, nextSystemTickAt)
+    const nextReservoirTime = nextReservoirAt()
+    const nextTime = Math.min(nextRollTime, nextReservoirTime, nextSystemTickAt)
     if (nextTime > MAX_BATTLE_TIME + TIME_EPSILON) break
 
     const time = roundBattleTime(nextTime)
+    if (nextReservoirTime <= nextRollTime + TIME_EPSILON && nextReservoirTime <= nextSystemTickAt + TIME_EPSILON) {
+      for (const actor of ['player', 'opponent'] as const) {
+        const fighter = actor === 'player' ? player : opponent
+        for (const entry of Object.values(reservoirs[actor]).filter((candidate) => Math.abs(candidate.nextAt - time) <= TIME_EPSILON)) {
+          resetReservoir(actor, entry.item, time)
+          const processed = processTriggerQueue(time, actor, fighter, 0, [{ item: entry.item, allowExtraRollFanout: true }])
+          for (let index = 0; index < processed.frogRollRequests && index < 3; index += 1) {
+            resolveActor(time, actor, false, 0, true)
+          }
+          if (playerHp <= 0 || opponentHp <= 0) {
+            return finish(time, `战斗结束，${currentLeadText()}`)
+          }
+        }
+      }
+      continue
+    }
+
     if (nextRollTime <= nextSystemTickAt + TIME_EPSILON) {
       for (const actor of ['player', 'opponent'] as const) {
         if (Math.abs(nextRollAt[actor] - time) > TIME_EPSILON) continue
