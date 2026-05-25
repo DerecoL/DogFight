@@ -1213,6 +1213,17 @@ input {
 .enchant-badge svg {
   flex: 0 0 auto;
 }
+.item-card small.extra-trigger-dice {
+  max-width: 100%;
+  padding: 2px 6px;
+  border: 1px solid rgba(127, 88, 32, .34);
+  border-radius: 999px;
+  background: rgba(255, 244, 205, .86);
+  color: #7f5820;
+}
+.item-card small.extra-trigger-dice svg {
+  flex: 0 0 auto;
+}
 .item-effect {
   width: 100%;
   min-width: 0;
@@ -1695,6 +1706,22 @@ input {
   font-size: 18px;
   font-weight: 950;
   box-shadow: 1px 2px 0 rgba(61, 45, 37, .18);
+}
+.tip-dice.extra-trigger-dice {
+  padding: 8px 10px;
+  border: 2px dashed rgba(127, 88, 32, .55);
+  border-radius: 8px;
+  background: rgba(255, 244, 205, .58);
+}
+.tip-dice.extra-trigger-dice svg,
+.tip-dice.extra-trigger-dice span {
+  border-color: rgba(127, 88, 32, .7);
+  color: #7f5820;
+}
+.tip-dice.extra-trigger-dice strong {
+  font-size: 14px;
+  font-weight: 950;
+  color: #7f5820;
 }
 .tip-description {
   min-height: 78px;

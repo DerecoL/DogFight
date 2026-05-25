@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { itemTriggerCountLabel, triggerDiceLabel } from './item-trigger-display'
+import { extraTriggerDiceLabel, itemTriggerCountLabel, triggerDiceLabel } from './item-trigger-display'
 
-const item = (dice: number[], advancedEffect = 'NONE', triggerDiceOverride?: number[] | null) => ({ dice, advancedEffect, triggerDiceOverride })
+const item = (dice: number[], advancedEffect = 'NONE', triggerDiceOverride?: number[] | null, enchant?: { kind: string; dice?: number[] } | null) => ({ dice, advancedEffect, triggerDiceOverride, enchant })
 
 describe('item trigger dice display', () => {
   it('keeps all six dice visible when an item triggers from every roll face', () => {
@@ -35,6 +35,20 @@ describe('item trigger dice display', () => {
       { def: { effect: 'SHIFT_TRIGGER_DICE_UP' } },
       { def: { effect: 'SHIFT_TRIGGER_DICE_DOWN' } },
     ])).toBe('1/6')
+  })
+
+  it('shows enchantment extra dice in final trigger dice and as a separate extra label', () => {
+    const enchanted = item([4, 5, 6], 'NONE', null, { kind: 'EXTRA_DICE', dice: [1, 4] })
+
+    expect(triggerDiceLabel(enchanted)).toBe('1/4/5/6')
+    expect(extraTriggerDiceLabel(enchanted)).toBe('1')
+  })
+
+  it('applies relic remapping before comparing enchantment extra dice against base dice', () => {
+    const enchanted = item([4, 5, 6], 'NONE', null, { kind: 'EXTRA_DICE', dice: [1] })
+
+    expect(triggerDiceLabel(enchanted, [{ def: { effect: 'SHIFT_TRIGGER_DICE_UP' } }])).toBe('1/2/5/6')
+    expect(extraTriggerDiceLabel(enchanted, [{ def: { effect: 'SHIFT_TRIGGER_DICE_UP' } }])).toBe('2')
   })
 })
 

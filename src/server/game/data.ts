@@ -17,6 +17,7 @@ export const THORNS_DAMAGE_PER_STACK = 2
 export const BOOM_COUNTER_TRIGGER_THRESHOLD = 50
 export const POST_BATTLE_EQUIPPED_SELL_BONUS_AMOUNT = 3
 export const POST_BATTLE_CARRIED_SELL_BONUS_AMOUNT = 1
+export const MULTI_TRIGGER_CAP = 5
 
 function slotItem(
   id: string,
@@ -62,11 +63,11 @@ export const ITEM_DEFS: ItemDef[] = [
     description: '造成 4 点伤害。命中后有 20% 概率给敌人施加 1 层【虚弱】。',
     advancedEffect: 'APPLY_WEAK_20_ON_HIT',
   }),
-  slotItem('lucky-paw', '幸运爪垫', 1, 4, [6], ['big'], { type: 'DAMAGE', amount: 12 }),
-  slotItem('milk-bone', '牛奶骨头', 1, 4, [2, 4], ['heal'], { type: 'HEAL', amount: 6 }),
-  slotItem('rubber-ball', '橡胶球', 2, 6, [3, 5], ['medium'], { type: 'DAMAGE', amount: 9 }),
+  slotItem('lucky-paw', '幸运爪垫', 1, 4, [6], ['big', 'multi'], { type: 'DAMAGE', amount: 5 }, { multi: 2 }),
+  slotItem('milk-bone', '牛奶骨头', 1, 4, [2, 4], ['heal', 'multi'], { type: 'HEAL', amount: 3 }, { multi: 2 }),
+  slotItem('rubber-ball', '橡胶球', 2, 6, [3, 5], ['medium', 'multi'], { type: 'DAMAGE', amount: 4 }, { multi: 2 }),
   slotItem('spiked-collar', '尖刺项圈', 2, 7, [4, 5, 6], ['big', 'medium'], { type: 'DAMAGE', amount: 8 }),
-  slotItem('training-disc', '训练飞盘', 2, 6, [1, 6], ['medium'], { type: 'DAMAGE', amount: 10 }),
+  slotItem('training-disc', '训练飞盘', 2, 6, [1, 6], ['medium', 'multi'], { type: 'DAMAGE', amount: 3 }, { multi: 3 }),
   slotItem('guard-vest', '护卫背心', 3, 8, [1, 3, 5], ['medium', 'heal'], { type: 'HEAL', amount: 8 }),
   slotItem('giant-bone', '巨型骨棒', 4, 10, [5, 6], ['large', 'big', 'fury'], { type: 'DAMAGE', amount: 16 }, {
     description: '造成 16 点伤害。攻击时有 50% 概率触发【激昂】；【激昂】使所有攻击伤害 +1，可叠加。',
@@ -190,6 +191,16 @@ export const ITEM_DEFS: ItemDef[] = [
     advancedEffect: 'POISON_ON_ATTACK_HIT',
     defaultQuality: 'SILVER',
   }),
+  slotItem('lotus-sea', '荷叶之海', 2, 11, [], ['multi', 'support', 'aura'], { type: 'UTILITY', amount: 0 }, {
+    description: '光环：左侧相邻【多重】装备的多重值 +1。钻石品质改为左右相邻【多重】装备的多重值 +1。多重最多提高到 5。',
+    advancedEffect: 'MULTI_ADJACENT_BONUS',
+    defaultQuality: 'GOLD',
+  }),
+  slotItem('kyushu-bracer', '九州护腕', 2, 12, [], ['multi', 'support', 'shield'], { type: 'UTILITY', amount: 0 }, {
+    description: '光环：己方【多重】装备第 2 次及之后触发时，若为攻击则额外伤害 +2，并获得 1 点【护盾】。',
+    advancedEffect: 'MULTI_REPEAT_BONUS',
+    defaultQuality: 'GOLD',
+  }),
 ]
 
 export const CLASS_REWARD_DEFS: ItemDef[] = [
@@ -282,6 +293,14 @@ export function nightPatrolLightTriggerCount(quality?: string | null) {
   return Math.max(1, qualityAmountFrom(1, quality, 'GOLD'))
 }
 
+export function kyushuBracerDamageBonus(quality?: string | null) {
+  return qualityAmountFrom(2, quality, 'GOLD')
+}
+
+export function kyushuBracerShieldBonus(quality?: string | null) {
+  return Math.max(1, qualityAmountFrom(1, quality, 'GOLD'))
+}
+
 export function itemDescription(itemId: string, quality?: string | null) {
   const def = itemDef(itemId)
   const currentQuality = normalizeQuality(quality)
@@ -324,6 +343,10 @@ export function itemDescription(itemId: string, quality?: string | null) {
   }
   if (advanced === 'POST_BATTLE_EQUIPPED_SELL_BONUS') return `无需触发。放在装备栏时，参战结束后出售价格 +${POST_BATTLE_EQUIPPED_SELL_BONUS_AMOUNT}。`
   if (advanced === 'POST_BATTLE_CARRIED_SELL_BONUS') return `无需触发。放在装备栏或背包时，参战结束后出售价格 +${POST_BATTLE_CARRIED_SELL_BONUS_AMOUNT}。`
+  if (advanced === 'MULTI_ADJACENT_BONUS') return currentQuality === 'DIAMOND'
+    ? `光环：左右【相邻】的【多重】装备多重值 +1。【多重】最多提高到 ${MULTI_TRIGGER_CAP}。`
+    : `光环：左侧【相邻】的【多重】装备多重值 +1。【多重】最多提高到 ${MULTI_TRIGGER_CAP}。`
+  if (advanced === 'MULTI_REPEAT_BONUS') return `光环：己方【多重】装备第 2 次及之后触发时，若为攻击则额外伤害 +${kyushuBracerDamageBonus(currentQuality)}，并获得 ${kyushuBracerShieldBonus(currentQuality)} 点【护盾】。`
   if (advanced === 'FROG_RESERVOIR_SPEED') return '被动：所有【蓄水】装备充水速度 +15%。'
   if (advanced === 'FROG_ROLL_ON_RESERVOIR') return `${baseEffect}【蓄水】触发后，进行一次普通投骰，按骰点激活装备；该投骰不会再次触发蛙鸣鼓的投骰效果。`
   if (advanced === 'FROG_CHARGE_ADJACENT') return `${baseEffect}【蓄水】触发后，使【相邻】装备立刻获得 50% 水位。`
@@ -343,7 +366,7 @@ export function itemDescription(itemId: string, quality?: string | null) {
   if (advanced === 'TRIGGER_MINUS_THREE') return `${baseEffect}${def.description}`
   if (advanced === 'LARGE_TRIGGERS_NON_LARGE') return `${baseEffect}${def.description}`
   if (advanced === 'DISABLE_ENEMY_LARGE') return `${baseEffect}${def.description}`
-  if (baseEffect) return baseEffect
+  if (baseEffect) return def.multi && def.multi > 1 ? `${baseEffect}【多重 ${def.multi}】：命中时总共完整触发 ${def.multi} 次。` : baseEffect
   if (def.description) return def.description
   return def.description
 }

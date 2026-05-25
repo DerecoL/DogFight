@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync, statSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
 const app = readFileSync(new URL('./App.tsx', import.meta.url), 'utf8')
@@ -26,6 +26,10 @@ function itemDefIds() {
 function relicDefIds() {
   const relicBlock = data.slice(data.indexOf('export const RELIC_DEFS'), data.indexOf('export const ALL_ITEM_DEFS'))
   return [...relicBlock.matchAll(/\{\s*id:\s*['`]([^'`]+)['`]/g)].map((match) => match[1])
+}
+
+function publicAsset(path: string) {
+  return new URL(`../public${path}`, import.meta.url)
 }
 
 describe('selection screen structure', () => {
@@ -527,10 +531,15 @@ describe('selection screen structure', () => {
   })
 
   it('hides full-range trigger dice on direct-trigger item surfaces', () => {
-    expect(app).toContain("import { triggerDiceLabel } from './item-trigger-display'")
+    expect(app).toContain("from './item-trigger-display'")
+    expect(app).toContain('extraTriggerDiceLabel')
+    expect(app).toContain('triggerDiceLabel')
     expect(app).toContain('triggerDiceLabel(itemTriggerDisplay(item), relics)')
+    expect(app).toContain('extraTriggerDiceLabel(itemTriggerDisplay(item), relics)')
     expect(app).toContain('{triggerDice && <small><Dice5 size={12} /> {triggerDice}</small>}')
+    expect(app).toContain('{extraTriggerDice && <small className="extra-trigger-dice"><Sparkles size={12} /> 额外 {extraTriggerDice}</small>}')
     expect(app).toContain('const tipTriggerDice = triggerDiceLabel(item ? itemTriggerDisplay(item) : def, item ? (relicsOverride ?? run.relics) : [])')
+    expect(app).toContain('const tipExtraTriggerDice = item ? extraTriggerDiceLabel(itemTriggerDisplay(item), relicsOverride ?? run.relics) : null')
     expect(app).toContain('{tipTriggerDice && (')
     expect(app).not.toContain('<small><Dice5 size={12} /> {item.def.dice.join')
   })
@@ -815,9 +824,22 @@ describe('selection screen structure', () => {
 
   it('wires manuscript surprise backgrounds into reward and settlement surfaces', () => {
     expect(app).toContain('const surpriseBackgrounds')
-    expect(app).toContain("classReward: '/assets/backgrounds/canine-fighting-study.png'")
-    expect(app).toContain("settlement: '/assets/backgrounds/canine-anatomy-run.png'")
-    expect(app).toContain("enchant: '/assets/backgrounds/canine-comparative-anatomy.png'")
+    const surpriseBackgroundPaths = [
+      '/assets/backgrounds/canine-fighting-study.webp',
+      '/assets/backgrounds/canine-anatomy-run.webp',
+      '/assets/backgrounds/canine-comparative-anatomy.webp',
+    ]
+    expect(app).toContain("classReward: '/assets/backgrounds/canine-fighting-study.webp'")
+    expect(app).toContain("settlement: '/assets/backgrounds/canine-anatomy-run.webp'")
+    expect(app).toContain("enchant: '/assets/backgrounds/canine-comparative-anatomy.webp'")
+    expect(app).not.toContain('/assets/backgrounds/canine-fighting-study.png')
+    expect(app).not.toContain('/assets/backgrounds/canine-anatomy-run.png')
+    expect(app).not.toContain('/assets/backgrounds/canine-comparative-anatomy.png')
+    for (const path of surpriseBackgroundPaths) {
+      const asset = publicAsset(path)
+      expect(existsSync(asset)).toBe(true)
+      expect(statSync(asset).size).toBeLessThanOrEqual(1_200_000)
+    }
     expect(app).toContain('function surpriseBackgroundStyle')
     expect(app).toContain('surprise-surface')
     expect(app).toContain("surpriseBackgroundStyle('classReward')")

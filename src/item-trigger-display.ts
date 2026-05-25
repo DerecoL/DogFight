@@ -2,6 +2,10 @@ type TriggerDisplayItem = {
   dice: number[]
   advancedEffect?: string
   triggerDiceOverride?: number[] | null
+  enchant?: {
+    kind?: string
+    dice?: number[]
+  } | null
 }
 
 type TriggerDisplayRelic = {
@@ -50,12 +54,34 @@ function shiftDieDown(die: number) {
   return die <= 1 ? 6 : die - 1
 }
 
-export function triggerDiceLabel(item: TriggerDisplayItem, relics: TriggerDisplayRelic[] = []) {
-  if (item.advancedEffect && nonSelfTriggeredEffects.has(item.advancedEffect)) return null
-  let dice = item.triggerDiceOverride && item.triggerDiceOverride.length > 0 ? item.triggerDiceOverride : item.dice
+function itemBaseDice(item: TriggerDisplayItem) {
+  return item.triggerDiceOverride && item.triggerDiceOverride.length > 0 ? item.triggerDiceOverride : item.dice
+}
+
+function itemExtraDice(item: TriggerDisplayItem) {
+  return item.enchant?.kind === 'EXTRA_DICE' && Array.isArray(item.enchant.dice) ? item.enchant.dice : []
+}
+
+function applyRelicDiceRemapping(dice: number[], relics: TriggerDisplayRelic[]) {
   if (relics.some((relic) => relic.def?.effect === 'SHIFT_TRIGGER_DICE_UP')) dice = dice.map(shiftDieUp)
   if (relics.some((relic) => relic.def?.effect === 'SHIFT_TRIGGER_DICE_DOWN')) dice = dice.map(shiftDieDown)
+  return dice
+}
+
+function normalizedDiceLabel(dice: number[]) {
   return [...new Set(dice)].sort((left, right) => left - right).join('/')
+}
+
+export function triggerDiceLabel(item: TriggerDisplayItem, relics: TriggerDisplayRelic[] = []) {
+  if (item.advancedEffect && nonSelfTriggeredEffects.has(item.advancedEffect)) return null
+  return normalizedDiceLabel(applyRelicDiceRemapping([...itemBaseDice(item), ...itemExtraDice(item)], relics))
+}
+
+export function extraTriggerDiceLabel(item: TriggerDisplayItem, relics: TriggerDisplayRelic[] = []) {
+  if (item.advancedEffect && nonSelfTriggeredEffects.has(item.advancedEffect)) return null
+  const baseDice = new Set(applyRelicDiceRemapping([...itemBaseDice(item)], relics))
+  const extraDice = applyRelicDiceRemapping([...itemExtraDice(item)], relics).filter((die) => !baseDice.has(die))
+  return extraDice.length > 0 ? normalizedDiceLabel(extraDice) : null
 }
 
 export function itemTriggerCount(events: TriggerCountEvent[], owner: string, itemId: string, displayIndex: number) {

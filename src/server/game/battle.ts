@@ -11,9 +11,12 @@ import {
   relicRollBiasChance,
   SHIBA_POISON_ON_ROLL_AMOUNT,
   BOOM_COUNTER_TRIGGER_THRESHOLD,
+  MULTI_TRIGGER_CAP,
   growthDamageBase,
   growthDamageStep,
   itemDefForQuality,
+  kyushuBracerDamageBonus,
+  kyushuBracerShieldBonus,
   nightPatrolLightTriggerCount,
   THORNS_DAMAGE_PER_STACK,
 } from './data'
@@ -67,6 +70,8 @@ type ItemTrigger = {
   targetHpDelta: number
   text: string
   roll?: number
+  multiIndex?: number
+  multiTotal?: number
   targetItemId?: string
   boomCounterItemId?: string
   boomCounterValue?: number
@@ -77,6 +82,8 @@ type ItemTrigger = {
 type TriggerQueueEntry = {
   item: GameItem
   allowExtraRollFanout: boolean
+  multiIndex: number
+  multiTotal: number
 }
 
 type BattleSideState = {
@@ -311,6 +318,32 @@ function bloodContractAdjacentItems(actor: FighterSnapshot, item: GameItem, qual
   })
 }
 
+function isMultiItem(item: GameItem) {
+  return (itemDef(item.defId).multi ?? 1) > 1
+}
+
+function multiAdjacentBonusApplies(source: GameItem, target: GameItem) {
+  const sourceQuality = normalizeQuality(source.quality)
+  const sourceLeft = source.x
+  const sourceRight = source.x + itemDef(source.defId).width
+  const targetLeft = target.x
+  const targetRight = target.x + itemDef(target.defId).width
+  const targetTouchesSourceLeft = targetRight === sourceLeft
+  const targetTouchesSourceRight = targetLeft === sourceRight
+  return sourceQuality === 'DIAMOND'
+    ? targetTouchesSourceLeft || targetTouchesSourceRight
+    : targetTouchesSourceLeft
+}
+
+function effectiveMultiCount(actor: FighterSnapshot, item: GameItem) {
+  const base = itemDef(item.defId).multi ?? 1
+  if (base <= 1) return 1
+  const bonus = triggerOrder(actor.items).filter((source) =>
+    itemDef(source.defId).advancedEffect === 'MULTI_ADJACENT_BONUS' && multiAdjacentBonusApplies(source, item),
+  ).length
+  return Math.min(MULTI_TRIGGER_CAP, base + bonus)
+}
+
 function neighborItems(actor: FighterSnapshot, item: GameItem, target: EnchantmentTarget) {
   if (target === 'ADJACENT') return adjacentItems(actor, item)
   const ordered = triggerOrder(actor.items)
@@ -320,8 +353,13 @@ function neighborItems(actor: FighterSnapshot, item: GameItem, target: Enchantme
   return neighbor ? [neighbor] : []
 }
 
-function queueItems(queue: TriggerQueueEntry[], items: GameItem[], allowExtraRollFanout = true) {
-  queue.push(...items.map((item) => ({ item, allowExtraRollFanout })))
+function queueItems(queue: TriggerQueueEntry[], actor: FighterSnapshot, items: GameItem[], allowExtraRollFanout = true) {
+  for (const item of items) {
+    const multiTotal = effectiveMultiCount(actor, item)
+    for (let multiIndex = 1; multiIndex <= multiTotal; multiIndex += 1) {
+      queue.push({ item, allowExtraRollFanout, multiIndex, multiTotal })
+    }
+  }
 }
 
 function itemBaseEffectKind(def: ItemDef): EnchantmentBaseEffect | null {

@@ -56,8 +56,7 @@ import {
   soundCueForUiFeedback,
 } from './sound-feedback'
 import { resolveSlotPlacement } from './placement'
-import { itemTriggerCountLabel } from './item-trigger-display'
-import { triggerDiceLabel } from './item-trigger-display'
+import { extraTriggerDiceLabel, itemTriggerCountLabel, triggerDiceLabel } from './item-trigger-display'
 import { itemVisualProfile } from './item-visual-profile'
 import { ALL_ITEM_DEFS } from './server/game/data'
 import { queryBattleFxAnchor, resolveBattleFxPoints } from './battle-vfx-coordinates'
@@ -453,9 +452,9 @@ const visualThemeAssets: Record<VisualThemeId, string> = {
   royalKennel: dogBrawlTownBackground,
 }
 const surpriseBackgrounds: Record<SurpriseBackgroundId, string> = {
-  classReward: '/assets/backgrounds/canine-fighting-study.png',
-  settlement: '/assets/backgrounds/canine-anatomy-run.png',
-  enchant: '/assets/backgrounds/canine-comparative-anatomy.png',
+  classReward: '/assets/backgrounds/canine-fighting-study.webp',
+  settlement: '/assets/backgrounds/canine-anatomy-run.webp',
+  enchant: '/assets/backgrounds/canine-comparative-anatomy.webp',
 }
 const visualThemeOrder: VisualThemeId[] = ['dogPark', 'backAlley', 'royalKennel']
 const gameIcon = '/assets/game-icon.png'
@@ -882,7 +881,7 @@ function equipmentSlotCount(relics?: Relic[]) {
 }
 
 function itemTriggerDisplay(item: Item) {
-  return { ...item.def, triggerDiceOverride: item.triggerDiceOverride }
+  return { ...item.def, triggerDiceOverride: item.triggerDiceOverride, enchant: item.enchant }
 }
 
 function battleEquipmentItems(snapshot: BattleSnapshot) {
@@ -3961,6 +3960,7 @@ function DraggableItem({ item, relics, selected, dragging, upgradeable, onSelect
 function ItemCardContent({ item, relics = [], upgradeable = false }: { item: Item; relics?: Relic[]; upgradeable?: boolean }) {
   const { language } = useLanguage()
   const triggerDice = triggerDiceLabel(itemTriggerDisplay(item), relics)
+  const extraTriggerDice = extraTriggerDiceLabel(itemTriggerDisplay(item), relics)
   const visual = itemVisualProfile(item.def)
   const localizedDef = localizeItemDef(item.def, language)
   const qualityText = language === 'en-US' ? localizeQuality(normalizeQuality(item.quality), language) : qualityLabel[normalizeQuality(item.quality)]
@@ -3975,6 +3975,7 @@ function ItemCardContent({ item, relics = [], upgradeable = false }: { item: Ite
       {item.enchant && <span className="enchant-badge"><Sparkles size={12} />附魔</span>}
       <SizePreview size={item.def.size} />
       {triggerDice && <small><Dice5 size={12} /> {triggerDice}</small>}
+      {extraTriggerDice && <small className="extra-trigger-dice"><Sparkles size={12} /> 额外 {extraTriggerDice}</small>}
       <small className="item-effect">{effect}</small>
       {item.enchant && <small className="item-effect enchant-text">{enchantmentText(item.enchant)}</small>}
       </span>
@@ -4072,6 +4073,7 @@ function FloatingTip({ run, item, offer, anchor, descriptionOverride, relicsOver
   const sellValue = item ? sellValueForItem(item) : null
   const style = anchor ? { '--tip-x': `${anchor.x}px`, '--tip-y': `${anchor.y}px` } as React.CSSProperties : undefined
   const tipTriggerDice = triggerDiceLabel(item ? itemTriggerDisplay(item) : def, item ? (relicsOverride ?? run.relics) : [])
+  const tipExtraTriggerDice = item ? extraTriggerDiceLabel(itemTriggerDisplay(item), relicsOverride ?? run.relics) : null
   const visual = itemVisualProfile(def)
   const localizedDef = localizeItemDef(def, language)
   const qualityText = language === 'en-US' ? localizeQuality(quality, language) : qualityLabel[quality]
@@ -4103,6 +4105,13 @@ function FloatingTip({ run, item, offer, anchor, descriptionOverride, relicsOver
         <div className="tip-dice" aria-label={`触发点数 ${tipTriggerDice}`}>
           <Dice5 size={22} />
           {tipTriggerDice.split('/').map((face) => <span key={face}>{face}</span>)}
+        </div>
+      )}
+      {tipExtraTriggerDice && (
+        <div className="tip-dice extra-trigger-dice" aria-label={`额外触发点数 ${tipExtraTriggerDice}`}>
+          <Sparkles size={22} />
+          <strong>额外</strong>
+          {tipExtraTriggerDice.split('/').map((face) => <span key={face}>{face}</span>)}
         </div>
       )}
       <p className="tip-description"><RuleText text={descriptionText} /></p>
@@ -4362,6 +4371,7 @@ function BattleEquipmentRow({ owner, snapshot, events, displayIndex, activeEvent
           const boomCounterState = boomCounterStateForBattleItem(item, owner, events, displayIndex, activeEvent)
           const reservoirState = reservoirStateForBattleItem(activeEvent, owner, item.id)
           const triggerDice = triggerDiceLabel(itemTriggerDisplay(item), snapshot.relics ?? [])
+          const extraTriggerDice = extraTriggerDiceLabel(itemTriggerDisplay(item), snapshot.relics ?? [])
           const triggerCountLabel = itemTriggerCountLabel(events, owner, item.id, displayIndex)
           const triggerCountPopping = activeItemId === item.id
           const localizedDef = localizeItemDef(item.def, language)
@@ -4394,6 +4404,7 @@ function BattleEquipmentRow({ owner, snapshot, events, displayIndex, activeEvent
             <span>{localizedDef.name}</span>
             {item.enchant && <span className="enchant-badge"><Sparkles size={12} />附魔</span>}
             {triggerDice && <small><Dice5 size={12} /> {triggerDice}</small>}
+            {extraTriggerDice && <small className="extra-trigger-dice"><Sparkles size={12} /> 额外 {extraTriggerDice}</small>}
             <small className="item-effect">{itemEffect}</small>
             {boomCounterState && (
               <span className="boom-counter-meter" aria-label={`爆鸣计数 ${boomCounterState.count}/${boomCounterState.max}`}>
