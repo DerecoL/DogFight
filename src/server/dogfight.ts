@@ -21,10 +21,10 @@ const DOGFIGHT_LOSS_LIMIT = 5
 const DOGFIGHT_WAITING_ROOM_TTL_MS = 10 * 60_000
 const DOGFIGHT_ACTIVE_ROOM_TTL_MS = 30 * 60_000
 const DOGFIGHT_FORCE_COMPLETE_MAX_STEPS = 80
-const DOG_TYPES: DogType[] = ['SHIBA', 'SAMOYED', 'MUTT', 'BULLY', 'EMPEROR']
+const DOG_TYPES: DogType[] = ['SHIBA', 'SAMOYED', 'MUTT', 'BULLY', 'EMPEROR', 'FROG']
 
 const dogChoiceSchema = z.object({
-  dogType: z.enum(['SHIBA', 'SAMOYED', 'MUTT', 'BULLY', 'EMPEROR']),
+  dogType: z.enum(['SHIBA', 'SAMOYED', 'MUTT', 'BULLY', 'EMPEROR', 'FROG']),
   luckyNumber: z.number().int().min(1).max(6).optional(),
 })
 

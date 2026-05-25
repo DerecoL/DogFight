@@ -468,7 +468,7 @@ export function buildApp() {
   app.post('/api/runs', async (request, reply) => {
     const userId = requireUser(request.userId)
     const parsed = z.object({
-      dogType: z.enum(['SHIBA', 'SAMOYED', 'MUTT', 'BULLY', 'EMPEROR']),
+      dogType: z.enum(['SHIBA', 'SAMOYED', 'MUTT', 'BULLY', 'EMPEROR', 'FROG']),
       luckyNumber: z.number().int().min(1).max(6).optional(),
       mode: z.enum(['CASUAL', 'LADDER']).optional(),
     }).safeParse(request.body)

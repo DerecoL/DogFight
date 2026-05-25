@@ -287,15 +287,26 @@ describe('selection screen structure', () => {
   })
 
   it('offers dog emperor with a lucky-number selector and picture avatars', () => {
-    expect(app).toContain("type DogType = 'SHIBA' | 'SAMOYED' | 'MUTT' | 'BULLY' | 'EMPEROR'")
+    expect(app).toContain("type DogType = 'SHIBA' | 'SAMOYED' | 'MUTT' | 'BULLY' | 'EMPEROR' | 'FROG'")
     expect(app).toContain("EMPEROR: '狗皇帝'")
+    expect(app).toContain("FROG: '青蛙'")
     expect(app).toContain("EMPEROR: '/assets/dogs/emperor.webp'")
+    expect(app).toContain("FROG: '/assets/dogs/frog.svg'")
     expect(app).toContain('luckyNumber')
     expect(app).toContain('幸运数字')
     expect(app).toContain("SHIBA: '/assets/dogs/shiba.webp'")
     expect(app).toContain("SAMOYED: '/assets/dogs/samoyed.webp'")
     expect(app).toContain("MUTT: '/assets/dogs/mutt.webp'")
     expect(app).toContain("BULLY: '/assets/dogs/bully.webp'")
+  })
+
+  it('renders frog reservoir water on battle item cards', () => {
+    expect(app).toContain('type BattleReservoirEntry')
+    expect(app).toContain('reservoirStateForBattleItem')
+    expect(app).toContain('frog-reservoir-fill')
+    expect(app).toContain('frog-reservoir-card')
+    expect(css).toContain('.frog-reservoir-fill')
+    expect(css).toContain('linear-gradient(180deg, rgba(92, 214, 168')
   })
 
   it('keeps shop choices in a fixed board and pads missing choices with blanks', () => {

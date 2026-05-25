@@ -46,7 +46,7 @@ describe('offline dog builder', () => {
 
   it('creates dog-specific build identities instead of one fixed item sequence', () => {
     const builds = new Map<DogType, string[]>()
-    for (const dogType of ['SHIBA', 'SAMOYED', 'MUTT', 'BULLY', 'EMPEROR'] as DogType[]) {
+    for (const dogType of ['SHIBA', 'SAMOYED', 'MUTT', 'BULLY', 'EMPEROR', 'FROG'] as DogType[]) {
       const fighter = buildOfflineFighter({ dogType, round: 6, wins: 4, losses: 0 })
       builds.set(dogType, fighter.items.map((item) => item.defId))
       expect(
@@ -61,7 +61,7 @@ describe('offline dog builder', () => {
   })
 
   it('selects at most one class reward from each unlocked reward round', () => {
-    for (const dogType of ['SHIBA', 'SAMOYED', 'MUTT', 'BULLY', 'EMPEROR'] as DogType[]) {
+    for (const dogType of ['SHIBA', 'SAMOYED', 'MUTT', 'BULLY', 'EMPEROR', 'FROG'] as DogType[]) {
       const fighter = buildOfflineFighter({ dogType, round: 6, wins: 8, losses: 0 })
       const classRewards = fighter.items
         .map((item) => itemDef(item.defId))
@@ -104,7 +104,7 @@ describe('offline dog builder', () => {
 
   it('keeps the first two rounds limited to bronze starter training gear', () => {
     for (const round of [0, 1]) {
-      for (const dogType of ['SHIBA', 'SAMOYED', 'MUTT', 'BULLY', 'EMPEROR'] as DogType[]) {
+      for (const dogType of ['SHIBA', 'SAMOYED', 'MUTT', 'BULLY', 'EMPEROR', 'FROG'] as DogType[]) {
         const fighter = buildOfflineFighter({ dogType, round, wins: 0, losses: 0 })
 
         expect(fighter.items).toHaveLength(3)
@@ -124,5 +124,18 @@ describe('offline dog builder', () => {
     expect(ghost.items.some((item) => itemDef(item.defId).kind === 'CLASS_EQUIPMENT')).toBe(true)
     expect(ghost.relics?.length).toBeGreaterThan(0)
     assertLegalEquipment(ghost.items)
+  })
+
+  it('can build a frog reservoir opponent with frog class equipment', () => {
+    const fighter = buildOfflineFighter({ dogType: 'FROG' as never, round: 6, wins: 6, losses: 0 })
+    const classRewards = fighter.items
+      .map((item) => itemDef(item.defId))
+      .filter((def) => def.kind === 'CLASS_EQUIPMENT')
+
+    expect(fighter.dogType).toBe('FROG')
+    expect(classRewards).toHaveLength(2)
+    expect(classRewards.every((def) => def.classDog === 'FROG')).toBe(true)
+    expect(fighter.items.some((item) => item.defId === 'frog-croak-drum' || item.defId === 'frog-rainy-season')).toBe(true)
+    assertLegalEquipment(fighter.items)
   })
 })

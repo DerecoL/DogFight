@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="frog avatar">
+  <defs>
+    <radialGradient id="skin" cx="50%" cy="36%" r="62%">
+      <stop offset="0" stop-color="#baf072"/>
+      <stop offset=".62" stop-color="#69bd45"/>
+      <stop offset="1" stop-color="#2b7d36"/>
+    </radialGradient>
+    <radialGradient id="belly" cx="50%" cy="48%" r="55%">
+      <stop offset="0" stop-color="#f2f8ac"/>
+      <stop offset="1" stop-color="#cce47c"/>
+    </radialGradient>
+    <radialGradient id="eye" cx="38%" cy="32%" r="58%">
+      <stop offset="0" stop-color="#fff8df"/>
+      <stop offset=".28" stop-color="#9a5b2d"/>
+      <stop offset="1" stop-color="#3b170f"/>
+    </radialGradient>
+    <filter id="soft" x="-15%" y="-15%" width="130%" height="130%">
+      <feDropShadow dx="0" dy="10" stdDeviation="9" flood-color="#2f5f2f" flood-opacity=".28"/>
+    </filter>
+  </defs>
+  <rect width="512" height="512" rx="96" fill="#f6efda"/>
+  <path d="M92 395c21-88 4-169 57-223 21-21 48-31 78-24 19 5 32 16 41 29 9-13 23-24 42-29 30-7 57 3 78 24 53 54 36 135 57 223 8 33-17 64-50 64H142c-33 0-58-31-50-64Z" fill="#fff" opacity=".92"/>
+  <path d="M112 386c18-81 8-154 53-200 24-24 61-25 86-5l17 13 17-13c25-20 62-19 86 5 45 46 35 119 53 200 6 26-14 51-41 51H153c-27 0-47-25-41-51Z" fill="url(#skin)" stroke="#174f2a" stroke-width="10" filter="url(#soft)"/>
+  <ellipse cx="199" cy="201" rx="56" ry="60" fill="#fff8ec" stroke="#5e271d" stroke-width="8"/>
+  <ellipse cx="337" cy="201" rx="56" ry="60" fill="#fff8ec" stroke="#5e271d" stroke-width="8"/>
+  <circle cx="199" cy="203" r="42" fill="url(#eye)"/>
+  <circle cx="337" cy="203" r="42" fill="url(#eye)"/>
+  <circle cx="183" cy="183" r="11" fill="#fff"/>
+  <circle cx="322" cy="183" r="11" fill="#fff"/>
+  <circle cx="212" cy="174" r="7" fill="#fff"/>
+  <circle cx="350" cy="174" r="7" fill="#fff"/>
+  <path d="M194 311c42 30 108 30 150 0 26 32 24 88-7 111H201c-31-23-33-79-7-111Z" fill="url(#belly)" opacity=".95"/>
+  <path d="M209 268c35 18 82 18 118 0" fill="none" stroke="#5a261b" stroke-width="9" stroke-linecap="round"/>
+  <path d="M178 260c5 12 20 15 30 3m120 0c10 12 25 9 30-3" fill="none" stroke="#5a261b" stroke-width="7" stroke-linecap="round"/>
+  <ellipse cx="236" cy="229" rx="6" ry="9" fill="#5a261b" transform="rotate(-28 236 229)"/>
+  <ellipse cx="300" cy="229" rx="6" ry="9" fill="#5a261b" transform="rotate(28 300 229)"/>
+  <circle cx="240" cy="155" r="9" fill="#3c933f" opacity=".65"/>
+  <circle cx="270" cy="160" r="8" fill="#3c933f" opacity=".55"/>
+  <circle cx="302" cy="152" r="6" fill="#3c933f" opacity=".5"/>
+  <path d="M147 345c70 36 172 36 243 0" fill="none" stroke="#6ec1c6" stroke-width="22" stroke-linecap="round"/>
+  <path d="M147 345c70 36 172 36 243 0" fill="none" stroke="#2b5b67" stroke-width="5" stroke-linecap="round" opacity=".7"/>
+  <circle cx="190" cy="354" r="12" fill="#f8b4bd" stroke="#7f3b48" stroke-width="4"/>
+  <circle cx="240" cy="371" r="11" fill="#eff4a7" stroke="#85914a" stroke-width="4"/>
+  <circle cx="295" cy="371" r="11" fill="#f8d267" stroke="#9c7530" stroke-width="4"/>
+  <circle cx="347" cy="354" r="12" fill="#b9f0d8" stroke="#507a6b" stroke-width="4"/>
+  <path d="M270 354v31" stroke="#f8d267" stroke-width="10" stroke-linecap="round"/>
+  <circle cx="270" cy="407" r="42" fill="#e2a72f" stroke="#7d4d22" stroke-width="7"/>
+  <path d="M248 393h45m-43 19h42" stroke="#7d4d22" stroke-width="8" stroke-linecap="round"/>
+  <path d="M252 423l18-17 18 17" fill="none" stroke="#7d4d22" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="270" y="411" text-anchor="middle" font-family="Arial, sans-serif" font-size="29" font-weight="900" fill="#7d4d22">ZERO</text>
+</svg>
