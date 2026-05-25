@@ -861,6 +861,16 @@ function itemIcon(def: ItemDef) {
   return itemIcons[def.id] ?? '/assets/items/bite.svg'
 }
 
+const prewarmedItemArt = new Set<string>()
+
+function prewarmItemArt(src: string | null | undefined) {
+  if (!src || prewarmedItemArt.has(src) || typeof Image === 'undefined') return
+  prewarmedItemArt.add(src)
+  const image = new Image()
+  image.src = src
+  void image.decode?.().catch(() => undefined)
+}
+
 function isItemArtDebugRoute() {
   return typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('itemArtGallery')
 }
@@ -1320,6 +1330,8 @@ export default function App() {
       setTutorialPlaced(false)
       return
     }
+    run.items.forEach((item) => prewarmItemArt(itemVisualProfile(item.def).artSrc))
+    run.shopItems.forEach((offer) => prewarmItemArt(offer.def ? itemVisualProfile(offer.def).artSrc : null))
     setTutorialBought(hasBoughtTutorialItem(run))
     setTutorialPlaced(hasPlacedTutorialItem(run))
   }, [run])
@@ -3991,7 +4003,7 @@ function ItemCardContent({ item, relics = [], upgradeable = false }: { item: Ite
 function ItemArt({ def, visual = itemVisualProfile(def) }: { def: ItemDef; visual?: ReturnType<typeof itemVisualProfile> }) {
   return (
     <span className={`item-art-window ${visual.className} ${visual.hasCustomArt ? 'has-custom-art' : 'generated-art'}`} data-art-aspect={visual.artAspect}>
-      {visual.artSrc ? <img className="item-card-art" src={visual.artSrc} alt="" /> : <span className="item-card-art-fallback" aria-hidden="true" />}
+      {visual.artSrc ? <img className="item-card-art" src={visual.artSrc} alt="" decoding="async" /> : <span className="item-card-art-fallback" aria-hidden="true" />}
       <span className="item-icon-badge">
         <img className="item-icon" src={itemIcon(def)} alt="" />
       </span>
@@ -4055,16 +4067,27 @@ function ItemArtDebugGallery() {
   )
 }
 
-function DraggingItemOverlay({ item, relics = [] }: { item: Item | null; relics?: Relic[] }) {
-  if (!item) return null
+function DraggingItemGhost({ item }: { item: Item }) {
+  const { language } = useLanguage()
+  const localizedDef = localizeItemDef(item.def, language)
+  const quality = normalizeQuality(item.quality)
+  const qualityText = language === 'en-US' ? localizeQuality(quality, language) : qualityLabel[quality]
   return (
-    <ItemFrame
-      className={`drag-overlay-item item-card paper-item-card ${itemTone(item.def)} ${qualityClass(item.quality)}`}
+    <div
+      className={`drag-overlay-item drag-overlay-ghost ${itemTone(item.def)} ${qualityClass(item.quality)}`}
       style={{ width: `calc(${item.def.width} * var(--slot-w))`, height: `calc(${item.def.height} * var(--board-slot-h))` }}
     >
-      <ItemCardContent item={item} relics={relics} />
-    </ItemFrame>
+      <span className="quality-chip">{qualityText}</span>
+      <img className="item-icon" src={itemIcon(item.def)} alt="" decoding="async" />
+      <strong>{localizedDef.name}</strong>
+      <small>{item.def.size}{language === 'en-US' ? ' slots' : '格'}</small>
+    </div>
   )
+}
+
+function DraggingItemOverlay({ item }: { item: Item | null; relics?: Relic[] }) {
+  if (!item) return null
+  return <DraggingItemGhost item={item} />
 }
 
 function FloatingTip({ run, item, offer, anchor, descriptionOverride, relicsOverride, onClose, onBuy, onSell, onUpgrade }: { run: Run; item: Item | null; offer: ShopOffer | null; anchor: TipAnchor | null; descriptionOverride?: string | null; relicsOverride?: Relic[] | null; onClose: () => void; onBuy: (() => void) | null; onSell: (() => void) | null; onUpgrade: (() => void) | null }) {

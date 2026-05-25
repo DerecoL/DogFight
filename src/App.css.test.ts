@@ -221,6 +221,15 @@ describe('equipment layout scale', () => {
     expect(cssRule('.action-button:active, .primary:active, .secondary:active, .danger-button:active, .icon-button:active, .reroll-button:active')).toContain('translateY')
   })
 
+  it('keeps drag and press feedback on cheap composited styles', () => {
+    expect(cssRule('.drag-overlay-item')).toContain('will-change: transform')
+    expect(cssRule('.drag-overlay-item')).toContain('contain: paint')
+    expect(cssRule('.drag-overlay-item::before, .drag-overlay-item::after')).toContain('display: none')
+    expect(cssRule('.drag-overlay-ghost')).toContain('box-shadow')
+    expect(cssRule('.drag-overlay-ghost .item-icon')).toContain('filter: none')
+    expect(cssRule('.item-card.input-active, .item-card:active')).not.toContain('filter:')
+  })
+
   it('adds handdrawn battle staging and reduced motion support', () => {
     expect(cssRule('.handdrawn-stage')).toContain('background')
     expect(cssRule('.handdrawn-stage::before')).toContain('radial-gradient')

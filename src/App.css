@@ -1256,7 +1256,6 @@ input {
 .item-card.input-active,
 .item-card:active {
   transform: translateY(1px) scale(.985);
-  filter: brightness(.97) saturate(1.08);
   box-shadow: var(--pressed-sketch-shadow);
 }
 .quality-chip {
@@ -1302,8 +1301,46 @@ input {
   z-index: 1000;
   pointer-events: none;
   cursor: grabbing;
-  transform: rotate(-1deg) scale(1.04);
-  box-shadow: 0 18px 46px rgba(37, 48, 71, .32), inset 0 -22px 0 rgba(61, 45, 37, .08);
+  transform: rotate(-1deg) scale(1.03);
+  will-change: transform;
+  contain: paint;
+  box-shadow: 0 12px 26px rgba(37, 48, 71, .24), 2px 3px 0 rgba(61, 45, 37, .18);
+}
+
+.drag-overlay-item::before, .drag-overlay-item::after {
+  display: none;
+}
+
+.drag-overlay-ghost {
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 8px;
+  overflow: hidden;
+  border: 3px solid var(--item-tone-ink);
+  border-radius: 12px;
+  background:
+    radial-gradient(circle at 35% 24%, rgba(255, 255, 255, .72), transparent 24%),
+    var(--item-tone-soft);
+  color: var(--item-tone-ink);
+  text-align: center;
+  box-shadow: 0 12px 26px rgba(37, 48, 71, .24), 2px 3px 0 rgba(61, 45, 37, .18);
+}
+
+.drag-overlay-ghost .item-icon {
+  width: 34px;
+  height: 34px;
+  filter: none;
+}
+
+.drag-overlay-ghost strong,
+.drag-overlay-ghost small {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .paper-card {

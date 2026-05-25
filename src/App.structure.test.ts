@@ -74,6 +74,15 @@ describe('selection screen structure', () => {
     expect(app).toContain('className={`status-chip handdrawn-status-chip ${status.type}`}')
   })
 
+  it('decodes item card art asynchronously and prewarms visible run art', () => {
+    expect(app).toContain('decoding="async"')
+    expect(app).toContain('function prewarmItemArt')
+    expect(app).toContain('const prewarmedItemArt = new Set<string>()')
+    expect(app).toContain('image.decode?.()')
+    expect(app).toContain('run.items.forEach')
+    expect(app).toContain('run.shopItems.forEach')
+  })
+
   it('routes command buttons through the handdrawn action wrapper', () => {
     expect(app).toContain('function ActionButton')
     expect(app).toContain('<ActionButton')
@@ -110,7 +119,7 @@ describe('selection screen structure', () => {
     expect(app).toContain('className={`shop-card paper-shop-card paper-card')
     expect(app).toContain('className={`battle-item item-card paper-item-card')
     expect(app).toContain('className={`item-card paper-item-card')
-    expect(app).toContain('className={`drag-overlay-item item-card paper-item-card')
+    expect(app).toContain('className={`drag-overlay-item drag-overlay-ghost')
   })
 
   it('routes remaining low-frequency controls through handdrawn primitives', () => {
