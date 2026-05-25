@@ -3,14 +3,13 @@ import { createPortal } from 'react-dom'
 import {
   DndContext,
   DragOverlay,
+  MeasuringStrategy,
   PointerSensor,
   pointerWithin,
   rectIntersection,
   type Collision,
   type CollisionDetection,
   type DragEndEvent,
-  type DragStartEvent,
-  useDraggable,
   useDroppable,
   useSensor,
   useSensors,
@@ -434,6 +433,7 @@ type DogfightRoomsResponse = { rooms: DogfightRoomSummary[] }
 type DogfightRoomResponse = { room: DogfightRoom }
 type DogfightLeaveResponse = { room: DogfightRoom | null }
 type DogfightBattleResponse = { battle: { id: string; roomId: string; round: number; opponentKind: string; result: Battle } }
+type ItemDropHandler = (itemId: string, overId: string) => void
 
 const dogNames: Record<DogType, string> = { SHIBA: '柴犬', SAMOYED: '萨摩耶', MUTT: '土狗', BULLY: '恶霸', EMPEROR: '狗皇帝', FROG: '祖灵' }
 const dogTraits: Record<DogType, string> = {
@@ -442,7 +442,7 @@ const dogTraits: Record<DogType, string> = {
   MUTT: '20% 概率【额外投掷】一次',
   BULLY: '40% 概率使本次触发的【大型物品】效果翻倍',
   EMPEROR: '指定【天命数字】，命中时 50% 概率使触发效果翻倍',
-  FROG: '显式点数装备改为【蓄水】触发：间隔 = 6 / 点数数量，可被职业装备提速',
+  FROG: '显式点数装备改为【蓄水】触发，可被职业装备提速',
 }
 const dogAssets: Record<DogType, string> = {
   SHIBA: '/assets/dogs/shiba.webp',
@@ -880,6 +880,8 @@ const dragCollisionDetection: CollisionDetection = (args) => {
   return prioritizeDragCollisions(rectIntersection(args))
 }
 
+const dndMeasuring = { droppable: { strategy: MeasuringStrategy.BeforeDragging } }
+
 function isItemArtDebugRoute() {
   return typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('itemArtGallery')
 }
@@ -1073,16 +1075,16 @@ function enchantmentText(enchant?: Enchantment | null) {
     return `附魔：触发时额外${effect} ${enchant.amount}`
   }
   if (enchant.kind === 'SPECIAL') {
-    const effect = enchant.effect === 'THORNS' ? '荆棘' : enchant.effect === 'FURY' ? '激昂' : enchant.effect === 'POISON' ? '中毒' : '虚弱'
+    const effect = enchant.effect === 'THORNS' ? '【荆棘】' : enchant.effect === 'FURY' ? '【激昂】' : enchant.effect === 'POISON' ? '【中毒】' : '【虚弱】'
     return `附魔：触发时额外触发 ${enchant.amount} 层${effect}`
   }
-  const target = enchant.target === 'LEFT' ? '左侧' : enchant.target === 'RIGHT' ? '右侧' : '相邻'
+  const target = enchant.target === 'LEFT' ? '左侧' : enchant.target === 'RIGHT' ? '右侧' : '【相邻】'
   if (enchant.kind === 'TRIGGER_NEIGHBOR') return `附魔：触发时额外触发${target}装备`
   if (enchant.kind === 'BUFF_NEIGHBOR_EFFECT') {
     const effect = enchant.effect === 'DAMAGE' ? '攻击' : enchant.effect === 'HEAL' ? '回复生命' : '增加护盾'
     return `附魔：触发时使${target}装备下次${effect} +${enchant.amount}`
   }
-  const effect = enchant.effect === 'LIFESTEAL' ? '吸血' : enchant.effect === 'THORNS' ? '荆棘' : '净化'
+  const effect = enchant.effect === 'LIFESTEAL' ? '【吸血】' : enchant.effect === 'THORNS' ? '【荆棘】' : '【净化】'
   return `附魔：触发时使${target}装备获得${effect} ${enchant.amount}`
 }
 
@@ -1197,6 +1199,28 @@ function getFloatingTipPosition(element: HTMLElement): TipAnchor {
   return { x, y }
 }
 
+function useDeferredTipAnchor(setTipAnchor: (anchor: TipAnchor | null) => void) {
+  const timeoutRef = useRef<ReturnType<typeof window.setTimeout> | null>(null)
+  const cancelTipAnchor = useCallback(() => {
+    if (timeoutRef.current == null) return
+    window.clearTimeout(timeoutRef.current)
+    timeoutRef.current = null
+  }, [])
+  const scheduleTipAnchor = useCallback((element: HTMLElement) => {
+    cancelTipAnchor()
+    timeoutRef.current = window.setTimeout(() => {
+      timeoutRef.current = null
+      if (!element.isConnected) return
+      const anchor = getFloatingTipPosition(element)
+      setTipAnchor(anchor)
+    }, 80)
+  }, [cancelTipAnchor, setTipAnchor])
+
+  useEffect(() => cancelTipAnchor, [cancelTipAnchor])
+
+  return { scheduleTipAnchor, cancelTipAnchor }
+}
+
 function getRuleTermTipPosition(element: HTMLElement): Pick<RuleTermTipState, 'anchor' | 'placement'> {
   const rect = element.getBoundingClientRect()
   const edge = 16
@@ -1291,7 +1315,6 @@ export default function App() {
   const [selectedEnchantId, setSelectedEnchantId] = useState<string | null>(null)
   const [selectedPotionId, setSelectedPotionId] = useState<string | null>(null)
   const [tipAnchor, setTipAnchor] = useState<TipAnchor | null>(null)
-  const [draggingItemId, setDraggingItemId] = useState<string | null>(null)
   const [battle, setBattle] = useState<Battle | null>(null)
   const [eventIndex, setEventIndex] = useState(0)
   const [speed, setSpeed] = useState(1)
@@ -1309,6 +1332,7 @@ export default function App() {
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 2 } }))
   const hasBattle = Boolean(battle)
+  const { scheduleTipAnchor, cancelTipAnchor } = useDeferredTipAnchor(setTipAnchor)
 
   const loadRunHistory = useCallback(async () => {
     const data = await api<{ history: PlayerRunHistory }>('/runs/history')
@@ -1417,7 +1441,6 @@ export default function App() {
   const selectedPotion = run?.phase === 'POTION_CHOICE'
     ? run.potionChoices.find((choice) => choice.id === selectedPotionId) ?? run.potionChoices[0] ?? null
     : null
-  const draggingItem = run?.items.find((item) => item.id === draggingItemId) || null
   const currentEvent = battle?.events[eventIndex]
   const score = run ? run.wins * 100 + Math.max(0, 12 - run.losses * 2) * 5 : 0
   const classRewardCeremonyKey = run?.phase === 'CLASS_REWARD' ? `${run.id}:${run.round}` : ''
@@ -1626,7 +1649,8 @@ export default function App() {
     markOfferInspectedForTutorial()
     setSelectedOfferId(offerId)
     setSelectedItemId(null)
-    setTipAnchor(getFloatingTipPosition(element))
+    setTipAnchor(null)
+    scheduleTipAnchor(element)
   }
 
   const onInspectItem = (itemId: string, element: HTMLElement) => {
@@ -1658,10 +1682,12 @@ export default function App() {
     }
     setSelectedItemId(itemId)
     setSelectedOfferId(null)
-    setTipAnchor(getFloatingTipPosition(element))
+    setTipAnchor(null)
+    scheduleTipAnchor(element)
   }
 
   const closeShopTip = () => {
+    cancelTipAnchor()
     setSelectedItemId(null)
     setSelectedOfferId(null)
     setTipAnchor(null)
@@ -1685,14 +1711,16 @@ export default function App() {
     }
   }
 
-  const onDragStart = (event: DragStartEvent) => {
-    setDraggingItemId(String(event.active.id))
+  const onDragStart = () => {
+    cancelTipAnchor()
     setTipAnchor(null)
   }
   const onDragEnd = (event: DragEndEvent) => {
-    setDraggingItemId(null)
     const itemId = String(event.active.id)
     const overId = event.over ? String(event.over.id) : ''
+    handleItemDrop(itemId, overId)
+  }
+  const handleItemDrop: ItemDropHandler = (itemId, overId) => {
     if (overId.startsWith('UPGRADE_ITEM:')) {
       const targetItemId = overId.slice('UPGRADE_ITEM:'.length)
       const sourceItem = run?.items.find((item) => item.id === itemId)
@@ -1707,7 +1735,7 @@ export default function App() {
       }
       return
     }
-    if (String(event.over?.id) === 'SELL_ZONE' && run?.phase === 'SHOP') {
+    if (overId === 'SELL_ZONE' && run?.phase === 'SHOP') {
       setSelectedItemId(null)
       setTipAnchor(null)
       void action(
@@ -1716,10 +1744,11 @@ export default function App() {
       )
       return
     }
-    const slot = event.over ? parseSlotId(overId) : null
+    const slot = overId ? parseSlotId(overId) : null
     if (slot) moveItem(itemId, slot.area, slot.x, slot.y)
     else pushUiFeedback('place-failed')
   }
+  const onDragCancel = () => undefined
 
   const tutorialGuide = user && isCasualTutorialRunning(casualTutorialState) ? (
     <CasualTutorialGuide
@@ -1825,7 +1854,7 @@ export default function App() {
       )}
 
       {!battle && run.phase === 'CLASS_REWARD' && !showClassRewardCeremony && (
-        <DndContext sensors={sensors} collisionDetection={dragCollisionDetection} onDragStart={onDragStart} onDragEnd={onDragEnd}>
+        <DndContext sensors={sensors} measuring={dndMeasuring} collisionDetection={dragCollisionDetection} onDragStart={onDragStart} onDragEnd={onDragEnd} onDragCancel={onDragCancel}>
           <section className="reward-workbench">
             <ClassRewardSelect
               choices={run.classRewardChoices}
@@ -1835,7 +1864,7 @@ export default function App() {
             <InventoryBoard
               run={run}
               selectedItemId={selectedItemId}
-              draggingItemId={draggingItemId}
+              onDrop={handleItemDrop}
               onSellRelic={sellRelic}
               onSelectItem={onInspectItem}
               onSlotClick={(area, x, y) => selectedItemId && moveItem(selectedItemId, area, x, y)}
@@ -1843,7 +1872,7 @@ export default function App() {
             <FloatingTip run={run} item={selectedItem} offer={null} anchor={tipAnchor} onClose={closeShopTip} onBuy={null} onSell={null} onUpgrade={selectedItem && canUpgradeItem(selectedItem, run.items) ? () => upgradeItem(selectedItem.id) : null} />
           </section>
           <DragOverlay dropAnimation={null} zIndex={1000}>
-            <DraggingItemOverlay item={draggingItem} relics={run.relics} />
+            <DraggingItemOverlay />
           </DragOverlay>
         </DndContext>
       )}
@@ -1858,7 +1887,7 @@ export default function App() {
           <InventoryBoard
             run={run}
             selectedItemId={selectedItemId}
-            draggingItemId={draggingItemId}
+            onDrop={handleItemDrop}
             onSellRelic={sellRelic}
             onSelectItem={onInspectItem}
             onSlotClick={() => undefined}
@@ -1877,7 +1906,7 @@ export default function App() {
           <InventoryBoard
             run={run}
             selectedItemId={selectedItemId}
-            draggingItemId={draggingItemId}
+            onDrop={handleItemDrop}
             onSellRelic={sellRelic}
             onSelectItem={onInspectItem}
             onSlotClick={() => undefined}
@@ -1892,7 +1921,7 @@ export default function App() {
           <InventoryBoard
             run={run}
             selectedItemId={selectedItemId}
-            draggingItemId={draggingItemId}
+            onDrop={handleItemDrop}
             onSellRelic={sellRelic}
             onSelectItem={onInspectItem}
             onSlotClick={() => undefined}
@@ -1902,12 +1931,11 @@ export default function App() {
       )}
 
       {!battle && run.phase === 'SHOP' && (
-        <DndContext sensors={sensors} collisionDetection={dragCollisionDetection} onDragStart={onDragStart} onDragEnd={onDragEnd}>
+        <DndContext sensors={sensors} measuring={dndMeasuring} collisionDetection={dragCollisionDetection} onDragStart={onDragStart} onDragEnd={onDragEnd} onDragCancel={onDragCancel}>
           <section className="shop-workbench">
             <ShopShelf
               run={run}
               selectedOfferId={selectedOfferId}
-              draggingItemId={draggingItemId}
               onInspectOffer={onInspectOffer}
               onReroll={() => action(() => api(`/runs/${run.id}/shop/reroll`, { method: 'POST' }), { success: 'reroll-success' })}
               onMatch={() => action(() => api(`/runs/${run.id}/battle/match`, { method: 'POST' }), { success: 'battle-start' })}
@@ -1915,7 +1943,7 @@ export default function App() {
             <InventoryBoard
               run={run}
               selectedItemId={selectedItemId}
-              draggingItemId={draggingItemId}
+              onDrop={handleItemDrop}
               onSellRelic={sellRelic}
               onSelectItem={onInspectItem}
               onSlotClick={(area, x, y) => selectedItemId && moveItem(selectedItemId, area, x, y)}
@@ -1936,13 +1964,13 @@ export default function App() {
             />
           </section>
           <DragOverlay dropAnimation={null} zIndex={1000}>
-            <DraggingItemOverlay item={draggingItem} relics={run.relics} />
+            <DraggingItemOverlay />
           </DragOverlay>
         </DndContext>
       )}
 
       {!battle && (run.phase === 'MATCH' || run.phase === 'PREP') && (
-        <DndContext sensors={sensors} collisionDetection={dragCollisionDetection} onDragStart={onDragStart} onDragEnd={onDragEnd}>
+        <DndContext sensors={sensors} measuring={dndMeasuring} collisionDetection={dragCollisionDetection} onDragStart={onDragStart} onDragEnd={onDragEnd} onDragCancel={onDragCancel}>
           <section className="match-panel" data-tutorial-anchor="battle-start">
             {run.phase === 'MATCH' ? (
               <>
@@ -1956,7 +1984,7 @@ export default function App() {
                 <p>整理装备与遗物后再匹配对手。</p>
               </>
             )}
-            <InventoryBoard run={run} selectedItemId={selectedItemId} draggingItemId={draggingItemId} onSellRelic={sellRelic} onSelectItem={onInspectItem} onSlotClick={(area, x, y) => selectedItemId && moveItem(selectedItemId, area, x, y)} />
+            <InventoryBoard run={run} selectedItemId={selectedItemId} onDrop={handleItemDrop} onSellRelic={sellRelic} onSelectItem={onInspectItem} onSlotClick={(area, x, y) => selectedItemId && moveItem(selectedItemId, area, x, y)} />
             <FloatingTip
               run={run}
               item={selectedItem}
@@ -1972,7 +2000,7 @@ export default function App() {
             </ActionButton>
           </section>
           <DragOverlay dropAnimation={null} zIndex={1000}>
-            <DraggingItemOverlay item={draggingItem} relics={run.relics} />
+            <DraggingItemOverlay />
           </DragOverlay>
         </DndContext>
       )}
@@ -2185,17 +2213,20 @@ function PlayerHistoryOverlay({ history, onClose }: { history: PlayerRunHistory;
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null)
   const [inspectedItem, setInspectedItem] = useState<Item | null>(null)
   const [tipAnchor, setTipAnchor] = useState<TipAnchor | null>(null)
+  const { scheduleTipAnchor, cancelTipAnchor } = useDeferredTipAnchor(setTipAnchor)
   const runs = activeTab === 'ALL' ? history.recentRuns : history.recentRuns.filter((entry) => entry.mode === activeTab)
   const selectedRun = runs.find((entry) => entry.id === selectedRunId) ?? runs[0] ?? null
   const bestRun = history.bestRun
 
   const closeTip = () => {
+    cancelTipAnchor()
     setInspectedItem(null)
     setTipAnchor(null)
   }
   const inspectItem = (item: Item, element: HTMLElement) => {
     setInspectedItem(item)
-    setTipAnchor(getFloatingTipPosition(element))
+    setTipAnchor(null)
+    scheduleTipAnchor(element)
   }
 
   return (
@@ -2477,7 +2508,6 @@ function DogfightRoomView({ room, onRoomChange, onLeave, soundEnabled }: { room:
   const [selectedEnchantId, setSelectedEnchantId] = useState<string | null>(null)
   const [selectedPotionId, setSelectedPotionId] = useState<string | null>(null)
   const [tipAnchor, setTipAnchor] = useState<TipAnchor | null>(null)
-  const [draggingItemId, setDraggingItemId] = useState<string | null>(null)
   const [battle, setBattle] = useState<Battle | null>(null)
   const [battleId, setBattleId] = useState<string | null>(null)
   const [dismissedAutoBattleId, setDismissedAutoBattleId] = useState<string | null>(null)
@@ -2486,13 +2516,13 @@ function DogfightRoomView({ room, onRoomChange, onLeave, soundEnabled }: { room:
   const [error, setError] = useState('')
   const [now, setNow] = useState(() => Date.now())
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 2 } }))
+  const { scheduleTipAnchor, cancelTipAnchor } = useDeferredTipAnchor(setTipAnchor)
   const run = room.currentRun
   const currentMember = room.currentRunMember ?? (run ? room.members.find((member) => member.runId === run.id) ?? null : null)
   const selectedItem = run?.items.find((item) => item.id === selectedItemId) || null
   const selectedOffer = run?.shopItems.find((offer) => offer.offerId === selectedOfferId) || null
   const selectedEnchant = run?.enchantChoices.find((choice) => choice.id === selectedEnchantId) ?? run?.enchantChoices[0] ?? null
   const selectedPotion = run?.potionChoices.find((choice) => choice.id === selectedPotionId) ?? run?.potionChoices[0] ?? null
-  const draggingItem = run?.items.find((item) => item.id === draggingItemId) || null
   const deadline = room.phaseDeadline ? Math.max(0, Math.ceil((new Date(room.phaseDeadline).getTime() - now) / 1000)) : 0
   const selectedBattleMemberId = selectedMemberId ?? currentMember?.id ?? sortedDogfightMembers(room.members)[0]?.id ?? null
 
@@ -2618,7 +2648,8 @@ function DogfightRoomView({ room, onRoomChange, onLeave, soundEnabled }: { room:
   const onInspectOffer = (offerId: string, element: HTMLElement) => {
     setSelectedOfferId(offerId)
     setSelectedItemId(null)
-    setTipAnchor(getFloatingTipPosition(element))
+    setTipAnchor(null)
+    scheduleTipAnchor(element)
   }
 
   const onInspectItem = (itemId: string, element: HTMLElement) => {
@@ -2646,25 +2677,30 @@ function DogfightRoomView({ room, onRoomChange, onLeave, soundEnabled }: { room:
     }
     setSelectedItemId(itemId)
     setSelectedOfferId(null)
-    setTipAnchor(getFloatingTipPosition(element))
+    setTipAnchor(null)
+    scheduleTipAnchor(element)
   }
 
   const closeTip = () => {
+    cancelTipAnchor()
     setSelectedItemId(null)
     setSelectedOfferId(null)
     setTipAnchor(null)
   }
 
-  const onDragStart = (event: DragStartEvent) => {
-    setDraggingItemId(String(event.active.id))
+  const onDragStart = () => {
+    cancelTipAnchor()
     setTipAnchor(null)
   }
 
   const onDragEnd = (event: DragEndEvent) => {
-    setDraggingItemId(null)
     if (!run || currentMember?.ready) return
     const itemId = String(event.active.id)
     const overId = event.over ? String(event.over.id) : ''
+    handleItemDrop(itemId, overId)
+  }
+  const handleItemDrop: ItemDropHandler = (itemId, overId) => {
+    if (!run || currentMember?.ready) return
     if (overId.startsWith('UPGRADE_ITEM:')) {
       const targetItemId = overId.slice('UPGRADE_ITEM:'.length)
       const sourceItem = run.items.find((item) => item.id === itemId)
@@ -2677,15 +2713,16 @@ function DogfightRoomView({ room, onRoomChange, onLeave, soundEnabled }: { room:
       }
       return
     }
-    if (String(event.over?.id) === 'SELL_ZONE' && run.phase === 'SHOP') {
+    if (overId === 'SELL_ZONE' && run.phase === 'SHOP') {
       setSelectedItemId(null)
       setTipAnchor(null)
       void runAction(() => api<{ run: Run }>(`/runs/${run.id}/shop/sell`, { method: 'POST', body: JSON.stringify({ itemId }) }))
       return
     }
-    const slot = event.over ? parseSlotId(overId) : null
+    const slot = overId ? parseSlotId(overId) : null
     if (slot) moveItem(itemId, slot.area, slot.x, slot.y)
   }
+  const onDragCancel = () => undefined
 
   const battleRun = battleToRun(battle) ?? run
 
@@ -2756,12 +2793,12 @@ function DogfightRoomView({ room, onRoomChange, onLeave, soundEnabled }: { room:
               <DogSelect onPick={chooseDog} />
             </section>
           ) : run && room.phase === 'SHOP' ? (
-            <DndContext sensors={sensors} collisionDetection={dragCollisionDetection} onDragStart={onDragStart} onDragEnd={onDragEnd}>
+            <DndContext sensors={sensors} measuring={dndMeasuring} collisionDetection={dragCollisionDetection} onDragStart={onDragStart} onDragEnd={onDragEnd} onDragCancel={onDragCancel}>
               <DogfightRunWorkbench
                 run={run}
                 selectedItemId={selectedItemId}
                 selectedOfferId={selectedOfferId}
-                draggingItemId={draggingItemId}
+                onDrop={handleItemDrop}
                 onInspectOffer={onInspectOffer}
                 onInspectItem={onInspectItem}
                 onMoveItem={moveItem}
@@ -2784,7 +2821,7 @@ function DogfightRoomView({ room, onRoomChange, onLeave, soundEnabled }: { room:
                 onCloseTip={closeTip}
               />
               <DragOverlay dropAnimation={null} zIndex={1000}>
-                <DraggingItemOverlay item={draggingItem} relics={run.relics} />
+                <DraggingItemOverlay />
               </DragOverlay>
             </DndContext>
           ) : (
@@ -2805,11 +2842,11 @@ function DogfightRoomView({ room, onRoomChange, onLeave, soundEnabled }: { room:
   )
 }
 
-function DogfightRunWorkbench({ run, selectedItemId, selectedOfferId, draggingItemId, selectedItem, selectedOffer, tipAnchor, onInspectOffer, onInspectItem, onMoveItem, onReroll, onBuy, onSell, onSellRelic, onUpgrade, onChoice, onClassReward, onRelic, onUpgradeChoice, selectedEnchantId, onEnchantChoice, selectedPotionId, onPotionChoice, onCloseTip }: {
+function DogfightRunWorkbench({ run, selectedItemId, selectedOfferId, selectedItem, selectedOffer, tipAnchor, onDrop, onInspectOffer, onInspectItem, onMoveItem, onReroll, onBuy, onSell, onSellRelic, onUpgrade, onChoice, onClassReward, onRelic, onUpgradeChoice, selectedEnchantId, onEnchantChoice, selectedPotionId, onPotionChoice, onCloseTip }: {
   run: Run
   selectedItemId: string | null
   selectedOfferId: string | null
-  draggingItemId: string | null
+  onDrop: ItemDropHandler
   selectedItem: Item | null
   selectedOffer: ShopOffer | null
   tipAnchor: TipAnchor | null
@@ -2836,7 +2873,7 @@ function DogfightRunWorkbench({ run, selectedItemId, selectedOfferId, draggingIt
     return (
       <section className="reward-workbench">
         <ClassRewardSelect choices={run.classRewardChoices} visualTheme={visualThemeForRound(run.round)} onPick={onClassReward} />
-        <InventoryBoard run={run} selectedItemId={selectedItemId} draggingItemId={draggingItemId} onSellRelic={onSellRelic} onSelectItem={onInspectItem} onSlotClick={(area, x, y) => selectedItemId && onMoveItem(selectedItemId, area, x, y)} />
+        <InventoryBoard run={run} selectedItemId={selectedItemId} onDrop={onDrop} onSellRelic={onSellRelic} onSelectItem={onInspectItem} onSlotClick={(area, x, y) => selectedItemId && onMoveItem(selectedItemId, area, x, y)} />
         <FloatingTip run={run} item={selectedItem} offer={null} anchor={tipAnchor} onClose={onCloseTip} onBuy={null} onSell={null} onUpgrade={onUpgrade} />
       </section>
     )
@@ -2845,7 +2882,7 @@ function DogfightRunWorkbench({ run, selectedItemId, selectedOfferId, draggingIt
     return (
       <section className="reward-workbench enchant-workbench">
         <EnchantChoiceSelect choices={run.enchantChoices} selectedId={selectedEnchantId} visualTheme={visualThemeForRound(run.round)} onSelect={onEnchantChoice} />
-        <InventoryBoard run={run} selectedItemId={selectedItemId} draggingItemId={draggingItemId} onSellRelic={onSellRelic} onSelectItem={onInspectItem} onSlotClick={() => undefined} />
+        <InventoryBoard run={run} selectedItemId={selectedItemId} onDrop={onDrop} onSellRelic={onSellRelic} onSelectItem={onInspectItem} onSlotClick={() => undefined} />
         <FloatingTip run={run} item={selectedItem} offer={null} anchor={tipAnchor} onClose={onCloseTip} onBuy={null} onSell={null} onUpgrade={null} />
       </section>
     )
@@ -2855,7 +2892,7 @@ function DogfightRunWorkbench({ run, selectedItemId, selectedOfferId, draggingIt
     return (
       <section className="reward-workbench upgrade-workbench">
         <UpgradeChoiceSelect run={run} visualTheme={visualThemeForRound(run.round)} />
-        <InventoryBoard run={run} selectedItemId={selectedItemId} draggingItemId={draggingItemId} onSellRelic={onSellRelic} onSelectItem={onInspectItem} onSlotClick={() => undefined} />
+        <InventoryBoard run={run} selectedItemId={selectedItemId} onDrop={onDrop} onSellRelic={onSellRelic} onSelectItem={onInspectItem} onSlotClick={() => undefined} />
         <FloatingTip run={run} item={selectedItem} offer={null} anchor={tipAnchor} onClose={onCloseTip} onBuy={null} onSell={null} onUpgrade={selectedItem && canFreeUpgradeItem(selectedItem) ? () => onUpgradeChoice(selectedItem.id) : null} />
       </section>
     )
@@ -2864,15 +2901,15 @@ function DogfightRunWorkbench({ run, selectedItemId, selectedOfferId, draggingIt
     return (
       <section className="reward-workbench potion-workbench">
         <PotionChoiceSelect choices={run.potionChoices} selectedId={selectedPotionId} visualTheme={visualThemeForRound(run.round)} onSelect={onPotionChoice} />
-        <InventoryBoard run={run} selectedItemId={selectedItemId} draggingItemId={draggingItemId} onSellRelic={onSellRelic} onSelectItem={onInspectItem} onSlotClick={() => undefined} />
+        <InventoryBoard run={run} selectedItemId={selectedItemId} onDrop={onDrop} onSellRelic={onSellRelic} onSelectItem={onInspectItem} onSlotClick={() => undefined} />
         <FloatingTip run={run} item={selectedItem} offer={null} anchor={tipAnchor} onClose={onCloseTip} onBuy={null} onSell={null} onUpgrade={null} />
       </section>
     )
   }
   return (
     <section className="shop-workbench dogfight-workbench">
-      {run.phase === 'SHOP' && <ShopShelf run={run} selectedOfferId={selectedOfferId} draggingItemId={draggingItemId} onInspectOffer={onInspectOffer} onReroll={onReroll} onMatch={() => undefined} />}
-      <InventoryBoard run={run} selectedItemId={selectedItemId} draggingItemId={draggingItemId} onSellRelic={onSellRelic} onSelectItem={onInspectItem} onSlotClick={(area, x, y) => selectedItemId && onMoveItem(selectedItemId, area, x, y)} />
+      {run.phase === 'SHOP' && <ShopShelf run={run} selectedOfferId={selectedOfferId} onInspectOffer={onInspectOffer} onReroll={onReroll} onMatch={() => undefined} />}
+      <InventoryBoard run={run} selectedItemId={selectedItemId} onDrop={onDrop} onSellRelic={onSellRelic} onSelectItem={onInspectItem} onSlotClick={(area, x, y) => selectedItemId && onMoveItem(selectedItemId, area, x, y)} />
       <FloatingTip run={run} item={selectedItem} offer={selectedOffer} anchor={tipAnchor} onClose={onCloseTip} onBuy={selectedOffer ? onBuy : null} onSell={selectedItem ? onSell : null} onUpgrade={onUpgrade} />
     </section>
   )
@@ -3054,6 +3091,7 @@ function ApexArena() {
 function ApexSnapshotDetails({ entry }: { entry: ApexEntry }) {
   const [inspectedItem, setInspectedItem] = useState<Item | null>(null)
   const [tipAnchor, setTipAnchor] = useState<TipAnchor | null>(null)
+  const { scheduleTipAnchor, cancelTipAnchor } = useDeferredTipAnchor(setTipAnchor)
   const equipment = entry.items.filter((item) => item.area === 'EQUIPMENT')
   const bag = entry.items.filter((item) => item.area === 'BAG')
   const apexTipRun: Run = {
@@ -3083,9 +3121,11 @@ function ApexSnapshotDetails({ entry }: { entry: ApexEntry }) {
   }
   const setInspectedItemWithAnchor = (item: Item, element: HTMLElement) => {
     setInspectedItem(item)
-    setTipAnchor(getFloatingTipPosition(element))
+    setTipAnchor(null)
+    scheduleTipAnchor(element)
   }
   const closeTip = () => {
+    cancelTipAnchor()
     setInspectedItem(null)
     setTipAnchor(null)
   }
@@ -3736,7 +3776,7 @@ function PotionChoiceSelect({ choices, selectedId, visualTheme, onSelect }: { ch
   )
 }
 
-function ShopShelf({ run, selectedOfferId, draggingItemId, onInspectOffer, onReroll, onMatch }: { run: Run; selectedOfferId: string | null; draggingItemId: string | null; onInspectOffer: (offerId: string, element: HTMLElement) => void; onReroll: () => void; onMatch: () => void }) {
+function ShopShelf({ run, selectedOfferId, onInspectOffer, onReroll, onMatch }: { run: Run; selectedOfferId: string | null; onInspectOffer: (offerId: string, element: HTMLElement) => void; onReroll: () => void; onMatch: () => void }) {
   const { language } = useLanguage()
   const visualTheme = visualThemeForRound(run.round)
   return (
@@ -3747,7 +3787,7 @@ function ShopShelf({ run, selectedOfferId, draggingItemId, onInspectOffer, onRer
           <p>点击商品查看详情，确认后再购买。</p>
         </div>
         <div className="shop-actions">
-          <SellDropZone active={Boolean(draggingItemId)} />
+          <SellDropZone />
           <HanddrawnButton variant="secondary" className="reroll-button" onClick={onReroll} title={`刷新商店：${run.refreshCost} 金币`}>
             <RefreshCcw size={18} />
             <span className="price-tag"><Coins size={14} />{run.refreshCost}</span>
@@ -3766,10 +3806,10 @@ function ShopShelf({ run, selectedOfferId, draggingItemId, onInspectOffer, onRer
   )
 }
 
-function SellDropZone({ active }: { active: boolean }) {
+function SellDropZone() {
   const { isOver, setNodeRef } = useDroppable({ id: 'SELL_ZONE' })
   return (
-    <div ref={setNodeRef} className={`sell-zone ${active ? 'active' : ''} ${isOver ? 'over' : ''}`}>
+    <div ref={setNodeRef} data-drop-id="SELL_ZONE" className={`sell-zone ${isOver ? 'over' : ''}`}>
       <BadgeDollarSign size={18} />
       <span>拖到这里出售</span>
     </div>
@@ -3811,15 +3851,15 @@ function SizePreview({ size }: { size: number }) {
   )
 }
 
-function InventoryBoard({ run, selectedItemId, draggingItemId, onSellRelic, onSelectItem, onSlotClick }: { run: Run; selectedItemId: string | null; draggingItemId: string | null; onSellRelic?: ((relicId: string) => void) | null; onSelectItem: (itemId: string, element: HTMLElement) => void; onSlotClick: (area: Area, x: number, y: number) => void }) {
+function InventoryBoard({ run, selectedItemId, onDrop, onSellRelic, onSelectItem, onSlotClick }: { run: Run; selectedItemId: string | null; onDrop: ItemDropHandler; onSellRelic?: ((relicId: string) => void) | null; onSelectItem: (itemId: string, element: HTMLElement) => void; onSlotClick: (area: Area, x: number, y: number) => void }) {
   const equipmentSlots = equipmentSlotCount(run.relics)
   const visualTheme = visualThemeForRound(run.round)
   return (
     <section className={`inventory-board expanded paper-inventory visual-theme-surface visual-theme-${visualTheme}`} data-visual-theme={visualTheme} style={visualThemeStyle(visualTheme)}>
-      <GridPanel title="装备栏" subtitle={`${equipmentSlots} 格单行，从左向右触发`} icon={<Grid3X3 size={18} />} area="EQUIPMENT" tutorialAnchor="equipment-board" w={equipmentSlots} h={1} items={run.items} relics={run.relics ?? []} selectedItemId={selectedItemId} draggingItemId={draggingItemId} onSelectItem={onSelectItem} onSlotClick={onSlotClick} />
+      <GridPanel title="装备栏" subtitle={`${equipmentSlots} 格单行，从左向右触发`} icon={<Grid3X3 size={18} />} area="EQUIPMENT" tutorialAnchor="equipment-board" w={equipmentSlots} h={1} items={run.items} relics={run.relics ?? []} selectedItemId={selectedItemId} onDrop={onDrop} onSelectItem={onSelectItem} onSlotClick={onSlotClick} />
       <div className="bag-relic-row">
         <RelicRail relics={run.relics ?? []} onSellRelic={onSellRelic ?? null} />
-        <GridPanel title="背包" subtitle={`${BASE_EQUIPMENT_SLOT_COUNT} 格单行，战斗中默认不生效`} icon={<Backpack size={18} />} area="BAG" tutorialAnchor="bag-board" w={BASE_EQUIPMENT_SLOT_COUNT} h={1} items={run.items} relics={run.relics ?? []} selectedItemId={selectedItemId} draggingItemId={draggingItemId} onSelectItem={onSelectItem} onSlotClick={onSlotClick} />
+        <GridPanel title="背包" subtitle={`${BASE_EQUIPMENT_SLOT_COUNT} 格单行，战斗中默认不生效`} icon={<Backpack size={18} />} area="BAG" tutorialAnchor="bag-board" w={BASE_EQUIPMENT_SLOT_COUNT} h={1} items={run.items} relics={run.relics ?? []} selectedItemId={selectedItemId} onDrop={onDrop} onSelectItem={onSelectItem} onSlotClick={onSlotClick} />
       </div>
     </section>
   )
@@ -3907,7 +3947,7 @@ function RelicFloatingTip({ relic, anchor, onClose, onSell }: { relic: Relic | n
   )
 }
 
-function GridPanel({ title, subtitle, icon, area, tutorialAnchor, w, h, items, relics = [], selectedItemId, draggingItemId, onSelectItem, onSlotClick }: { title: string; subtitle: string; icon: React.ReactNode; area: Area; tutorialAnchor?: string; w: number; h: number; items: Item[]; relics?: Relic[]; selectedItemId: string | null; draggingItemId: string | null; onSelectItem: (itemId: string, element: HTMLElement) => void; onSlotClick: (area: Area, x: number, y: number) => void }) {
+function GridPanel({ title, subtitle, icon, area, tutorialAnchor, w, h, items, relics = [], selectedItemId, onDrop, onSelectItem, onSlotClick }: { title: string; subtitle: string; icon: React.ReactNode; area: Area; tutorialAnchor?: string; w: number; h: number; items: Item[]; relics?: Relic[]; selectedItemId: string | null; onDrop: ItemDropHandler; onSelectItem: (itemId: string, element: HTMLElement) => void; onSlotClick: (area: Area, x: number, y: number) => void }) {
   return (
     <div className="grid-panel" data-tutorial-anchor={tutorialAnchor}>
       <div className="grid-heading">
@@ -3921,7 +3961,7 @@ function GridPanel({ title, subtitle, icon, area, tutorialAnchor, w, h, items, r
           return <Slot key={`${area}:${x}:${y}`} id={`${area}:${x}:${y}`} x={x} y={y} title={`${title} ${x + 1}-${y + 1}`} onClick={() => onSlotClick(area, x, y)} />
         })}
         {items.filter((item) => item.area === area).map((item) => (
-          <DraggableItem key={item.id} item={item} relics={relics} selected={selectedItemId === item.id} dragging={draggingItemId === item.id} upgradeable={canUpgradeItem(item, items)} onSelect={(element) => onSelectItem(item.id, element)} />
+          <DraggableItem key={item.id} item={item} relics={relics} selected={selectedItemId === item.id} upgradeable={canUpgradeItem(item, items)} onDrop={onDrop} onSelect={(element) => onSelectItem(item.id, element)} />
         ))}
       </div>
     </div>
@@ -3930,25 +3970,102 @@ function GridPanel({ title, subtitle, icon, area, tutorialAnchor, w, h, items, r
 
 function Slot({ id, x, y, title, onClick }: { id: string; x: number; y: number; title: string; onClick: () => void }) {
   const { isOver, setNodeRef } = useDroppable({ id })
-  return <HanddrawnSlotButton nodeRef={setNodeRef} over={isOver} style={{ gridColumn: x + 1, gridRow: y + 1 }} onClick={onClick} aria-label={title} title={title} />
+  return <HanddrawnSlotButton nodeRef={setNodeRef} data-drop-id={id} over={isOver} style={{ gridColumn: x + 1, gridRow: y + 1 }} onClick={onClick} aria-label={title} title={title} />
 }
 
-function DraggableItem({ item, relics, selected, dragging, upgradeable, onSelect }: { item: Item; relics: Relic[]; selected: boolean; dragging: boolean; upgradeable: boolean; onSelect: (element: HTMLElement) => void }) {
+function dropIdFromEventTarget(target: EventTarget | null) {
+  if (!(target instanceof Element)) return ''
+  return target.closest<HTMLElement>('[data-drop-id]')?.dataset.dropId ?? ''
+}
+
+function createFastDragGhost(item: Item) {
+  const ghost = document.createElement('div')
+  ghost.className = `drag-overlay-item drag-overlay-ghost ${itemTone(item.def)} ${qualityClass(item.quality)}`
+  ghost.style.width = `calc(${item.def.width} * var(--slot-w))`
+  ghost.style.height = `calc(${item.def.height} * var(--board-slot-h))`
+  const quality = document.createElement('span')
+  quality.className = 'quality-chip'
+  quality.textContent = qualityLabel[normalizeQuality(item.quality)]
+  const mark = document.createElement('span')
+  mark.className = 'drag-ghost-mark'
+  mark.textContent = item.def.name.slice(0, 1)
+  const name = document.createElement('strong')
+  name.textContent = item.def.name
+  const size = document.createElement('small')
+  size.textContent = `${item.def.size}格`
+  ghost.append(quality, mark, name, size)
+  document.body.appendChild(ghost)
+  return ghost
+}
+
+function startFastItemDrag(event: ReactPointerEvent<HTMLElement>, item: Item, onDrop: ItemDropHandler, onDragState: (dragging: boolean) => void, onClick: (source: HTMLElement) => void) {
+  if (event.button !== 0) return false
+  const startX = event.clientX
+  const startY = event.clientY
+  const source = event.currentTarget
+  let dragging = false
+  let ghost: HTMLElement | null = null
+  const moveGhost = (x: number, y: number) => {
+    if (!ghost) return
+    ghost.style.transform = `translate3d(${x + 10}px, ${y + 10}px, 0)`
+  }
+  const cleanup = () => {
+    window.removeEventListener('pointermove', onPointerMove, true)
+    window.removeEventListener('pointerup', onPointerUp, true)
+    window.removeEventListener('pointercancel', onPointerCancel, true)
+    source.classList.remove('dragging', 'input-active')
+    ghost?.remove()
+    ghost = null
+    if (dragging) window.setTimeout(() => source.classList.remove('fast-drag-suppress-click'), 0)
+    onDragState(false)
+  }
+  const beginDrag = (x: number, y: number) => {
+    dragging = true
+    source.classList.add('fast-drag-suppress-click')
+    ghost = createFastDragGhost(item)
+    moveGhost(x, y)
+    onDragState(true)
+  }
+  const onPointerMove = (moveEvent: PointerEvent) => {
+    const distance = Math.hypot(moveEvent.clientX - startX, moveEvent.clientY - startY)
+    if (!dragging && distance >= 2) beginDrag(moveEvent.clientX, moveEvent.clientY)
+    if (!dragging) return
+    moveEvent.preventDefault()
+    moveGhost(moveEvent.clientX, moveEvent.clientY)
+  }
+  const onPointerUp = (upEvent: PointerEvent) => {
+    if (dragging) {
+      upEvent.preventDefault()
+      const overId = dropIdFromEventTarget(upEvent.target)
+      cleanup()
+      onDrop(item.id, overId)
+      return
+    }
+    cleanup()
+    onClick(source)
+  }
+  const onPointerCancel = () => cleanup()
+  window.addEventListener('pointermove', onPointerMove, true)
+  window.addEventListener('pointerup', onPointerUp, true)
+  window.addEventListener('pointercancel', onPointerCancel, true)
+  return true
+}
+
+function DraggableItem({ item, relics, selected, upgradeable, onDrop, onSelect }: { item: Item; relics: Relic[]; selected: boolean; upgradeable: boolean; onDrop: ItemDropHandler; onSelect: (element: HTMLElement) => void }) {
   const { language } = useLanguage()
-  const { attributes, listeners, setNodeRef: setDraggableNodeRef } = useDraggable({ id: item.id })
-  const { isOver, setNodeRef: setDropNodeRef } = useDroppable({ id: `UPGRADE_ITEM:${item.id}`, disabled: dragging })
-  const [pressed, setPressed] = useState(false)
-  useEffect(() => {
-    if (dragging) setPressed(false)
-  }, [dragging])
+  const { isOver, setNodeRef: setDropNodeRef } = useDroppable({ id: `UPGRADE_ITEM:${item.id}` })
+  const nodeRef = useRef<HTMLElement | null>(null)
+  const suppressClickRef = useRef(false)
   const setNodeRef = (node: HTMLElement | null) => {
-    setDraggableNodeRef(node)
+    nodeRef.current = node
     setDropNodeRef(node)
   }
-  const endPress = () => setPressed(false)
   const handlePointerDown = (event: ReactPointerEvent<HTMLElement>) => {
-    listeners?.onPointerDown?.(event)
-    if (!event.defaultPrevented && event.button === 0) setPressed(true)
+    event.preventDefault()
+    startFastItemDrag(event, item, onDrop, (isDragging) => {
+      suppressClickRef.current = isDragging
+      if (isDragging) nodeRef.current?.classList.remove('input-active')
+    }, onSelect)
   }
   const style = {
     gridColumn: `${item.x + 1} / span ${item.def.width}`,
@@ -3961,21 +4078,23 @@ function DraggableItem({ item, relics, selected, dragging, upgradeable, onSelect
     <ItemFrame
       as="button"
       ref={setNodeRef}
-      className={`item-card paper-item-card ${itemTone(item.def)} ${qualityClass(item.quality)} ${selected ? 'selected' : ''} ${dragging ? 'dragging' : ''} ${pressed ? 'input-active' : ''} ${upgradeable ? 'can-upgrade' : ''} ${isOver ? 'upgrade-over' : ''}`}
+      data-drop-id={`UPGRADE_ITEM:${item.id}`}
+      className={`item-card paper-item-card ${itemTone(item.def)} ${qualityClass(item.quality)} ${selected ? 'selected' : ''} ${upgradeable ? 'can-upgrade' : ''} ${isOver ? 'upgrade-over' : ''}`}
       style={style}
       onClick={(event) => {
         event.stopPropagation()
+        if (suppressClickRef.current || event.currentTarget.classList.contains('fast-drag-suppress-click')) {
+          event.preventDefault()
+          suppressClickRef.current = false
+          return
+        }
         onSelect(event.currentTarget)
       }}
       onPointerDown={handlePointerDown}
-      onPointerUp={endPress}
-      onPointerCancel={endPress}
-      onPointerLeave={endPress}
       title={`${qualityText} ${localizedDef.name} · ${item.def.size}${language === 'en-US' ? ' slots' : '格'}${triggerDice ? ` · ${language === 'en-US' ? 'Dice' : '点数'} ${triggerDice}` : ''}`}
-      {...attributes}
     >
-      {dragging ? <DraggingItemGhost item={item} source /> : <ItemCardContent item={item} relics={relics} upgradeable={upgradeable} />}
-    </ItemFrame>
+      <ItemCardContent item={item} relics={relics} upgradeable={upgradeable} />
+      </ItemFrame>
   )
 }
 
@@ -4069,34 +4188,33 @@ function ItemArtDebugGallery() {
   )
 }
 
-function DraggingItemGhost({ item, source = false }: { item: Item; source?: boolean }) {
+function DraggingItemGhost({ item }: { item: Item }) {
   const { language } = useLanguage()
   const localizedDef = localizeItemDef(item.def, language)
   const quality = normalizeQuality(item.quality)
   const qualityText = language === 'en-US' ? localizeQuality(quality, language) : qualityLabel[quality]
   return (
     <div
-      className={`drag-overlay-item drag-overlay-ghost ${source ? 'drag-source-ghost' : ''} ${itemTone(item.def)} ${qualityClass(item.quality)}`}
-      style={source ? undefined : { width: `calc(${item.def.width} * var(--slot-w))`, height: `calc(${item.def.height} * var(--board-slot-h))` }}
+      className={`drag-overlay-item drag-overlay-ghost ${itemTone(item.def)} ${qualityClass(item.quality)}`}
+      style={{ width: `calc(${item.def.width} * var(--slot-w))`, height: `calc(${item.def.height} * var(--board-slot-h))` }}
     >
       <span className="quality-chip">{qualityText}</span>
-      <img className="item-icon" src={itemIcon(item.def)} alt="" decoding="async" />
+      <span className="drag-ghost-mark" aria-hidden="true">{localizedDef.name.slice(0, 1)}</span>
       <strong>{localizedDef.name}</strong>
       <small>{item.def.size}{language === 'en-US' ? ' slots' : '格'}</small>
     </div>
   )
 }
 
-function DraggingItemOverlay({ item }: { item: Item | null; relics?: Relic[] }) {
-  if (!item) return null
-  return <DraggingItemGhost item={item} />
+function DraggingItemOverlay({ item = null }: { item?: Item | null }) {
+  return item ? <DraggingItemGhost item={item} /> : null
 }
 
 function FloatingTip({ run, item, offer, anchor, descriptionOverride, relicsOverride, onClose, onBuy, onSell, onUpgrade }: { run: Run; item: Item | null; offer: ShopOffer | null; anchor: TipAnchor | null; descriptionOverride?: string | null; relicsOverride?: Relic[] | null; onClose: () => void; onBuy: (() => void) | null; onSell: (() => void) | null; onUpgrade: (() => void) | null }) {
   const { language } = useLanguage()
   const def = item?.def ?? offer?.def
-  useOutsideTipDismiss(Boolean(def), onClose)
-  if (!def) return null
+  useOutsideTipDismiss(Boolean(def && anchor), onClose)
+  if (!def || !anchor) return null
   const isOffer = Boolean(offer)
   const quality = normalizeQuality(item?.quality ?? offer?.quality)
   const canAfford = !offer || run.gold >= offer.price
@@ -4108,7 +4226,7 @@ function FloatingTip({ run, item, offer, anchor, descriptionOverride, relicsOver
   const localizedDef = localizeItemDef(def, language)
   const qualityText = language === 'en-US' ? localizeQuality(quality, language) : qualityLabel[quality]
   const descriptionText = language === 'en-US' ? localizedDef.description : (descriptionOverride ?? def.description ?? effectText(def, quality))
-  return (
+  const tip = (
     <FloatingPaperTip className="floating-tip paper-card" style={style}>
       <div className="tip-tags">
         <span className={`size-badge ${visual.className}`}>{def.size}格</span>
@@ -4174,6 +4292,8 @@ function FloatingTip({ run, item, offer, anchor, descriptionOverride, relicsOver
       </div>
     </FloatingPaperTip>
   )
+  if (typeof document === 'undefined') return tip
+  return createPortal(tip, document.body)
 }
 
 function StatusFloatingTip({ statusTip, onClose }: { statusTip: StatusTipState | null; onClose: () => void }) {

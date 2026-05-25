@@ -80,7 +80,9 @@ describe('selection screen structure', () => {
     expect(app).not.toContain('function prewarmItemArt')
     expect(app).not.toContain('const prewarmedItemArt = new Set<string>()')
     expect(app).not.toContain('image.decode?.()')
-    expect(app).toContain("className={`drag-overlay-item drag-overlay-ghost ${source ? 'drag-source-ghost' : ''}")
+    expect(app).toContain('className={`drag-overlay-item drag-overlay-ghost ${itemTone(item.def)}')
+    expect(app).not.toContain('function DragSourcePlaceholder')
+    expect(app).not.toContain('className={`drag-source-placeholder ${itemTone(item.def)}')
     expect(app).not.toContain('<img className="item-card-art" src={visual.artSrc} alt="" />')
   })
 

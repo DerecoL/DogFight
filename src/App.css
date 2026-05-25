@@ -1251,11 +1251,6 @@ input {
 .item-card.dragging::before, .item-card.dragging::after {
   display: none;
 }
-.item-card.input-active,
-.item-card:active {
-  transform: translateY(1px) scale(.985);
-  box-shadow: var(--pressed-sketch-shadow);
-}
 .quality-chip {
   position: absolute;
   left: 4px;
@@ -1296,13 +1291,15 @@ input {
 }
 
 .drag-overlay-item {
+  position: fixed;
+  left: 0;
+  top: 0;
   z-index: 1000;
   pointer-events: none;
   cursor: grabbing;
-  transform: rotate(-1deg) scale(1.03);
   will-change: transform;
-  contain: paint;
-  box-shadow: 0 12px 26px rgba(37, 48, 71, .24), 2px 3px 0 rgba(61, 45, 37, .18);
+  contain: layout paint style;
+  box-shadow: 0 8px 16px rgba(37, 48, 71, .18);
 }
 
 .drag-overlay-item::before, .drag-overlay-item::after {
@@ -1313,31 +1310,38 @@ input {
   display: grid;
   place-items: center;
   align-content: center;
-  gap: 6px;
+  gap: 4px;
   min-width: 0;
   padding: 8px;
   overflow: hidden;
   border: 3px solid var(--item-tone-ink);
-  border-radius: 12px;
-  background:
-    radial-gradient(circle at 35% 24%, rgba(255, 255, 255, .72), transparent 24%),
-    var(--item-tone-soft);
+  border-radius: 10px;
+  background: var(--item-tone-soft);
   color: var(--item-tone-ink);
   text-align: center;
-  box-shadow: 0 12px 26px rgba(37, 48, 71, .24), 2px 3px 0 rgba(61, 45, 37, .18);
+  box-shadow: 0 8px 16px rgba(37, 48, 71, .18);
 }
 
-.drag-overlay-ghost .item-icon {
-  width: 34px;
-  height: 34px;
-  filter: none;
+.drag-ghost-mark {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border: 2px solid currentColor;
+  border-radius: 999px;
+  background: rgba(255, 250, 241, .72);
+  font-size: 18px;
+  font-weight: 950;
+  line-height: 1;
 }
 
-.drag-source-ghost {
+.drag-source-placeholder {
   width: 100%;
   height: 100%;
-  transform: none;
-  box-shadow: none;
+  border: 2px dashed color-mix(in srgb, var(--item-tone-main) 72%, #3d2d25);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--item-tone-soft) 72%, transparent);
+  opacity: .52;
 }
 
 .drag-overlay-ghost strong,
@@ -5023,6 +5027,30 @@ input {
 .paper-item-card.item-card.quality-bronze::after,
 .paper-item-card.item-card.quality-silver::after {
   animation: none;
+}
+
+.drag-performance-mode .item-card::before,
+.drag-performance-mode .item-card::after {
+  display: none;
+}
+
+.drag-performance-mode .item-card,
+.drag-performance-mode .slot,
+.drag-performance-mode .drag-overlay-item {
+  transition: none !important;
+}
+
+.drag-performance-mode .item-card-icon-art {
+  filter: none;
+}
+
+.drag-performance-mode .upgrade-indicator {
+  animation: none;
+  box-shadow: none;
+}
+
+.drag-performance-mode .floating-tip {
+  display: none;
 }
 
 .battle-equipment-row.sketch-panel {
