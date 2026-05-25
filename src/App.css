@@ -1746,8 +1746,8 @@ input {
 .combatant { display: flex; align-items: center; gap: 12px; width: 100%; padding: 12px; background: #fff; border-radius: 18px; border: 1px solid var(--line); }
 .hp { display: grid; gap: 6px; width: 100%; }
 .hp span { display: inline-flex; align-items: center; gap: 6px; font-weight: 850; }
-.hp div { height: 16px; overflow: hidden; background: #f2d7d7; border-radius: 999px; }
-.hp i { display: block; height: 100%; background: linear-gradient(90deg, #31b981, #8be05a); transition: width .2s ease; }
+.hp > div:not(.bone-health-bar):not(.status-effects):not(.shield-bar) { height: 16px; overflow: hidden; background: #f2d7d7; border-radius: 999px; }
+.hp > div:not(.bone-health-bar):not(.shield-bar) > i { display: block; height: 100%; background: linear-gradient(90deg, #31b981, #8be05a); transition: width .2s ease; }
 .hp .status-effects {
   height: auto;
   min-height: 24px;
@@ -1814,14 +1814,14 @@ input {
   font-weight: 750;
   color: var(--ink);
 }
-.hp .hp-bar {
+.hp .hp-bar:not(.bone-health-bar) {
   position: relative;
   height: 18px;
   overflow: hidden;
   background: #f2d7d7;
   border-radius: 999px;
 }
-.hp .hp-bar i {
+.hp .hp-bar:not(.bone-health-bar) i {
   position: absolute;
   top: 0;
   bottom: 0;
@@ -1847,7 +1847,9 @@ input {
 .shield-bar {
   position: relative;
   height: 18px;
+  overflow: hidden;
   border: 1px solid rgba(37, 99, 235, .22);
+  border-radius: 999px;
   background: #dbeafe;
 }
 .shield-bar i {

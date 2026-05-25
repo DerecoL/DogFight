@@ -60,12 +60,21 @@ describe('equipment layout scale', () => {
   })
 
   it('styles battle health as a bone framed bar with shield and poison layers', () => {
-    expect(uiCssRule('.bone-health-bar')).toContain('border-radius: 999px')
-    expect(uiCssRule('.bone-health-bar::before')).toContain('box-shadow')
-    expect(uiCssRule('.bone-health-knob.left')).toContain('border-radius: 999px')
-    expect(uiCssRule('.bone-health-fill')).toContain('transition: width')
-    expect(uiCssRule('.bone-health-shield')).toContain('background')
-    expect(uiCssRule('.bone-health-poison')).toContain('background')
+    expect(uiCssRule('.bone-health .bone-health-bar')).toContain('border-radius: 999px')
+    expect(uiCssRule('.bone-health .bone-health-bar::before')).toContain('box-shadow')
+    expect(uiCssRule('.bone-health .bone-health-knob.left')).toContain('border-radius: 999px')
+    expect(uiCssRule('.bone-health .bone-health-fill')).toContain('transition: width')
+    expect(uiCssRule('.bone-health .bone-health-shield')).toContain('background')
+    expect(uiCssRule('.bone-health .bone-health-poison')).toContain('background')
+  })
+
+  it('keeps legacy hp descendant rules from overriding the bone health bar shape', () => {
+    expect(css).not.toContain('.hp div {')
+    expect(css).not.toContain('.hp i {')
+    expect(css).not.toContain('.hp .hp-bar {')
+    expect(css).not.toContain('.hp .hp-bar i {')
+    expect(uiCssRule('.bone-health .bone-health-bar')).toContain('overflow: visible')
+    expect(uiCssRule('.bone-health .bone-health-fill')).toContain('background: linear-gradient(90deg, #ff9f9f, #ec5f6d)')
   })
 
   it('styles the center dice as a readable front-facing handdrawn die', () => {
