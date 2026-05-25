@@ -1253,6 +1253,9 @@ input {
 .item-card.dragging {
   opacity: .35;
 }
+.item-card.dragging::before, .item-card.dragging::after {
+  display: none;
+}
 .item-card.input-active,
 .item-card:active {
   transform: translateY(1px) scale(.985);
@@ -1333,6 +1336,13 @@ input {
   width: 34px;
   height: 34px;
   filter: none;
+}
+
+.drag-source-ghost {
+  width: 100%;
+  height: 100%;
+  transform: none;
+  box-shadow: none;
 }
 
 .drag-overlay-ghost strong,

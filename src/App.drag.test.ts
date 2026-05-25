@@ -25,9 +25,24 @@ describe('drag overlay layering', () => {
     expect(css).toContain('.item-card:active')
   })
 
+  it('uses pointer-first collision detection so drag hover feedback follows the cursor', () => {
+    expect(app).toContain('pointerWithin,')
+    expect(app).toContain('rectIntersection,')
+    expect(app).toContain('const dragCollisionDetection: CollisionDetection')
+    expect(app).toContain('prioritizeDragCollisions(pointerCollisions)')
+    expect(app).toContain("String(collision.id).startsWith('UPGRADE_ITEM:')")
+    expect(app).toContain('collisionDetection={dragCollisionDetection}')
+  })
+
+  it('clears source press and upgrade feedback once an item is actively dragged', () => {
+    expect(app).toContain('useDroppable({ id: `UPGRADE_ITEM:${item.id}`, disabled: dragging })')
+    expect(app).toContain('if (dragging) setPressed(false)')
+  })
+
   it('uses a lightweight drag ghost without full card art content', () => {
     expect(app).toContain('function DraggingItemGhost')
     expect(app).toContain('return <DraggingItemGhost item={item} />')
+    expect(app).toContain('dragging ? <DraggingItemGhost item={item} source /> : <ItemCardContent')
     const overlayStart = app.indexOf('function DraggingItemOverlay')
     const overlayEnd = app.indexOf('function FloatingTip')
     const overlaySource = app.slice(overlayStart, overlayEnd)

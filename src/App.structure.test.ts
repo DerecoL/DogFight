@@ -81,6 +81,8 @@ describe('selection screen structure', () => {
     expect(app).toContain('image.decode?.()')
     expect(app).toContain('run.items.forEach')
     expect(app).toContain('run.shopItems.forEach')
+    expect(app).toContain("className={`drag-overlay-item drag-overlay-ghost ${source ? 'drag-source-ghost' : ''}")
+    expect(app).not.toContain('<img className="item-card-art" src={visual.artSrc} alt="" />')
   })
 
   it('routes command buttons through the handdrawn action wrapper', () => {
@@ -529,7 +531,9 @@ describe('selection screen structure', () => {
     expect(app).toContain('itemVisualProfile(item.def)')
     expect(app).toContain('className={`item-art-window ${visual.className} ${visual.hasCustomArt ? \'has-custom-art\' : \'generated-art\'}`}')
     expect(app).toContain('data-art-aspect={visual.artAspect}')
-    expect(app).toContain('{visual.artSrc ? <img className="item-card-art" src={visual.artSrc} alt="" /> : <span className="item-card-art-fallback" aria-hidden="true" />}')
+    expect(app).toContain('<ItemArtIcon def={def} className="item-card-icon-art" />')
+    expect(app).not.toContain('item-card-art-fallback')
+    expect(app).not.toContain('className="item-card-art"')
     expect(app).toContain('<span className="item-icon-badge">')
     expect(app).toContain('className={`tip-icon-frame ${visual.className}`}')
     expect(app).toContain('className={`size-badge ${visual.className}`}')

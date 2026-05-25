@@ -227,6 +227,8 @@ describe('equipment layout scale', () => {
     expect(cssRule('.drag-overlay-item::before, .drag-overlay-item::after')).toContain('display: none')
     expect(cssRule('.drag-overlay-ghost')).toContain('box-shadow')
     expect(cssRule('.drag-overlay-ghost .item-icon')).toContain('filter: none')
+    expect(cssRule('.drag-source-ghost')).toContain('box-shadow: none')
+    expect(cssRule('.item-card.dragging::before, .item-card.dragging::after')).toContain('display: none')
     expect(cssRule('.item-card.input-active, .item-card:active')).not.toContain('filter:')
   })
 
@@ -711,7 +713,8 @@ describe('equipment layout scale', () => {
     expect(cssRule('.item-art-window')).toContain('aspect-ratio')
     expect(cssRule('.item-art-window')).toContain('background')
     expect(cssRule('.item-art-window.generated-art::before')).toContain('var(--item-tone-main)')
-    expect(cssRule('.item-card-art')).toContain('object-fit: cover')
+    expect(cssRule('.item-card-icon-art')).toContain('object-fit: contain')
+    expect(cssRule('.item-card-icon-art')).toContain('width: min(74%, 78px)')
     expect(cssRule('.item-icon-badge')).toContain('position: absolute')
     expect(cssRule('.item-card-copy')).toContain('background')
     expect(cssRule('.size-badge[class*="item-tone-"]')).toContain('var(--item-tone-soft)')

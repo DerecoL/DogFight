@@ -4,6 +4,10 @@ import {
   DndContext,
   DragOverlay,
   PointerSensor,
+  pointerWithin,
+  rectIntersection,
+  type Collision,
+  type CollisionDetection,
   type DragEndEvent,
   type DragStartEvent,
   useDraggable,
@@ -869,6 +873,17 @@ function prewarmItemArt(src: string | null | undefined) {
   const image = new Image()
   image.src = src
   void image.decode?.().catch(() => undefined)
+}
+
+function prioritizeDragCollisions(collisions: Collision[]) {
+  const upgradeCollisions = collisions.filter((collision) => String(collision.id).startsWith('UPGRADE_ITEM:'))
+  return upgradeCollisions.length > 0 ? upgradeCollisions : collisions
+}
+
+const dragCollisionDetection: CollisionDetection = (args) => {
+  const pointerCollisions = pointerWithin(args)
+  if (pointerCollisions.length > 0) return prioritizeDragCollisions(pointerCollisions)
+  return prioritizeDragCollisions(rectIntersection(args))
 }
 
 function isItemArtDebugRoute() {
@@ -1818,7 +1833,7 @@ export default function App() {
       )}
 
       {!battle && run.phase === 'CLASS_REWARD' && !showClassRewardCeremony && (
-        <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd}>
+        <DndContext sensors={sensors} collisionDetection={dragCollisionDetection} onDragStart={onDragStart} onDragEnd={onDragEnd}>
           <section className="reward-workbench">
             <ClassRewardSelect
               choices={run.classRewardChoices}
@@ -1895,7 +1910,7 @@ export default function App() {
       )}
 
       {!battle && run.phase === 'SHOP' && (
-        <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd}>
+        <DndContext sensors={sensors} collisionDetection={dragCollisionDetection} onDragStart={onDragStart} onDragEnd={onDragEnd}>
           <section className="shop-workbench">
             <ShopShelf
               run={run}
@@ -1935,7 +1950,7 @@ export default function App() {
       )}
 
       {!battle && (run.phase === 'MATCH' || run.phase === 'PREP') && (
-        <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd}>
+        <DndContext sensors={sensors} collisionDetection={dragCollisionDetection} onDragStart={onDragStart} onDragEnd={onDragEnd}>
           <section className="match-panel" data-tutorial-anchor="battle-start">
             {run.phase === 'MATCH' ? (
               <>
@@ -2570,6 +2585,12 @@ function DogfightRoomView({ room, onRoomChange, onLeave, soundEnabled }: { room:
     if (room.phase !== 'BATTLE') setDismissedAutoBattleId(null)
   }, [room.phase])
 
+  useEffect(() => {
+    if (!run) return
+    run.items.forEach((item) => prewarmItemArt(itemVisualProfile(item.def).artSrc))
+    run.shopItems.forEach((offer) => prewarmItemArt(offer.def ? itemVisualProfile(offer.def).artSrc : null))
+  }, [run])
+
   const moveItem = (itemId: string, area: Area, x: number, y: number) => {
     if (!run || currentMember?.ready) return
     const placement = resolveRunSlotPlacement(run, itemId, area, x, y)
@@ -2749,7 +2770,7 @@ function DogfightRoomView({ room, onRoomChange, onLeave, soundEnabled }: { room:
               <DogSelect onPick={chooseDog} />
             </section>
           ) : run && room.phase === 'SHOP' ? (
-            <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd}>
+            <DndContext sensors={sensors} collisionDetection={dragCollisionDetection} onDragStart={onDragStart} onDragEnd={onDragEnd}>
               <DogfightRunWorkbench
                 run={run}
                 selectedItemId={selectedItemId}
@@ -3783,7 +3804,7 @@ function ShopCard({ offer, selected, ownedCount, affordable, onClick }: { offer:
       {owned && <span className="owned-badge" aria-label={`已拥有 ${ownedCount} 件同名装备`}>已拥有 x{ownedCount}</span>}
       {def && visual && (
         <span className={`item-art-window shop-card-art ${visual.className} ${visual.hasCustomArt ? 'has-custom-art' : 'generated-art'}`} data-art-aspect={visual.artAspect}>
-          {visual.artSrc ? <img className="item-card-art" src={visual.artSrc} alt="" /> : <span className="item-card-art-fallback" aria-hidden="true" />}
+          {visual.artSrc ? <img className="item-card-art" src={visual.artSrc} alt="" decoding="async" /> : <span className="item-card-art-fallback" aria-hidden="true" />}
           <span className="item-icon-badge">
             <img className="shop-item-icon" src={itemIcon(def)} alt="" />
           </span>
@@ -3934,8 +3955,11 @@ function Slot({ id, x, y, title, onClick }: { id: string; x: number; y: number; 
 function DraggableItem({ item, relics, selected, dragging, upgradeable, onSelect }: { item: Item; relics: Relic[]; selected: boolean; dragging: boolean; upgradeable: boolean; onSelect: (element: HTMLElement) => void }) {
   const { language } = useLanguage()
   const { attributes, listeners, setNodeRef: setDraggableNodeRef } = useDraggable({ id: item.id })
-  const { isOver, setNodeRef: setDropNodeRef } = useDroppable({ id: `UPGRADE_ITEM:${item.id}` })
+  const { isOver, setNodeRef: setDropNodeRef } = useDroppable({ id: `UPGRADE_ITEM:${item.id}`, disabled: dragging })
   const [pressed, setPressed] = useState(false)
+  useEffect(() => {
+    if (dragging) setPressed(false)
+  }, [dragging])
   const setNodeRef = (node: HTMLElement | null) => {
     setDraggableNodeRef(node)
     setDropNodeRef(node)
@@ -3969,7 +3993,7 @@ function DraggableItem({ item, relics, selected, dragging, upgradeable, onSelect
       title={`${qualityText} ${localizedDef.name} · ${item.def.size}${language === 'en-US' ? ' slots' : '格'}${triggerDice ? ` · ${language === 'en-US' ? 'Dice' : '点数'} ${triggerDice}` : ''}`}
       {...attributes}
     >
-      <ItemCardContent item={item} relics={relics} upgradeable={upgradeable} />
+      {dragging ? <DraggingItemGhost item={item} source /> : <ItemCardContent item={item} relics={relics} upgradeable={upgradeable} />}
     </ItemFrame>
   )
 }
@@ -4067,15 +4091,15 @@ function ItemArtDebugGallery() {
   )
 }
 
-function DraggingItemGhost({ item }: { item: Item }) {
+function DraggingItemGhost({ item, source = false }: { item: Item; source?: boolean }) {
   const { language } = useLanguage()
   const localizedDef = localizeItemDef(item.def, language)
   const quality = normalizeQuality(item.quality)
   const qualityText = language === 'en-US' ? localizeQuality(quality, language) : qualityLabel[quality]
   return (
     <div
-      className={`drag-overlay-item drag-overlay-ghost ${itemTone(item.def)} ${qualityClass(item.quality)}`}
-      style={{ width: `calc(${item.def.width} * var(--slot-w))`, height: `calc(${item.def.height} * var(--board-slot-h))` }}
+      className={`drag-overlay-item drag-overlay-ghost ${source ? 'drag-source-ghost' : ''} ${itemTone(item.def)} ${qualityClass(item.quality)}`}
+      style={source ? undefined : { width: `calc(${item.def.width} * var(--slot-w))`, height: `calc(${item.def.height} * var(--board-slot-h))` }}
     >
       <span className="quality-chip">{qualityText}</span>
       <img className="item-icon" src={itemIcon(item.def)} alt="" decoding="async" />
@@ -4118,7 +4142,7 @@ function FloatingTip({ run, item, offer, anchor, descriptionOverride, relicsOver
         <div className="tip-identity">
           <span className={`tip-icon-frame ${visual.className}`}>
             <span className={`item-art-window tip-art-preview ${visual.className} ${visual.hasCustomArt ? 'has-custom-art' : 'generated-art'}`} data-art-aspect={visual.artAspect}>
-              {visual.artSrc ? <img className="item-card-art" src={visual.artSrc} alt="" /> : <span className="item-card-art-fallback" aria-hidden="true" />}
+              {visual.artSrc ? <img className="item-card-art" src={visual.artSrc} alt="" decoding="async" /> : <span className="item-card-art-fallback" aria-hidden="true" />}
             </span>
             <img className="tip-icon" src={itemIcon(def)} alt="" />
           </span>
