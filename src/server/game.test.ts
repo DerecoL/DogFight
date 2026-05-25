@@ -2209,6 +2209,27 @@ describe('battle simulation', () => {
       .toContainEqual(expect.objectContaining({ itemId: 'three', duration: 2, progress: 0 }))
   })
 
+  it('stores overflow progress when frog reservoir charging pushes an item past full', () => {
+    const player: FighterSnapshot = {
+      name: 'P',
+      dogType: 'FROG' as never,
+      wins: 0,
+      losses: 0,
+      round: 0,
+      items: [
+        { id: 'funnel', defId: 'frog-raindrop-funnel', quality: 'GOLD', area: 'EQUIPMENT', x: 0, y: 0 },
+        { id: 'bite', defId: 'small-bite', quality: 'BRONZE', area: 'EQUIPMENT', x: 1, y: 0 },
+      ],
+    }
+    const opponent: FighterSnapshot = { name: 'O', dogType: 'SHIBA', wins: 0, losses: 0, round: 0, items: [] }
+    const result = simulateBattle(player, opponent, 'frog-reservoir-overflow')
+    const biteEvents = result.events.filter((event) => event.kind === 'ITEM' && event.actor === 'player' && event.itemId === 'bite')
+    const firstBiteReservoir = (biteEvents[0] as never as { reservoirs?: { player: Array<{ itemId: string; duration: number; progress: number; nextAt: number }> } })?.reservoirs?.player
+
+    expect(biteEvents.slice(0, 2).map((event) => event.time)).toEqual([2, 3])
+    expect(firstBiteReservoir).toContainEqual(expect.objectContaining({ itemId: 'bite', duration: 2, progress: 0.5, nextAt: 3 }))
+  })
+
   it('counts only explicit trigger dice when frog reservoir timing is changed by potions, enchants, and relic shifts', () => {
     const player: FighterSnapshot = {
       name: 'P',

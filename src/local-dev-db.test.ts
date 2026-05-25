@@ -14,6 +14,7 @@ describe('local development database', () => {
     expect(pkg.scripts.dev).toContain('pglite-server')
     expect(pkg.scripts.dev).toContain('--include-database-url')
     expect(pkg.scripts.dev).toContain('node scripts/start-local-dev.mjs')
+    expect(localDevScript).toContain('sslmode=disable')
     expect(localDevScript).toContain("runNpmScript('db:push')")
     expect(localDevScript).toContain("runNpmScript('dev:app')")
     expect(pkg.scripts['dev:app']).toContain('npm:dev:server')

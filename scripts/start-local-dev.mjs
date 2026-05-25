@@ -2,9 +2,15 @@ import { spawn } from 'node:child_process'
 
 const npmCommand = 'npm'
 
+function ensureSslDisabled(databaseUrl) {
+  if (!databaseUrl || databaseUrl.includes('sslmode=')) return databaseUrl
+  return `${databaseUrl}${databaseUrl.includes('?') ? '&' : '?'}sslmode=disable`
+}
+
 function runNpmScript(script) {
   return new Promise((resolve, reject) => {
     const child = spawn(npmCommand, ['run', script], {
+      env: process.env,
       stdio: 'inherit',
       shell: process.platform === 'win32',
     })
@@ -28,6 +34,8 @@ function runNpmScript(script) {
     })
   })
 }
+
+process.env.DATABASE_URL = ensureSslDisabled(process.env.DATABASE_URL)
 
 await runNpmScript('db:push')
 await runNpmScript('dev:app')
