@@ -70,6 +70,7 @@ import {
   localizeRelicDef,
   localizeShopType,
 } from './i18n/game-text'
+import { localizeBattleEventText, localizeFeedbackText, localizeServerError } from './i18n/battle-text'
 import {
   BoneHealthBar,
   ChoiceCard as HanddrawnChoiceCard,
@@ -3332,11 +3333,12 @@ function LanguageSelector() {
 }
 
 function FeedbackLayer({ feedbacks }: { feedbacks: UiFeedbackEvent[] }) {
+  const { language } = useLanguage()
   return (
     <div className="feedback-layer" aria-live="polite" aria-atomic="false">
       {feedbacks.map((feedback) => (
         <div key={feedback.id} className={`ui-feedback-toast ${feedback.tone}`} data-feedback-kind={feedback.kind}>
-          <span>{feedback.label}</span>
+          <span>{localizeFeedbackText(feedback.label, language)}</span>
         </div>
       ))}
     </div>
@@ -4169,6 +4171,7 @@ function ForfeitRunAction({ run, onForfeit }: { run: Run; onForfeit: () => void 
 }
 
 function BattleView({ run, battle, currentEvent, eventIndex, speed, score, soundEnabled, onSpeed, onContinue, onRestart }: { run: Run; battle: Battle | null; currentEvent?: BattleEvent; eventIndex: number; speed: number; score: number; soundEnabled: boolean; onSpeed: (speed: number) => void; onContinue: () => void; onRestart: () => void }) {
+  const { language } = useLanguage()
   const [logOpen, setLogOpen] = useState(false)
   const [battleTip, setBattleTip] = useState<{ item: Item; owner: 'player' | 'opponent'; anchor: TipAnchor } | null>(null)
   const [settlementHidden, setSettlementHidden] = useState(false)
@@ -4214,7 +4217,7 @@ function BattleView({ run, battle, currentEvent, eventIndex, speed, score, sound
       <div className="battle-toolbar">
         <div className="battle-status">
           <h2>自动战斗</h2>
-          <p>{event ? `${event.time}s · ${event.text}` : '准备播放战斗结果'}</p>
+          <p>{event ? `${event.time}s · ${localizeBattleEventText(event.text, language)}` : localizeBattleEventText('准备播放战斗结果', language)}</p>
         </div>
         <div className="speed-row" aria-label="战斗速度">
           {[1, 2, 4].map((value) => <HanddrawnTabButton key={value} active={speed === value} onClick={() => onSpeed(value)}>{value}x</HanddrawnTabButton>)}
@@ -4872,6 +4875,7 @@ function quadraticPoint(start: number, control: number, end: number, t: number) 
 }
 
 function CollapsedBattleLog({ events, eventIndex, open, onToggle }: { events: BattleEvent[]; eventIndex: number; open: boolean; onToggle: () => void }) {
+  const { language } = useLanguage()
   const startIndex = open ? Math.max(0, eventIndex - 40) : Math.max(0, eventIndex - 3)
   const visible = events.slice(startIndex, eventIndex + 1)
   return (
@@ -4881,4 +4885,10 @@ function CollapsedBattleLog({ events, eventIndex, open, onToggle }: { events: Ba
         {visible.map((event, index) => {
           const absoluteIndex = startIndex + index
           return (
-            <p key={`${event.time}-${index}-${event.text}`} className={`${event.actor} ${event.effectType === 'POISON' ? 'poison' : ''} ${absoluteIndex === eventIndex ? 'active-feedback' : ''}`}>{event.time}s · {event.text
+             <p key={`${event.time}-${index}-${event.text}`} className={`${event.actor} ${event.effectType === 'POISON' ? 'poison' : ''} ${absoluteIndex === eventIndex ? 'active-feedback' : ''}`}>{event.time}s · {localizeBattleEventText(event.text, language)}</p>
+          )
+        })}
+      </div>
+    </div>
+  )
+}

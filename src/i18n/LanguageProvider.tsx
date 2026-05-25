@@ -1,5 +1,6 @@
-import { createContext, useContext, useMemo, useState, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { text, type uiText } from './dictionary'
+import { applyLegacyDomLocalization } from './legacy-dom-localization'
 import { readStoredLanguage, writeStoredLanguage } from './language'
 import type { Language } from './types'
 
@@ -15,6 +16,8 @@ const LanguageContext = createContext<LanguageContextValue | null>(null)
 
 export function LanguageProvider({ children }: { children: ReactNode }) {
   const [language, setLanguageState] = useState<Language>(() => readStoredLanguage())
+
+  useEffect(() => applyLegacyDomLocalization(language), [language])
 
   const value = useMemo<LanguageContextValue>(() => {
     const setLanguage = (nextLanguage: Language) => {
