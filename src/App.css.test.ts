@@ -60,12 +60,21 @@ describe('equipment layout scale', () => {
   })
 
   it('styles battle health as a bone framed bar with shield and poison layers', () => {
-    expect(uiCssRule('.bone-health-bar')).toContain('border-radius: 999px')
-    expect(uiCssRule('.bone-health-bar::before')).toContain('box-shadow')
-    expect(uiCssRule('.bone-health-knob.left')).toContain('border-radius: 999px')
-    expect(uiCssRule('.bone-health-fill')).toContain('transition: width')
-    expect(uiCssRule('.bone-health-shield')).toContain('background')
-    expect(uiCssRule('.bone-health-poison')).toContain('background')
+    expect(uiCssRule('.bone-health .bone-health-bar')).toContain('border-radius: 999px')
+    expect(uiCssRule('.bone-health .bone-health-bar::before')).toContain('box-shadow')
+    expect(uiCssRule('.bone-health .bone-health-knob.left')).toContain('border-radius: 999px')
+    expect(uiCssRule('.bone-health .bone-health-fill')).toContain('transition: width')
+    expect(uiCssRule('.bone-health .bone-health-shield')).toContain('background')
+    expect(uiCssRule('.bone-health .bone-health-poison')).toContain('background')
+  })
+
+  it('keeps legacy hp descendant rules from overriding the bone health bar shape', () => {
+    expect(css).not.toContain('.hp div {')
+    expect(css).not.toContain('.hp i {')
+    expect(css).not.toContain('.hp .hp-bar {')
+    expect(css).not.toContain('.hp .hp-bar i {')
+    expect(uiCssRule('.bone-health .bone-health-bar')).toContain('overflow: visible')
+    expect(uiCssRule('.bone-health .bone-health-fill')).toContain('background: linear-gradient(90deg, #ff9f9f, #ec5f6d)')
   })
 
   it('styles the center dice as a readable front-facing handdrawn die', () => {
@@ -204,6 +213,15 @@ describe('equipment layout scale', () => {
     expect(cssRule('.upgrade-indicator')).toContain('animation')
     expect(cssRule('.paper-shop-card .price-tag')).toContain('rotate')
     expect(cssRule('.action-button:active, .primary:active, .secondary:active, .danger-button:active, .icon-button:active, .reroll-button:active')).toContain('translateY')
+  })
+
+  it('keeps drag and press feedback on cheap composited styles', () => {
+    expect(cssRule('.drag-overlay-item')).toContain('will-change: transform')
+    expect(cssRule('.drag-overlay-item')).toContain('contain: paint')
+    expect(cssRule('.drag-overlay-item::before, .drag-overlay-item::after')).toContain('display: none')
+    expect(cssRule('.drag-overlay-ghost')).toContain('box-shadow')
+    expect(cssRule('.drag-overlay-ghost .item-icon')).toContain('filter: none')
+    expect(cssRule('.item-card.input-active, .item-card:active')).not.toContain('filter:')
   })
 
   it('adds handdrawn battle staging and reduced motion support', () => {

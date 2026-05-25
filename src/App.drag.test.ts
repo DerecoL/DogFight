@@ -24,4 +24,14 @@ describe('drag overlay layering', () => {
     expect(css).toContain('.item-card.input-active,')
     expect(css).toContain('.item-card:active')
   })
+
+  it('uses a lightweight drag ghost without full card art content', () => {
+    expect(app).toContain('function DraggingItemGhost')
+    expect(app).toContain('return <DraggingItemGhost item={item} />')
+    const overlayStart = app.indexOf('function DraggingItemOverlay')
+    const overlayEnd = app.indexOf('function FloatingTip')
+    const overlaySource = app.slice(overlayStart, overlayEnd)
+    expect(overlaySource).not.toContain('ItemCardContent')
+    expect(overlaySource).not.toContain('ItemArt')
+  })
 })

@@ -59,6 +59,8 @@ export type AdvancedEffect =
   | 'PURGE_ENEMY_BUFFS'
   | 'POST_BATTLE_EQUIPPED_SELL_BONUS'
   | 'POST_BATTLE_CARRIED_SELL_BONUS'
+  | 'MULTI_ADJACENT_BONUS'
+  | 'MULTI_REPEAT_BONUS'
 
 export type ItemDef = {
   id: string
@@ -72,6 +74,7 @@ export type ItemDef = {
   price: number
   dice: number[]
   tags: string[]
+  multi?: number
   description?: string
   advancedEffect?: AdvancedEffect
   defaultQuality?: ItemQuality
@@ -220,6 +223,8 @@ export type BattleEvent = {
   defId?: string
   quality?: ItemQuality
   itemTriggerCount?: number
+  multiIndex?: number
+  multiTotal?: number
   boomCounterItemId?: string
   boomCounterValue?: number
   boomCounterMax?: number

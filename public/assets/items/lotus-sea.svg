@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="lotus sea">
+  <rect width="64" height="64" rx="14" fill="#d9f8df"/>
+  <path d="M8 41c8-9 18-12 30-9 7 2 12 1 18-3-3 12-12 19-25 19-9 0-16-2-23-7z" fill="#3f9f5b" stroke="#2f5d3a" stroke-width="4" stroke-linejoin="round"/>
+  <path d="M27 34c5 1 10 4 15 10" fill="none" stroke="#eaffdf" stroke-width="4" stroke-linecap="round"/>
+  <path d="M30 21c2-8 7-12 14-13 1 8-2 14-10 18z" fill="#f9a8d4" stroke="#8a2b63" stroke-width="4" stroke-linejoin="round"/>
+  <path d="M23 24c-2-7 0-13 6-18 5 6 6 12 2 19z" fill="#fbcfe8" stroke="#8a2b63" stroke-width="4" stroke-linejoin="round"/>
+  <circle cx="22" cy="42" r="3" fill="#fef9c3"/>
+</svg>

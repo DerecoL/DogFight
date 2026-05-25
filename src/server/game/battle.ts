@@ -11,9 +11,12 @@ import {
   relicRollBiasChance,
   SHIBA_POISON_ON_ROLL_AMOUNT,
   BOOM_COUNTER_TRIGGER_THRESHOLD,
+  MULTI_TRIGGER_CAP,
   growthDamageBase,
   growthDamageStep,
   itemDefForQuality,
+  kyushuBracerDamageBonus,
+  kyushuBracerShieldBonus,
   nightPatrolLightTriggerCount,
   THORNS_DAMAGE_PER_STACK,
 } from './data'
@@ -66,6 +69,8 @@ type ItemTrigger = {
   targetHpDelta: number
   text: string
   roll?: number
+  multiIndex?: number
+  multiTotal?: number
   targetItemId?: string
   boomCounterItemId?: string
   boomCounterValue?: number
@@ -76,6 +81,8 @@ type ItemTrigger = {
 type TriggerQueueEntry = {
   item: GameItem
   allowExtraRollFanout: boolean
+  multiIndex: number
+  multiTotal: number
 }
 
 type BattleSideState = {
@@ -308,6 +315,32 @@ function bloodContractAdjacentItems(actor: FighterSnapshot, item: GameItem, qual
   })
 }
 
+function isMultiItem(item: GameItem) {
+  return (itemDef(item.defId).multi ?? 1) > 1
+}
+
+function multiAdjacentBonusApplies(source: GameItem, target: GameItem) {
+  const sourceQuality = normalizeQuality(source.quality)
+  const sourceLeft = source.x
+  const sourceRight = source.x + itemDef(source.defId).width
+  const targetLeft = target.x
+  const targetRight = target.x + itemDef(target.defId).width
+  const targetTouchesSourceLeft = targetRight === sourceLeft
+  const targetTouchesSourceRight = targetLeft === sourceRight
+  return sourceQuality === 'DIAMOND'
+    ? targetTouchesSourceLeft || targetTouchesSourceRight
+    : targetTouchesSourceLeft
+}
+
+function effectiveMultiCount(actor: FighterSnapshot, item: GameItem) {
+  const base = itemDef(item.defId).multi ?? 1
+  if (base <= 1) return 1
+  const bonus = triggerOrder(actor.items).filter((source) =>
+    itemDef(source.defId).advancedEffect === 'MULTI_ADJACENT_BONUS' && multiAdjacentBonusApplies(source, item),
+  ).length
+  return Math.min(MULTI_TRIGGER_CAP, base + bonus)
+}
+
 function neighborItems(actor: FighterSnapshot, item: GameItem, target: EnchantmentTarget) {
   if (target === 'ADJACENT') return adjacentItems(actor, item)
   const ordered = triggerOrder(actor.items)
@@ -317,8 +350,13 @@ function neighborItems(actor: FighterSnapshot, item: GameItem, target: Enchantme
   return neighbor ? [neighbor] : []
 }
 
-function queueItems(queue: TriggerQueueEntry[], items: GameItem[], allowExtraRollFanout = true) {
-  queue.push(...items.map((item) => ({ item, allowExtraRollFanout })))
+function queueItems(queue: TriggerQueueEntry[], actor: FighterSnapshot, items: GameItem[], allowExtraRollFanout = true) {
+  for (const item of items) {
+    const multiTotal = effectiveMultiCount(actor, item)
+    for (let multiIndex = 1; multiIndex <= multiTotal; multiIndex += 1) {
+      queue.push({ item, allowExtraRollFanout, multiIndex, multiTotal })
+    }
+  }
 }
 
 function itemBaseEffectKind(def: ItemDef): EnchantmentBaseEffect | null {
@@ -580,12 +618,15 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
     extra: boolean,
     extraDepth: number,
     allowExtraRollFanout: boolean,
+    multiIndex: number,
+    multiTotal: number,
   ): ItemTrigger[] => {
     const targetSide = opponentOf(actorSide)
     const targetFighter = targetSide === 'player' ? player : opponent
     const def = itemDef(item.defId)
     const quality = normalizeQuality(item.quality)
     const triggers: ItemTrigger[] = []
+    const finishTriggers = () => triggers.map((trigger) => ({ ...trigger, multiIndex, multiTotal }))
     const actorState = state[actorSide]
     const targetState = state[targetSide]
     const advanced = def.advancedEffect ?? 'NONE'
@@ -611,7 +652,7 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
         roll,
         text: `${itemName(def, quality)} 被【失效】抵消`,
       })
-      return triggers
+      return finishTriggers()
     }
 
     if (actorState.disabledLarge > 0 && isLarge(def, actor)) {
@@ -630,7 +671,7 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
         roll,
         text: `${itemName(def, quality)} 被【失效】抵消`,
       })
-      return triggers
+      return finishTriggers()
     }
 
     if (advanced === 'BOOM_COUNTER') return triggers
@@ -743,6 +784,34 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
     }
     if (actorState.furyStacks > 0 && (def.effect.type === 'DAMAGE' || def.effect.type === 'DAMAGE_SELF_SHIELD')) {
       amount += actorState.furyStacks
+    }
+    const multiRepeatBonusItems = multiIndex > 1 && isMultiItem(item)
+      ? equippedItemsWithEffect(actor, 'MULTI_REPEAT_BONUS')
+      : []
+    if (multiRepeatBonusItems.length > 0 && (def.effect.type === 'DAMAGE' || def.effect.type === 'DAMAGE_SELF_SHIELD')) {
+      amount += multiRepeatBonusItems.reduce((sum, source) => sum + kyushuBracerDamageBonus(source.quality), 0)
+    }
+    if (!recoveryBlocked && multiRepeatBonusItems.length > 0) {
+      for (const source of multiRepeatBonusItems) {
+        const sourceDef = itemDef(source.defId)
+        const sourceQuality = normalizeQuality(source.quality)
+        const shield = kyushuBracerShieldBonus(sourceQuality)
+        applyShield(actorSide, shield)
+        triggers.push({
+          itemId: source.id,
+          defId: source.defId,
+          quality: sourceQuality,
+          effectType: 'UTILITY',
+          amount: shield,
+          target: actorSide,
+          sourceHp: getHp(actorSide),
+          targetHp: getHp(targetSide),
+          sourceHpDelta: 0,
+          targetHpDelta: 0,
+          roll,
+          text: `${itemName(sourceDef, sourceQuality)} 因【多重】追击获得 ${shield} 点【护盾】`,
+        })
+      }
     }
 
     if (!sacrificeReplacesSmallEffect && (def.effect.type === 'DAMAGE' || def.effect.type === 'DAMAGE_SELF_SHIELD')) {
@@ -998,27 +1067,27 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
     }
     if (!sacrificeReplacesSmallEffect && advanced === 'ADJACENT_TEMP_TRIGGER') {
       const adjacent = adjacentItems(actor, item)
-      for (let i = 0; i < nightPatrolLightTriggerCount(quality); i += 1) queueItems(queue, adjacent)
+      for (let i = 0; i < nightPatrolLightTriggerCount(quality); i += 1) queueItems(queue, actor, adjacent)
     }
     if (!sacrificeReplacesSmallEffect && (advanced === 'TRIGGER_ADJACENT' || (advanced === 'ADJACENT_ON_EXTRA_ROLL' && extra))) {
-      queueItems(queue, adjacentItems(actor, item))
+      queueItems(queue, actor, adjacentItems(actor, item))
     }
     if (!sacrificeReplacesSmallEffect && advanced === 'TRIGGER_MINUS_THREE' && roll >= 4) {
-      queueItems(queue, triggerOrder(actor.items).filter((entry) => itemDef(entry.defId).dice.includes(roll - 3)))
+      queueItems(queue, actor, triggerOrder(actor.items).filter((entry) => itemDef(entry.defId).dice.includes(roll - 3)))
     }
     if (!sacrificeReplacesSmallEffect && hasEquippedEffect(actor, 'LARGE_TRIGGERS_NON_LARGE') && isLarge(def, actor)) {
       const candidates = triggerOrder(actor.items).filter((entry) => {
         const candidateDef = itemDef(entry.defId)
         return !isLarge(candidateDef, actor) && candidateDef.advancedEffect !== 'LARGE_TRIGGERS_NON_LARGE'
       })
-      if (candidates.length > 0) queueItems(queue, [candidates[Math.floor(rng() * candidates.length)]])
+      if (candidates.length > 0) queueItems(queue, actor, [candidates[Math.floor(rng() * candidates.length)]])
     }
     if (sacrificeReplacesSmallEffect) {
-      queueItems(queue, triggerOrder(actor.items).filter((entry) => isLarge(itemDef(entry.defId), actor)))
+      queueItems(queue, actor, triggerOrder(actor.items).filter((entry) => isLarge(itemDef(entry.defId), actor)))
     }
     if (!sacrificeReplacesSmallEffect && advanced === 'EXTRA_ROLL_TRIGGERS_ALL' && extra && allowExtraRollFanout) {
       const target = triggerOrder(actor.items).find((entry) => entry.id !== item.id)
-      if (target) queueItems(queue, [target, target], false)
+      if (target) queueItems(queue, actor, [target, target], false)
     }
     if (!sacrificeReplacesSmallEffect && advanced === 'ROLL_COUNTER_EXTRA' && actorState.rollCount % 4 === 0) {
       processed.extraRollRequests += 1
@@ -1068,7 +1137,7 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
         }
       }
       if (enchant.kind === 'TRIGGER_NEIGHBOR') {
-        queueItems(queue, neighborItems(actor, item, enchant.target))
+        queueItems(queue, actor, neighborItems(actor, item, enchant.target))
       }
       if (enchant.kind === 'BUFF_NEIGHBOR_EFFECT') {
         for (const targetItem of neighborItems(actor, item, enchant.target)) {
@@ -1103,7 +1172,7 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
       })
     }
 
-    return triggers
+    return finishTriggers()
   }
 
   const resolveActor = (time: number, actorSide: Side, extra = false, extraDepth = 0) => {
@@ -1134,46 +1203,49 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
     const initialMatches = triggerOrder(fighter.items)
       .map((item) => ({ item, context: matchingContext(fighter, item, roll, fighterState.forcedItemDice) }))
       .filter(({ context }) => context.matches)
-    const initialQueue = hasEquippedEffect(fighter, 'ONLY_LUCKY_DOUBLE') && fighter.luckyNumber !== roll
+    const initialQueueItems = hasEquippedEffect(fighter, 'ONLY_LUCKY_DOUBLE') && fighter.luckyNumber !== roll
       ? []
       : initialMatches.flatMap(({ item, context }) => context.triggeredBySize && rng() < 0.5 ? [item, item] : [item])
     const emptyRollSafety = relicWithEffect(fighter, 'EMPTY_ROLL_LARGE_SAFETY')
     const missedBeforeRoll = fighterState.emptyRolls
-    if (initialQueue.length === 0 && emptyRollSafety && missedBeforeRoll >= relicEmptyRollMisses(emptyRollSafety.relicId, emptyRollSafety.quality)) {
+    if (initialQueueItems.length === 0 && emptyRollSafety && missedBeforeRoll >= relicEmptyRollMisses(emptyRollSafety.relicId, emptyRollSafety.quality)) {
       const safety = triggerOrder(fighter.items).find((item) => isLarge(itemDef(item.defId), fighter))
         ?? triggerOrder(fighter.items).find((item) => [2, 3].includes(itemDef(item.defId).size))
-      if (safety) initialQueue.push(safety)
+      if (safety) initialQueueItems.push(safety)
       fighterState.emptyRolls = 0
-    } else if (initialQueue.length === 0) {
+    } else if (initialQueueItems.length === 0) {
       fighterState.emptyRolls += 1
     } else {
       fighterState.emptyRolls = 0
     }
     const queuedItems = hasEquippedEffect(fighter, 'ONLY_LUCKY_DOUBLE') && fighter.luckyNumber === roll
-      ? initialQueue.flatMap((item) => [item, item])
-      : initialQueue
-    const queue = queuedItems.map((item) => ({ item, allowExtraRollFanout: true }))
+      ? initialQueueItems.flatMap((item) => [item, item])
+      : initialQueueItems
+    const queue: TriggerQueueEntry[] = []
+    queueItems(queue, fighter, queuedItems)
     const processed = { count: 0, capped: false, extraRollRequests: 0 }
     while (queue.length > 0 && processed.count < TRIGGER_QUEUE_CAP) {
       const entry = queue.shift()
       if (!entry) continue
-      const { item, allowExtraRollFanout } = entry
+      const { item, allowExtraRollFanout, multiIndex, multiTotal } = entry
       const context = matchingContext(fighter, item, roll, fighterState.forcedItemDice)
       processed.count += 1
       const itemTriggerCount = (fighterState.itemTriggerCounts[item.id] ?? 0) + 1
       fighterState.itemTriggerCounts[item.id] = itemTriggerCount
-      for (const trigger of executeItem(actorSide, fighter, item, time, roll, context.scale, context.note, queue, processed, extra, extraDepth, allowExtraRollFanout)) {
+      for (const trigger of executeItem(actorSide, fighter, item, time, roll, context.scale, context.note, queue, processed, extra, extraDepth, allowExtraRollFanout, multiIndex, multiTotal)) {
         push({
           time,
           actor: actorSide,
           kind: 'ITEM',
-          text: trigger.text,
+          text: trigger.multiTotal && trigger.multiTotal > 1 ? `${trigger.text}（多重 ${trigger.multiIndex}/${trigger.multiTotal}）` : trigger.text,
           roll: trigger.roll,
           itemId: trigger.itemId,
           targetItemId: trigger.targetItemId,
           defId: trigger.defId,
           quality: trigger.quality,
           itemTriggerCount,
+          multiIndex: trigger.multiIndex,
+          multiTotal: trigger.multiTotal,
           boomCounterItemId: trigger.boomCounterItemId,
           boomCounterValue: trigger.boomCounterValue,
           boomCounterMax: trigger.boomCounterMax,

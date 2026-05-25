@@ -40,6 +40,8 @@ const nonSelfTriggeredEffects = new Set([
   'GRANT_LIFESTEAL_ADJACENT',
   'BOOM_COUNTER',
   'POISON_ON_ATTACK_HIT',
+  'MULTI_ADJACENT_BONUS',
+  'MULTI_REPEAT_BONUS',
 ])
 
 function shiftDieUp(die: number) {

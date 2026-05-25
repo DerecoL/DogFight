@@ -50,11 +50,11 @@ export const itemTextById: Record<string, DefText> = {
   'starter-5': { name: '5-Pip Fang Bite', description: 'Deals 5 damage when a 5 is rolled.' },
   'starter-6': { name: '6-Pip Fang Bite', description: 'Deals 5 damage when a 6 is rolled.' },
   'small-bite': { name: 'Small Bite', description: 'Deals 4 damage. On hit, has a 20% chance to apply 1 Weak stack.' },
-  'lucky-paw': { name: 'Lucky Paw Pad', description: 'A compact attack item that hits hard on lucky high rolls.' },
-  'milk-bone': { name: 'Milk Bone', description: 'Restores health on its trigger rolls.' },
-  'rubber-ball': { name: 'Rubber Ball', description: 'A medium attack item with reliable mid-roll pressure.' },
+  'lucky-paw': { name: 'Lucky Paw Pad', description: 'Deals 5 damage. Multi 2: when it hits, it fully triggers 2 times.' },
+  'milk-bone': { name: 'Milk Bone', description: 'Restores 3 health. Multi 2: when it hits, it fully triggers 2 times.' },
+  'rubber-ball': { name: 'Rubber Ball', description: 'Deals 4 damage. Multi 2: when it hits, it fully triggers 2 times.' },
   'spiked-collar': { name: 'Spiked Collar', description: 'A medium attack item that favors high rolls.' },
-  'training-disc': { name: 'Training Disc', description: 'Deals damage on edge rolls: 1 and 6.' },
+  'training-disc': { name: 'Training Disc', description: 'Deals 3 damage. Multi 3: when it hits, it fully triggers 3 times.' },
   'guard-vest': { name: 'Guard Vest', description: 'Restores health across alternating trigger rolls.' },
   'giant-bone': { name: 'Giant Bone Club', description: 'Deals 16 damage. Attacks have a 50% chance to gain Fury; each Fury stack adds 1 attack damage.' },
   'dog-house': { name: 'Puppy Kennel', description: 'Restores 12 health and steals 1 enemy buff, prioritizing Thorns then Haste. Shield cannot be stolen.' },
@@ -81,6 +81,8 @@ export const itemTextById: Record<string, DefText> = {
   'v4-reverse-fur-comb': { name: 'Reverse-Fur Purifying Comb', description: 'Purges up to 3 enemy buffs. Heal 5 for each removed stack, prioritizing Thorns, Haste, then Shield chunks.' },
   'patting-bear': { name: 'Patting Bear', description: 'Each trigger applies 1 Wound. Wound increases direct attack damage taken by 1 per stack.' },
   'poisoned-dog-fang': { name: 'Poisoned Dog Fang', description: 'No trigger required. Each attack hit applies 1 Poison stack.' },
+  'lotus-sea': { name: 'Lotus Sea', description: 'Aura: the left adjacent Multi item gains +1 multi count. Diamond affects both adjacent Multi items. Multi is capped at 5.' },
+  'kyushu-bracer': { name: 'Kyushu Bracer', description: 'Aura: allied Multi items gain +2 attack damage on their 2nd and later triggers, and you gain 1 Shield.' },
   'shiba-speed-katana': { name: 'Swift Katana', description: 'Each trigger grants 1 Haste stack, up to 5 stacks, resetting after battle.' },
   'shiba-great-katana': { name: 'Great Katana', description: 'Also triggers one adjacent item once.' },
   'shiba-swallow-katana': { name: 'Swallow Katana', description: 'Has a 20% chance to grant an extra roll. Stacks up to 3 extra rolls.' },
@@ -153,6 +155,7 @@ export const ruleTermTextByTerm: Record<string, RuleTermText> = {
   '真实伤害': { term: 'True Damage', description: 'Damage that directly reduces health and does not get absorbed by Shield first.', note: 'Broken Canine can deal true damage.' },
   '雪崩': { term: 'Avalanche', description: 'Samoyed class count. Low rolls add stacks. At 5 stacks, they clear and deal damage; each Avalanche doubles the next one.', note: 'Avalanche base damage scales with quality.' },
   '爆鸣计数': { term: 'Boom Count', description: 'Boom Counter can only trigger by counting. Each allied item trigger adds 1 count. At 50, it clears and deals direct damage.', note: 'Upgrading Boom Counter only increases the damage dealt at 50.' },
+  '多重': { term: 'Multi', description: 'When an item hits, it fully triggers the marked number of times. Multi 2 triggers fully twice in the same hit.', note: 'Each repeat counts as a successful trigger. Each Disabled stack cancels only one repeat. Multi is capped at 5.' },
 }
 
 export function localizeItemDef(def: LocalizableItemDef, language: Language): DefText {
