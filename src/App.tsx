@@ -431,7 +431,7 @@ type DogfightRoomResponse = { room: DogfightRoom }
 type DogfightLeaveResponse = { room: DogfightRoom | null }
 type DogfightBattleResponse = { battle: { id: string; roomId: string; round: number; opponentKind: string; result: Battle } }
 
-const dogNames: Record<DogType, string> = { SHIBA: '柴犬', SAMOYED: '萨摩耶', MUTT: '土狗', BULLY: '恶霸', EMPEROR: '狗皇帝', FROG: '青蛙' }
+const dogNames: Record<DogType, string> = { SHIBA: '柴犬', SAMOYED: '萨摩耶', MUTT: '土狗', BULLY: '恶霸', EMPEROR: '狗皇帝', FROG: '祖灵' }
 const dogTraits: Record<DogType, string> = {
   SHIBA: '20% 概率改掷为【小点】 1/2/3',
   SAMOYED: '20% 概率改掷为【大点】 4/5/6',
@@ -446,7 +446,7 @@ const dogAssets: Record<DogType, string> = {
   MUTT: '/assets/dogs/mutt.webp',
   BULLY: '/assets/dogs/bully.webp',
   EMPEROR: '/assets/dogs/emperor.webp',
-  FROG: '/assets/dogs/frog.svg',
+  FROG: '/assets/dogs/zuling.jpg',
 }
 const dogBrawlTownBackground = '/assets/backgrounds/dog-brawl-town.jpg'
 const visualThemeAssets: Record<VisualThemeId, string> = {

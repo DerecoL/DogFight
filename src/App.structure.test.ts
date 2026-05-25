@@ -302,9 +302,9 @@ describe('selection screen structure', () => {
   it('offers dog emperor with a lucky-number selector and picture avatars', () => {
     expect(app).toContain("type DogType = 'SHIBA' | 'SAMOYED' | 'MUTT' | 'BULLY' | 'EMPEROR' | 'FROG'")
     expect(app).toContain("EMPEROR: '狗皇帝'")
-    expect(app).toContain("FROG: '青蛙'")
+    expect(app).toContain("FROG: '祖灵'")
     expect(app).toContain("EMPEROR: '/assets/dogs/emperor.webp'")
-    expect(app).toContain("FROG: '/assets/dogs/frog.svg'")
+    expect(app).toContain("FROG: '/assets/dogs/zuling.jpg'")
     expect(app).toContain('luckyNumber')
     expect(app).toContain('幸运数字')
     expect(app).toContain("SHIBA: '/assets/dogs/shiba.webp'")

@@ -9,7 +9,7 @@ export const DOGS: Record<DogType, { name: string; trait: string }> = {
   MUTT: { name: '土狗', trait: '20% 概率【额外投掷】一次' },
   BULLY: { name: '恶霸', trait: '40% 概率使本次触发的【大型物品】效果翻倍' },
   EMPEROR: { name: '狗皇帝', trait: '指定【天命数字】（幸运数字），命中时 50% 概率使触发效果翻倍' },
-  FROG: { name: '青蛙', trait: '显式点数装备改为【蓄水】触发：间隔 = 6 / 点数数量，可被职业装备提速' },
+  FROG: { name: '祖灵', trait: '显式点数装备改为【蓄水】触发：间隔 = 6 / 点数数量，可被职业装备提速' },
 }
 
 export const SHIBA_POISON_ON_ROLL_AMOUNT = 6

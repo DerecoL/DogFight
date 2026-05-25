@@ -40,7 +40,7 @@ export const dogTextByType: Record<DogType, DefText> = {
   MUTT: { name: 'Mutt', description: '20% chance to gain one extra roll.' },
   BULLY: { name: 'Bully', description: '40% chance to double the effect of the triggered large item.' },
   EMPEROR: { name: 'Dog Emperor', description: 'Choose a destiny number. When it hits, there is a 50% chance to double triggered effects.' },
-  FROG: { name: 'Frog', description: 'Explicit-dice gear fills a reservoir instead of using base rolls. Trigger interval is 6 divided by explicit dice count, and class gear can speed it up.' },
+  FROG: { name: 'Zuling', description: 'Explicit-dice gear fills a reservoir instead of using base rolls. Trigger interval is 6 divided by explicit dice count, and class gear can speed it up.' },
 }
 
 export const itemTextById: Record<string, DefText> = {
@@ -162,8 +162,8 @@ export const ruleTermTextByTerm: Record<string, RuleTermText> = {
   '真实伤害': { term: 'True Damage', description: 'Damage that directly reduces health and does not get absorbed by Shield first.', note: 'Broken Canine can deal true damage.' },
   '雪崩': { term: 'Avalanche', description: 'Samoyed class count. Low rolls add stacks. At 5 stacks, they clear and deal damage; each Avalanche doubles the next one.', note: 'Avalanche base damage scales with quality.' },
   '爆鸣计数': { term: 'Boom Count', description: 'Boom Counter can only trigger by counting. Each allied item trigger adds 1 count. At 50, it clears and deals direct damage.', note: 'Upgrading Boom Counter only increases the damage dealt at 50.' },
-  '蓄水': { term: 'Reservoir', description: 'Frog class timing mechanic. Explicit-dice gear fills over time based on its explicit dice count, then triggers and clears its own reservoir when full.', note: 'The base interval is max(0.5, 6 divided by explicit dice count divided by speed multiplier). Linked triggers do not clear the target reservoir.' },
-  '暴雨季': { term: 'Rainy Season', description: 'A temporary Frog class speed window. When triggered, all reservoir gear fills 50% faster for 4 seconds.', note: 'Multiplies with Lily Pad Pump and does not change explicit dice count.' },
+  '蓄水': { term: 'Reservoir', description: 'Zuling class timing mechanic. Explicit-dice gear fills over time based on its explicit dice count, then triggers and clears its own reservoir when full.', note: 'The base interval is max(0.5, 6 divided by explicit dice count divided by speed multiplier). Linked triggers do not clear the target reservoir.' },
+  '暴雨季': { term: 'Rainy Season', description: 'A temporary Zuling class speed window. When triggered, all reservoir gear fills 50% faster for 4 seconds.', note: 'Multiplies with Lily Pad Pump and does not change explicit dice count.' },
   '多重': { term: 'Multi', description: 'When this item hits, it fully triggers the listed number of times. Multi 2 means two complete trigger resolutions from the same hit.', note: 'Each segment counts as a successful trigger. Each Disabled stack cancels only one segment. Multi caps at 5.' },
 }
 
@@ -185,7 +185,7 @@ export function localizeDog(dogType: DogType, language: Language): { name: strin
       MUTT: { name: '土狗', trait: '20% 概率【额外投掷】一次' },
       BULLY: { name: '恶霸', trait: '40% 概率使本次触发的【大型物品】效果翻倍' },
       EMPEROR: { name: '狗皇帝', trait: '指定【天命数字】（幸运数字），命中时 50% 概率使触发效果翻倍' },
-      FROG: { name: '青蛙', trait: '显式点数装备改为【蓄水】触发：间隔 = 6 / 点数数量，可被职业装备提速' },
+      FROG: { name: '祖灵', trait: '显式点数装备改为【蓄水】触发：间隔 = 6 / 点数数量，可被职业装备提速' },
     }
     return zhDogText[dogType]
   }
