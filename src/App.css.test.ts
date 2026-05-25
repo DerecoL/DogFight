@@ -19,6 +19,12 @@ function cssRule(selector: string) {
   return match?.[1] ?? ''
 }
 
+function lastCssRule(selector: string) {
+  const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const matches = [...css.matchAll(new RegExp(`${escaped}\\s*\\{([^}]*)\\}`, 'gs'))]
+  return matches.at(-1)?.[1] ?? ''
+}
+
 function uiCssRule(selector: string) {
   const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   const match = uiCss.match(new RegExp(`${escaped}\\s*\\{([^}]*)\\}`, 's'))
@@ -467,6 +473,10 @@ describe('equipment layout scale', () => {
     expect(cssRule('.settlement-page')).toContain('position: fixed')
     expect(cssRule('.settlement-page')).toContain('inset: 0')
     expect(cssRule('.settlement-page')).toContain('z-index')
+    expect(lastCssRule('.settlement-page')).toContain('left: 50%')
+    expect(lastCssRule('.settlement-page')).toContain('right: auto')
+    expect(lastCssRule('.settlement-page')).toContain('transform: translateX(-50%)')
+    expect(lastCssRule('.settlement-page')).toContain('max-width: 1280px')
     expect(cssRule('.settlement-hide-button')).toContain('position: absolute')
     expect(cssRule('.settlement-hide-button')).toContain('top: clamp')
     expect(cssRule('.settlement-show-button')).toContain('position: fixed')
