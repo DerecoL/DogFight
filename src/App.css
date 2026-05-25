@@ -2120,7 +2120,7 @@ input {
   min-width: 0;
   max-width: 100%;
   width: 100%;
-  padding: 9px;
+  padding: 9px 9px 28px;
   border-radius: 16px;
   background: var(--wood-grain), var(--wood-frame);
   box-shadow: var(--wood-shadow);
@@ -2174,8 +2174,8 @@ input {
   width: 100%;
   height: var(--slot-h);
   min-height: 142px;
-  padding-bottom: 36px;
-  overflow: hidden;
+  padding-bottom: 18px;
+  overflow: visible;
   isolation: isolate;
   cursor: pointer;
   text-align: center;
@@ -2323,7 +2323,7 @@ input {
 .trigger-count-stamp {
   position: absolute;
   left: 50%;
-  bottom: 6px;
+  bottom: -18px;
   z-index: 6;
   display: inline-flex;
   align-items: center;
@@ -4270,7 +4270,7 @@ input {
 
 .battle-slot-grid {
   gap: 5px;
-  padding: 10px;
+  padding: 10px 10px 28px;
   border: 3px solid var(--ink);
   border-radius: 12px;
   background: var(--wood-grain), var(--wood-frame);
@@ -6074,8 +6074,8 @@ input {
   .floating-tip { right: auto; bottom: auto; width: min(380px, calc(100vw - 28px)); }
   .tip-body { grid-template-columns: 1fr; }
   .slot-grid { gap: 5px; padding: 10px; }
-  .battle-slot-grid { gap: 5px; padding: 10px; }
-  .battle-item { padding-bottom: 30px; }
+  .battle-slot-grid { gap: 5px; padding: 10px 10px 30px; }
+  .battle-item { padding-bottom: 12px; }
   .item-card { padding: 6px 4px; font-size: 11px; }
   .item-icon { width: 28px; height: 28px; }
   .shop-card { grid-template-columns: 48px 1fr; }

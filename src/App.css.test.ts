@@ -400,8 +400,8 @@ describe('equipment layout scale', () => {
     expect(cssRule('.battle-item-trigger::after')).toContain('content: ""')
     expect(app).toContain('itemTriggerCountLabel(events, owner, item.id, displayIndex)')
     expect(app).toContain('className={`trigger-count-stamp')
-    expect(cssRule('.trigger-count-stamp')).toContain('bottom: 6px')
-    expect(cssRule('.battle-slot-grid')).not.toContain('padding-bottom')
+    expect(cssRule('.trigger-count-stamp')).toContain('bottom: -18px')
+    expect(cssRule('.battle-slot-grid')).toContain('padding: 9px 9px 28px')
     expect(cssRule('.battle-item.trigger-count-pop .trigger-count-stamp')).toContain('animation')
     expect(css).toContain('@keyframes triggerCountStampPop')
     expect(cssRule('.battle-dog.vfx-target-damage .battle-dog-img')).toContain('filter')
@@ -415,18 +415,19 @@ describe('equipment layout scale', () => {
     expect(css).toContain('@keyframes vfxDamageJolt')
   })
 
-  it('keeps battle trigger counts inside equipment cards so they cannot cover controls', () => {
+  it('keeps battle trigger counts outside equipment cards with reserved row space', () => {
     expect(cssRule('.battle-equipment-row')).toContain('--slot-h: 142px')
     expect(cssRule('.battle-item')).toContain('min-height: 142px')
-    expect(cssRule('.battle-item')).toContain('padding-bottom: 36px')
-    expect(cssRule('.battle-item')).toContain('overflow: hidden')
+    expect(cssRule('.battle-item')).toContain('overflow: visible')
     expect(cssRule('.battle-item')).toContain('isolation: isolate')
-    expect(cssRule('.trigger-count-stamp')).toContain('bottom: 6px')
+    expect(cssRule('.battle-slot-grid')).toContain('padding: 9px 9px 28px')
+    expect(lastCssRule('.battle-slot-grid')).toContain('padding: 10px 10px 30px')
+    expect(cssRule('.trigger-count-stamp')).toContain('bottom: -18px')
     expect(cssRule('.trigger-count-stamp')).toContain('z-index: 6')
     expect(cssRule('.trigger-count-stamp')).toContain('white-space: nowrap')
     expect(css).toContain('.battle-equipment-row { --slot-w: 58px; --slot-h: 104px; }')
     expect(css).toContain('.battle-item { min-height: 104px; }')
-    expect(css).not.toContain('.battle-slot-grid { padding-bottom: 25px; }')
+    expect(css).toContain('.battle-slot-grid { gap: 5px; padding: 10px 10px 30px; }')
   })
 
   it('keeps explanatory copy separated from nearby headings', () => {
