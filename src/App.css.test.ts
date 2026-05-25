@@ -240,6 +240,17 @@ describe('equipment layout scale', () => {
     expect(css).not.toContain('.item-card:active')
   })
 
+  it('keeps move-slot and battle target effects above tray skin layers', () => {
+    expect(cssRule('.slot-grid')).toContain('isolation: isolate')
+    expect(cssRule('.battle-slot-grid')).toContain('isolation: isolate')
+    expect(cssRule('.battle-slot-grid::before, .paper-inventory .slot-grid::before')).toContain('z-index: 0')
+    expect(cssRule('.paper-inventory .slot, .battle-slot')).toContain('z-index: 1')
+    expect(cssRule('.slot.over')).toContain('z-index: 4')
+    expect(cssRule('.slot.over::after')).toContain('z-index: 2')
+    expect(cssRule('.battle-item-vfx-target')).toContain('z-index: 10')
+    expect(cssRule('.battle-fx-stage')).toContain('z-index: 80')
+  })
+
   it('adds handdrawn battle staging and reduced motion support', () => {
     expect(cssRule('.handdrawn-stage')).toContain('background')
     expect(cssRule('.handdrawn-stage::before')).toContain('radial-gradient')
@@ -283,6 +294,11 @@ describe('equipment layout scale', () => {
   })
 
   it('keeps desktop battle playback focused on large equipment rails over empty stage space', () => {
+    expect(cssRule('.visual-battle')).toContain('width: min(1920px, 100%)')
+    expect(cssRule('.visual-battle')).toContain('min-height: calc(100vh - 170px)')
+    expect(cssRule('.visual-battle')).toContain('margin: 0 auto')
+    expect(lastCssRule('.battle-panel')).toContain('width: min(1920px, 100%)')
+    expect(lastCssRule('.battle-panel')).not.toContain('width: min(1280px, 100%)')
     expect(cssRule('.visual-battle')).toContain('grid-template-rows: auto auto minmax(190px, 240px) auto auto auto')
     expect(cssRule('.battle-stage')).toContain('min-height: 190px')
     expect(cssRule('.battle-stage')).toContain('max-height: 240px')
@@ -364,6 +380,19 @@ describe('equipment layout scale', () => {
     expect(cssRule('.paper-shop-card.selected')).toContain('filter: var(--shop-paper-filter-hover)')
     expect(cssRule('.paper-shop-card.shop-card-unaffordable')).toContain('filter: grayscale(.82) brightness(.68) saturate(.55) drop-shadow')
     expect(cssRule('.paper-shop-card.shop-card-unaffordable:hover')).toContain('filter: grayscale(.82) brightness(.68) saturate(.55) drop-shadow')
+  })
+
+  it('keeps shop note edge strokes uniform while layering quality glow above the paper skin', () => {
+    expect(cssRule('.paper-shop-card')).toContain('--shop-quality-glow-ring')
+    expect(cssRule('.paper-shop-card')).toContain('--shop-paper-shadow: var(--shop-quality-glow-ring)')
+    expect(cssRule('.paper-shop-card')).not.toContain('--shop-paper-shadow: var(--paper-edge-stroke)')
+    expect(cssRule('.paper-shop-card::before')).toContain('z-index: 1')
+    expect(cssRule('.paper-shop-card::after')).toContain('z-index: 1')
+    expect(cssRule('.paper-shop-card > *')).toContain('z-index: 2')
+    expect(cssRule('.paper-shop-card:hover')).not.toContain('var(--paper-edge-stroke)')
+    expect(lastCssRule('.paper-shop-card.paper-item-card.item-card')).toContain('box-shadow: var(--shop-paper-shadow)')
+    expect(lastCssRule('.paper-shop-card.paper-item-card.item-card::before')).toContain('-webkit-mask: none')
+    expect(lastCssRule('.paper-shop-card.paper-item-card.item-card::after')).toContain('animation: none')
   })
 
   it('adds fourth-pass handdrawn detail to history, tips, relics, and reward choices', () => {

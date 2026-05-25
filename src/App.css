@@ -1013,6 +1013,7 @@ input {
 .grid-heading h3 { display: inline-flex; align-items: center; gap: 7px; }
 .slot-grid {
   position: relative;
+  isolation: isolate;
   display: grid;
   gap: 8px;
   min-width: 0;
@@ -1032,7 +1033,11 @@ input {
   border-radius: 11px;
   background: linear-gradient(180deg, #f5d9ae, #e2b980);
 }
-.slot.over { background: #c7f9df; outline: 3px solid rgba(49, 185, 129, .35); }
+.slot.over {
+  z-index: 4;
+  background: #c7f9df;
+  outline: 3px solid rgba(49, 185, 129, .35);
+}
 .item-card {
   --quality-frame-width: 3px;
   --quality-frame-material:
@@ -2068,7 +2073,9 @@ input {
 
 .visual-battle {
   position: relative;
-  width: 100%;
+  width: min(1920px, 100%);
+  min-height: calc(100vh - 170px);
+  margin: 0 auto;
   overflow: hidden;
   isolation: isolate;
   display: grid;
@@ -2123,6 +2130,7 @@ input {
 .battle-slot-grid {
   grid-column: 1;
   position: relative;
+  isolation: isolate;
   display: grid;
   grid-template-rows: var(--slot-h);
   gap: 6px;
@@ -2138,12 +2146,16 @@ input {
   content: "";
   position: absolute;
   inset: 7px;
+  z-index: 0;
   border-radius: 12px;
   background:
     var(--wood-grain),
     linear-gradient(90deg, rgba(255, 236, 197, .09), transparent 38%, rgba(57, 31, 16, .07));
   opacity: .58;
   pointer-events: none;
+}
+.paper-inventory .slot, .battle-slot {
+  z-index: 1;
 }
 .battle-slot {
   position: relative;
@@ -2178,6 +2190,18 @@ input {
   background: linear-gradient(135deg, rgba(255, 255, 255, .3), transparent 68%);
   opacity: .58;
   pointer-events: none;
+}
+.slot.over::after {
+  inset: -2px;
+  z-index: 2;
+  height: auto;
+  border: 3px solid rgba(34, 197, 94, .68);
+  border-radius: inherit;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(187, 247, 208, .62), transparent 68%),
+    linear-gradient(135deg, rgba(255, 255, 255, .36), transparent 62%);
+  opacity: .95;
+  box-shadow: 0 0 0 3px rgba(187, 247, 208, .42), 0 0 20px rgba(34, 197, 94, .58);
 }
 .battle-item {
   width: 100%;
@@ -2256,6 +2280,7 @@ input {
   animation: paperShimmer .72s ease-out 1;
 }
 .battle-item-vfx-target {
+  z-index: 10;
   animation: meteorTargetPulse .72s ease-out 1;
   outline: 4px solid rgba(255, 248, 219, .94);
   box-shadow:
@@ -4523,7 +4548,7 @@ input {
 }
 
 .battle-panel {
-  width: min(1280px, 100%);
+  width: min(1920px, 100%);
   margin: 0 auto;
 }
 
@@ -4632,7 +4657,15 @@ input {
   --shop-paper-edge-width: 1.25px;
   --shop-paper-edge-ink: rgba(61, 45, 37, .58);
   --shop-quality-glow: rgba(190, 111, 50, .56);
-  --shop-quality-glow-strong: color-mix(in srgb, var(--shop-quality-glow) 100%, transparent);
+  --shop-quality-glow-strong: color-mix(in srgb, var(--shop-quality-glow) 70%, transparent);
+  --shop-quality-glow-ring:
+    0 0 0 1px color-mix(in srgb, var(--shop-quality-glow) 42%, transparent),
+    0 0 16px color-mix(in srgb, var(--shop-quality-glow) 66%, transparent),
+    0 0 34px var(--shop-quality-glow-strong);
+  --shop-quality-glow-ring-hover:
+    0 0 0 1px color-mix(in srgb, var(--shop-quality-glow) 52%, transparent),
+    0 0 20px color-mix(in srgb, var(--shop-quality-glow) 76%, transparent),
+    0 0 46px var(--shop-quality-glow-strong);
   --shop-paper-filter:
     drop-shadow(0 0 4px var(--shop-quality-glow))
     drop-shadow(0 0 14px var(--shop-quality-glow))
@@ -4645,7 +4678,8 @@ input {
     var(--paper-grain),
     radial-gradient(circle at 16% 18%, rgba(255, 255, 255, .55), transparent 24%),
     linear-gradient(180deg, #fffdf4, #f3dfbd);
-  --shop-paper-shadow: var(--paper-edge-stroke), 0 12px 22px rgba(112, 72, 30, .16), 2px 4px 0 rgba(61, 45, 37, .12);
+  --shop-paper-shadow: var(--shop-quality-glow-ring), 0 12px 22px rgba(112, 72, 30, .16), 2px 4px 0 rgba(61, 45, 37, .12);
+  --shop-paper-shadow-hover: var(--shop-quality-glow-ring-hover), 0 16px 30px rgba(112, 72, 30, .18), 3px 5px 0 rgba(61, 45, 37, .14);
   transform-origin: 50% 65%;
   transform: translateY(var(--shop-paper-y, 0)) rotate(var(--paper-tilt));
   border: 0;
@@ -4654,6 +4688,11 @@ input {
   box-shadow: var(--shop-paper-shadow);
   filter: var(--shop-paper-filter);
   clip-path: var(--shop-paper-cut, polygon(1% 2%, 28% 0, 58% 1.4%, 98% 0, 100% 78%, 98% 99%, 61% 98%, 31% 100%, 0 98%, 1.2% 54%));
+}
+
+.paper-shop-card > * {
+  position: relative;
+  z-index: 2;
 }
 
 .shop-shelf:is(.visual-theme-surface).sketch-panel {
@@ -4736,6 +4775,7 @@ input {
 
 .paper-shop-card::before {
   inset: 0;
+  z-index: 1;
   border: 0;
   background:
     linear-gradient(100deg, rgba(255, 255, 255, .24), transparent 36%, rgba(112, 72, 30, .07)),
@@ -4748,6 +4788,7 @@ input {
 
 .paper-shop-card::after {
   inset: 2px;
+  z-index: 1;
   background:
     radial-gradient(circle at 20% 26%, rgba(61, 45, 37, .035) 0 1px, transparent 1.7px),
     repeating-linear-gradient(88deg, rgba(61, 45, 37, .025) 0 1px, transparent 1px 13px);
@@ -4794,7 +4835,7 @@ input {
 
 .paper-shop-card:hover {
   transform: translateY(calc(var(--shop-paper-y, 0px) - 2px)) rotate(var(--paper-tilt));
-  box-shadow: var(--paper-edge-stroke), 0 16px 30px rgba(112, 72, 30, .18), 3px 5px 0 rgba(61, 45, 37, .14);
+  box-shadow: var(--shop-paper-shadow-hover);
   filter: var(--shop-paper-filter-hover);
 }
 
@@ -4805,7 +4846,7 @@ input {
 .paper-shop-card.shop-card-owned {
   --shop-paper-edge-ink: rgba(31, 92, 64, .64);
   box-shadow:
-    var(--paper-edge-stroke),
+    var(--shop-quality-glow-ring),
     inset 0 -22px 0 rgba(34, 168, 111, .10),
     0 0 0 4px rgba(34, 168, 111, .14),
     2px 4px 0 rgba(61, 45, 37, .12);
@@ -5027,6 +5068,77 @@ input {
 .paper-item-card.item-card.quality-bronze::after,
 .paper-item-card.item-card.quality-silver::after {
   animation: none;
+}
+
+.paper-shop-card.paper-item-card.item-card {
+  border: 0;
+  box-shadow: var(--shop-paper-shadow);
+}
+
+.paper-shop-card.paper-item-card.item-card::before {
+  inset: 0;
+  z-index: 1;
+  width: auto;
+  height: auto;
+  padding: 0;
+  border: 0;
+  border-radius: inherit;
+  background:
+    linear-gradient(100deg, rgba(255, 255, 255, .24), transparent 36%, rgba(112, 72, 30, .07)),
+    var(--paper-fiber);
+  box-shadow: inset 0 0 0 var(--shop-paper-edge-width) var(--shop-paper-edge-ink), inset 0 2px 0 rgba(255, 255, 255, .64), inset 0 -4px 0 rgba(112, 72, 30, .10);
+  opacity: .9;
+  mix-blend-mode: normal;
+  clip-path: inherit;
+  transform: none;
+  -webkit-mask: none;
+  mask: none;
+}
+
+.paper-shop-card.paper-item-card.item-card::after {
+  inset: 2px;
+  z-index: 1;
+  left: 2px;
+  right: 2px;
+  top: 2px;
+  bottom: 2px;
+  width: auto;
+  height: auto;
+  padding: 0;
+  border: 0;
+  border-radius: inherit;
+  background:
+    radial-gradient(circle at 20% 26%, rgba(61, 45, 37, .035) 0 1px, transparent 1.7px),
+    repeating-linear-gradient(88deg, rgba(61, 45, 37, .025) 0 1px, transparent 1px 13px);
+  box-shadow: none;
+  opacity: .64;
+  mix-blend-mode: multiply;
+  clip-path: inherit;
+  transform: none;
+  animation: none;
+  -webkit-mask: none;
+  mask: none;
+}
+
+.paper-shop-card.paper-item-card.item-card:hover {
+  box-shadow: var(--shop-paper-shadow-hover);
+}
+
+.paper-shop-card.paper-item-card.item-card.selected {
+  box-shadow: 0 0 0 4px var(--selection-wash), var(--shop-paper-shadow-hover);
+}
+
+.paper-shop-card.paper-item-card.item-card.shop-card-owned {
+  box-shadow:
+    var(--shop-quality-glow-ring),
+    inset 0 -22px 0 rgba(34, 168, 111, .10),
+    0 0 0 4px rgba(34, 168, 111, .14),
+    2px 4px 0 rgba(61, 45, 37, .12);
+}
+
+.paper-shop-card.paper-item-card.item-card.shop-card-unaffordable,
+.paper-shop-card.paper-item-card.item-card.shop-card-unaffordable:hover {
+  box-shadow: var(--shop-paper-shadow);
 }
 
 .drag-performance-mode .item-card::before,

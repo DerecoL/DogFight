@@ -1004,7 +1004,7 @@ const battleVfxStyles: Record<BattleVfxKind, BattleVfxStyle> = {
   damage: { kind: 'damage', color: '#ef4444', accent: '#fbbf24', prefix: '-', particleCount: 40 },
   heal: { kind: 'heal', color: '#16a34a', accent: '#86efac', prefix: '+', particleCount: 34 },
   shield: { kind: 'shield', color: '#2563eb', accent: '#93c5fd', prefix: '+', particleCount: 32 },
-  poison: { kind: 'poison', color: '#22c55e', accent: '#a7f3d0', prefix: '+', particleCount: 46 },
+  poison: { kind: 'poison', color: '#22c55e', accent: '#a7f3d0', prefix: '-', particleCount: 46 },
   weak: { kind: 'weak', color: '#7c3aed', accent: '#ddd6fe', prefix: '', particleCount: 30 },
   freeze: { kind: 'freeze', color: '#38bdf8', accent: '#dbeafe', prefix: '', particleCount: 32 },
   thorns: { kind: 'thorns', color: '#b7791f', accent: '#fde68a', prefix: '+', particleCount: 34 },

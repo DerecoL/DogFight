@@ -517,6 +517,7 @@ describe('selection screen structure', () => {
 
   it('highlights poison battle effects with green damage and log styling', () => {
     expect(app).toContain("poison: { kind: 'poison', color: '#22c55e'")
+    expect(app).toContain("poison: { kind: 'poison', color: '#22c55e', accent: '#a7f3d0', prefix: '-'")
     expect(css).toContain('.battle-log p.poison')
   })
 
