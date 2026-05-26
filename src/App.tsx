@@ -3832,11 +3832,13 @@ function ShopCard({ offer, selected, ownedCount, affordable, onClick }: { offer:
         <ItemArt def={def} visual={visual} className="shop-card-art" />
       )}
       <div className="shop-card-main">
-        <span className={`size-badge ${visual?.className ?? 'item-tone-utility'}`}>{def?.size ?? '?'}格</span>
         <strong>{localizedDef?.name ?? def?.name ?? offer.defId}</strong>
+        <span className={`size-badge ${visual?.className ?? 'item-tone-utility'}`}>{def?.size ?? '?'}格</span>
       </div>
-      {def && <SizePreview size={def.size} />}
-      {triggerDice && <span className="dice-line"><Dice5 size={15} /> {triggerDice}</span>}
+      <div className="shop-card-meta">
+        {def && <SizePreview size={def.size} />}
+        {triggerDice && <span className="dice-line"><Dice5 size={15} /> {triggerDice}</span>}
+      </div>
       <span className="effect-line">{def ? (language === 'en-US' ? localizedDef?.description : effectText(def, quality)) : '未知效果'}</span>
       <span className="price-tag"><Coins size={14} />{offer.price}{offer.discount < 1 ? ` · ${Math.round(offer.discount * 10)}折` : ''}</span>
     </ItemFrame>

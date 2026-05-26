@@ -662,21 +662,26 @@ input {
 }
 .offer-row {
   display: grid;
-  grid-template-columns: repeat(5, minmax(150px, 1fr));
+  grid-template-columns: repeat(5, minmax(218px, 1fr));
   align-items: stretch;
-  gap: 14px;
+  gap: 12px;
   min-width: 0;
   width: 100%;
 }
 .shop-card {
   position: relative;
-  min-height: 150px;
+  min-height: 138px;
   display: grid;
-  grid-template-columns: 54px 1fr;
-  align-content: start;
+  grid-template-columns: 58px minmax(0, 1fr);
+  grid-template-rows: auto 52px auto;
+  grid-template-areas:
+    "quality title"
+    "art meta"
+    "price description";
+  align-content: stretch;
   justify-items: start;
-  gap: 8px 10px;
-  padding: 13px;
+  gap: 7px 10px;
+  padding: 12px 13px 10px;
   color: var(--ink);
   text-align: left;
   border-radius: 10px 13px 9px 12px;
@@ -708,15 +713,29 @@ input {
   filter: drop-shadow(0 8px 10px rgba(112, 72, 30, .14));
 }
 .shop-card-main {
-  display: grid;
-  gap: 5px;
-  justify-items: start;
+  grid-area: title;
+  display: flex;
+  align-items: flex-start;
+  align-content: flex-start;
+  flex-wrap: wrap;
+  gap: 5px 6px;
+  justify-content: flex-start;
+  min-width: 0;
 }
-.shop-card > .dice-line,
-.shop-card > .effect-line,
-.shop-card > .price-tag,
-.shop-card > .size-preview {
-  grid-column: 2;
+.shop-card-meta {
+  grid-area: meta;
+  display: flex;
+  align-items: start;
+  align-content: start;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+}
+.shop-card > .effect-line {
+  grid-area: description;
+}
+.shop-card > .price-tag {
+  grid-area: price;
 }
 .dice-line, .effect-line, .price-tag {
   display: inline-flex;
@@ -730,6 +749,12 @@ input {
   line-height: 1.35;
   word-break: normal;
   overflow-wrap: break-word;
+  align-self: stretch;
+  width: 100%;
+  padding: 7px 9px;
+  border: 1.5px solid rgba(61, 45, 37, .36);
+  border-radius: 6px;
+  background: rgba(255, 250, 241, .42);
 }
 .price-tag {
   min-height: 22px;
@@ -745,9 +770,9 @@ input {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 40px;
-  height: 25px;
-  padding: 0 8px;
+  min-width: 34px;
+  height: 22px;
+  padding: 0 7px;
   border-radius: 999px;
   font-size: 12px;
   font-weight: 950;
@@ -1106,11 +1131,18 @@ input {
   min-height: 42px;
 }
 .shop-card-art {
+  grid-area: art;
+  align-self: start;
+  justify-self: start;
+  width: 52px;
+  height: 52px;
+  aspect-ratio: 1;
+  min-height: 0;
   background: var(--paper-grain), var(--item-tone-soft);
 }
 .shop-card-art .item-card-icon-art {
-  width: min(76%, 84px);
-  height: min(76%, 84px);
+  width: 40px;
+  height: 40px;
 }
 .tip-art-preview {
   grid-area: 1 / 1;
@@ -1270,6 +1302,20 @@ input {
   font-size: 10px;
   line-height: 1.1;
   font-weight: 950;
+}
+.shop-quality-chip {
+  position: relative;
+  left: auto;
+  top: auto;
+  grid-area: quality;
+  align-self: start;
+  justify-self: start;
+  min-width: 44px;
+  min-height: 24px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  line-height: 1.15;
 }
 .upgrade-indicator {
   position: absolute;
@@ -4219,27 +4265,33 @@ input {
 }
 
 .offer-row {
-  grid-template-columns: repeat(5, minmax(170px, 1fr));
+  grid-template-columns: repeat(5, minmax(218px, 1fr));
   gap: 12px;
 }
 
 .shop-card {
-  min-height: 118px;
-  grid-template-columns: 48px minmax(0, 1fr);
-  align-content: center;
+  min-height: 138px;
+  grid-template-columns: 58px minmax(0, 1fr);
+  grid-template-rows: auto 52px auto;
+  grid-template-areas:
+    "quality title"
+    "art meta"
+    "price description";
+  align-content: stretch;
   justify-items: start;
-  gap: 4px 8px;
-  padding: 9px;
-  border: 3px solid var(--ink);
+  gap: 7px 10px;
+  padding: 12px 13px 10px;
+  border: 0;
   border-radius: 10px;
-  box-shadow: 4px 5px 0 rgba(61, 45, 37, .18);
+  box-shadow: none;
 }
 
-.shop-card > .dice-line,
-.shop-card > .effect-line,
-.shop-card > .price-tag,
-.shop-card > .size-preview {
-  grid-column: 2;
+.shop-card > .effect-line {
+  grid-area: description;
+}
+
+.shop-card > .price-tag {
+  grid-area: price;
 }
 
 .shop-item-icon {
@@ -4254,8 +4306,8 @@ input {
 }
 
 .shop-card-main {
-  grid-column: 2;
-  gap: 3px;
+  grid-area: title;
+  gap: 8px;
 }
 
 .inventory-board {
@@ -4653,26 +4705,28 @@ input {
 }
 
 .paper-shop-card {
-  --shop-paper-edge-width: 1.25px;
-  --shop-paper-edge-ink: rgba(61, 45, 37, .58);
-  --shop-quality-glow: rgba(190, 111, 50, .56);
-  --shop-quality-glow-strong: color-mix(in srgb, var(--shop-quality-glow) 70%, transparent);
+  --shop-paper-edge-width: 1.75px;
+  --shop-paper-edge-ink: rgba(61, 45, 37, .74);
+  --shop-quality-glow: rgba(194, 91, 34, .78);
+  --shop-quality-glow-strong: color-mix(in srgb, var(--shop-quality-glow) 88%, transparent);
   --shop-quality-glow-ring:
-    0 0 0 1px color-mix(in srgb, var(--shop-quality-glow) 42%, transparent),
-    0 0 16px color-mix(in srgb, var(--shop-quality-glow) 66%, transparent),
-    0 0 34px var(--shop-quality-glow-strong);
-  --shop-quality-glow-ring-hover:
-    0 0 0 1px color-mix(in srgb, var(--shop-quality-glow) 52%, transparent),
+    0 0 0 1.5px color-mix(in srgb, var(--shop-quality-glow) 54%, transparent),
     0 0 20px color-mix(in srgb, var(--shop-quality-glow) 76%, transparent),
-    0 0 46px var(--shop-quality-glow-strong);
+    0 0 42px var(--shop-quality-glow-strong);
+  --shop-quality-glow-ring-hover:
+    0 0 0 2px color-mix(in srgb, var(--shop-quality-glow) 64%, transparent),
+    0 0 26px color-mix(in srgb, var(--shop-quality-glow) 86%, transparent),
+    0 0 58px var(--shop-quality-glow-strong);
   --shop-paper-filter:
-    drop-shadow(0 0 4px var(--shop-quality-glow))
-    drop-shadow(0 0 14px var(--shop-quality-glow))
-    drop-shadow(0 0 34px var(--shop-quality-glow-strong));
+    drop-shadow(0 0 5px var(--shop-quality-glow))
+    drop-shadow(0 0 16px var(--shop-quality-glow))
+    drop-shadow(0 0 36px var(--shop-quality-glow-strong))
+    drop-shadow(0 0 70px color-mix(in srgb, var(--shop-quality-glow) 62%, transparent));
   --shop-paper-filter-hover:
-    drop-shadow(0 0 6px var(--shop-quality-glow))
-    drop-shadow(0 0 18px var(--shop-quality-glow))
-    drop-shadow(0 0 44px var(--shop-quality-glow-strong));
+    drop-shadow(0 0 7px var(--shop-quality-glow))
+    drop-shadow(0 0 22px var(--shop-quality-glow))
+    drop-shadow(0 0 46px var(--shop-quality-glow-strong))
+    drop-shadow(0 0 86px color-mix(in srgb, var(--shop-quality-glow) 70%, transparent));
   --shop-paper-tone:
     var(--paper-grain),
     radial-gradient(circle at 16% 18%, rgba(255, 255, 255, .55), transparent 24%),
@@ -4710,22 +4764,22 @@ input {
 }
 
 .paper-shop-card.quality-bronze {
-  --shop-quality-glow: rgba(190, 111, 50, .56);
+  --shop-quality-glow: rgba(194, 91, 34, .78);
   border: 0;
 }
 
 .paper-shop-card.quality-silver {
-  --shop-quality-glow: rgba(207, 224, 236, .66);
+  --shop-quality-glow: rgba(207, 224, 236, .86);
   border: 0;
 }
 
 .paper-shop-card.quality-gold {
-  --shop-quality-glow: rgba(255, 207, 66, .95);
+  --shop-quality-glow: rgba(255, 207, 66, 1);
   border: 0;
 }
 
 .paper-shop-card.quality-diamond {
-  --shop-quality-glow: rgba(102, 231, 255, .96);
+  --shop-quality-glow: rgba(102, 231, 255, 1);
   border: 0;
 }
 
@@ -5138,6 +5192,62 @@ input {
 .paper-shop-card.paper-item-card.item-card.shop-card-unaffordable,
 .paper-shop-card.paper-item-card.item-card.shop-card-unaffordable:hover {
   box-shadow: var(--shop-paper-shadow);
+}
+
+.paper-shop-card.shop-card {
+  min-height: 138px;
+  grid-template-columns: 58px minmax(0, 1fr);
+  grid-template-rows: auto 52px auto;
+  grid-template-areas:
+    "quality title"
+    "art meta"
+    "price description";
+  align-content: stretch;
+  justify-items: start;
+  gap: 7px 10px;
+  padding: 12px 13px 10px;
+  overflow: visible;
+}
+
+.paper-shop-card.shop-card .shop-quality-chip {
+  grid-area: quality;
+  align-self: start;
+  justify-self: start;
+}
+
+.paper-shop-card.shop-card .shop-card-art {
+  grid-area: art;
+  align-self: start;
+  justify-self: start;
+}
+
+.paper-shop-card.shop-card .shop-card-main {
+  grid-area: title;
+  width: 100%;
+}
+
+.paper-shop-card.shop-card .shop-card-main strong {
+  max-width: 100%;
+  font-size: 14px;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+
+.paper-shop-card.shop-card .shop-card-meta {
+  grid-area: meta;
+}
+
+.paper-shop-card.shop-card .effect-line {
+  grid-area: description;
+  min-height: 38px;
+  max-height: 52px;
+  overflow: hidden;
+}
+
+.paper-shop-card.shop-card .price-tag {
+  grid-area: price;
+  justify-self: start;
+  align-self: end;
 }
 
 .drag-performance-mode .item-card::before,
