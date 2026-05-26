@@ -1127,6 +1127,32 @@ function sortedDogfightMembers(members: DogfightMember[]) {
   })
 }
 
+function mergeDogfightRoomRun(room: DogfightRoom, nextRun: Run) {
+  let updatedCurrentRunMember = room.currentRunMember
+  const members = room.members.map((member) => {
+    if (member.runId !== nextRun.id) return member
+    const updatedMember = {
+      ...member,
+      dogType: nextRun.dogType,
+      wins: nextRun.wins,
+      losses: nextRun.losses,
+      round: nextRun.round,
+      gold: nextRun.gold,
+      phase: nextRun.phase,
+      status: nextRun.phase,
+    }
+    if (room.currentRunMember?.id === member.id) updatedCurrentRunMember = updatedMember
+    return updatedMember
+  })
+
+  return {
+    ...room,
+    members,
+    currentRun: room.currentRun?.id === nextRun.id ? nextRun : room.currentRun,
+    currentRunMember: updatedCurrentRunMember,
+  }
+}
+
 function diceToneText(def: ItemDef) {
   const min = Math.min(...def.dice)
   const max = Math.max(...def.dice)
@@ -2550,8 +2576,11 @@ function DogfightRoomView({ room, onRoomChange, onLeave, soundEnabled }: { room:
       const data = await fn()
       if ('room' in data) {
         onRoomChange(data.room)
+      } else if (data.run) {
+        onRoomChange(mergeDogfightRoomRun(room, data.run))
+        void refreshRoom()
       } else {
-        await refreshRoom()
+        void refreshRoom()
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : '斗狗操作失败')

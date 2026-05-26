@@ -37,6 +37,7 @@ import type {
   GameItem,
   ItemDef,
   ItemQuality,
+  BattleSafetyCode,
   BattleReservoirRows,
 } from './types'
 
@@ -77,6 +78,7 @@ type ItemTrigger = {
   boomCounterValue?: number
   boomCounterMax?: number
   boomCounterChanged?: boolean
+  safetyCode?: BattleSafetyCode
 }
 
 type TriggerQueueEntry = {
@@ -1302,6 +1304,7 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
         sourceHpDelta: 0,
         targetHpDelta: 0,
         roll,
+        safetyCode: 'TRIGGER_QUEUE_CAP',
         text: `触发队列达到上限 ${TRIGGER_QUEUE_CAP}，后续联动已截断`,
       })
     }
@@ -1353,6 +1356,7 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
           target: trigger.target,
           sourceHpDelta: trigger.sourceHpDelta,
           targetHpDelta: trigger.targetHpDelta,
+          safetyCode: trigger.safetyCode,
         })
       }
     }
@@ -1361,6 +1365,7 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
         time,
         actor: actorSide,
         kind: 'ITEM',
+        safetyCode: 'TRIGGER_QUEUE_CAP',
         text: `触发队列达到上限 ${TRIGGER_QUEUE_CAP}，后续联动已截断`,
         effectType: 'UTILITY',
         target: 'none',
@@ -1447,6 +1452,7 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
         time,
         actor: actorSide,
         kind: 'ITEM',
+        safetyCode: 'EXTRA_ROLL_CHAIN_CAP',
         text: `【额外投掷】链达到上限 ${EXTRA_ROLL_CHAIN_CAP}，后续【额外投掷】已截断`,
         effectType: 'UTILITY',
         target: 'none',

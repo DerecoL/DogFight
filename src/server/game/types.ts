@@ -209,11 +209,14 @@ export type BattleStatusRows = {
   negative: BattleStatusEntry[]
 }
 
+export type BattleSafetyCode = 'TRIGGER_QUEUE_CAP' | 'EXTRA_ROLL_CHAIN_CAP'
+
 export type BattleEvent = {
   time: number
   actor: 'player' | 'opponent' | 'system'
   kind: 'ROLL' | 'ITEM' | 'POISON' | 'END'
   text: string
+  safetyCode?: BattleSafetyCode
   playerHp: number
   opponentHp: number
   playerMaxHp: number

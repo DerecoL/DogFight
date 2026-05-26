@@ -243,6 +243,13 @@ describe('selection screen structure', () => {
     expect(app).not.toContain("tone={3 - run.losses <= 1 ? 'danger' : 'safe'}")
   })
 
+  it('applies dogfight run action results before background room refresh', () => {
+    expect(app).toContain('function mergeDogfightRoomRun')
+    expect(app).toContain('onRoomChange(mergeDogfightRoomRun(room, data.run))')
+    expect(app).toContain('void refreshRoom()')
+    expect(app).not.toContain('await refreshRoom()')
+  })
+
   it('keeps the current dog trait visible in the top banner during a run', () => {
     expect(app).toContain('<DogTraitSummary run={run} />')
     expect(app).toContain('function DogTraitSummary')
