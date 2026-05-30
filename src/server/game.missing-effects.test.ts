@@ -146,6 +146,34 @@ describe('missing equipment effect regressions', () => {
     expect(smallEvent).toMatchObject({ defId: 'small-bite', amount: 4, targetHpDelta: -4 })
   })
 
+  it('prevents bully gym and night patrol light from recursively refiring the same large item', () => {
+    const player: FighterSnapshot = {
+      name: 'P',
+      dogType: 'BULLY',
+      wins: 0,
+      losses: 0,
+      round: 8,
+      items: [
+        { id: 'lamp', defId: 'v3-night-patrol-light', quality: 'GOLD', area: 'EQUIPMENT', x: 0, y: 0 },
+        { id: 'large', defId: 'giant-bone', quality: 'BRONZE', area: 'EQUIPMENT', x: 2, y: 0 },
+        { id: 'gym', defId: 'bully-gym', quality: 'GOLD', area: 'EQUIPMENT', x: 6, y: 0 },
+      ],
+    }
+    const opponent: FighterSnapshot = { name: 'O', dogType: 'SHIBA', wins: 0, losses: 0, round: 8, items: [] }
+    const result = simulateBattle(player, opponent, 'plain-10')
+    const firstPlayerRoll = result.events.find((event) => event.kind === 'ROLL' && event.actor === 'player')
+    const firstRollEvents = result.events.filter(
+      (event) => event.kind === 'ITEM' && event.actor === 'player' && event.time === firstPlayerRoll?.time,
+    )
+    const largeDamageEvents = firstRollEvents.filter(
+      (event) => event.itemId === 'large' && event.effectType === 'DAMAGE',
+    )
+
+    expect(firstPlayerRoll?.roll).toBe(6)
+    expect(firstRollEvents.some((event) => event.text.includes('触发队列达到上限'))).toBe(false)
+    expect(largeDamageEvents).toHaveLength(2)
+  })
+
   it('makes bully demolish disable the enemy large item instead of the next allied large item', () => {
     const player: FighterSnapshot = {
       name: 'P',

@@ -3,7 +3,7 @@ import { simulateBattle } from './battle'
 import type { BattleResult, DogType, FighterSnapshot } from './types'
 
 const APEX_SEED_COUNT = 50
-const DOG_TYPES: DogType[] = ['SHIBA', 'SAMOYED', 'MUTT', 'BULLY', 'EMPEROR']
+const DOG_TYPES: DogType[] = ['SHIBA', 'SAMOYED', 'MUTT', 'BULLY', 'EMPEROR', 'FROG']
 const SHANGHAI_DAILY_RESET_OFFSET_MS = 3 * 60 * 60 * 1000
 
 export type ApexSeedEntry = {

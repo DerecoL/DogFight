@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Kyushu Bracer">
+  <defs>
+    <linearGradient id="metal" x1="16" x2="48" y1="10" y2="54" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fde68a"/>
+      <stop offset="0.55" stop-color="#f59e0b"/>
+      <stop offset="1" stop-color="#92400e"/>
+    </linearGradient>
+    <linearGradient id="guard" x1="20" x2="44" y1="18" y2="46" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#e0f2fe"/>
+      <stop offset="1" stop-color="#2563eb"/>
+    </linearGradient>
+  </defs>
+  <circle cx="32" cy="32" r="27" fill="#fff7ed" stroke="#b45309" stroke-width="3"/>
+  <path d="M22 14h20l7 12-7 24H22l-7-24z" fill="url(#metal)" stroke="#78350f" stroke-width="3" stroke-linejoin="round"/>
+  <path d="M24 23h16l4 7-4 12H24l-4-12z" fill="url(#guard)" stroke="#1e3a8a" stroke-width="2" stroke-linejoin="round"/>
+  <path d="M32 20v26M23 31h18" stroke="#fffbeb" stroke-width="3" stroke-linecap="round"/>
+  <path d="M18 17l-5-5M46 17l5-5M18 47l-5 5M46 47l5 5" stroke="#fbbf24" stroke-width="3" stroke-linecap="round"/>
+</svg>

@@ -205,8 +205,14 @@ describe('dog and item definitions', () => {
 
   it('defines dog emperor as the lucky-number effect dog', () => {
     expect(DOGS).toHaveProperty('EMPEROR')
-    expect(DOGS.EMPEROR.trait).toContain('幸运数字')
+    expect(DOGS.EMPEROR.trait).toContain('天命数字')
     expect(DOGS.EMPEROR.trait).toContain('50%')
+  })
+
+  it('defines frog as the reservoir timing dog', () => {
+    expect(DOGS).toHaveProperty('FROG')
+    expect(DOGS.FROG.trait).toContain('蓄水')
+    expect(DOGS.FROG.trait).toContain('职业装备提速')
   })
 
   it('defines class rewards by dog and unlock round plus relic definitions', () => {
@@ -216,6 +222,16 @@ describe('dog and item definitions', () => {
       '燕回太刀',
     ])
     expect(CLASS_REWARD_DEFS.filter((item) => item.classDog === 'BULLY' && item.unlockRound === 6)).toHaveLength(3)
+    expect(CLASS_REWARD_DEFS.filter((item) => item.classDog === 'FROG' && item.unlockRound === 3).map((item) => item.name)).toEqual([
+      '荷叶水泵',
+      '蛙鸣鼓',
+      '雨滴漏斗',
+    ])
+    expect(CLASS_REWARD_DEFS.filter((item) => item.classDog === 'FROG' && item.unlockRound === 6).map((item) => item.name)).toEqual([
+      '莲池回声',
+      '暴雨季',
+      '满池闸门',
+    ])
     expect(RELIC_DEFS.map((relic) => relic.name)).toEqual(expect.arrayContaining(['点金手·左', '点金手·右', '半截骰·左', '半截骰·右']))
   })
 
@@ -1411,6 +1427,98 @@ describe('battle simulation', () => {
     expect(rightIndex).toBeGreaterThan(sourceIndex)
   })
 
+  it('does not let one trigger chain bounce between the same two items forever', () => {
+    const player: FighterSnapshot = {
+      name: 'P',
+      dogType: 'MUTT',
+      wins: 0,
+      losses: 0,
+      round: 0,
+      items: [
+        {
+          id: 'left-trigger',
+          defId: 'starter-1',
+          quality: 'BRONZE',
+          area: 'EQUIPMENT',
+          x: 0,
+          y: 0,
+          triggerDiceOverride: [1, 2, 3, 4, 5, 6],
+          enchant: { kind: 'TRIGGER_NEIGHBOR', target: 'RIGHT', label: 'trigger right' },
+        },
+        {
+          id: 'right-trigger',
+          defId: 'starter-1',
+          quality: 'BRONZE',
+          area: 'EQUIPMENT',
+          x: 1,
+          y: 0,
+          triggerDiceOverride: [1, 2, 3, 4, 5, 6],
+          enchant: { kind: 'TRIGGER_NEIGHBOR', target: 'LEFT', label: 'trigger left' },
+        },
+      ],
+    }
+    const opponent: FighterSnapshot = { name: 'O', dogType: 'MUTT', wins: 0, losses: 0, round: 0, items: [] }
+
+    const result = simulateBattle(player, opponent, 'trigger-chain-ping-pong')
+    const firstPlayerRoll = result.events.find((event) => event.kind === 'ROLL' && event.actor === 'player')
+    const firstRollItems = result.events.filter((event) =>
+      event.kind === 'ITEM'
+      && event.actor === 'player'
+      && event.time === firstPlayerRoll?.time
+      && (event.itemId === 'left-trigger' || event.itemId === 'right-trigger')
+    )
+
+    expect(firstRollItems.map((event) => event.itemId)).toEqual([
+      'left-trigger',
+      'right-trigger',
+      'right-trigger',
+      'left-trigger',
+      'left-trigger',
+      'right-trigger',
+    ])
+    expect(firstRollItems.some((event) => event.text.includes('触发队列达到上限'))).toBe(false)
+  })
+
+  it('shares chain history across branching trigger paths', () => {
+    const triggerItem = (id: string, x: number, naturallyTriggered: boolean): FighterSnapshot['items'][number] => ({
+      id,
+      defId: naturallyTriggered ? 'starter-1' : 'starter-6',
+      quality: 'BRONZE',
+      area: 'EQUIPMENT',
+      x,
+      y: 0,
+      triggerDiceOverride: naturallyTriggered ? [1] : [6],
+      enchant: { kind: 'TRIGGER_NEIGHBOR', target: 'ADJACENT', label: 'trigger adjacent' },
+    })
+    const player: FighterSnapshot = {
+      name: 'P',
+      dogType: 'BULLY',
+      wins: 0,
+      losses: 0,
+      round: 8,
+      items: [
+        triggerItem('a', 0, true),
+        triggerItem('b', 1, false),
+        triggerItem('c', 2, false),
+        triggerItem('d', 3, false),
+      ],
+    }
+    const opponent: FighterSnapshot = { name: 'O', dogType: 'BULLY', wins: 0, losses: 0, round: 8, items: [] }
+
+    const result = simulateBattle(player, opponent, 'single-chain-bully-8')
+    const firstPlayerRoll = result.events.find((event) => event.kind === 'ROLL' && event.actor === 'player')
+    const firstRollItems = result.events.filter((event) =>
+      event.kind === 'ITEM'
+      && event.actor === 'player'
+      && event.time === firstPlayerRoll?.time
+      && ['a', 'b', 'c', 'd'].includes(event.itemId ?? '')
+    )
+
+    expect(firstPlayerRoll?.roll).toBe(1)
+    expect(firstRollItems.map((event) => event.itemId)).toEqual(['a', 'b', 'a', 'c', 'b', 'd', 'c'])
+    expect(firstRollItems.some((event) => event.text.includes('触发队列达到上限'))).toBe(false)
+  })
+
   it('lets small bite sometimes inflict weak after dealing damage', () => {
     const player: FighterSnapshot = {
       name: 'P',
@@ -1482,9 +1590,9 @@ describe('battle simulation', () => {
     )
 
     expect(firstPlayerRoll?.roll).toBe(6)
-    expect(itemEvents.map((event) => event.itemId)).toEqual(['starter', 'paw', 'collar', 'disc', 'bone'])
-    expect(itemEvents.map((event) => event.targetHpDelta)).toEqual([-5, -12, -8, -10, -16])
-    expect(itemEvents.map((event) => event.opponentHp)).toEqual([95, 83, 75, 65, 49])
+    expect(itemEvents.map((event) => event.itemId)).toEqual(['starter', 'paw', 'paw', 'collar', 'disc', 'disc', 'disc', 'bone'])
+    expect(itemEvents.map((event) => event.targetHpDelta)).toEqual([-5, -5, -5, -8, -3, -3, -3, -16])
+    expect(itemEvents.map((event) => event.opponentHp)).toEqual([95, 90, 85, 77, 74, 71, 68, 52])
   })
 
   it('lets shiba break repeat size-based triggers half the time', () => {
@@ -1507,8 +1615,8 @@ describe('battle simulation', () => {
     )
 
     expect(firstPlayerRoll?.roll).toBe(2)
-    expect(ballEvents).toHaveLength(2)
-    expect(ballEvents.map((event) => event.amount)).toEqual([9, 9])
+    expect(ballEvents).toHaveLength(4)
+    expect(ballEvents.map((event) => event.amount)).toEqual([4, 4, 4, 4])
   })
 
   it('lets dog house steal one thorn buff from the opponent after healing', () => {
@@ -1759,7 +1867,7 @@ describe('battle simulation', () => {
     const result = simulateBattle(player, opponent, 'structured-item-event')
     const mapped = result.events.find((event) => event.kind === 'ITEM' && event.defId === 'lucky-paw' && event.text.includes('点金手·左'))
 
-    expect(mapped).toMatchObject({ roll: 3, amount: 6, targetHpDelta: -6 })
+    expect(mapped).toMatchObject({ roll: 3, amount: 3, targetHpDelta: -3 })
     expect(mapped?.text).toContain('点金手·左')
     expect(result.playerSnapshot.relics?.[0]).toMatchObject({ relicId: 'midas-left', def: { name: '点金手·左' } })
   })
@@ -1781,7 +1889,7 @@ describe('battle simulation', () => {
     const result = simulateBattle(player, opponent, 'structured-item-event')
     const mapped = result.events.find((event) => event.kind === 'ITEM' && event.defId === 'lucky-paw' && event.text.includes('点金手·左'))
 
-    expect(mapped).toMatchObject({ roll: 3, amount: 9, targetHpDelta: -9 })
+    expect(mapped).toMatchObject({ roll: 3, amount: 4, targetHpDelta: -4 })
   })
 
   it('makes carrot shift equipped trigger dice up with wraparound', () => {
@@ -1802,7 +1910,7 @@ describe('battle simulation', () => {
     const shiftedRoll = shifted.events.find((event) => event.kind === 'ROLL' && event.actor === 'player')
     const originalRoll = original.events.find((event) => event.kind === 'ROLL' && event.actor === 'player')
 
-    expect(shifted.events.find((event) => event.time === shiftedRoll?.time && event.kind === 'ITEM' && event.itemId === 'paw')).toMatchObject({ roll: 1, amount: 12 })
+    expect(shifted.events.find((event) => event.time === shiftedRoll?.time && event.kind === 'ITEM' && event.itemId === 'paw')).toMatchObject({ roll: 1, amount: 5 })
     expect(original.events.find((event) => event.time === originalRoll?.time && event.kind === 'ITEM' && event.itemId === 'paw')).toBeUndefined()
   })
 
@@ -1823,7 +1931,7 @@ describe('battle simulation', () => {
     const roll = result.events.find((event) => event.kind === 'ROLL' && event.actor === 'player')
 
     expect(roll?.roll).toBe(2)
-    expect(result.events.find((event) => event.time === roll?.time && event.kind === 'ITEM' && event.itemId === 'paw')).toMatchObject({ roll: 2, amount: 12 })
+    expect(result.events.find((event) => event.time === roll?.time && event.kind === 'ITEM' && event.itemId === 'paw')).toMatchObject({ roll: 2, amount: 5 })
   })
 
   it('makes tissue shift equipped trigger dice down with wraparound', () => {
@@ -2166,5 +2274,127 @@ describe('battle simulation', () => {
 
     expect(firstExtraRoll).toBeDefined()
     expect(extraRollDamage.map((event) => event.itemId)).toEqual(['bite-a', 'bite-a'])
+  })
+
+  it('uses frog reservoir timing instead of base rolls for explicit trigger dice equipment', () => {
+    const player: FighterSnapshot = {
+      name: 'P',
+      dogType: 'FROG' as never,
+      wins: 0,
+      losses: 0,
+      round: 0,
+      items: [
+        { id: 'one', defId: 'starter-1', quality: 'BRONZE', area: 'EQUIPMENT', x: 0, y: 0 },
+        { id: 'three', defId: 'small-bite', quality: 'BRONZE', area: 'EQUIPMENT', x: 1, y: 0 },
+        { id: 'six', defId: 'starter-6', quality: 'BRONZE', area: 'EQUIPMENT', x: 2, y: 0, triggerDiceOverride: [1, 2, 3, 4, 5, 6] },
+      ],
+    }
+    const opponent: FighterSnapshot = { name: 'O', dogType: 'SHIBA', wins: 0, losses: 0, round: 0, items: [] }
+    const result = simulateBattle(player, opponent, 'frog-reservoir-basic')
+    const firstByItem = (itemId: string) => result.events.find((event) => event.kind === 'ITEM' && event.itemId === itemId)
+
+    expect(firstByItem('six')?.time).toBe(0.5)
+    expect(firstByItem('three')?.time).toBe(1)
+    expect(firstByItem('one')?.time).toBe(3)
+    const oneEvents = result.events.filter((event) => event.kind === 'ITEM' && event.itemId === 'one')
+    expect(oneEvents.slice(0, 2).map((event) => event.time)).toEqual([3, 9])
+    expect(result.events.find((event) => event.kind === 'ROLL' && event.actor === 'player')).toBeUndefined()
+    expect((eventAtOrBefore(result, 1) as never as { reservoirs?: { player: Array<{ itemId: string; duration: number; progress: number; nextAt: number }> } }).reservoirs?.player)
+      .toContainEqual(expect.objectContaining({ itemId: 'one', duration: 6, progress: expect.closeTo(0.6667, 3), nextAt: 3 }))
+  })
+
+  it('stores overflow progress when frog reservoir charging pushes an item past full', () => {
+    const player: FighterSnapshot = {
+      name: 'P',
+      dogType: 'FROG' as never,
+      wins: 0,
+      losses: 0,
+      round: 0,
+      items: [
+        { id: 'funnel', defId: 'frog-raindrop-funnel', quality: 'GOLD', area: 'EQUIPMENT', x: 0, y: 0 },
+        { id: 'bite', defId: 'small-bite', quality: 'BRONZE', area: 'EQUIPMENT', x: 1, y: 0 },
+      ],
+    }
+    const opponent: FighterSnapshot = { name: 'O', dogType: 'SHIBA', wins: 0, losses: 0, round: 0, items: [] }
+    const result = simulateBattle(player, opponent, 'frog-reservoir-overflow')
+    const biteEvents = result.events.filter((event) => event.kind === 'ITEM' && event.actor === 'player' && event.itemId === 'bite' && event.effectType === 'DAMAGE')
+    const firstBiteReservoir = (biteEvents[0] as never as { reservoirs?: { player: Array<{ itemId: string; duration: number; progress: number; nextAt: number }> } })?.reservoirs?.player
+
+    expect(biteEvents.slice(0, 2).map((event) => event.time)).toEqual([1, 2])
+    expect(firstBiteReservoir).toContainEqual(expect.objectContaining({ itemId: 'bite', duration: 2, progress: 0.5, nextAt: 2 }))
+  })
+
+  it('counts only explicit trigger dice when frog reservoir timing is changed by potions, enchants, and relic shifts', () => {
+    const player: FighterSnapshot = {
+      name: 'P',
+      dogType: 'FROG' as never,
+      wins: 0,
+      losses: 0,
+      round: 0,
+      relics: [{ id: 'carrot', relicId: 'carrot', quality: 'SILVER', slot: 0 }, { id: 'midas', relicId: 'midas-left', quality: 'SILVER', slot: 1 }],
+      items: [
+        { id: 'potion', defId: 'starter-1', quality: 'BRONZE', area: 'EQUIPMENT', x: 0, y: 0, triggerDiceOverride: [1, 2] },
+        { id: 'enchant', defId: 'starter-1', quality: 'BRONZE', area: 'EQUIPMENT', x: 1, y: 0, enchant: { kind: 'EXTRA_DICE', dice: [3], label: '额外在 3 点触发' } },
+        { id: 'mapped', defId: 'lucky-paw', quality: 'BRONZE', area: 'EQUIPMENT', x: 2, y: 0 },
+      ],
+    }
+    const opponent: FighterSnapshot = { name: 'O', dogType: 'SHIBA', wins: 0, losses: 0, round: 0, items: [] }
+    const result = simulateBattle(player, opponent, 'frog-reservoir-explicit-dice')
+    const firstByItem = (itemId: string) => result.events.find((event) => event.kind === 'ITEM' && event.itemId === itemId)
+
+    expect(firstByItem('potion')?.time).toBe(1.5)
+    expect(firstByItem('enchant')?.time).toBe(1.5)
+    expect(firstByItem('mapped')?.time).toBe(3)
+  })
+
+  it('keeps no-dice equipment on original non-reservoir rules for frog', () => {
+    const player: FighterSnapshot = {
+      name: 'P',
+      dogType: 'FROG' as never,
+      wins: 0,
+      losses: 0,
+      round: 0,
+      items: [
+        { id: 'ingot', defId: 'dog-gold-ingot', quality: 'BRONZE', area: 'EQUIPMENT', x: 0, y: 0 },
+        { id: 'bite', defId: 'starter-1', quality: 'BRONZE', area: 'EQUIPMENT', x: 1, y: 0 },
+      ],
+    }
+    const opponent: FighterSnapshot = { name: 'O', dogType: 'SHIBA', wins: 0, losses: 0, round: 0, items: [] }
+    const result = simulateBattle(player, opponent, 'frog-no-dice')
+
+    expect(result.events.some((event) => event.kind === 'ITEM' && event.itemId === 'ingot')).toBe(false)
+    expect((eventAtOrBefore(result, 1) as never as { reservoirs?: { player: Array<{ itemId: string }> } }).reservoirs?.player)
+      .toEqual([expect.objectContaining({ itemId: 'bite' })])
+  })
+
+  it('lets frog class equipment accelerate reservoirs and create ordinary roll activations', () => {
+    const player: FighterSnapshot = {
+      name: 'P',
+      dogType: 'FROG' as never,
+      wins: 0,
+      losses: 0,
+      round: 6,
+      items: [
+        { id: 'pump', defId: 'frog-lily-pump', quality: 'GOLD', area: 'EQUIPMENT', x: 0, y: 0 },
+        { id: 'drum', defId: 'frog-croak-drum', quality: 'GOLD', area: 'EQUIPMENT', x: 1, y: 0 },
+        { id: 'funnel', defId: 'frog-raindrop-funnel', quality: 'GOLD', area: 'EQUIPMENT', x: 2, y: 0 },
+        { id: 'echo', defId: 'frog-lotus-echo', quality: 'DIAMOND', area: 'EQUIPMENT', x: 3, y: 0 },
+        { id: 'storm', defId: 'frog-rainy-season', quality: 'DIAMOND', area: 'EQUIPMENT', x: 4, y: 0 },
+        { id: 'gate', defId: 'frog-full-pond-gate', quality: 'DIAMOND', area: 'EQUIPMENT', x: 5, y: 0 },
+        { id: 'bite-a', defId: 'starter-1', quality: 'BRONZE', area: 'EQUIPMENT', x: 6, y: 0, triggerDiceOverride: [1, 2, 3, 4, 5, 6] },
+        { id: 'bite-b', defId: 'starter-1', quality: 'BRONZE', area: 'EQUIPMENT', x: 7, y: 0, triggerDiceOverride: [1, 2, 3, 4, 5, 6] },
+      ],
+    }
+    const opponent: FighterSnapshot = { name: 'O', dogType: 'SHIBA', wins: 0, losses: 0, round: 6, items: [] }
+    const result = simulateBattle(player, opponent, 'frog-class-equipment')
+    const firstBite = result.events.find((event) => event.kind === 'ITEM' && event.itemId === 'bite-a')
+    const frogRoll = result.events.find((event) => event.kind === 'ROLL' && event.actor === 'player' && event.text.includes('蛙鸣鼓'))
+    const echoDamageAtRoll = result.events.filter((event) => event.kind === 'ITEM' && event.actor === 'player' && event.time === frogRoll?.time && event.itemId === 'bite-a')
+
+    expect(firstBite?.time).toBeLessThan(6)
+    expect(frogRoll).toBeDefined()
+    expect(echoDamageAtRoll.length).toBeGreaterThanOrEqual(2)
+    expect(result.events.some((event) => event.text.includes('暴雨季') && event.text.includes('充水速度'))).toBe(true)
+    expect(result.events.some((event) => event.text.includes('满池闸门') && event.text.includes('水位最高'))).toBe(true)
   })
 })

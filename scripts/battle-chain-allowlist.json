@@ -1,0 +1,6 @@
+[
+  {
+    "scenarioId": "fixture-mutt-extra-roll-fanout",
+    "reason": "Existing MUTT extra-roll stress case: chase car, counting collar, and chase tail can intentionally hit the extra-roll chain cap. Keep visible as an approved high-chain baseline."
+  }
+]

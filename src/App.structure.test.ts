@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync, statSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
 const app = readFileSync(new URL('./App.tsx', import.meta.url), 'utf8')
@@ -26,6 +26,10 @@ function itemDefIds() {
 function relicDefIds() {
   const relicBlock = data.slice(data.indexOf('export const RELIC_DEFS'), data.indexOf('export const ALL_ITEM_DEFS'))
   return [...relicBlock.matchAll(/\{\s*id:\s*['`]([^'`]+)['`]/g)].map((match) => match[1])
+}
+
+function publicAsset(path: string) {
+  return new URL(`../public${path}`, import.meta.url)
 }
 
 describe('selection screen structure', () => {
@@ -70,6 +74,18 @@ describe('selection screen structure', () => {
     expect(app).toContain('className={`status-chip handdrawn-status-chip ${status.type}`}')
   })
 
+  it('decodes item icons asynchronously without prewarming card art images', () => {
+    expect(app).toContain('decoding="async"')
+    expect(app).toContain('function ItemArtIcon')
+    expect(app).not.toContain('function prewarmItemArt')
+    expect(app).not.toContain('const prewarmedItemArt = new Set<string>()')
+    expect(app).not.toContain('image.decode?.()')
+    expect(app).toContain('className={`drag-overlay-item drag-overlay-ghost ${itemTone(item.def)}')
+    expect(app).not.toContain('function DragSourcePlaceholder')
+    expect(app).not.toContain('className={`drag-source-placeholder ${itemTone(item.def)}')
+    expect(app).not.toContain('<img className="item-card-art" src={visual.artSrc} alt="" />')
+  })
+
   it('routes command buttons through the handdrawn action wrapper', () => {
     expect(app).toContain('function ActionButton')
     expect(app).toContain('<ActionButton')
@@ -106,7 +122,7 @@ describe('selection screen structure', () => {
     expect(app).toContain('className={`shop-card paper-shop-card paper-card')
     expect(app).toContain('className={`battle-item item-card paper-item-card')
     expect(app).toContain('className={`item-card paper-item-card')
-    expect(app).toContain('className={`drag-overlay-item item-card paper-item-card')
+    expect(app).toContain('className={`drag-overlay-item drag-overlay-ghost')
   })
 
   it('routes remaining low-frequency controls through handdrawn primitives', () => {
@@ -227,6 +243,13 @@ describe('selection screen structure', () => {
     expect(app).not.toContain("tone={3 - run.losses <= 1 ? 'danger' : 'safe'}")
   })
 
+  it('applies dogfight run action results before background room refresh', () => {
+    expect(app).toContain('function mergeDogfightRoomRun')
+    expect(app).toContain('onRoomChange(mergeDogfightRoomRun(room, data.run))')
+    expect(app).toContain('void refreshRoom()')
+    expect(app).not.toContain('await refreshRoom()')
+  })
+
   it('keeps the current dog trait visible in the top banner during a run', () => {
     expect(app).toContain('<DogTraitSummary run={run} />')
     expect(app).toContain('function DogTraitSummary')
@@ -287,15 +310,26 @@ describe('selection screen structure', () => {
   })
 
   it('offers dog emperor with a lucky-number selector and picture avatars', () => {
-    expect(app).toContain("type DogType = 'SHIBA' | 'SAMOYED' | 'MUTT' | 'BULLY' | 'EMPEROR'")
+    expect(app).toContain("type DogType = 'SHIBA' | 'SAMOYED' | 'MUTT' | 'BULLY' | 'EMPEROR' | 'FROG'")
     expect(app).toContain("EMPEROR: '狗皇帝'")
+    expect(app).toContain("FROG: '祖灵'")
     expect(app).toContain("EMPEROR: '/assets/dogs/emperor.webp'")
+    expect(app).toContain("FROG: '/assets/dogs/zuling.jpg'")
     expect(app).toContain('luckyNumber')
     expect(app).toContain('幸运数字')
     expect(app).toContain("SHIBA: '/assets/dogs/shiba.webp'")
     expect(app).toContain("SAMOYED: '/assets/dogs/samoyed.webp'")
     expect(app).toContain("MUTT: '/assets/dogs/mutt.webp'")
     expect(app).toContain("BULLY: '/assets/dogs/bully.webp'")
+  })
+
+  it('renders frog reservoir water on battle item cards', () => {
+    expect(app).toContain('type BattleReservoirEntry')
+    expect(app).toContain('reservoirStateForBattleItem')
+    expect(app).toContain('frog-reservoir-fill')
+    expect(app).toContain('frog-reservoir-card')
+    expect(css).toContain('.frog-reservoir-fill')
+    expect(css).toContain('linear-gradient(180deg, rgba(92, 214, 168')
   })
 
   it('keeps shop choices in a fixed board and pads missing choices with blanks', () => {
@@ -490,6 +524,7 @@ describe('selection screen structure', () => {
 
   it('highlights poison battle effects with green damage and log styling', () => {
     expect(app).toContain("poison: { kind: 'poison', color: '#22c55e'")
+    expect(app).toContain("poison: { kind: 'poison', color: '#22c55e', accent: '#a7f3d0', prefix: '-'")
     expect(css).toContain('.battle-log p.poison')
   })
 
@@ -503,10 +538,14 @@ describe('selection screen structure', () => {
     expect(app).toContain("from './item-visual-profile'")
     expect(app).toContain('itemVisualProfile(def)')
     expect(app).toContain('itemVisualProfile(item.def)')
-    expect(app).toContain('className={`item-art-window ${visual.className} ${visual.hasCustomArt ? \'has-custom-art\' : \'generated-art\'}`}')
+    expect(app).toContain('className={`item-art-window ${className} ${visual.className} icon-art`}')
     expect(app).toContain('data-art-aspect={visual.artAspect}')
-    expect(app).toContain('{visual.artSrc ? <img className="item-card-art" src={visual.artSrc} alt="" /> : <span className="item-card-art-fallback" aria-hidden="true" />}')
-    expect(app).toContain('<span className="item-icon-badge">')
+    expect(app).toContain('<ItemArtIcon def={def} className="item-card-icon-art" />')
+    expect(app).toContain('<ItemArt def={def} visual={visual} className="shop-card-art" />')
+    expect(app).toContain('<ItemArt def={def} visual={visual} className="tip-art-preview" />')
+    expect(app).not.toContain('item-card-art-fallback')
+    expect(app).not.toContain('className="item-card-art"')
+    expect(app).not.toContain('item-icon-badge')
     expect(app).toContain('className={`tip-icon-frame ${visual.className}`}')
     expect(app).toContain('className={`size-badge ${visual.className}`}')
     expect(app).toContain("new URLSearchParams(window.location.search).has('itemArtGallery')")
@@ -516,10 +555,15 @@ describe('selection screen structure', () => {
   })
 
   it('hides full-range trigger dice on direct-trigger item surfaces', () => {
-    expect(app).toContain("import { triggerDiceLabel } from './item-trigger-display'")
+    expect(app).toContain("from './item-trigger-display'")
+    expect(app).toContain('extraTriggerDiceLabel')
+    expect(app).toContain('triggerDiceLabel')
     expect(app).toContain('triggerDiceLabel(itemTriggerDisplay(item), relics)')
+    expect(app).toContain('extraTriggerDiceLabel(itemTriggerDisplay(item), relics)')
     expect(app).toContain('{triggerDice && <small><Dice5 size={12} /> {triggerDice}</small>}')
+    expect(app).toContain('{extraTriggerDice && <small className="extra-trigger-dice"><Sparkles size={12} /> 额外 {extraTriggerDice}</small>}')
     expect(app).toContain('const tipTriggerDice = triggerDiceLabel(item ? itemTriggerDisplay(item) : def, item ? (relicsOverride ?? run.relics) : [])')
+    expect(app).toContain('const tipExtraTriggerDice = item ? extraTriggerDiceLabel(itemTriggerDisplay(item), relicsOverride ?? run.relics) : null')
     expect(app).toContain('{tipTriggerDice && (')
     expect(app).not.toContain('<small><Dice5 size={12} /> {item.def.dice.join')
   })
@@ -776,7 +820,9 @@ describe('selection screen structure', () => {
     expect(app).toContain('function meteorPaletteForFx')
     expect(app).toContain('function drawMeteorImpactFlash')
     expect(app).toContain('function createMeteorSparkParticles')
-    expect(app).toContain('const meteorVolley = [')
+    expect(app).toContain("import { battleProjectileCues, type BattleProjectileCue } from './battle-vfx-projectiles'")
+    expect(app).toContain('battleProjectileCues(fx.kind)')
+    expect(app).toContain('type MeteorCue = BattleProjectileCue')
     expect(app).toContain('const tailLayers = [')
     expect(app).toContain('context.shadowBlur')
     expect(app).toContain('context.createRadialGradient')
@@ -804,9 +850,22 @@ describe('selection screen structure', () => {
 
   it('wires manuscript surprise backgrounds into reward and settlement surfaces', () => {
     expect(app).toContain('const surpriseBackgrounds')
-    expect(app).toContain("classReward: '/assets/backgrounds/canine-fighting-study.png'")
-    expect(app).toContain("settlement: '/assets/backgrounds/canine-anatomy-run.png'")
-    expect(app).toContain("enchant: '/assets/backgrounds/canine-comparative-anatomy.png'")
+    const surpriseBackgroundPaths = [
+      '/assets/backgrounds/canine-fighting-study.webp',
+      '/assets/backgrounds/canine-anatomy-run.webp',
+      '/assets/backgrounds/canine-comparative-anatomy.webp',
+    ]
+    expect(app).toContain("classReward: '/assets/backgrounds/canine-fighting-study.webp'")
+    expect(app).toContain("settlement: '/assets/backgrounds/canine-anatomy-run.webp'")
+    expect(app).toContain("enchant: '/assets/backgrounds/canine-comparative-anatomy.webp'")
+    expect(app).not.toContain('/assets/backgrounds/canine-fighting-study.png')
+    expect(app).not.toContain('/assets/backgrounds/canine-anatomy-run.png')
+    expect(app).not.toContain('/assets/backgrounds/canine-comparative-anatomy.png')
+    for (const path of surpriseBackgroundPaths) {
+      const asset = publicAsset(path)
+      expect(existsSync(asset)).toBe(true)
+      expect(statSync(asset).size).toBeLessThanOrEqual(1_200_000)
+    }
     expect(app).toContain('function surpriseBackgroundStyle')
     expect(app).toContain('surprise-surface')
     expect(app).toContain("surpriseBackgroundStyle('classReward')")

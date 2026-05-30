@@ -71,6 +71,7 @@ function visualTone(def: VisualItemDef): ItemVisualTone {
   if (def.tags.includes('economy') || def.tags.includes('sell')) return 'economy'
   if (def.tags.includes('growth')) return 'growth'
   if (def.tags.includes('counter')) return 'counter'
+  if (def.tags.includes('multi')) return 'trigger'
   if (def.tags.includes('trigger')) return 'trigger'
   if (def.tags.includes('damage') || def.effect.type === 'DAMAGE') return 'damage'
   return 'utility'

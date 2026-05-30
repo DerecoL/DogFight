@@ -22,7 +22,7 @@ type OfflineBuildProfile = {
   preferredDice: number[]
 }
 
-const DOG_TYPES: DogType[] = ['SHIBA', 'SAMOYED', 'MUTT', 'BULLY', 'EMPEROR']
+const DOG_TYPES: DogType[] = ['SHIBA', 'SAMOYED', 'MUTT', 'BULLY', 'EMPEROR', 'FROG']
 const OFFLINE_NAME_PREFIXES = [
   '阿麦',
   '老周',
@@ -95,6 +95,14 @@ const PROFILES: Record<DogType, OfflineBuildProfile> = {
     classRewards: ['emperor-curtain', 'emperor-edict', 'emperor-dice-cup', 'emperor-minister'],
     relics: ['midas-left', 'midas-right'],
     keepStarterDice: [1, 4, 6],
+    preferredDice: [1, 2, 3, 4, 5, 6],
+  },
+  FROG: {
+    shopPreference: ['GENERAL', 'SMALL_DICE', 'SMALL'],
+    itemTags: ['reservoir', 'trigger', 'stable', 'small'],
+    classRewards: ['frog-croak-drum', 'frog-rainy-season', 'frog-lily-pump', 'frog-full-pond-gate'],
+    relics: ['carrot', 'midas-right'],
+    keepStarterDice: [1, 2, 3],
     preferredDice: [1, 2, 3, 4, 5, 6],
   },
 }

@@ -40,6 +40,7 @@ export const dogTextByType: Record<DogType, DefText> = {
   MUTT: { name: 'Mutt', description: '20% chance to gain one extra roll.' },
   BULLY: { name: 'Bully', description: '40% chance to double the effect of the triggered large item.' },
   EMPEROR: { name: 'Dog Emperor', description: 'Choose a destiny number. When it hits, there is a 50% chance to double triggered effects.' },
+  FROG: { name: 'Zuling', description: 'Explicit-dice gear fills a reservoir instead of using base rolls, starts battle at 50% reservoir progress, and triggers every 6 divided by explicit dice count before class speed bonuses.' },
 }
 
 export const itemTextById: Record<string, DefText> = {
@@ -50,13 +51,13 @@ export const itemTextById: Record<string, DefText> = {
   'starter-5': { name: '5-Pip Fang Bite', description: 'Deals 5 damage when a 5 is rolled.' },
   'starter-6': { name: '6-Pip Fang Bite', description: 'Deals 5 damage when a 6 is rolled.' },
   'small-bite': { name: 'Small Bite', description: 'Deals 4 damage. On hit, has a 20% chance to apply 1 Weak stack.' },
-  'lucky-paw': { name: 'Lucky Paw Pad', description: 'A compact attack item that hits hard on lucky high rolls.' },
-  'milk-bone': { name: 'Milk Bone', description: 'Restores health on its trigger rolls.' },
-  'rubber-ball': { name: 'Rubber Ball', description: 'A medium attack item with reliable mid-roll pressure.' },
+  'lucky-paw': { name: 'Lucky Paw Pad', description: 'Multi 2. Deals 5 damage twice when triggered.' },
+  'milk-bone': { name: 'Milk Bone', description: 'Multi 2. Restores 3 health twice when triggered.' },
+  'rubber-ball': { name: 'Rubber Ball', description: 'Multi 2. Deals 4 damage twice on reliable mid rolls.' },
   'spiked-collar': { name: 'Spiked Collar', description: 'A medium attack item that favors high rolls.' },
-  'training-disc': { name: 'Training Disc', description: 'Deals damage on edge rolls: 1 and 6.' },
+  'training-disc': { name: 'Training Disc', description: 'Multi 3. Deals 3 damage three times on edge rolls: 1 and 6.' },
   'guard-vest': { name: 'Guard Vest', description: 'Restores health across alternating trigger rolls.' },
-  'giant-bone': { name: 'Giant Bone Club', description: 'Deals 16 damage. Attacks have a 50% chance to gain Fury; each Fury stack adds 1 attack damage.' },
+  'giant-bone': { name: 'Giant Bone Club', description: 'Deals 16 damage. Attacks have a 50% chance to gain Fury.' },
   'dog-house': { name: 'Puppy Kennel', description: 'Restores 12 health and steals 1 enemy buff, prioritizing Thorns then Haste. Shield cannot be stolen.' },
   'dog-gold-ingot': { name: 'Dog Gold Ingot', description: 'No trigger required. If equipped, post-battle sell price increases by 3.' },
   'dog-silver-ingot': { name: 'Dog Silver Ingot', description: 'No trigger required. If equipped or carried, post-battle sell price increases by 1.' },
@@ -72,15 +73,17 @@ export const itemTextById: Record<string, DefText> = {
   'v3-dinosaur-leg-bone': { name: 'Dinosaur Femur Club', description: 'Deals 18 damage. If the enemy has Shield, this hit deals double damage to Shield.' },
   'v3-auto-waterer': { name: 'Automatic Waterer', description: 'Restores 8 health. If you are already at full health, permanently gain 1 max health.' },
   'v3-night-patrol-light': { name: 'Night Patrol Light', description: 'Temporarily improves adjacent gear trigger odds for 2 seconds by doubling base weight.' },
-  'v3-blood-mad-fang': { name: 'Blood-Mad Fang', description: 'Deals 6 damage and heals you for 100% of the health damage dealt.' },
+  'v3-blood-mad-fang': { name: 'Blood-Mad Fang', description: 'Deals 6 damage and triggers Lifesteal.' },
   'v3-fermented-trash-bin': { name: 'Fermented Trash Bin', description: 'Applies 5 Poison stacks and disables the enemy rightmost item once.' },
   'v3-golden-kennel': { name: 'Untouchable Golden Kennel', description: 'Gain 14 Shield. While shielded, incoming Poison and Weak stacks are halved, rounded up.' },
   'v4-blood-contract-fang': { name: 'Blood Pact Fang', description: 'Aura: grants Lifesteal to the left adjacent item for the battle. Diamond affects both adjacent items.' },
   'v4-boom-counter': { name: 'Boom Counter', description: 'Triggers only by counting. Each allied item trigger adds 1 count. At 50, resets and deals direct damage.' },
   'v4-growing-chew-sword': { name: 'Growing Chew Sword', description: 'Starts at 1 damage. Each successful trigger increases later damage this battle by 3 without a cap.' },
   'v4-reverse-fur-comb': { name: 'Reverse-Fur Purifying Comb', description: 'Purges up to 3 enemy buffs. Heal 5 for each removed stack, prioritizing Thorns, Haste, then Shield chunks.' },
-  'patting-bear': { name: 'Patting Bear', description: 'Each trigger applies 1 Wound. Wound increases direct attack damage taken by 1 per stack.' },
+  'patting-bear': { name: 'Patting Bear', description: 'Each trigger applies 1 Wound.' },
   'poisoned-dog-fang': { name: 'Poisoned Dog Fang', description: 'No trigger required. Each attack hit applies 1 Poison stack.' },
+  'lotus-sea': { name: 'Lotus Sea', description: 'Aura: the left adjacent Multi item gains +1 Multi. Diamond affects both adjacent Multi items.' },
+  'kyushu-bracer': { name: 'Kyushu Bracer', description: 'Aura: allied Multi attack items gain bonus damage on their 2nd and later trigger, and grant Shield.' },
   'shiba-speed-katana': { name: 'Swift Katana', description: 'Each trigger grants 1 Haste stack, up to 5 stacks, resetting after battle.' },
   'shiba-great-katana': { name: 'Great Katana', description: 'Also triggers one adjacent item once.' },
   'shiba-swallow-katana': { name: 'Swallow Katana', description: 'Has a 20% chance to grant an extra roll. Stacks up to 3 extra rolls.' },
@@ -111,6 +114,12 @@ export const itemTextById: Record<string, DefText> = {
   'emperor-curtain': { name: 'Rule Behind the Curtain', description: 'Your original destiny number becomes inactive. Adjacent gear uses the destiny number as its trigger number.' },
   'emperor-edict': { name: 'Tyrannical Edict', description: 'At battle start, forcibly changes the trigger dice of the two leftmost items on both sides to your destiny number.' },
   'emperor-fallen': { name: 'Fallen Monarch', description: 'Only destiny-number gear can take effect, including no-trigger gear, but destiny-number gear triggers twice.' },
+  'frog-lily-pump': { name: 'Lily Pad Pump', description: 'Passive: all reservoir gear fills 15% faster.' },
+  'frog-croak-drum': { name: 'Croak Drum', description: 'After this item triggers from a full reservoir, perform one ordinary roll. That roll cannot request another Croak Drum roll.' },
+  'frog-raindrop-funnel': { name: 'Raindrop Funnel', description: 'After this item triggers from a full reservoir, adjacent reservoir gear gains 50% reservoir progress.' },
+  'frog-lotus-echo': { name: 'Lotus Pond Echo', description: 'The first non-class item hit by an ordinary roll created by class gear triggers one extra time.' },
+  'frog-rainy-season': { name: 'Rainy Season', description: 'After this item triggers from a full reservoir, all reservoir gear fills 50% faster for 4 seconds.' },
+  'frog-full-pond-gate': { name: 'Full Pond Gate', description: 'After this item triggers from a full reservoir, immediately triggers the non-class item with the highest current reservoir progress.' },
 }
 
 export const relicTextById: Record<string, DefText> = {
@@ -153,6 +162,9 @@ export const ruleTermTextByTerm: Record<string, RuleTermText> = {
   '真实伤害': { term: 'True Damage', description: 'Damage that directly reduces health and does not get absorbed by Shield first.', note: 'Broken Canine can deal true damage.' },
   '雪崩': { term: 'Avalanche', description: 'Samoyed class count. Low rolls add stacks. At 5 stacks, they clear and deal damage; each Avalanche doubles the next one.', note: 'Avalanche base damage scales with quality.' },
   '爆鸣计数': { term: 'Boom Count', description: 'Boom Counter can only trigger by counting. Each allied item trigger adds 1 count. At 50, it clears and deals direct damage.', note: 'Upgrading Boom Counter only increases the damage dealt at 50.' },
+  '蓄水': { term: 'Reservoir', description: 'Zuling class timing mechanic. Explicit-dice gear starts battle at 50% reservoir progress, fills over time based on its explicit dice count, then triggers at full and keeps any overflow progress above 100%.', note: 'The base interval is max(0.5, 6 divided by explicit dice count divided by speed multiplier). Linked triggers do not clear the target reservoir, and overflow is capped below full after the trigger.' },
+  '暴雨季': { term: 'Rainy Season', description: 'A temporary Zuling class speed window. When triggered, all reservoir gear fills 50% faster for 4 seconds.', note: 'Multiplies with Lily Pad Pump and does not change explicit dice count.' },
+  '多重': { term: 'Multi', description: 'When this item hits, it fully triggers the listed number of times. Multi 2 means two complete trigger resolutions from the same hit.', note: 'Each segment counts as a successful trigger. Each Disabled stack cancels only one segment. Multi caps at 5.' },
 }
 
 export function localizeItemDef(def: LocalizableItemDef, language: Language): DefText {
@@ -172,7 +184,8 @@ export function localizeDog(dogType: DogType, language: Language): { name: strin
       SAMOYED: { name: '萨摩耶', trait: '20% 概率改掷为【大点】 4/5/6' },
       MUTT: { name: '土狗', trait: '20% 概率【额外投掷】一次' },
       BULLY: { name: '恶霸', trait: '40% 概率使本次触发的【大型物品】效果翻倍' },
-      EMPEROR: { name: '狗皇帝', trait: '指定【天命数字】（幸运数字），命中时 50% 概率使触发效果翻倍' },
+      EMPEROR: { name: '狗皇帝', trait: '指定【天命数字】，命中时 50% 概率使触发效果翻倍' },
+      FROG: { name: '祖灵', trait: '显式点数装备改为【蓄水】触发，可被职业装备提速' },
     }
     return zhDogText[dogType]
   }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ALL_ITEM_DEFS, growthDamageBase, growthDamageStep, itemDefForQuality, relicDefForQuality, relicEquipmentEffectScale } from './game/data'
+import { ALL_ITEM_DEFS, DOGS, growthDamageBase, growthDamageStep, itemDefForQuality, relicDefForQuality, relicEquipmentEffectScale } from './game/data'
 import { ITEM_QUALITIES, qualityAmountFrom } from './game/quality'
 
 function numbers(defId: string, quality: 'GOLD' | 'DIAMOND') {
@@ -45,12 +45,25 @@ describe('quality-adjusted item descriptions', () => {
     expect(description).toContain('【护盾】不算增益')
   })
 
-  it('describes giant bone fury as a stacking attack damage buff', () => {
-    const description = itemDefForQuality('giant-bone', 'BRONZE').description
+  it('links rule terms without restating their definitions in item and dog descriptions', () => {
+    expect(DOGS.EMPEROR.trait).toContain('【天命数字】')
+    expect(DOGS.EMPEROR.trait).not.toContain('幸运数字')
+    expect(DOGS.FROG.trait).toContain('【蓄水】')
+    expect(DOGS.FROG.trait).not.toContain('初始水位')
+    expect(DOGS.FROG.trait).not.toContain('间隔 =')
 
+    const description = itemDefForQuality('giant-bone', 'BRONZE').description
     expect(description).toContain('50% 概率触发【激昂】')
-    expect(description).toContain('所有攻击伤害 +1')
-    expect(description).toContain('可叠加')
+    expect(description).not.toContain('所有攻击伤害 +1')
+    expect(description).not.toContain('可叠加')
+
+    expect(itemDefForQuality('v3-blood-mad-fang', 'GOLD').description).toContain('【吸血】')
+    expect(itemDefForQuality('v3-blood-mad-fang', 'GOLD').description).not.toContain('100%')
+    expect(itemDefForQuality('v4-blood-contract-fang', 'GOLD').description).not.toContain('按实际造成的生命伤害')
+    expect(itemDefForQuality('patting-bear', 'SILVER').description).not.toContain('直接攻击伤害 +')
+    expect(itemDefForQuality('lotus-sea', 'GOLD').description).not.toContain('最多提高到')
+    expect(itemDefForQuality('lucky-paw', 'BRONZE').description).toContain('【多重】 2')
+    expect(itemDefForQuality('lucky-paw', 'BRONZE').description).not.toContain('命中时总共完整触发')
   })
 
   it('shows upgraded base effects for described equipment and class rewards', () => {
