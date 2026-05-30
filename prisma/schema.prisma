@@ -21,6 +21,12 @@ model User {
   runs         Run[]
   ladderProfiles LadderProfile[]
   ladderSettlements LadderSettlement[]
+  wallet       AccountWallet?
+  currencyLedger CurrencyLedger[]
+  achievementProgress AchievementProgress[]
+  dailyTaskSets DailyTaskSet[]
+  cosmeticInventory CosmeticInventory[]
+  cosmeticEquips CosmeticEquip[]
 }
 
 model Run {
@@ -237,4 +243,99 @@ model DogfightBattle {
   @@index([roomId, round])
   @@index([participantAId])
   @@index([participantBId])
+}
+
+model AccountWallet {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  balance     Int      @default(0)
+  dailyEarned Int      @default(0)
+  dailyKey    String   @default("")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model CurrencyLedger {
+  id        String   @id @default(cuid())
+  userId    String
+  amount    Int
+  balanceAfter Int
+  source    String
+  refId     String?
+  dailyKey  String?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([userId, dailyKey])
+}
+
+model AchievementProgress {
+  id            String   @id @default(cuid())
+  userId        String
+  achievementId String
+  progress      Int      @default(0)
+  completedAt   DateTime?
+  claimedAt     DateTime?
+  updatedAt     DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, achievementId])
+  @@index([userId, completedAt, claimedAt])
+}
+
+model DailyTaskSet {
+  id          String   @id @default(cuid())
+  userId      String
+  dateKey     String
+  refreshUsed Boolean  @default(false)
+  tasks       String   @default("[]")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, dateKey])
+}
+
+model CosmeticInventory {
+  id            String   @id @default(cuid())
+  userId        String
+  catalogItemId String
+  acquiredAt    DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, catalogItemId])
+  @@index([userId])
+}
+
+model CosmeticEquip {
+  id            String   @id @default(cuid())
+  userId        String
+  slot          String
+  catalogItemId String
+  updatedAt     DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, slot])
+}
+
+model ShopCatalogOverride {
+  id            String   @id @default(cuid())
+  catalogItemId String   @unique
+  listed        Boolean  @default(true)
+  price         Int?
+  section       String?
+  limitPerUser  Int?
+  rotationKey   String?
+  sku           String?
+  purchaseType  String?
+  source        String   @default("DB_OVERRIDE")
+  updatedAt     DateTime @updatedAt
 }

@@ -20,6 +20,7 @@ import { calculateLadderResult, ladderTierForScore, ladderTierLabels, ladderTier
 import { STARTING_GOLD, isTrainingMatchRound, selectCasualGhostSnapshot, selectLadderGhostSnapshot, targetLadderOpponentWinsRange, targetOpponentWins } from './game/matchmaking'
 import type { BattleResult, DogType, EnchantmentChoice, FighterSnapshot, GameItem, PotionChoice, RelicInstance, ShopOffer, ShopType } from './game/types'
 import { applyRelicChoice, createFinishedBattleRecord, initialItems, makeChoices, makeNewRunShop, makePotionChoices, makeRelicChoices, makeShop, nextPhaseData, parseJson, phaseDataAfterEnchant, postBattleLargeItemReward, postBattleSellBonusItemGrowths, publicLadderSettlement, publicRun, publicRunHistory, relicsFromRun, removeRelicByInstanceId, seedGhost, snapshotFromRun, toGameItems } from './state'
+import { accountSummary, claimAchievement, claimDaily, equipUserCosmetic, getAchievements, getCosmetics, getDailyTasks, getShop, purchaseShopItem, recordAccountEvent, refreshDaily } from './account-services'
 
 type PrismaTransaction = Prisma.TransactionClient
 type ApexSourceRun = {
@@ -390,7 +391,41 @@ export function buildApp() {
     const userId = requireUser(request.userId)
     const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } })
     const activeRun = await prisma.run.findFirst({ where: { userId, status: 'ACTIVE' }, orderBy: { createdAt: 'desc' }, include: { items: true, ladderSettlement: true } })
-    return { user: publicUser(user), activeRun: activeRun ? publicRun(activeRun) : null }
+    return { user: publicUser(user), activeRun: activeRun ? publicRun(activeRun) : null, account: await accountSummary(userId) }
+  })
+
+  app.get('/api/achievements', async (request) => getAchievements(requireUser(request.userId)))
+
+  app.post('/api/achievements/:achievementId/claim', async (request) => {
+    const userId = requireUser(request.userId)
+    const { achievementId } = z.object({ achievementId: z.string() }).parse(request.params)
+    return claimAchievement(userId, achievementId)
+  })
+
+  app.get('/api/daily-tasks', async (request) => getDailyTasks(requireUser(request.userId)))
+
+  app.post('/api/daily-tasks/refresh', async (request) => refreshDaily(requireUser(request.userId)))
+
+  app.post('/api/daily-tasks/:taskId/claim', async (request) => {
+    const userId = requireUser(request.userId)
+    const { taskId } = z.object({ taskId: z.string() }).parse(request.params)
+    return claimDaily(userId, taskId)
+  })
+
+  app.get('/api/shop', async (request) => getShop(requireUser(request.userId)))
+
+  app.post('/api/shop/purchase', async (request) => {
+    const userId = requireUser(request.userId)
+    const { catalogItemId } = z.object({ catalogItemId: z.string() }).parse(request.body)
+    return purchaseShopItem(userId, catalogItemId)
+  })
+
+  app.get('/api/cosmetics/me', async (request) => getCosmetics(requireUser(request.userId)))
+
+  app.post('/api/cosmetics/equip', async (request) => {
+    const userId = requireUser(request.userId)
+    const { catalogItemId } = z.object({ catalogItemId: z.string() }).parse(request.body)
+    return equipUserCosmetic(userId, catalogItemId)
   })
 
   app.get('/api/ladder/me', async (request) => {
@@ -493,6 +528,7 @@ export function buildApp() {
       },
       include: { items: true },
     })
+    await recordAccountEvent(userId, { kind: 'RUN_CREATED', dogType: body.dogType })
     return { run: publicRun(run) }
   })
 
@@ -645,6 +681,7 @@ export function buildApp() {
           include: { items: true },
         }),
       ])
+      await recordAccountEvent(userId, { kind: 'SHOP_PURCHASED', shopType: run.shopType, itemDefId: offer.defId })
       return { run: publicRun(updated) }
     }
 
@@ -658,6 +695,7 @@ export function buildApp() {
       },
       include: { items: true },
     })
+    await recordAccountEvent(userId, { kind: 'SHOP_PURCHASED', shopType: run.shopType, itemDefId: offer.defId })
     return { run: publicRun(updated) }
   })
 
@@ -1077,8 +1115,20 @@ export function buildApp() {
       Object.assign(updateData, { items: itemUpdates })
     }
     const updated = await prisma.run.update({ where: { id: run.id }, data: updateData, include: { items: true, ladderSettlement: true } })
+    await recordAccountEvent(userId, {
+      kind: 'BATTLE_FINISHED',
+      mode: run.mode,
+      dogType: run.dogType,
+      winner: playerWon,
+      wins,
+      losses,
+      round: nextRound,
+      itemCount: currentItems.length,
+      relicCount: relicsFromRun(run).length,
+    })
     if (status === 'COMPLETE' && run.mode === 'LADDER') {
       await settleLadderRun(userId, run.id, wins, losses)
+      await recordAccountEvent(userId, { kind: 'LADDER_SETTLED', wins, losses })
       const settledRun = await prisma.run.findUniqueOrThrow({ where: { id: run.id }, include: { items: true, ladderSettlement: true } })
       return { run: publicRun(settledRun) }
     }
@@ -1114,6 +1164,9 @@ export function buildApp() {
     }
     if (settlement.type === 'invalid') {
       return reply.code(400).send({ error: '当前跑局已经结算或不可放弃' })
+    }
+    if (settlement.run.mode === 'LADDER') {
+      await recordAccountEvent(userId, { kind: 'LADDER_SETTLED', wins: settlement.run.wins, losses: settlement.run.losses })
     }
 
     return { run: publicRun(settlement.run) }

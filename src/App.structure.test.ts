@@ -488,6 +488,20 @@ describe('selection screen structure', () => {
     expect(app).toContain('title={statusDescription(status)}')
   })
 
+  it('wires battle review dashboard and categorized log filters into battle playback surfaces', () => {
+    expect(app).toContain("from './battle-review'")
+    expect(app).toContain('buildBattleReview(run.lastBattle)')
+    expect(app).toContain('function BattleReviewDashboard')
+    expect(app).toContain('function BattleReviewSideCard')
+    expect(app).toContain('className="battle-review-dashboard"')
+    expect(app).toContain('className="battle-review-side-grid"')
+    expect(app).toContain('className="battle-review-top-item"')
+    expect(app).toContain('const [activeFilter, setActiveFilter] = useState<BattleLogFilter>')
+    expect(app).toContain('battleLogFilters.map')
+    expect(app).toContain('filterBattleEvents(indexedEvents, activeFilter)')
+    expect(app).toContain('data-log-filter={filter}')
+  })
+
   it('highlights poison battle effects with green damage and log styling', () => {
     expect(app).toContain("poison: { kind: 'poison', color: '#22c55e'")
     expect(css).toContain('.battle-log p.poison')

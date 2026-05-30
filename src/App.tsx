@@ -61,6 +61,13 @@ import { triggerDiceLabel } from './item-trigger-display'
 import { itemVisualProfile } from './item-visual-profile'
 import { ALL_ITEM_DEFS } from './server/game/data'
 import { queryBattleFxAnchor, resolveBattleFxPoints } from './battle-vfx-coordinates'
+import {
+  buildBattleReview,
+  filterBattleEvents,
+  type BattleLogFilter,
+  type BattleReview,
+  type BattleReviewSideStats,
+} from './battle-review'
 import { TERM_DEFS } from './shared/rule-terms'
 import { LANGUAGE_STORAGE_KEY, useLanguage, type Language } from './i18n'
 import {
@@ -99,7 +106,7 @@ type Area = 'EQUIPMENT' | 'BAG'
 type ShopType = 'GENERAL' | 'LARGE' | 'MEDIUM' | 'SMALL' | 'SMALL_DICE' | 'BIG_DICE' | 'RELIC' | 'UPGRADE' | 'POTION'
 type ItemQuality = 'BRONZE' | 'SILVER' | 'GOLD' | 'DIAMOND'
 type GameMode = 'CASUAL' | 'LADDER' | 'DOGFIGHT' | 'PEAK'
-type AppScreen = 'LOBBY' | 'CASUAL' | 'LADDER' | 'DOGFIGHT' | 'PEAK'
+type AppScreen = 'LOBBY' | 'CASUAL' | 'LADDER' | 'DOGFIGHT' | 'PEAK' | 'SHOP' | 'ACHIEVEMENTS'
 type HistoryModeTab = 'ALL' | 'CASUAL' | 'DOGFIGHT' | 'PEAK' | 'LADDER'
 type HistoryRunMode = Exclude<HistoryModeTab, 'ALL'>
 type RunMode = 'CASUAL' | 'LADDER'
@@ -294,6 +301,16 @@ type PlayerRunHistory = {
   recentRuns: PlayerRunHistoryEntry[]
 }
 type AuthUser = { id: string; account: string; nickname: string | null }
+type AccountWallet = { balance: number; dailyEarned: number; dailyKey: string }
+type CosmeticType = 'TITLE' | 'AVATAR' | 'BACKGROUND' | 'DOG_SKIN' | 'BATTLE_EFFECT'
+type CosmeticRarity = 'COMMON' | 'RARE' | 'EPIC' | 'LEGENDARY'
+type ShopCatalogItem = { id: string; name: string; description: string; type: CosmeticType; rarity: CosmeticRarity; price: number; section: 'PERMANENT' | 'FEATURED'; assetKey: string; sku?: string; purchaseType: string; source: string; owned: boolean; equipped: boolean }
+type AccountShopResponse = { wallet: AccountWallet; sections: { permanent: ShopCatalogItem[]; featured: ShopCatalogItem[] } }
+type AchievementEntry = { id: string; title: string; description: string; category: string; hidden: boolean; target: number; progress: number; reward: number; completed: boolean; claimable: boolean; claimed: boolean }
+type AchievementsResponse = { wallet: AccountWallet; achievements: AchievementEntry[] }
+type DailyTaskEntry = { taskId: string; slot: string; progress: number; target: number; reward: number; claimedAt: string | null; def?: { title: string; description: string } }
+type DailyTasksResponse = { wallet: AccountWallet; dateKey: string; refreshUsed: boolean; tasks: DailyTaskEntry[] }
+type CosmeticsResponse = { inventory: Array<{ catalogItemId: string; item?: ShopCatalogItem }>; equipped: Array<{ slot: CosmeticType; catalogItemId: string; item?: ShopCatalogItem }> }
 type CasualTutorialStepId = 'LOBBY' | 'DOG_SELECT' | 'SHOP_INSPECT' | 'SHOP_BUY' | 'PLACE_ITEM' | 'MATCH' | 'BATTLE_WATCH' | 'CONTINUE'
 type CasualTutorialStatus = 'idle' | 'active' | 'completed' | 'skipped' | 'replaying'
 type CasualTutorialState = { status: CasualTutorialStatus; stepId: CasualTutorialStepId }
@@ -736,6 +753,7 @@ const ladderTierLabel: Record<LadderTier, string> = {
 const dogOptions: DogType[] = ['SHIBA', 'SAMOYED', 'MUTT', 'BULLY', 'EMPEROR']
 const shopChoiceOrder: ShopType[] = ['GENERAL', 'LARGE', 'MEDIUM', 'SMALL', 'SMALL_DICE', 'BIG_DICE', 'RELIC', 'UPGRADE', 'POTION']
 const SHOP_CHOICE_SLOT_COUNT = shopChoiceOrder.length
+const battleLogFilters: BattleLogFilter[] = ['all', 'damage', 'sustain', 'status', 'equipment']
 const dogStrategies: Record<DogType, string> = {
   SHIBA: '适合新手，专注于持续输出伤害',
   SAMOYED: '适合押【大点】构筑，爆发窗口更集中',
@@ -1723,9 +1741,25 @@ export default function App() {
     return (
       <Shell feedbacks={uiFeedbacks} run={run ?? undefined} error={error} musicEnabled={musicEnabled} musicBlocked={musicBlocked} onToggleMusic={toggleMusic} onLogout={() => action(() => api('/auth/logout', { method: 'POST' }).then(() => ({ user: null })))}>
         <PlayerRunHistoryPanel history={runHistory} ladderProfile={ladderProfile} onOpen={() => setHistoryOverlayOpen(true)} />
-        <ModeLobby run={run} runHistory={runHistory} onOpen={() => setHistoryOverlayOpen(true)} onEnterCasual={handleEnterCasual} onReplayTutorial={startCasualTutorial} onEnterLadder={() => setAppScreen('LADDER')} onEnterDogfight={() => setAppScreen('DOGFIGHT')} onEnterPeak={() => setAppScreen('PEAK')} />
+        <ModeLobby run={run} runHistory={runHistory} onOpen={() => setHistoryOverlayOpen(true)} onEnterCasual={handleEnterCasual} onReplayTutorial={startCasualTutorial} onEnterLadder={() => setAppScreen('LADDER')} onEnterDogfight={() => setAppScreen('DOGFIGHT')} onEnterPeak={() => setAppScreen('PEAK')} onEnterShop={() => setAppScreen('SHOP')} onEnterAchievements={() => setAppScreen('ACHIEVEMENTS')} />
         {historyOverlayOpen && <PlayerHistoryOverlay history={runHistory} onClose={() => setHistoryOverlayOpen(false)} />}
         {tutorialGuide}
+      </Shell>
+    )
+  }
+
+  if (appScreen === 'SHOP') {
+    return (
+      <Shell feedbacks={uiFeedbacks} run={run ?? undefined} error={error} musicEnabled={musicEnabled} musicBlocked={musicBlocked} onToggleMusic={toggleMusic} onOpenLobby={() => setAppScreen('LOBBY')} onLogout={() => action(() => api('/auth/logout', { method: 'POST' }).then(() => ({ user: null })))}>
+        <AccountShopScreen />
+      </Shell>
+    )
+  }
+
+  if (appScreen === 'ACHIEVEMENTS') {
+    return (
+      <Shell feedbacks={uiFeedbacks} run={run ?? undefined} error={error} musicEnabled={musicEnabled} musicBlocked={musicBlocked} onToggleMusic={toggleMusic} onOpenLobby={() => setAppScreen('LOBBY')} onLogout={() => action(() => api('/auth/logout', { method: 'POST' }).then(() => ({ user: null })))}>
+        <AchievementsScreen />
       </Shell>
     )
   }
@@ -4275,6 +4309,7 @@ function BattleView({ run, battle, currentEvent, eventIndex, speed, score, sound
 
 function SettlementView({ run, score, onReturnLobby, onHide }: { run: Run; score: number; onReturnLobby: () => void; onHide: () => void }) {
   const visualTheme = visualThemeForRound(run.round)
+  const review = run.lastBattle ? buildBattleReview(run.lastBattle) : null
   return (
     <section className="settlement-page surprise-surface" style={surpriseBackgroundStyle('settlement')}>
       <IconButton className="settlement-hide-button" title="隐藏结算" onClick={onHide}>
@@ -4298,10 +4333,65 @@ function SettlementView({ run, score, onReturnLobby, onHide }: { run: Run; score
           </span>
         </div>
         {run.ladderSettlement && <LadderSettlementSummary settlement={run.ladderSettlement} />}
+        {run.lastBattle && review && <BattleReviewDashboard battle={run.lastBattle} review={review} />}
         <ActionButton onClick={onReturnLobby}>返回大厅</ActionButton>
       </HanddrawnFrame>
     </section>
   )
+}
+
+function BattleReviewDashboard({ battle, review }: { battle: Battle; review: BattleReview }) {
+  const { language, t } = useLanguage()
+  return (
+    <section className="battle-review-dashboard" aria-label={t('battleReviewTitle')}>
+      <div className="battle-review-heading">
+        <strong>{t('battleReviewTitle')}</strong>
+        {review.systemDamage > 0 && <span className="tip-tag">{t('battleReviewSystemDamage')} {review.systemDamage}</span>}
+      </div>
+      <div className="battle-review-side-grid">
+        <BattleReviewSideCard
+          stats={review.player}
+          sideLabel={t('battleReviewPlayer')}
+          topItemName={battleReviewTopItemName(battle, review.player, language)}
+        />
+        <BattleReviewSideCard
+          stats={review.opponent}
+          sideLabel={t('battleReviewOpponent')}
+          topItemName={battleReviewTopItemName(battle, review.opponent, language)}
+        />
+      </div>
+    </section>
+  )
+}
+
+function BattleReviewSideCard({ stats, sideLabel, topItemName }: { stats: BattleReviewSideStats; sideLabel: string; topItemName: string | null }) {
+  const { t } = useLanguage()
+  return (
+    <article className={`battle-review-side-card ${stats.side}`}>
+      <header>
+        <span>{sideLabel}</span>
+        <strong>{stats.label}</strong>
+      </header>
+      <div className="battle-review-metrics">
+        <span className="battle-review-metric"><small>{t('battleReviewDamage')}</small><strong>{stats.damage}</strong></span>
+        <span className="battle-review-metric"><small>{t('battleReviewHealing')}</small><strong>{stats.healing}</strong></span>
+        <span className="battle-review-metric"><small>{t('battleReviewShield')}</small><strong>{stats.shield}</strong></span>
+        <span className="battle-review-metric"><small>{t('battleReviewPoisonDamage')}</small><strong>{stats.poisonDamage}</strong></span>
+        <span className="battle-review-metric"><small>{t('battleReviewStatuses')}</small><strong>{stats.statusEvents}</strong></span>
+      </div>
+      <div className="battle-review-top-item">
+        <small>{t('battleReviewTopItem')}</small>
+        <strong>{stats.topItem && topItemName ? `${topItemName} · ${stats.topItem.contribution}` : t('battleReviewNoItem')}</strong>
+      </div>
+    </article>
+  )
+}
+
+function battleReviewTopItemName(battle: Battle, stats: BattleReviewSideStats, language: Language) {
+  if (!stats.topItem) return null
+  const snapshot = stats.side === 'player' ? battle.playerSnapshot : battle.opponentSnapshot
+  const item = snapshot?.items.find((entry) => entry.id === stats.topItem?.itemId)
+  return item ? localizeItemDef(item.def, language).name : stats.topItem.name
 }
 
 function LadderSettlementSummary({ settlement }: { settlement: LadderSettlement }) {
@@ -4875,20 +4965,40 @@ function quadraticPoint(start: number, control: number, end: number, t: number) 
 }
 
 function CollapsedBattleLog({ events, eventIndex, open, onToggle }: { events: BattleEvent[]; eventIndex: number; open: boolean; onToggle: () => void }) {
-  const { language } = useLanguage()
-  const startIndex = open ? Math.max(0, eventIndex - 40) : Math.max(0, eventIndex - 3)
-  const visible = events.slice(startIndex, eventIndex + 1)
+  const { language, t } = useLanguage()
+  const [activeFilter, setActiveFilter] = useState<BattleLogFilter>('all')
+  const indexedEvents = events.slice(0, eventIndex + 1).map((event, absoluteIndex) => ({ ...event, absoluteIndex }))
+  const filteredEvents = filterBattleEvents(indexedEvents, activeFilter)
+  const visible = filteredEvents.slice(open ? -40 : -3)
   return (
     <div className={`battle-log-shell ${open ? 'open' : ''}`}>
       <HanddrawnTextButton className="log-toggle" onClick={onToggle}>{open ? '收起日志' : '展开日志'}</HanddrawnTextButton>
+      <div className="battle-log-filters" aria-label="战斗日志分类">
+        {battleLogFilters.map((filter) => (
+          <HanddrawnTabButton
+            key={filter}
+            className={`battle-log-filter ${activeFilter === filter ? 'active' : ''}`}
+            active={activeFilter === filter}
+            data-log-filter={filter}
+            onClick={() => setActiveFilter(filter)}
+          >
+            {battleLogFilterLabel(filter, t)}
+          </HanddrawnTabButton>
+        ))}
+      </div>
       <div className="battle-log">
-        {visible.map((event, index) => {
-          const absoluteIndex = startIndex + index
-          return (
-             <p key={`${event.time}-${index}-${event.text}`} className={`${event.actor} ${event.effectType === 'POISON' ? 'poison' : ''} ${absoluteIndex === eventIndex ? 'active-feedback' : ''}`}>{event.time}s · {localizeBattleEventText(event.text, language)}</p>
-          )
-        })}
+        {visible.length > 0 ? visible.map((event, index) => (
+          <p key={`${event.time}-${index}-${event.text}`} className={`${event.actor} ${event.effectType === 'POISON' ? 'poison' : ''} ${event.absoluteIndex === eventIndex ? 'active-feedback' : ''}`}>{event.time}s · {localizeBattleEventText(event.text, language)}</p>
+        )) : <p className="system battle-log-empty">{t('battleLogFilterEmpty')}</p>}
       </div>
     </div>
   )
+}
+
+function battleLogFilterLabel(filter: BattleLogFilter, t: ReturnType<typeof useLanguage>['t']) {
+  if (filter === 'damage') return t('battleLogFilterDamage')
+  if (filter === 'sustain') return t('battleLogFilterSustain')
+  if (filter === 'status') return t('battleLogFilterStatus')
+  if (filter === 'equipment') return t('battleLogFilterEquipment')
+  return t('battleLogFilterAll')
 }
