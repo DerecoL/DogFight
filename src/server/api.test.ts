@@ -1093,7 +1093,7 @@ describeWithDatabase('run API', () => {
     expect(upgraded.body.run.relics).toContainEqual(expect.objectContaining({ relicId: firstRelic, quality: nextQuality(firstRelicChoice.quality) }))
   })
 
-  it('supports upgrade shop choice and upgrades one owned non-diamond item for free', async () => {
+  it('supports tiered upgrade shop choice and upgrades one eligible item for free', async () => {
     const agent = request.agent(app.server)
     await app.ready()
 
@@ -1101,10 +1101,10 @@ describeWithDatabase('run API', () => {
     const created = await agent.post('/api/runs').send({ dogType: 'MUTT' }).expect(200)
     const runId = created.body.run.id
     const target = created.body.run.items[0]
-    await prisma.run.update({ where: { id: runId }, data: { round: 4, phase: 'CHOICE', choices: JSON.stringify(['UPGRADE']), gold: 13 } })
+    await prisma.run.update({ where: { id: runId }, data: { round: 4, phase: 'CHOICE', choices: JSON.stringify(['UPGRADE_SILVER']), gold: 13 } })
 
-    const upgradeChoice = await agent.post(`/api/runs/${runId}/choice/select`).send({ shopType: 'UPGRADE' }).expect(200)
-    expect(upgradeChoice.body.run).toMatchObject({ phase: 'UPGRADE_CHOICE', shopType: 'UPGRADE', gold: 13 })
+    const upgradeChoice = await agent.post(`/api/runs/${runId}/choice/select`).send({ shopType: 'UPGRADE_SILVER' }).expect(200)
+    expect(upgradeChoice.body.run).toMatchObject({ phase: 'UPGRADE_CHOICE', shopType: 'UPGRADE_SILVER', gold: 13 })
 
     const upgraded = await agent.post(`/api/runs/${runId}/upgrade/select`).send({ itemId: target.id }).expect(200)
     expect(upgraded.body.run.phase).toBe('PREP')
@@ -1113,6 +1113,22 @@ describeWithDatabase('run API', () => {
     expect(upgraded.body.run.items.find((item: { id: string }) => item.id === target.id)).toMatchObject({
       quality: 'SILVER',
     })
+  })
+
+  it('rejects items at or above the selected upgrade shop tier', async () => {
+    const agent = request.agent(app.server)
+    await app.ready()
+
+    await agent.post('/api/auth/register').send({ email: `upgrade-tier-reject${Date.now()}@dog.test`, password: 'dogdice' }).expect(200)
+    const created = await agent.post('/api/runs').send({ dogType: 'MUTT' }).expect(200)
+    const runId = created.body.run.id
+    const target = created.body.run.items[0]
+    await prisma.itemInstance.update({ where: { id: target.id }, data: { quality: 'GOLD' } })
+    await prisma.run.update({ where: { id: runId }, data: { phase: 'UPGRADE_CHOICE', shopType: 'UPGRADE_GOLD' } })
+
+    const rejected = await agent.post(`/api/runs/${runId}/upgrade/select`).send({ itemId: target.id }).expect(400)
+
+    expect(rejected.body.error).toBe('当前升级商店不能升级该品质装备')
   })
 
   it('supports potion shop choice and applies a concrete potion to a non-class item', async () => {

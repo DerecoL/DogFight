@@ -14,7 +14,7 @@ import { itemDef, itemDefForQuality, relicDef, relicDefForQuality } from './game
 import { canPlace, findSlot, type PlacementOptions } from './game/grid'
 import { applyPotionToBaseDice } from './game/potion'
 import { canUpgradePair, nextQuality, normalizeQuality, upgradeEnchant } from './game/quality'
-import { itemSellValue } from './game/shop'
+import { canUseUpgradeShop, isUpgradeShopType, itemSellValue } from './game/shop'
 import { simulateBattle } from './game/battle'
 import { calculateLadderResult, ladderTierForScore, ladderTierLabels, ladderTiers, LADDER_SEASON_ID, type LadderTier } from './game/ladder'
 import { STARTING_GOLD, isTrainingMatchRound, selectCasualGhostSnapshot, selectLadderGhostSnapshot, targetLadderOpponentWinsRange, targetOpponentWins } from './game/matchmaking'
@@ -798,7 +798,7 @@ export function buildApp() {
   app.post('/api/runs/:runId/choice/select', async (request, reply) => {
     const userId = requireUser(request.userId)
     const { runId } = z.object({ runId: z.string() }).parse(request.params)
-    const body = z.object({ shopType: z.enum(['GENERAL', 'LARGE', 'MEDIUM', 'SMALL', 'SMALL_DICE', 'BIG_DICE', 'RELIC', 'UPGRADE', 'POTION']) }).parse(request.body)
+    const body = z.object({ shopType: z.enum(['GENERAL', 'LARGE', 'MEDIUM', 'SMALL', 'SMALL_DICE', 'BIG_DICE', 'RELIC', 'UPGRADE', 'UPGRADE_SILVER', 'UPGRADE_GOLD', 'UPGRADE_DIAMOND', 'POTION']) }).parse(request.body)
     const run = await prisma.run.findFirstOrThrow({ where: { id: runId, userId }, include: { items: true } })
     if (await isReadyDogfightRunLocked(run.id)) return reply.code(400).send({ error: '本回合已完成，等待其他玩家' })
     if (run.phase !== 'CHOICE') return reply.code(400).send({ error: '当前不在三选一' })
@@ -814,12 +814,12 @@ export function buildApp() {
       })
       return { run: publicRun(updated) }
     }
-    if (body.shopType === 'UPGRADE') {
-      const hasUpgradeableItem = toGameItems(run.items).some((item) => nextQuality(item.quality) !== null)
+    if (isUpgradeShopType(body.shopType)) {
+      const hasUpgradeableItem = toGameItems(run.items).some((item) => canUseUpgradeShop(body.shopType, item))
       if (!hasUpgradeableItem) return reply.code(400).send({ error: '当前没有可升级装备' })
       const updated = await prisma.run.update({
         where: { id: run.id },
-        data: { phase: 'UPGRADE_CHOICE', shopType: 'UPGRADE', choices: '[]', shopItems: '[]', relicChoices: '[]', potionChoices: '[]' },
+        data: { phase: 'UPGRADE_CHOICE', shopType: body.shopType, choices: '[]', shopItems: '[]', relicChoices: '[]', potionChoices: '[]' },
         include: { items: true },
       })
       return { run: publicRun(updated) }
@@ -851,6 +851,7 @@ export function buildApp() {
     if (run.phase !== 'UPGRADE_CHOICE') return reply.code(400).send({ error: '当前不在升级商店' })
     const item = run.items.find((entry) => entry.id === body.itemId)
     if (!item) return reply.code(404).send({ error: '装备不存在' })
+    if (!canUseUpgradeShop(run.shopType as ShopType, item)) return reply.code(400).send({ error: '当前升级商店不能升级该品质装备' })
     const upgradedQuality = nextQuality(item.quality)
     if (!upgradedQuality) return reply.code(400).send({ error: '钻石品质已满级' })
 

@@ -165,13 +165,13 @@ describe('shop generation', () => {
   })
 
   it('can offer relic and upgrade shops independently after round 4 when equipment can improve', () => {
-    const rolls = [0, 0.2, 0.4, 0, 0, 0, 0]
+    const rolls = [0, 0.2, 0.4, 0, 0, 0, 0, 0]
     const choices = createChoices(() => rolls.shift() ?? 0, 4, [
-      { id: 'upgrade-me', defId: 'starter-1', quality: 'GOLD', area: 'EQUIPMENT', x: 0, y: 0 },
+      { id: 'upgrade-me', defId: 'starter-1', quality: 'BRONZE', area: 'EQUIPMENT', x: 0, y: 0 },
     ])
 
     expect(choices).toContain('RELIC')
-    expect(choices).toContain('UPGRADE')
+    expect(choices).toContain('UPGRADE_SILVER')
     expect(choices).toHaveLength(3)
   })
 
@@ -182,7 +182,9 @@ describe('shop generation', () => {
     ])
 
     expect(choices).toContain('RELIC')
-    expect(choices).not.toContain('UPGRADE')
+    expect(choices).not.toContain('UPGRADE_SILVER')
+    expect(choices).not.toContain('UPGRADE_GOLD')
+    expect(choices).not.toContain('UPGRADE_DIAMOND')
   })
 })
 

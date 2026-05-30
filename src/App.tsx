@@ -107,7 +107,7 @@ import './ui/handdrawn.css'
 type DogType = 'SHIBA' | 'SAMOYED' | 'MUTT' | 'BULLY' | 'EMPEROR' | 'FROG'
 type Phase = 'SHOP' | 'CHOICE' | 'CLASS_REWARD' | 'ENCHANT_CHOICE' | 'RELIC_CHOICE' | 'UPGRADE_CHOICE' | 'POTION_CHOICE' | 'PREP' | 'MATCH' | 'BATTLE' | 'COMPLETE'
 type Area = 'EQUIPMENT' | 'BAG'
-type ShopType = 'GENERAL' | 'LARGE' | 'MEDIUM' | 'SMALL' | 'SMALL_DICE' | 'BIG_DICE' | 'RELIC' | 'UPGRADE' | 'POTION'
+type ShopType = 'GENERAL' | 'LARGE' | 'MEDIUM' | 'SMALL' | 'SMALL_DICE' | 'BIG_DICE' | 'RELIC' | 'UPGRADE' | 'UPGRADE_SILVER' | 'UPGRADE_GOLD' | 'UPGRADE_DIAMOND' | 'POTION'
 type ItemQuality = 'BRONZE' | 'SILVER' | 'GOLD' | 'DIAMOND'
 type GameMode = 'CASUAL' | 'LADDER' | 'DOGFIGHT' | 'PEAK'
 type AppScreen = 'LOBBY' | 'CASUAL' | 'LADDER' | 'DOGFIGHT' | 'PEAK' | 'SHOP' | 'ACHIEVEMENTS' | 'SETTINGS'
@@ -635,6 +635,9 @@ const shopNames: Record<ShopType, string> = {
   BIG_DICE: '大点商店',
   RELIC: '遗物商店',
   UPGRADE: '升级商店',
+  UPGRADE_SILVER: '白银商店',
+  UPGRADE_GOLD: '黄金商店',
+  UPGRADE_DIAMOND: '钻石商店',
   POTION: '药水商店',
 }
 const itemIcons: Record<string, string> = {
@@ -777,7 +780,7 @@ const ladderTierLabel: Record<LadderTier, string> = {
   DOG_KING: '犬王',
 }
 const dogOptions: DogType[] = ['SHIBA', 'SAMOYED', 'MUTT', 'BULLY', 'EMPEROR', 'FROG']
-const shopChoiceOrder: ShopType[] = ['GENERAL', 'LARGE', 'MEDIUM', 'SMALL', 'SMALL_DICE', 'BIG_DICE', 'RELIC', 'UPGRADE', 'POTION']
+const shopChoiceOrder: ShopType[] = ['GENERAL', 'LARGE', 'MEDIUM', 'SMALL', 'SMALL_DICE', 'BIG_DICE', 'RELIC', 'UPGRADE', 'UPGRADE_SILVER', 'UPGRADE_GOLD', 'UPGRADE_DIAMOND', 'POTION']
 const SHOP_CHOICE_SLOT_COUNT = shopChoiceOrder.length
 const battleLogFilters: BattleLogFilter[] = ['all', 'damage', 'sustain', 'status', 'equipment']
 const dogStrategies: Record<DogType, string> = {
@@ -805,6 +808,9 @@ const shopDescriptions: Record<ShopType, string> = {
   BIG_DICE: '偏向【大点】触发道具，适合高点爆发',
   RELIC: '免费选择一个遗物，强化骰子倾向和触发频率',
   UPGRADE: '免费选择一件未达到钻石的装备，直接提升 1 个品质',
+  UPGRADE_SILVER: '免费选择一件青铜装备，提升 1 个品质',
+  UPGRADE_GOLD: '免费选择一件黄金品质以下的装备，提升 1 个品质',
+  UPGRADE_DIAMOND: '免费选择一件钻石品质以下的装备，提升 1 个品质',
   POTION: '三选一药水，修改一件非职业装备的基础触发点数',
 }
 const ruleTerms = Object.fromEntries(TERM_DEFS.map((term) => [term.term, term]))
@@ -1177,8 +1183,15 @@ function canUpgradeItem(item: Item, items: Item[]) {
   return quality !== 'DIAMOND' && items.some((entry) => entry.id !== item.id && entry.defId === item.defId && normalizeQuality(entry.quality) === quality)
 }
 
-function canFreeUpgradeItem(item: Item) {
-  return normalizeQuality(item.quality) !== 'DIAMOND'
+function upgradeShopMaxQuality(shopType: ShopType): ItemQuality {
+  if (shopType === 'UPGRADE_SILVER') return 'SILVER'
+  if (shopType === 'UPGRADE_GOLD') return 'GOLD'
+  return 'DIAMOND'
+}
+
+function canFreeUpgradeItem(item: Item, shopType: ShopType = 'UPGRADE') {
+  const maxQuality = upgradeShopMaxQuality(shopType)
+  return qualityOrder.indexOf(normalizeQuality(item.quality)) < qualityOrder.indexOf(maxQuality)
 }
 
 function canUpgradeDrop(source: Item | undefined, target: Item | undefined) {
@@ -1742,7 +1755,7 @@ export default function App() {
     }
     if (run?.phase === 'UPGRADE_CHOICE') {
       const item = run.items.find((entry) => entry.id === itemId)
-      if (item && canFreeUpgradeItem(item)) {
+      if (item && canFreeUpgradeItem(item, run.shopType)) {
         selectUpgradeChoice(itemId)
         return
       }
@@ -2954,7 +2967,7 @@ function DogfightRoomView({ room, onRoomChange, onLeave, soundEnabled }: { room:
     }
     if (run?.phase === 'UPGRADE_CHOICE') {
       const item = run.items.find((entry) => entry.id === itemId)
-      if (item && canFreeUpgradeItem(item)) {
+      if (item && canFreeUpgradeItem(item, run.shopType)) {
         selectUpgradeChoice(itemId)
         return
       }
@@ -3877,7 +3890,7 @@ function ShopChoiceSelect({ choices, onPick }: { choices: ShopType[]; onPick: (s
 
 function shopChoiceIcon(shopType: ShopType) {
   if (shopType === 'RELIC') return <Trophy size={36} />
-  if (shopType === 'UPGRADE') return <PackagePlus size={36} />
+  if (shopType === 'UPGRADE' || shopType === 'UPGRADE_SILVER' || shopType === 'UPGRADE_GOLD' || shopType === 'UPGRADE_DIAMOND') return <PackagePlus size={36} />
   if (shopType === 'POTION') return <Sparkles size={36} />
   if (shopType === 'LARGE') return <Backpack size={36} />
   if (shopType === 'MEDIUM') return <Shield size={36} />
@@ -4053,19 +4066,20 @@ function RelicChoiceSelect({ choices, visualTheme, onPick }: { choices: RelicCho
 }
 
 function UpgradeChoiceSelect({ run, visualTheme }: { run: Run; visualTheme: VisualThemeId }) {
-  const upgradeableCount = run.items.filter(canFreeUpgradeItem).length
+  const maxQuality = upgradeShopMaxQuality(run.shopType)
+  const upgradeableCount = run.items.filter((item) => canFreeUpgradeItem(item, run.shopType)).length
   return (
     <HanddrawnFrame as="section" variant="panel" ornament="corner" className={`reward-panel paper-card visual-theme-surface visual-theme-${visualTheme} upgrade-panel`} data-visual-theme={visualTheme} style={visualThemeStyle(visualTheme)}>
       <div className="screen-heading centered">
         <h2>选择升级装备</h2>
-        <p>点击装备栏或背包里任意未达到钻石的装备，免费提升 1 个品质。</p>
+        <p>点击装备栏或背包里任意{qualityLabel[maxQuality]}品质以下的装备，免费提升 1 个品质。</p>
       </div>
       <div className="reward-choice-grid">
         <HanddrawnChoiceCard className="reward-choice enchant-choice" selected>
           <PackagePlus size={28} />
-          <strong>免费升级</strong>
+          <strong>{shopNames[run.shopType]}</strong>
           <span className="tip-tag">可升级 {upgradeableCount} 件</span>
-          <span className="choice-copy">钻石品质已经满级，不能继续提升。</span>
+          <span className="choice-copy">{qualityLabel[maxQuality]}及以上品质不能在本商店继续提升。</span>
         </HanddrawnChoiceCard>
       </div>
     </HanddrawnFrame>

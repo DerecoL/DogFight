@@ -1,6 +1,6 @@
 export type DogType = 'SHIBA' | 'SAMOYED' | 'MUTT' | 'BULLY' | 'EMPEROR' | 'FROG'
 export type Phase = 'SHOP' | 'CHOICE' | 'CLASS_REWARD' | 'ENCHANT_CHOICE' | 'RELIC_CHOICE' | 'UPGRADE_CHOICE' | 'POTION_CHOICE' | 'PREP' | 'MATCH' | 'BATTLE' | 'COMPLETE'
-export type ShopType = 'GENERAL' | 'LARGE' | 'MEDIUM' | 'SMALL' | 'SMALL_DICE' | 'BIG_DICE' | 'RELIC' | 'UPGRADE' | 'POTION'
+export type ShopType = 'GENERAL' | 'LARGE' | 'MEDIUM' | 'SMALL' | 'SMALL_DICE' | 'BIG_DICE' | 'RELIC' | 'UPGRADE' | 'UPGRADE_SILVER' | 'UPGRADE_GOLD' | 'UPGRADE_DIAMOND' | 'POTION'
 export type Area = 'EQUIPMENT' | 'BAG'
 export type ItemQuality = 'BRONZE' | 'SILVER' | 'GOLD' | 'DIAMOND'
 export type ItemKind = 'EQUIPMENT' | 'CLASS_EQUIPMENT'

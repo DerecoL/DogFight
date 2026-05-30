@@ -9,6 +9,7 @@ import { STARTING_GOLD } from './game/matchmaking'
 import { buildOfflineFighter, offlineFighterName } from './game/offline-builder'
 import { applyPotionToBaseDice } from './game/potion'
 import { nextQuality, normalizeQuality } from './game/quality'
+import { canUseUpgradeShop, isUpgradeShopType } from './game/shop'
 import { simulateBattle } from './game/battle'
 import type { BattleEvent, BattleResult, DogType, EnchantmentChoice, FighterSnapshot, GameItem, PotionChoice, ShopType } from './game/types'
 import { applyRelicChoice, initialItems, makeChoices, makePotionChoices, makeRelicChoices, makeShop, nextPhaseData as buildNextPhaseData, parseJson, phaseDataAfterEnchant, postBattleLargeItemReward, postBattleSellBonusItemGrowths, publicRun, relicsFromRun, seedGhost, snapshotFromRun, toGameItems } from './state'
@@ -287,10 +288,10 @@ async function autoChoosePendingRunStep(tx: Tx, run: Run & { items: Prisma.ItemI
         include: { items: true },
       })
     }
-    if (shopType === 'UPGRADE') {
+    if (isUpgradeShopType(shopType)) {
       return tx.run.update({
         where: { id: run.id },
-        data: { phase: 'UPGRADE_CHOICE', shopType: 'UPGRADE', choices: '[]', shopItems: '[]', relicChoices: '[]', potionChoices: '[]' },
+        data: { phase: 'UPGRADE_CHOICE', shopType, choices: '[]', shopItems: '[]', relicChoices: '[]', potionChoices: '[]' },
         include: { items: true },
       })
     }
@@ -348,7 +349,7 @@ async function autoChoosePendingRunStep(tx: Tx, run: Run & { items: Prisma.ItemI
   }
 
   if (run.phase === 'UPGRADE_CHOICE') {
-    const item = toGameItems(run.items).find((entry) => nextQuality(entry.quality) !== null)
+    const item = toGameItems(run.items).find((entry) => canUseUpgradeShop(run.shopType as ShopType, entry))
     if (!item) {
       return tx.run.update({
         where: { id: run.id },

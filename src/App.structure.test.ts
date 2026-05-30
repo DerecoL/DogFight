@@ -389,7 +389,7 @@ describe('selection screen structure', () => {
 
   it('allocates a shop choice slot for every shop type including potion', () => {
     expect(app).toContain('SHOP_CHOICE_SLOT_COUNT = shopChoiceOrder.length')
-    expect(app).toContain("const shopChoiceOrder: ShopType[] = ['GENERAL', 'LARGE', 'MEDIUM', 'SMALL', 'SMALL_DICE', 'BIG_DICE', 'RELIC', 'UPGRADE', 'POTION']")
+    expect(app).toContain("const shopChoiceOrder: ShopType[] = ['GENERAL', 'LARGE', 'MEDIUM', 'SMALL', 'SMALL_DICE', 'BIG_DICE', 'RELIC', 'UPGRADE', 'UPGRADE_SILVER', 'UPGRADE_GOLD', 'UPGRADE_DIAMOND', 'POTION']")
   })
 
   it('places normal three shop choices into the first three slots', () => {
@@ -399,8 +399,10 @@ describe('selection screen structure', () => {
 
   it('wires the free upgrade shop into choices and item selection', () => {
     expect(app).toContain("type Phase = 'SHOP' | 'CHOICE' | 'CLASS_REWARD' | 'ENCHANT_CHOICE' | 'RELIC_CHOICE' | 'UPGRADE_CHOICE' | 'POTION_CHOICE' | 'PREP' | 'MATCH' | 'BATTLE' | 'COMPLETE'")
-    expect(app).toContain("type ShopType = 'GENERAL' | 'LARGE' | 'MEDIUM' | 'SMALL' | 'SMALL_DICE' | 'BIG_DICE' | 'RELIC' | 'UPGRADE' | 'POTION'")
-    expect(app).toContain("UPGRADE: '升级商店'")
+    expect(app).toContain("type ShopType = 'GENERAL' | 'LARGE' | 'MEDIUM' | 'SMALL' | 'SMALL_DICE' | 'BIG_DICE' | 'RELIC' | 'UPGRADE' | 'UPGRADE_SILVER' | 'UPGRADE_GOLD' | 'UPGRADE_DIAMOND' | 'POTION'")
+    expect(app).toContain("UPGRADE_SILVER: '白银商店'")
+    expect(app).toContain("UPGRADE_GOLD: '黄金商店'")
+    expect(app).toContain("UPGRADE_DIAMOND: '钻石商店'")
     expect(app).toContain('function UpgradeChoiceSelect')
     expect(app).toContain("run.phase === 'UPGRADE_CHOICE'")
     expect(app).toContain('/upgrade/select')

@@ -31,6 +31,9 @@ export const shopTypeText: Record<ShopType, Record<Language, string>> = {
   BIG_DICE: { 'zh-CN': '大点商店', 'en-US': 'High Roll Shop' },
   RELIC: { 'zh-CN': '遗物商店', 'en-US': 'Relic Shop' },
   UPGRADE: { 'zh-CN': '升级商店', 'en-US': 'Upgrade Shop' },
+  UPGRADE_SILVER: { 'zh-CN': '白银升级商店', 'en-US': 'Silver Upgrade Shop' },
+  UPGRADE_GOLD: { 'zh-CN': '黄金升级商店', 'en-US': 'Gold Upgrade Shop' },
+  UPGRADE_DIAMOND: { 'zh-CN': '钻石升级商店', 'en-US': 'Diamond Upgrade Shop' },
   POTION: { 'zh-CN': '药水商店', 'en-US': 'Potion Shop' },
 }
 
