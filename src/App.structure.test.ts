@@ -539,7 +539,7 @@ describe('selection screen structure', () => {
     expect(data).not.toContain('export const TERM_DEFS = [')
   })
 
-  it('maps every item and relic definition to a dedicated SVG icon asset', () => {
+  it('maps every item and relic definition to a dedicated static icon asset', () => {
     const itemIconEntries = mappedAssetIds('itemIcons')
     const relicIconEntries = mappedAssetIds('relicIcons')
     const itemIconIds = itemIconEntries.map((entry) => entry.id)
