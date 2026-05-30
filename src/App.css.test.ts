@@ -382,15 +382,19 @@ describe('equipment layout scale', () => {
     expect(css).toContain('@keyframes battleRollResultPop')
   })
 
-  it('renders the center battle dice as a tilted physical die with a stronger roll pop', () => {
+  it('renders the center battle dice as an upright physical die instead of a flattened tile', () => {
     expect(cssRule('.battle-dice.dynamic-dice')).toContain('--dice-size')
     expect(cssRule('.battle-dice.dynamic-dice')).toContain('--dice-depth')
     expect(cssRule('.battle-dice.dynamic-dice .dynamic-dice-cube')).toContain('filter: drop-shadow')
-    expect(cssRule('.battle-dice.dynamic-dice .dynamic-dice-cube')).toContain('rotateX(58deg) rotateZ(-10deg)')
+    expect(cssRule('.battle-dice.dynamic-dice .dynamic-dice-cube')).toContain('rotateX(-10deg) rotateY(-24deg) rotateZ(-7deg)')
+    expect(cssRule('.battle-dice.dynamic-dice .dynamic-dice-cube')).not.toContain('rotateX(58deg)')
     expect(cssRule('.dynamic-dice-face.front')).toContain('border-radius: 18px')
-    expect(cssRule('.dynamic-dice-face.top')).toContain('translateZ(calc(var(--dice-size) - var(--dice-depth)))')
-    expect(cssRule('.dynamic-dice-face.side')).toContain('translateZ(calc(var(--dice-size) - var(--dice-depth)))')
-    expect(css).toContain('42% { transform: rotateX(238deg) rotateZ(30deg) translateY(-18px) scale(1.22); }')
+    expect(cssRule('.dynamic-dice-face.front')).toContain('translateZ(calc(var(--dice-depth) / 2))')
+    expect(cssRule('.dynamic-dice-face.top')).toContain('height: var(--dice-size)')
+    expect(cssRule('.dynamic-dice-face.top')).toContain('rotateX(90deg) translateZ(calc(var(--dice-depth) / 2))')
+    expect(cssRule('.dynamic-dice-face.side')).toContain('width: var(--dice-size)')
+    expect(cssRule('.dynamic-dice-face.side')).toContain('rotateY(90deg) translateZ(calc(var(--dice-depth) / 2))')
+    expect(css).toContain('42% { transform: rotateX(-22deg) rotateY(-42deg) rotateZ(13deg) translateY(-18px) scale(1.24); }')
     expect(css).toContain('48% { transform: scale(1.48) rotate(4deg); filter: brightness(1.24); }')
   })
 
