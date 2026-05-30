@@ -2659,6 +2659,38 @@ input {
 }
 .battle-dice span { color: var(--muted); font-weight: 850; font-size: 13px; }
 .battle-dice.rolling b { animation: dicePop .38s ease; }
+.battle-dice.dynamic-dice {
+  min-height: 96px;
+  grid-template-rows: 1fr;
+}
+.battle-dice.dynamic-dice .dynamic-dice-cube {
+  display: none;
+}
+.battle-dice b.dynamic-dice-value {
+  width: 64px;
+  height: 64px;
+  display: grid;
+  border: 3px solid rgba(61, 45, 37, .66);
+  border-radius: 18px;
+  font-size: 34px;
+  line-height: 1;
+  box-shadow: inset 0 5px 0 rgba(255, 255, 255, .5), 4px 5px 0 rgba(61, 45, 37, .16);
+}
+.dynamic-dice-player .dynamic-dice-value {
+  color: #14532d;
+  background: linear-gradient(180deg, #dcfce7, #86efac);
+}
+.dynamic-dice-opponent .dynamic-dice-value {
+  color: #7f1d1d;
+  background: linear-gradient(180deg, #fee2e2, #fca5a5);
+}
+.dynamic-dice-system .dynamic-dice-value {
+  color: #4b3b2f;
+  background: linear-gradient(180deg, #fff7ed, #fed7aa);
+}
+.battle-dice.rolling .dynamic-dice-value {
+  animation: battleRollResultPop .54s cubic-bezier(.2, 1.35, .28, 1);
+}
 .handdrawn-stage {
   background:
     var(--paper-fiber),
@@ -4028,10 +4060,62 @@ input {
   min-width: 94px;
 }
 
+.apex-config-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 85;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(37, 28, 22, .68);
+}
+
+.apex-config-sheet {
+  width: min(1040px, calc(100vw - 36px));
+  max-height: min(720px, calc(100vh - 36px));
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 12px;
+  padding: 16px;
+  overflow: hidden;
+  border: 3px solid var(--ink);
+  border-radius: 12px;
+  background:
+    var(--paper-fiber),
+    linear-gradient(180deg, rgba(255, 250, 241, .98), rgba(255, 244, 219, .96));
+  box-shadow: 10px 12px 0 rgba(24, 18, 14, .34), 0 24px 60px rgba(24, 18, 14, .28);
+}
+
+.apex-config-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+}
+
+.apex-config-header span {
+  color: var(--blue);
+  font-size: 12px;
+  font-weight: 950;
+}
+
+.apex-config-header h3 {
+  margin: 2px 0;
+}
+
+.apex-config-header p {
+  color: rgba(61, 45, 37, .76);
+  font-weight: 850;
+}
+
 .apex-snapshot-details {
+  min-height: 0;
   display: grid;
   gap: 10px;
   padding: 12px;
+  overflow: auto;
   border: 1px solid rgba(61, 45, 37, .22);
   border-radius: 12px;
   background: rgba(255, 255, 255, .72);
@@ -4039,7 +4123,48 @@ input {
 
 .apex-equipment-preview {
   --slot-w: 58px;
-  --slot-h: 82px;
+  --slot-h: 104px;
+}
+
+.apex-equipment-preview .battle-slot-grid {
+  overflow: hidden;
+}
+
+.apex-equipment-preview .battle-item {
+  min-height: 0;
+  padding: 6px 4px;
+  overflow: hidden;
+  align-content: center;
+  gap: 2px;
+  font-size: 10px;
+}
+
+.apex-equipment-preview .item-art-window {
+  width: 56px;
+  height: 56px;
+  min-height: 0;
+  max-width: 56px;
+}
+
+.apex-equipment-preview .item-card-icon-art {
+  width: 46px;
+  height: 46px;
+}
+
+.apex-equipment-preview .item-card-copy {
+  width: 100%;
+  display: grid;
+  gap: 1px;
+  background: transparent;
+}
+
+.apex-equipment-preview .item-effect {
+  display: none;
+}
+
+.apex-equipment-preview .size-preview,
+.apex-equipment-preview .item-card small {
+  display: none;
 }
 
 .apex-relic-preview {
@@ -5244,6 +5369,55 @@ input {
   animation: none;
 }
 
+.inventory-board .paper-item-card.item-card {
+  --inventory-quality-glow: rgba(194, 91, 34, .82);
+  --inventory-quality-glow-soft: color-mix(in srgb, var(--inventory-quality-glow) 52%, transparent);
+  --inventory-quality-glow-strong: color-mix(in srgb, var(--inventory-quality-glow) 82%, transparent);
+  --inventory-quality-shadow:
+    0 0 0 2px color-mix(in srgb, var(--inventory-quality-glow) 58%, transparent),
+    0 0 14px var(--inventory-quality-glow-soft),
+    0 0 34px var(--inventory-quality-glow-strong),
+    0 9px 18px rgba(37, 48, 71, .20);
+  --inventory-quality-shadow-strong:
+    0 0 0 3px color-mix(in srgb, var(--inventory-quality-glow) 68%, transparent),
+    0 0 20px color-mix(in srgb, var(--inventory-quality-glow) 76%, transparent),
+    0 0 48px color-mix(in srgb, var(--inventory-quality-glow) 88%, transparent),
+    0 12px 22px rgba(37, 48, 71, .22);
+  box-shadow: var(--inventory-quality-shadow);
+}
+
+.inventory-board .paper-item-card.item-card.quality-bronze {
+  --inventory-quality-glow: rgba(194, 91, 34, .82);
+}
+
+.inventory-board .paper-item-card.item-card.quality-silver {
+  --inventory-quality-glow: rgba(207, 224, 236, .92);
+}
+
+.inventory-board .paper-item-card.item-card.quality-gold {
+  --inventory-quality-glow: rgba(255, 207, 66, 1);
+}
+
+.inventory-board .paper-item-card.item-card.quality-diamond {
+  --inventory-quality-glow: rgba(102, 231, 255, 1);
+}
+
+.inventory-board .paper-item-card.item-card:hover {
+  box-shadow: var(--inventory-quality-shadow-strong);
+}
+
+.inventory-board .paper-item-card.item-card.selected {
+  box-shadow: var(--inventory-quality-shadow-strong);
+}
+
+.inventory-board .paper-item-card.item-card.upgrade-over {
+  box-shadow: var(--inventory-quality-shadow-strong);
+}
+
+.inventory-board .paper-item-card.item-card.dragging {
+  box-shadow: var(--inventory-quality-shadow);
+}
+
 .paper-shop-card.paper-item-card.item-card {
   border: 0;
   background: transparent;
@@ -6114,6 +6288,12 @@ input {
   55% { transform: rotate(4deg) translateY(1px) scale(1.05); }
   100% { transform: rotate(-1deg) translateY(0) scale(1); }
 }
+@keyframes battleRollResultPop {
+  0% { transform: scale(.72) rotate(-5deg); filter: brightness(1.08); }
+  48% { transform: scale(1.32) rotate(4deg); filter: brightness(1.24); }
+  72% { transform: scale(.94) rotate(-2deg); filter: brightness(1.1); }
+  100% { transform: scale(1) rotate(0); filter: brightness(1); }
+}
 @keyframes paperShimmer {
   from { opacity: 0; transform: translateX(-16px); }
   45% { opacity: .9; }
@@ -6712,6 +6892,26 @@ input {
     grid-column: 1 / -1;
     justify-self: start;
   }
+  .apex-config-overlay {
+    padding: 8px;
+  }
+  .apex-config-sheet {
+    width: calc(100vw - 16px);
+    max-height: calc(100vh - 16px);
+    padding: 10px;
+  }
+  .apex-equipment-preview {
+    --slot-h: 88px;
+  }
+  .apex-equipment-preview .item-art-window {
+    width: 46px;
+    height: 46px;
+    max-width: 46px;
+  }
+  .apex-equipment-preview .item-card-icon-art {
+    width: 38px;
+    height: 38px;
+  }
 }
 
 @media (max-width: 900px) {
@@ -6821,15 +7021,17 @@ input {
     opacity: .18;
   }
 }
-.account-hub-actions {
+.account-panel-actions {
   display: flex;
-  justify-content: center;
-  gap: 10px;
-  margin: 12px 0 18px;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
   flex-wrap: wrap;
+  justify-self: end;
+  width: min(520px, 100%);
 }
 
-.account-hub-button,
+.account-panel-button,
 .shop-card-actions button,
 .panel-title-row button,
 .achievement-tabs button {
@@ -6846,7 +7048,7 @@ input {
   cursor: pointer;
 }
 
-.account-hub-button:hover,
+.account-panel-button:hover,
 .shop-card-actions button:hover,
 .panel-title-row button:hover,
 .achievement-tabs button:hover,
@@ -6855,7 +7057,8 @@ input {
 }
 
 .account-shop-screen,
-.achievements-screen {
+.achievements-screen,
+.account-settings-screen {
   width: min(1180px, 100%);
   margin: 0 auto;
   display: grid;
@@ -6922,6 +7125,16 @@ input {
 
 .shop-cosmetic-card {
   border-color: var(--rarity, rgba(75, 53, 39, .35));
+}
+
+.account-setting-card.equipped {
+  box-shadow: 0 0 0 3px rgba(79, 124, 255, .2);
+}
+
+.account-settings-empty {
+  margin: 0;
+  color: #6d5849;
+  font-weight: 700;
 }
 
 .cosmetic-type {

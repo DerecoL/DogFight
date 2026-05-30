@@ -110,7 +110,7 @@ type Area = 'EQUIPMENT' | 'BAG'
 type ShopType = 'GENERAL' | 'LARGE' | 'MEDIUM' | 'SMALL' | 'SMALL_DICE' | 'BIG_DICE' | 'RELIC' | 'UPGRADE' | 'POTION'
 type ItemQuality = 'BRONZE' | 'SILVER' | 'GOLD' | 'DIAMOND'
 type GameMode = 'CASUAL' | 'LADDER' | 'DOGFIGHT' | 'PEAK'
-type AppScreen = 'LOBBY' | 'CASUAL' | 'LADDER' | 'DOGFIGHT' | 'PEAK' | 'SHOP' | 'ACHIEVEMENTS'
+type AppScreen = 'LOBBY' | 'CASUAL' | 'LADDER' | 'DOGFIGHT' | 'PEAK' | 'SHOP' | 'ACHIEVEMENTS' | 'SETTINGS'
 type HistoryModeTab = 'ALL' | 'CASUAL' | 'DOGFIGHT' | 'PEAK' | 'LADDER'
 type HistoryRunMode = Exclude<HistoryModeTab, 'ALL'>
 type RunMode = 'CASUAL' | 'LADDER'
@@ -1877,9 +1877,9 @@ export default function App() {
 
   if (appScreen === 'LOBBY') {
     return (
-      <Shell feedbacks={uiFeedbacks} run={run ?? undefined} error={error} musicEnabled={musicEnabled} musicBlocked={musicBlocked} onToggleMusic={toggleMusic} onLogout={() => action(() => api('/auth/logout', { method: 'POST' }).then(() => ({ user: null })))}>
-        <PlayerRunHistoryPanel history={runHistory} ladderProfile={ladderProfile} onOpen={() => setHistoryOverlayOpen(true)} />
-        <ModeLobby run={run} runHistory={runHistory} onOpen={() => setHistoryOverlayOpen(true)} onEnterCasual={handleEnterCasual} onReplayTutorial={startCasualTutorial} onEnterLadder={() => setAppScreen('LADDER')} onEnterDogfight={() => setAppScreen('DOGFIGHT')} onEnterPeak={() => setAppScreen('PEAK')} onEnterShop={() => setAppScreen('SHOP')} onEnterAchievements={() => setAppScreen('ACHIEVEMENTS')} />
+      <Shell feedbacks={uiFeedbacks} error={error} musicEnabled={musicEnabled} musicBlocked={musicBlocked} onToggleMusic={toggleMusic} onLogout={() => action(() => api('/auth/logout', { method: 'POST' }).then(() => ({ user: null })))}>
+        <PlayerRunHistoryPanel history={runHistory} ladderProfile={ladderProfile} onOpen={() => setHistoryOverlayOpen(true)} onEnterShop={() => setAppScreen('SHOP')} onEnterAchievements={() => setAppScreen('ACHIEVEMENTS')} onEnterSettings={() => setAppScreen('SETTINGS')} />
+        <ModeLobby run={run} runHistory={runHistory} onOpen={() => setHistoryOverlayOpen(true)} onEnterCasual={handleEnterCasual} onReplayTutorial={startCasualTutorial} onEnterLadder={() => setAppScreen('LADDER')} onEnterDogfight={() => setAppScreen('DOGFIGHT')} onEnterPeak={() => setAppScreen('PEAK')} />
         {historyOverlayOpen && <PlayerHistoryOverlay history={runHistory} onClose={() => setHistoryOverlayOpen(false)} />}
         {tutorialGuide}
       </Shell>
@@ -1898,6 +1898,14 @@ export default function App() {
     return (
       <Shell feedbacks={uiFeedbacks} run={run ?? undefined} error={error} musicEnabled={musicEnabled} musicBlocked={musicBlocked} onToggleMusic={toggleMusic} onOpenLobby={() => setAppScreen('LOBBY')} onLogout={() => action(() => api('/auth/logout', { method: 'POST' }).then(() => ({ user: null })))}>
         <AchievementsScreen />
+      </Shell>
+    )
+  }
+
+  if (appScreen === 'SETTINGS') {
+    return (
+      <Shell feedbacks={uiFeedbacks} run={run ?? undefined} error={error} musicEnabled={musicEnabled} musicBlocked={musicBlocked} onToggleMusic={toggleMusic} onOpenLobby={() => setAppScreen('LOBBY')} onLogout={() => action(() => api('/auth/logout', { method: 'POST' }).then(() => ({ user: null })))}>
+        <AccountSettingsScreen />
       </Shell>
     )
   }
@@ -2305,6 +2313,67 @@ function AchievementsScreen() {
   )
 }
 
+const cosmeticTypeOrder: CosmeticType[] = ['TITLE', 'AVATAR', 'BACKGROUND', 'DOG_SKIN', 'BATTLE_EFFECT']
+
+function AccountSettingsScreen() {
+  const [cosmetics, setCosmetics] = useState<CosmeticsResponse | null>(null)
+  const [error, setError] = useState('')
+  const load = useCallback(async () => setCosmetics(await api<CosmeticsResponse>('/cosmetics/me')), [])
+  useEffect(() => { void load().catch((err) => setError(err instanceof Error ? err.message : '加载失败')) }, [load])
+  const equip = async (catalogItemId: string) => {
+    setError('')
+    try {
+      setCosmetics(await api<CosmeticsResponse>('/cosmetics/equip', { method: 'POST', body: JSON.stringify({ catalogItemId }) }))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '装备失败')
+    }
+  }
+  const ownedItems = (cosmetics?.inventory ?? [])
+    .map((entry) => entry.item)
+    .filter((item): item is ShopCatalogItem => Boolean(item))
+  const equippedBySlot = new Map((cosmetics?.equipped ?? []).map((entry) => [entry.slot, entry.catalogItemId]))
+  const cosmeticGroups = cosmeticTypeOrder.map((type) => ({
+    type,
+    label: cosmeticTypeLabel(type),
+    items: ownedItems.filter((item) => item.type === type),
+  }))
+
+  return (
+    <section className="account-settings-screen">
+      <div className="screen-heading">
+        <div><p className="eyebrow">个人设置</p><h1>时装与展示</h1></div>
+      </div>
+      {error && <p className="error">{error}</p>}
+      {cosmetics ? cosmeticGroups.map((group) => (
+        <section className="shop-section" key={group.type}>
+          <h2>{group.label}</h2>
+          {group.items.length > 0 ? (
+            <div className="shop-section-grid">
+              {group.items.map((item) => {
+                const isEquipped = equippedBySlot.get(item.type) === item.id || item.equipped
+                return (
+                  <article key={item.id} className={`shop-cosmetic-card account-setting-card rarity-${item.rarity.toLowerCase()} ${isEquipped ? 'equipped' : ''}`}>
+                    <CosmeticBadge type={item.type} rarity={item.rarity} />
+                    <strong>{item.name}</strong>
+                    <p>{item.description}</p>
+                    <span className="cosmetic-type">{rarityLabel(item.rarity)} · 已拥有</span>
+                    <div className="shop-card-actions">
+                      <span>{isEquipped ? '当前装备' : '可装备'}</span>
+                      {isEquipped ? <button disabled>已装备</button> : <button onClick={() => void equip(item.id)}>装备</button>}
+                    </div>
+                  </article>
+                )
+              })}
+            </div>
+          ) : (
+            <p className="account-settings-empty">暂无已拥有的{group.label}，可先去商城购买。</p>
+          )}
+        </section>
+      )) : <p className="account-settings-empty">正在读取个人时装...</p>}
+    </section>
+  )
+}
+
 function CosmeticBadge({ type, rarity }: { type: CosmeticType; rarity: CosmeticRarity }) {
   const icon = type === 'TITLE' ? <Medal size={20} /> : type === 'AVATAR' ? <PawPrint size={20} /> : type === 'BACKGROUND' ? <House size={20} /> : type === 'DOG_SKIN' ? <Crown size={20} /> : <Sparkles size={20} />
   return <span className={`cosmetic-badge rarity-${rarity.toLowerCase()}`}>{icon}</span>
@@ -2318,7 +2387,7 @@ function rarityLabel(rarity: CosmeticRarity) {
   return ({ COMMON: '普通', RARE: '稀有', EPIC: '史诗', LEGENDARY: '传说' } as Record<CosmeticRarity, string>)[rarity]
 }
 
-function ModeLobby({ run, runHistory, onOpen, onEnterCasual, onReplayTutorial, onEnterLadder, onEnterDogfight, onEnterPeak, onEnterShop, onEnterAchievements }: { run: Run | null; runHistory: PlayerRunHistory; onOpen: () => void; onEnterCasual: () => void; onReplayTutorial: () => void; onEnterLadder: () => void; onEnterDogfight: () => void; onEnterPeak: () => void; onEnterShop: () => void; onEnterAchievements: () => void }) {
+function ModeLobby({ run, runHistory, onOpen, onEnterCasual, onReplayTutorial, onEnterLadder, onEnterDogfight, onEnterPeak }: { run: Run | null; runHistory: PlayerRunHistory; onOpen: () => void; onEnterCasual: () => void; onReplayTutorial: () => void; onEnterLadder: () => void; onEnterDogfight: () => void; onEnterPeak: () => void }) {
   const casualAction = run?.mode === 'CASUAL' ? '继续休闲模式' : '开始休闲模式'
   const ladderAction = run?.mode === 'LADDER' ? '继续天梯模式' : '进入天梯模式'
   return (
@@ -2328,10 +2397,6 @@ function ModeLobby({ run, runHistory, onOpen, onEnterCasual, onReplayTutorial, o
         <p>选择本次要进入的竞技方式。休闲或天梯完成后的狗可以送入巅峰竞技场。</p>
       </div>
         <ActionButton variant="secondary" className="tutorial-replay-button" type="button" onClick={onReplayTutorial}>新手引导</ActionButton>
-      <div className="account-hub-actions">
-        <button className="account-hub-button" onClick={onEnterShop}><ShoppingBag size={18} /> 商城</button>
-        <button className="account-hub-button" onClick={onEnterAchievements}><Medal size={18} /> 成就</button>
-      </div>
       <div className="mode-grid">
         {modeCards.map((mode) => (
           <HanddrawnFrame as="article" variant="card" ornament="corner" key={mode.id} className={`mode-card paper-card sticker-card ${mode.locked ? 'locked' : 'available'}`}>
@@ -2366,7 +2431,7 @@ function ModeLobby({ run, runHistory, onOpen, onEnterCasual, onReplayTutorial, o
   )
 }
 
-function PlayerRunHistoryPanel({ history, ladderProfile, onOpen }: { history: PlayerRunHistory; ladderProfile: LadderProfile | null; onOpen: () => void }) {
+function PlayerRunHistoryPanel({ history, ladderProfile, onOpen, onEnterShop, onEnterAchievements, onEnterSettings }: { history: PlayerRunHistory; ladderProfile: LadderProfile | null; onOpen: () => void; onEnterShop: () => void; onEnterAchievements: () => void; onEnterSettings: () => void }) {
   const bestRun = history.bestRun
   const winRate = history.totalWins + history.totalLosses > 0
     ? Math.round((history.totalWins / (history.totalWins + history.totalLosses)) * 100)
@@ -2402,7 +2467,12 @@ function PlayerRunHistoryPanel({ history, ladderProfile, onOpen }: { history: Pl
             <strong>暂无对局</strong>
           )}
         </div>
-        <HanddrawnTextButton className="history-open-action" onClick={onOpen}>查看详情和装备</HanddrawnTextButton>
+        <div className="account-panel-actions">
+          <button className="account-panel-button" type="button" onClick={onEnterShop}><ShoppingBag size={18} /> 商城</button>
+          <button className="account-panel-button" type="button" onClick={onEnterAchievements}><Medal size={18} /> 成就</button>
+          <button className="account-panel-button" type="button" onClick={onEnterSettings}><Sparkles size={18} /> 个人设置</button>
+          <HanddrawnTextButton className="history-open-action account-panel-button" onClick={onOpen}>查看详情和装备</HanddrawnTextButton>
+        </div>
       </div>
       <div className="history-run-list" aria-label="最近对局">
         {lobbyRecentRuns.length > 0 ? lobbyRecentRuns.map((entry) => (
@@ -3175,7 +3245,7 @@ function ApexArena() {
   const [reports, setReports] = useState<ApexReports | null>(null)
   const [submittedEntries, setSubmittedEntries] = useState<ApexEntries | null>(null)
   const [activeApexBoard, setActiveApexBoard] = useState<ApexBoardId>('overall')
-  const [expandedEntryId, setExpandedEntryId] = useState<string | null>(null)
+  const [selectedApexEntry, setSelectedApexEntry] = useState<ApexEntry | null>(null)
   const [loading, setLoading] = useState(true)
   const [submittingRunId, setSubmittingRunId] = useState<string | null>(null)
   const [error, setError] = useState('')
@@ -3299,17 +3369,40 @@ function ApexArena() {
                   </div>
                   {entry.isMine && <span className="apex-self-marker">我的记录</span>}
                   <span>{entry.isSeed ? '种子' : `防守连胜 ${entry.challengeWins}`}</span>
-                  <ActionButton variant="secondary" className="apex-config-toggle" onClick={() => setExpandedEntryId(expandedEntryId === entry.id ? null : entry.id)}>
-                    {expandedEntryId === entry.id ? '收起配置' : '查看配置'}
+                  <ActionButton variant="secondary" className="apex-config-toggle" onClick={() => setSelectedApexEntry(entry)}>
+                    查看配置
                   </ActionButton>
                 </article>
-                {expandedEntryId === entry.id && <ApexSnapshotDetails entry={entry} />}
               </div>
             ))}
           </div>
         </section>
       </div>
+      {selectedApexEntry && <ApexConfigOverlay entry={selectedApexEntry} onClose={() => setSelectedApexEntry(null)} />}
     </section>
+  )
+}
+
+function ApexConfigOverlay({ entry, onClose }: { entry: ApexEntry; onClose: () => void }) {
+  if (typeof document === 'undefined') return null
+
+  return createPortal(
+    <div className="apex-config-overlay" role="dialog" aria-modal="true" aria-label="巅峰配置详情" onClick={onClose}>
+      <section className="apex-config-sheet" onClick={(event) => event.stopPropagation()}>
+        <header className="apex-config-header">
+          <div>
+            <span>#{entry.rank} · {entry.isSeed ? '种子' : `防守连胜 ${entry.challengeWins}`}</span>
+            <h3>{entry.name}</h3>
+            <p>{dogNames[entry.dogType]} · {entry.wins}胜{entry.losses}败 · 第 {entry.round} 回合</p>
+          </div>
+          <IconButton title="关闭巅峰配置" onClick={onClose}>
+            <span aria-hidden="true">×</span>
+          </IconButton>
+        </header>
+        <ApexSnapshotDetails entry={entry} />
+      </section>
+    </div>,
+    document.body,
   )
 }
 
@@ -5137,7 +5230,7 @@ function BattleFxStage({ event, eventIndex, presentation, speed }: { event?: Bat
       <canvas ref={canvasRef} className="battle-fx-canvas handdrawn-fx-canvas" data-vfx-kind={battleVfxKind(event)} aria-hidden="true" />
       {activeFxInstances.map((instance) => (
         <span key={instance.id} className={`battle-feedback-burst ${instance.presentation.kind}`} aria-hidden="true">
-          {instance.presentation.kind === 'roll' ? '掷' : instance.presentation.amount ?? ''}
+          {instance.presentation.kind === 'roll' ? instance.event.roll ?? '' : instance.presentation.amount ?? ''}
         </span>
       ))}
     </div>

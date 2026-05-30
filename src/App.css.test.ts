@@ -338,6 +338,16 @@ describe('equipment layout scale', () => {
     expect(cssRule('.battle-stage .battle-dog.player')).toContain('grid-column: 3')
   })
 
+  it('shows battle dice as colored roll results without extra visible copy', () => {
+    expect(primitives).not.toContain('<span>{label}</span>')
+    expect(app).not.toContain("instance.presentation.kind === 'roll' ? '掷'")
+    expect(app).toContain("instance.presentation.kind === 'roll' ? instance.event.roll ?? ''")
+    expect(cssRule('.dynamic-dice-player .dynamic-dice-value')).toContain('color: #14532d')
+    expect(cssRule('.dynamic-dice-opponent .dynamic-dice-value')).toContain('color: #7f1d1d')
+    expect(cssRule('.battle-dice.rolling .dynamic-dice-value')).toContain('battleRollResultPop')
+    expect(css).toContain('@keyframes battleRollResultPop')
+  })
+
   it('keeps battle playback controls in one compact three-button row', () => {
     expect(app).toContain('className="battle-status"')
     expect(cssRule('.battle-status')).toContain('display: grid')
@@ -455,6 +465,16 @@ describe('equipment layout scale', () => {
     expect(lastCssRule('.paper-shop-card.paper-item-card.item-card.selected::before')).toContain('filter: var(--shop-paper-filter-hover)')
   })
 
+  it('adds visible quality glow behind inventory equipment cards inside the shop', () => {
+    expect(cssRule('.inventory-board .paper-item-card.item-card')).toContain('--inventory-quality-glow')
+    expect(cssRule('.inventory-board .paper-item-card.item-card')).toContain('box-shadow: var(--inventory-quality-shadow)')
+    expect(cssRule('.inventory-board .paper-item-card.item-card.quality-bronze')).toContain('--inventory-quality-glow: rgba(194, 91, 34, .82)')
+    expect(cssRule('.inventory-board .paper-item-card.item-card.quality-silver')).toContain('--inventory-quality-glow: rgba(207, 224, 236, .92)')
+    expect(cssRule('.inventory-board .paper-item-card.item-card.quality-gold')).toContain('--inventory-quality-glow: rgba(255, 207, 66, 1)')
+    expect(cssRule('.inventory-board .paper-item-card.item-card.quality-diamond')).toContain('--inventory-quality-glow: rgba(102, 231, 255, 1)')
+    expect(cssRule('.inventory-board .paper-item-card.item-card.selected')).toContain('var(--inventory-quality-shadow-strong)')
+  })
+
   it('adds fourth-pass handdrawn detail to history, tips, relics, and reward choices', () => {
     expect(cssRule('.player-history-panel::before')).toContain('content: ""')
     expect(cssRule('.history-summary')).toContain('grid-template-columns')
@@ -489,6 +509,18 @@ describe('equipment layout scale', () => {
     expect(cssRule('.history-equipment-preview .battle-item')).toContain('overflow: hidden')
     expect(cssRule('.history-equipment-preview .item-effect')).toContain('display: none')
     expect(cssRule('.history-equipment-preview .item-card-icon-art')).toContain('width: 34px')
+  })
+
+  it('presents apex equipment details in a wide callout overlay', () => {
+    expect(cssRule('.apex-config-overlay')).toContain('position: fixed')
+    expect(cssRule('.apex-config-overlay')).toContain('z-index: 85')
+    expect(cssRule('.apex-config-sheet')).toContain('width: min(1040px, calc(100vw - 36px))')
+    expect(cssRule('.apex-config-sheet')).toContain('grid-template-rows: auto minmax(0, 1fr)')
+    expect(cssRule('.apex-equipment-preview')).toContain('--slot-h: 104px')
+    expect(cssRule('.apex-equipment-preview .battle-slot-grid')).toContain('overflow: hidden')
+    expect(cssRule('.apex-equipment-preview .battle-item')).toContain('overflow: hidden')
+    expect(cssRule('.apex-equipment-preview .item-effect')).toContain('display: none')
+    expect(cssRule('.apex-equipment-preview .item-card-icon-art')).toContain('width: 46px')
   })
 
   it('adds battle vfx causality styling for triggers, targets, and handwritten feedback', () => {
@@ -582,7 +614,20 @@ describe('equipment layout scale', () => {
     expect(cssRule('.class-reward-ceremony.surprise-surface::before, .class-reward-ceremony.surprise-surface::after')).toContain('content: none')
     expect(cssRule('.class-reward-ceremony.surprise-surface .ceremony-stage')).toContain('overflow: hidden')
     expect(cssRule('.class-reward-ceremony.surprise-surface .ceremony-stage::before')).toContain('var(--surprise-bg)')
+    expect(cssRule('.class-reward-ceremony.surprise-surface .ceremony-stage::before')).toContain('background-size: cover, cover, auto 122%')
+    expect(cssRule('.class-reward-ceremony.surprise-surface .ceremony-stage::before')).toContain('background-position: center, center, center 48%')
     expect(cssRule('.class-reward-ceremony.surprise-surface .ceremony-stage > *')).toContain('z-index: 1')
+  })
+
+  it('uses stronger parchment contrast on awakening and settlement manuscript pages', () => {
+    expect(cssRule('.class-reward-ceremony.surprise-surface .ceremony-stage::after')).toContain('rgba(255, 248, 226, .46)')
+    expect(cssRule('.ceremony-copy h2')).toContain('color: #2b1f19')
+    expect(cssRule('.ceremony-copy p')).toContain('color: rgba(43, 31, 25, .94)')
+    expect(cssRule('.ceremony-reward-chip')).toContain('background: rgba(255, 251, 241, .92)')
+    expect(cssRule('.settlement-page.surprise-surface::before')).toContain('background-size: cover, cover, auto 118%')
+    expect(cssRule('.settlement-card h2')).toContain('color: #2b1f19')
+    expect(cssRule('.settlement-card > p')).toContain('color: rgba(43, 31, 25, .9)')
+    expect(cssRule('.settlement-score-grid small')).toContain('color: rgba(43, 31, 25, .82)')
   })
 
   it('presents completed run settlement as a full-screen overlay with top-right visibility controls', () => {

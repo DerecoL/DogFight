@@ -288,7 +288,6 @@ export function DynamicDice({ roll, actor = 'system', rolling = false, label, cl
         <span className="dynamic-dice-face side"><DicePips roll={roll ? (((roll + 2) % 6) + 1) : undefined} /></span>
       </div>
       <b className="dynamic-dice-value">{roll ?? '-'}</b>
-      <span>{label}</span>
     </div>
   )
 }
