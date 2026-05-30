@@ -2446,6 +2446,37 @@ function AchievementsScreen() {
 
 const cosmeticTypeOrder: CosmeticType[] = ['TITLE', 'AVATAR', 'BACKGROUND', 'DOG_SKIN', 'BATTLE_EFFECT']
 
+function defaultCosmeticItem(type: CosmeticType): ShopCatalogItem {
+  const labels: Record<CosmeticType, string> = {
+    TITLE: '默认称号',
+    AVATAR: '默认头像',
+    BACKGROUND: '默认主页',
+    DOG_SKIN: '默认狗狗',
+    BATTLE_EFFECT: '默认特效',
+  }
+  const descriptions: Record<CosmeticType, string> = {
+    TITLE: '不装备称号，显示账号原始样式。',
+    AVATAR: '使用初始狗狗头像。',
+    BACKGROUND: '使用游戏初始主页背景。',
+    DOG_SKIN: '使用狗狗原本的外观。',
+    BATTLE_EFFECT: '使用基础战斗表现。',
+  }
+  return {
+    id: `default-${type.toLowerCase()}`,
+    name: labels[type],
+    description: descriptions[type],
+    type,
+    rarity: 'COMMON',
+    price: 0,
+    section: 'PERMANENT',
+    assetKey: `default.${type.toLowerCase()}`,
+    purchaseType: 'GRANT_ONLY',
+    source: 'CODE',
+    owned: true,
+    equipped: false,
+  }
+}
+
 function AccountSettingsScreen({ onCosmeticsChange }: { onCosmeticsChange: () => Promise<CosmeticsResponse> }) {
   const [cosmetics, setCosmetics] = useState<CosmeticsResponse | null>(null)
   const [error, setError] = useState('')
@@ -2458,6 +2489,15 @@ function AccountSettingsScreen({ onCosmeticsChange }: { onCosmeticsChange: () =>
       await onCosmeticsChange()
     } catch (err) {
       setError(err instanceof Error ? err.message : '装备失败')
+    }
+  }
+  const unequip = async (cosmeticType: CosmeticType) => {
+    setError('')
+    try {
+      setCosmetics(await api<CosmeticsResponse>('/cosmetics/equip', { method: 'POST', body: JSON.stringify({ catalogItemId: null, cosmeticType }) }))
+      await onCosmeticsChange()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '恢复默认失败')
     }
   }
   const ownedItems = (cosmetics?.inventory ?? [])
@@ -2479,27 +2519,40 @@ function AccountSettingsScreen({ onCosmeticsChange }: { onCosmeticsChange: () =>
       {cosmetics ? cosmeticGroups.map((group) => (
         <section className="shop-section" key={group.type}>
           <h2>{group.label}</h2>
-          {group.items.length > 0 ? (
-            <div className="shop-section-grid">
-              {group.items.map((item) => {
-                const isEquipped = equippedBySlot.get(item.type) === item.id || item.equipped
-                return (
-                  <article key={item.id} className={`shop-cosmetic-card account-setting-card rarity-${item.rarity.toLowerCase()} ${isEquipped ? 'equipped' : ''}`}>
-                    <CosmeticBadge type={item.type} rarity={item.rarity} />
-                    <strong>{item.name}</strong>
-                    <p>{item.description}</p>
-                    <span className="cosmetic-type">{rarityLabel(item.rarity)} · 已拥有</span>
-                    <div className="shop-card-actions">
-                      <span>{isEquipped ? '当前装备' : '可装备'}</span>
-                      {isEquipped ? <button disabled>已装备</button> : <button onClick={() => void equip(item.id)}>装备</button>}
-                    </div>
-                  </article>
-                )
-              })}
-            </div>
-          ) : (
-            <p className="account-settings-empty">暂无已拥有的{group.label}，可先去商城购买。</p>
-          )}
+          <div className="shop-section-grid">
+            {(() => {
+              const defaultItem = defaultCosmeticItem(group.type)
+              const isEquipped = !equippedBySlot.has(group.type)
+              return (
+                <article key={`${group.type}-default`} className={`shop-cosmetic-card account-setting-card rarity-${defaultItem.rarity.toLowerCase()} ${isEquipped ? 'equipped' : ''}`}>
+                  <CosmeticBadge type={defaultItem.type} rarity={defaultItem.rarity} />
+                  <strong>{defaultItem.name}</strong>
+                  <p>{defaultItem.description}</p>
+                  <span className="cosmetic-type">默认 · 免费</span>
+                  <div className="shop-card-actions">
+                    <span>{isEquipped ? '当前默认' : '初始外观'}</span>
+                    {isEquipped ? <button disabled>已选择</button> : <button onClick={() => void unequip(group.type)}>选择默认</button>}
+                  </div>
+                </article>
+              )
+            })()}
+            {group.items.map((item) => {
+              const isEquipped = equippedBySlot.get(item.type) === item.id || item.equipped
+              return (
+                <article key={item.id} className={`shop-cosmetic-card account-setting-card rarity-${item.rarity.toLowerCase()} ${isEquipped ? 'equipped' : ''}`}>
+                  <CosmeticBadge type={item.type} rarity={item.rarity} />
+                  <strong>{item.name}</strong>
+                  <p>{item.description}</p>
+                  <span className="cosmetic-type">{rarityLabel(item.rarity)} · 已拥有</span>
+                  <div className="shop-card-actions">
+                    <span>{isEquipped ? '当前装备' : '可装备'}</span>
+                    {isEquipped ? <button disabled>已装备</button> : <button onClick={() => void equip(item.id)}>装备</button>}
+                  </div>
+                </article>
+              )
+            })}
+          </div>
+          {group.items.length === 0 && <p className="account-settings-empty">暂无已拥有的{group.label}，可先去商城购买。</p>}
         </section>
       )) : <p className="account-settings-empty">正在读取个人时装...</p>}
     </section>

@@ -296,6 +296,16 @@ describe('selection screen structure', () => {
     expect(app).toContain('src={cosmeticDogAsset(equippedCosmetics, snapshot.dogType, side)}')
   })
 
+  it('lets account settings choose the default cosmetic for each slot', () => {
+    expect(app).toContain('function defaultCosmeticItem')
+    expect(app).toContain('const unequip = async (cosmeticType: CosmeticType)')
+    expect(app).toContain("JSON.stringify({ catalogItemId: null, cosmeticType })")
+    expect(app).toContain('const defaultItem = defaultCosmeticItem(group.type)')
+    expect(app).toContain("key={`${group.type}-default`}")
+    expect(app).toContain("isEquipped ? '当前默认' : '初始外观'")
+    expect(app).toContain('onClick={() => void unequip(group.type)}')
+  })
+
   it('shows five-loss tolerance for casual runs in the top banner', () => {
     expect(app).toContain('value={`${5 - run.losses}`}')
     expect(app).toContain("tone={5 - run.losses <= 1 ? 'danger' : 'safe'}")

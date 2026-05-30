@@ -20,7 +20,7 @@ import { calculateLadderResult, ladderTierForScore, ladderTierLabels, ladderTier
 import { STARTING_GOLD, isTrainingMatchRound, selectCasualGhostSnapshot, selectLadderGhostSnapshot, targetLadderOpponentWinsRange, targetOpponentWins } from './game/matchmaking'
 import type { BattleResult, DogType, EnchantmentChoice, FighterSnapshot, GameItem, PotionChoice, RelicInstance, ShopOffer, ShopType } from './game/types'
 import { applyRelicChoice, createFinishedBattleRecord, initialItems, makeChoices, makeNewRunShop, makePotionChoices, makeRelicChoices, makeShop, nextPhaseData, parseJson, phaseDataAfterEnchant, postBattleLargeItemReward, postBattleSellBonusItemGrowths, publicLadderSettlement, publicRun, publicRunHistory, relicsFromRun, removeRelicByInstanceId, seedGhost, snapshotFromRun, toGameItems } from './state'
-import { accountSummary, claimAchievement, claimDaily, equipUserCosmetic, getAchievements, getCosmetics, getDailyTasks, getShop, purchaseShopItem, recordAccountEvent, refreshDaily } from './account-services'
+import { accountSummary, claimAchievement, claimDaily, equipUserCosmetic, getAchievements, getCosmetics, getDailyTasks, getShop, purchaseShopItem, recordAccountEvent, refreshDaily, unequipUserCosmetic } from './account-services'
 
 type PrismaTransaction = Prisma.TransactionClient
 type ApexSourceRun = {
@@ -424,8 +424,12 @@ export function buildApp() {
 
   app.post('/api/cosmetics/equip', async (request) => {
     const userId = requireUser(request.userId)
-    const { catalogItemId } = z.object({ catalogItemId: z.string() }).parse(request.body)
-    return equipUserCosmetic(userId, catalogItemId)
+    const body = z.union([
+      z.object({ catalogItemId: z.string(), cosmeticType: z.enum(['TITLE', 'AVATAR', 'BACKGROUND', 'DOG_SKIN', 'BATTLE_EFFECT']).optional() }),
+      z.object({ catalogItemId: z.null(), cosmeticType: z.enum(['TITLE', 'AVATAR', 'BACKGROUND', 'DOG_SKIN', 'BATTLE_EFFECT']) }),
+    ]).parse(request.body)
+    if (body.catalogItemId !== null) return equipUserCosmetic(userId, body.catalogItemId)
+    return unequipUserCosmetic(userId, body.cosmeticType)
   })
 
   app.get('/api/ladder/me', async (request) => {

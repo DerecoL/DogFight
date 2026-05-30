@@ -13,8 +13,10 @@ import {
   progressDailyTasks,
   purchaseCatalogItem,
   refreshDailyTasks,
+  unequipCosmetic,
   type AccountEvent,
   type AchievementProgress,
+  type CosmeticType,
   type DailyTaskProgress,
   type DailyTaskState,
   type EquippedCosmetic,
@@ -268,6 +270,19 @@ export async function equipUserCosmetic(userId: string, catalogItemId: string) {
       create: { userId, slot: target.slot, catalogItemId },
     })
     await recordAccountEvent(userId, { kind: 'COSMETIC_EQUIPPED', catalogItemId, cosmeticType: item.type }, tx)
+  })
+  return getCosmetics(userId)
+}
+
+export async function unequipUserCosmetic(userId: string, cosmeticType: CosmeticType) {
+  await prisma.$transaction(async (tx) => {
+    const equipped = await tx.cosmeticEquip.findMany({ where: { userId } })
+    const next = unequipCosmetic(
+      equipped.map((entry) => ({ slot: entry.slot as EquippedCosmetic['slot'], catalogItemId: entry.catalogItemId })),
+      cosmeticType,
+    )
+    if (next.length === equipped.length) return
+    await tx.cosmeticEquip.deleteMany({ where: { userId, slot: cosmeticType } })
   })
   return getCosmetics(userId)
 }

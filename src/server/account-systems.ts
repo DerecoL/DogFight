@@ -198,3 +198,7 @@ export function equipCosmetic(inventory: CosmeticInventoryEntry[], equipped: Equ
   if (!inventory.some((entry) => entry.catalogItemId === catalogItemId)) throw new Error('Catalog item not owned')
   return [...equipped.filter((entry) => entry.slot !== item.type), { slot: item.type, catalogItemId }]
 }
+
+export function unequipCosmetic(equipped: EquippedCosmetic[], cosmeticType: CosmeticType) {
+  return equipped.filter((entry) => entry.slot !== cosmeticType)
+}

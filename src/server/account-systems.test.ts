@@ -12,6 +12,7 @@ import {
   progressDailyTasks,
   purchaseCatalogItem,
   refreshDailyTasks,
+  unequipCosmetic,
 } from './account-systems'
 
 describe('account shop and achievements domain', () => {
@@ -65,5 +66,16 @@ describe('account shop and achievements domain', () => {
 
     expect(equipCosmetic(purchased.inventory, [], item.id)).toEqual([{ slot: item.type, catalogItemId: item.id }])
     expect(() => equipCosmetic([], [], item.id)).toThrow('Catalog item not owned')
+  })
+
+  it('clears one cosmetic slot when the player selects the default look', () => {
+    const title = SHOP_CATALOG.find((entry) => entry.type === 'TITLE')!
+    const avatar = SHOP_CATALOG.find((entry) => entry.type === 'AVATAR')!
+    const equipped = [
+      { slot: title.type, catalogItemId: title.id },
+      { slot: avatar.type, catalogItemId: avatar.id },
+    ]
+
+    expect(unequipCosmetic(equipped, title.type)).toEqual([{ slot: avatar.type, catalogItemId: avatar.id }])
   })
 })
