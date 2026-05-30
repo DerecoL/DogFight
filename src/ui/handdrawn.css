@@ -226,17 +226,22 @@
   box-shadow: inset 0 4px 7px rgba(61, 45, 37, .16), 0 3px 0 rgba(61, 45, 37, .12);
 }
 
+.bone-health .bone-health-bar {
+  height: 20px;
+  overflow: visible;
+  border: 3px solid var(--handdrawn-bone-edge);
+  border-radius: 999px;
+  background: linear-gradient(180deg, #fffdf6, var(--handdrawn-bone-paper));
+}
+
 .bone-health-bar::before {
   content: "";
   position: absolute;
-  inset: -8px 9px;
+  inset: 3px 14px;
   border-radius: 999px;
-  box-shadow:
-    -16px 0 0 0 var(--handdrawn-bone-paper),
-    16px 0 0 0 var(--handdrawn-bone-paper),
-    -16px 0 0 3px var(--handdrawn-bone-edge),
-    16px 0 0 3px var(--handdrawn-bone-edge);
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, .78);
   pointer-events: none;
+  z-index: 4;
 }
 
 .bone-health-knob {
@@ -254,6 +259,24 @@
 
 .bone-health-knob.left { left: -12px; border-radius: 999px; }
 .bone-health-knob.right { right: -12px; border-radius: 999px; }
+
+.bone-health .bone-health-bar > i.bone-health-knob {
+  top: 50%;
+  bottom: auto;
+  z-index: 0;
+  width: 26px;
+  height: 30px;
+  border: 3px solid var(--handdrawn-bone-edge);
+  border-radius: 999px;
+  background: var(--handdrawn-bone-paper);
+  box-shadow:
+    inset 0 3px 0 rgba(255, 255, 255, .72),
+    0 3px 0 rgba(61, 45, 37, .12);
+  transform: translateY(-50%);
+}
+
+.bone-health .bone-health-bar > i.bone-health-knob.left { left: -18px; }
+.bone-health .bone-health-bar > i.bone-health-knob.right { right: -18px; }
 
 .bone-health-fill {
   position: absolute;
@@ -282,6 +305,34 @@
   inset: 0 auto 0 0;
   border-radius: 999px;
   transition: width .22s ease-out, left .22s ease-out;
+  z-index: 3;
+  background: repeating-linear-gradient(135deg, rgba(34, 197, 94, .55) 0 5px, rgba(21, 128, 61, .7) 5px 10px);
+}
+
+.bone-health .bone-health-bar > i.bone-health-fill {
+  top: 0;
+  bottom: 0;
+  height: 100%;
+  border-radius: 999px;
+  z-index: 1;
+  background: linear-gradient(90deg, #ff9f9f, #ec5f6d);
+  transition: width .22s ease-out;
+}
+
+.bone-health .bone-health-bar > i.bone-health-shield {
+  top: 0;
+  bottom: 0;
+  height: 100%;
+  border-radius: 999px;
+  z-index: 2;
+  background: linear-gradient(90deg, rgba(96, 165, 250, .78), rgba(56, 189, 248, .9));
+}
+
+.bone-health .bone-health-bar > i.bone-health-poison {
+  top: 0;
+  bottom: 0;
+  height: 100%;
+  border-radius: 999px;
   z-index: 3;
   background: repeating-linear-gradient(135deg, rgba(34, 197, 94, .55) 0 5px, rgba(21, 128, 61, .7) 5px 10px);
 }

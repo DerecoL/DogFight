@@ -68,6 +68,16 @@ describe('equipment layout scale', () => {
     expect(uiCssRule('.bone-health-poison')).toContain('background')
   })
 
+  it('keeps bone health endpoints separate from the fill track', () => {
+    expect(uiCssRule('.bone-health .bone-health-bar')).toContain('overflow: visible')
+    expect(uiCssRule('.bone-health .bone-health-bar')).toContain('background: linear-gradient(180deg, #fffdf6, var(--handdrawn-bone-paper))')
+    expect(uiCssRule('.bone-health .bone-health-bar > i.bone-health-knob')).toContain('bottom: auto')
+    expect(uiCssRule('.bone-health .bone-health-bar > i.bone-health-knob')).toContain('background: var(--handdrawn-bone-paper)')
+    expect(uiCssRule('.bone-health .bone-health-bar > i.bone-health-fill')).toContain('background: linear-gradient(90deg, #ff9f9f, #ec5f6d)')
+    expect(uiCssRule('.bone-health .bone-health-bar > i.bone-health-shield')).toContain('background: linear-gradient(90deg, rgba(96, 165, 250, .78), rgba(56, 189, 248, .9))')
+    expect(uiCssRule('.bone-health .bone-health-bar > i.bone-health-poison')).toContain('background: repeating-linear-gradient')
+  })
+
   it('styles the center dice as a readable front-facing handdrawn die', () => {
     expect(uiCssRule('.dynamic-dice')).toContain('--dice-size')
     expect(uiCssRule('.dynamic-dice')).not.toContain('perspective')

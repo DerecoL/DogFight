@@ -45,6 +45,12 @@ export function normalizeTriggerDice(dice: readonly number[]) {
     .sort((left, right) => left - right)
 }
 
+export function normalizeTriggerDiceWithExtras(dice: readonly number[]) {
+  return dice
+    .filter((die) => Number.isInteger(die) && die >= 1 && die <= 6)
+    .sort((left, right) => left - right)
+}
+
 export function potionChoiceText(choice: Pick<PotionChoice, 'category' | 'dice'>) {
   const diceText = normalizeTriggerDice(choice.dice).join('/')
   if (choice.category === 'ADD_ONE') return `增加 ${diceText} 点触发`
@@ -80,5 +86,8 @@ export function applyPotionToBaseDice(baseDice: readonly number[], choice: Pick<
   if (choice.category === 'REPLACE_RANGE' || choice.category === 'REPLACE_ALL') {
     return normalizeTriggerDice(choice.dice)
   }
-  return normalizeTriggerDice([...baseDice, ...choice.dice])
+  const base = normalizeTriggerDiceWithExtras(baseDice)
+  const existing = new Set(base)
+  const additions = normalizeTriggerDice(choice.dice).filter((die) => choice.category === 'EXTRA_ONE' || !existing.has(die))
+  return normalizeTriggerDiceWithExtras([...base, ...additions])
 }

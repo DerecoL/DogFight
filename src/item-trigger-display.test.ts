@@ -26,6 +26,10 @@ describe('item trigger dice display', () => {
     expect(triggerDiceLabel(item([4, 5, 6], 'NONE', [1]), [{ def: { effect: 'SHIFT_TRIGGER_DICE_UP' } }])).toBe('2')
   })
 
+  it('shows extra potion dice even when the target already triggers on that point', () => {
+    expect(triggerDiceLabel(item([2], 'NONE', [2, 2]))).toBe('2 +2')
+  })
+
   it('shifts visible trigger dice down when tissue is active', () => {
     expect(triggerDiceLabel(item([1, 2, 3]), [{ def: { effect: 'SHIFT_TRIGGER_DICE_DOWN' } }])).toBe('1/2/6')
   })

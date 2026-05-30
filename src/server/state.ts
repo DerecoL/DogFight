@@ -14,7 +14,7 @@ import {
 import { createEnchantChoices } from './game/enchant'
 import { buildOfflineFighter } from './game/offline-builder'
 import { findSlot } from './game/grid'
-import { createPotionChoices, normalizeTriggerDice } from './game/potion'
+import { createPotionChoices, normalizeTriggerDiceWithExtras } from './game/potion'
 import { nextQuality, normalizeQuality } from './game/quality'
 import { createRng } from './game/rng'
 import { createChoices, createShop } from './game/shop'
@@ -51,7 +51,7 @@ export function toGameItems(items: ItemInstance[]): GameItem[] {
 
 function normalizeOptionalTriggerDice(value: string | null | undefined) {
   if (!value) return null
-  const dice = normalizeTriggerDice(parseJson<number[]>(value, []))
+  const dice = normalizeTriggerDiceWithExtras(parseJson<number[]>(value, []))
   return dice.length > 0 ? dice : null
 }
 

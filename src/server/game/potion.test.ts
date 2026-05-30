@@ -25,6 +25,12 @@ describe('potion choices', () => {
     expect(applyPotionToBaseDice([1, 2], choice)).toEqual([1, 2])
   })
 
+  it('keeps duplicate points from extra potions visible for item display', () => {
+    const choice: PotionChoice = { id: 'potion', category: 'EXTRA_ONE', dice: [2], description: '额外增加 2 点触发' }
+
+    expect(applyPotionToBaseDice([2], choice)).toEqual([2, 2])
+  })
+
   it('replaces base dice for range and all-dice potions', () => {
     const range: PotionChoice = { id: 'range', category: 'REPLACE_RANGE', dice: [1, 6], description: '改为极值 1/6 触发' }
     const all: PotionChoice = { id: 'all', category: 'REPLACE_ALL', dice: [1, 2, 3, 4, 5, 6], description: '改为全点数触发' }

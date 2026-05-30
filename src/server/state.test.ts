@@ -64,6 +64,24 @@ describe('game item conversion', () => {
 
     expect(item.triggerDiceOverride).toEqual([2, 5])
   })
+
+  it('preserves duplicate extra potion points when exposing item instances', () => {
+    const [item] = toGameItems([{
+      id: 'item-1',
+      runId: 'run-1',
+      defId: 'small-bite',
+      quality: 'BRONZE',
+      area: 'EQUIPMENT',
+      x: 0,
+      y: 0,
+      enchant: null,
+      triggerDiceOverride: JSON.stringify([2, 2]),
+      sellBonus: 0,
+      createdAt: new Date(),
+    } as never])
+
+    expect(item.triggerDiceOverride).toEqual([2, 2])
+  })
 })
 
 describe('finished battle records', () => {

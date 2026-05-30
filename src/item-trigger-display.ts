@@ -50,12 +50,28 @@ function shiftDieDown(die: number) {
   return die <= 1 ? 6 : die - 1
 }
 
+function triggerDiceText(dice: number[]) {
+  const sortedDice = dice
+    .filter((die) => Number.isInteger(die) && die >= 1 && die <= 6)
+    .sort((left, right) => left - right)
+  const uniqueDice = [...new Set(sortedDice)]
+  const seen = new Map<number, number>()
+  const extras: number[] = []
+  for (const die of sortedDice) {
+    const count = seen.get(die) ?? 0
+    if (count > 0) extras.push(die)
+    seen.set(die, count + 1)
+  }
+  const baseText = uniqueDice.join('/')
+  return extras.length > 0 ? `${baseText} ${extras.map((die) => `+${die}`).join(' ')}` : baseText
+}
+
 export function triggerDiceLabel(item: TriggerDisplayItem, relics: TriggerDisplayRelic[] = []) {
   if (item.advancedEffect && nonSelfTriggeredEffects.has(item.advancedEffect)) return null
   let dice = item.triggerDiceOverride && item.triggerDiceOverride.length > 0 ? item.triggerDiceOverride : item.dice
   if (relics.some((relic) => relic.def?.effect === 'SHIFT_TRIGGER_DICE_UP')) dice = dice.map(shiftDieUp)
   if (relics.some((relic) => relic.def?.effect === 'SHIFT_TRIGGER_DICE_DOWN')) dice = dice.map(shiftDieDown)
-  return [...new Set(dice)].sort((left, right) => left - right).join('/')
+  return triggerDiceText(dice)
 }
 
 export function itemTriggerCount(events: TriggerCountEvent[], owner: string, itemId: string, displayIndex: number) {
