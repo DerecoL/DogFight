@@ -262,6 +262,13 @@
   box-shadow: inset 0 3px 5px rgba(61, 45, 37, .12), 0 2px 0 rgba(61, 45, 37, .12);
 }
 
+.bone-health .bone-health-bar > i.bone-health-knob {
+  top: 50%;
+  bottom: auto;
+  background: var(--handdrawn-bone-paper);
+  transform: translateY(-50%);
+}
+
 .bone-health .bone-health-knob.left { left: -27px; border-radius: 999px; }
 .bone-health .bone-health-knob.right { right: -27px; border-radius: 999px; }
 .bone-health .bone-health-knob.left::before, .bone-health .bone-health-knob.right::before { top: 0; }

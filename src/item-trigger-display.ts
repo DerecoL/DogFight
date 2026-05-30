@@ -94,7 +94,9 @@ function normalizedDiceLabel(dice: number[]) {
 
 export function triggerDiceLabel(item: TriggerDisplayItem, relics: TriggerDisplayRelic[] = []) {
   if (item.advancedEffect && nonSelfTriggeredEffects.has(item.advancedEffect)) return null
-  return triggerDiceText(applyRelicDiceRemapping([...itemBaseDice(item), ...itemExtraDice(item)], relics))
+  const baseDice = applyRelicDiceRemapping([...itemBaseDice(item)], relics)
+  const extraDice = applyRelicDiceRemapping([...itemExtraDice(item)], relics)
+  return extraDice.length > 0 ? normalizedDiceLabel([...baseDice, ...extraDice]) : triggerDiceText(baseDice)
 }
 
 export function extraTriggerDiceLabel(item: TriggerDisplayItem, relics: TriggerDisplayRelic[] = []) {
