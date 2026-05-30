@@ -1539,7 +1539,44 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
       processed.count += 1
       const itemTriggerCount = (fighterState.itemTriggerCounts[item.id] ?? 0) + 1
       fighterState.itemTriggerCounts[item.id] = itemTriggerCount
-      for (const trigger of executeItem(actorSide, fighter, item, time, roll, context.scale, context.note, queue, processed, extra, extraDepth, allowExtraRollFanout, allowLargeTriggerFanout, frogClassRoll, chainEdgeIds, multiIndex, multiTotal)) {
+      const queueLengthBefore = queue.length
+      const extraRollRequestsBefore = processed.extraRollRequests
+      const frogRollRequestsBefore = processed.frogRollRequests
+      const itemTriggers = executeItem(actorSide, fighter, item, time, roll, context.scale, context.note, queue, processed, extra, extraDepth, allowExtraRollFanout, allowLargeTriggerFanout, frogClassRoll, chainEdgeIds, multiIndex, multiTotal)
+      const hasSelfTriggerEvent = itemTriggers.some((trigger) => trigger.itemId === item.id)
+      const def = itemDef(item.defId)
+      const quality = normalizeQuality(item.quality)
+      const sacrificeReplacesSmallEffect = def.size === 1
+        && triggerOrder(fighter.items).some((entry) => itemDef(entry.defId).advancedEffect === 'SMALL_TRIGGERS_LARGE')
+      const hasCountOnlySideEffect = queue.length > queueLengthBefore
+        || processed.extraRollRequests > extraRollRequestsBefore
+        || processed.frogRollRequests > frogRollRequestsBefore
+        || def.advancedEffect === 'ADJACENT_DAMAGE_BONUS'
+      if (
+        !hasSelfTriggerEvent
+        && hasCountOnlySideEffect
+        && !sacrificeReplacesSmallEffect
+        && def.advancedEffect !== 'BOOM_COUNTER'
+        && def.advancedEffect !== 'GRANT_LIFESTEAL_ADJACENT'
+      ) {
+        itemTriggers.unshift({
+          itemId: item.id,
+          defId: item.defId,
+          quality,
+          effectType: 'UTILITY',
+          amount: 0,
+          target: actorSide,
+          sourceHp: getHp(actorSide),
+          targetHp: getHp(opponentOf(actorSide)),
+          sourceHpDelta: 0,
+          targetHpDelta: 0,
+          roll,
+          multiIndex,
+          multiTotal,
+          text: `${itemName(def, quality)} 成功触发`,
+        })
+      }
+      for (const trigger of itemTriggers) {
         const multiText = trigger.multiTotal && trigger.multiTotal > 1 ? `（多重 ${trigger.multiIndex}/${trigger.multiTotal}）` : ''
         push({
           time,
@@ -1551,7 +1588,7 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
           targetItemId: trigger.targetItemId,
           defId: trigger.defId,
           quality: trigger.quality,
-          itemTriggerCount,
+          itemTriggerCount: trigger.itemId === item.id ? itemTriggerCount : undefined,
           multiIndex: trigger.multiIndex,
           multiTotal: trigger.multiTotal,
           boomCounterItemId: trigger.boomCounterItemId,

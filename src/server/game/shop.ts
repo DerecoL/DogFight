@@ -45,6 +45,7 @@ export function createShop(type: ShopType, rng: () => number, round = 0): ShopOf
 }
 
 export const UPGRADE_SHOP_TYPES = ['UPGRADE_SILVER', 'UPGRADE_GOLD', 'UPGRADE_DIAMOND'] as const satisfies readonly ShopType[]
+const SPECIAL_SHOP_CHANCE = 0.1
 
 const UPGRADE_SHOP_MAX_QUALITY: Partial<Record<ShopType, ItemQuality>> = {
   UPGRADE: 'DIAMOND',
@@ -113,14 +114,14 @@ export function createChoices<T extends QualityBearingItem>(rng: () => number, r
     const next = pick(rng, SHOP_CHOICES)
     if (!choices.includes(next)) choices.push(next)
   }
-  if (round >= 4 && rng() < 0.33) {
+  if (round >= 4 && rng() < SPECIAL_SHOP_CHANCE) {
     replaceWithSpecialChoice(choices, 'RELIC', rng)
   }
-  if (round >= 4 && rng() < 0.33) {
+  if (round >= 4 && rng() < SPECIAL_SHOP_CHANCE) {
     const upgradeShopType = pickUpgradeShopType(rng, round, items)
     if (upgradeShopType) replaceWithSpecialChoice(choices, upgradeShopType, rng)
   }
-  if (round >= 4 && rng() < 0.33) {
+  if (round >= 4 && rng() < SPECIAL_SHOP_CHANCE) {
     replaceWithSpecialChoice(choices, 'POTION', rng)
   }
   return choices

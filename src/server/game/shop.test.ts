@@ -2,12 +2,25 @@ import { describe, expect, it } from 'vitest'
 import { createChoices } from './shop'
 
 describe('shop choices', () => {
+  it('does not offer special shops when their independent rolls reach the ten percent threshold', () => {
+    const rolls = [
+      0.0, 0.2, 0.4,
+      0.1,
+      0.1,
+      0.1,
+    ]
+
+    const choices = createChoices(() => rolls.shift() ?? 0, 4, [{ quality: 'BRONZE' }])
+
+    expect(choices).toEqual(['GENERAL', 'LARGE', 'MEDIUM'])
+  })
+
   it('can independently offer relic, tiered upgrade, and potion shops in the same choice set', () => {
     const rolls = [
       0.0, 0.2, 0.4,
-      0.1, 0.0,
-      0.1, 0.0, 0.0,
-      0.1, 0.0,
+      0.09, 0.0,
+      0.09, 0.0, 0.0,
+      0.09, 0.0,
     ]
     const rng = () => rolls.shift() ?? 0
 
@@ -20,13 +33,13 @@ describe('shop choices', () => {
     const earlyRolls = [
       0.0, 0.2, 0.4,
       0.9,
-      0.1, 0.99, 0.0,
+      0.09, 0.99, 0.0,
       0.9,
     ]
     const lateRolls = [
       0.0, 0.2, 0.4,
       0.9,
-      0.1, 0.99, 0.0,
+      0.09, 0.99, 0.0,
       0.9,
     ]
 
@@ -41,7 +54,7 @@ describe('shop choices', () => {
     const rolls = [
       0.0, 0.2, 0.4,
       0.9,
-      0.1, 0.0, 0.0,
+      0.09, 0.0, 0.0,
       0.9,
     ]
     const choices = createChoices(() => rolls.shift() ?? 0, 10, [{ quality: 'GOLD' }])

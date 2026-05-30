@@ -712,6 +712,74 @@ describe('battle simulation', () => {
     expect(adjacentTriggersAtFirstRoll('DIAMOND')).toHaveLength(2)
   })
 
+  it('records trigger counts for night patrol light itself when it queues adjacent triggers', () => {
+    const player: FighterSnapshot = {
+      name: 'P',
+      dogType: 'BULLY',
+      wins: 0,
+      losses: 0,
+      round: 6,
+      items: [
+        { ...equipment('neighbor', 'starter-1', 0, 'BRONZE'), triggerDiceOverride: allDice },
+        { ...equipment('lamp', 'v3-night-patrol-light', 1, 'GOLD'), triggerDiceOverride: allDice },
+      ],
+    }
+    const opponent: FighterSnapshot = { name: 'O', dogType: 'BULLY', wins: 0, losses: 0, round: 6, items: [] }
+
+    const result = simulateBattle(player, opponent, 'night-light-count-self')
+    const firstPlayerRoll = result.events.find((event) => event.kind === 'ROLL' && event.actor === 'player')
+    const lampEvent = result.events.find((event) =>
+      event.kind === 'ITEM'
+      && event.actor === 'player'
+      && event.time === firstPlayerRoll?.time
+      && event.itemId === 'lamp'
+    )
+
+    expect(lampEvent).toMatchObject({
+      defId: 'v3-night-patrol-light',
+      itemTriggerCount: 1,
+      effectType: 'UTILITY',
+    })
+  })
+
+  it('records trigger counts for self-trigger side effects that do not emit direct payloads', () => {
+    const player: FighterSnapshot = {
+      name: 'P',
+      dogType: 'BULLY',
+      wins: 0,
+      losses: 0,
+      round: 6,
+      items: [
+        { ...equipment('post', 'v3-chew-scratch-post', 0, 'BRONZE'), triggerDiceOverride: allDice },
+        { ...equipment('bite', 'starter-1', 1, 'BRONZE'), triggerDiceOverride: allDice },
+      ],
+    }
+    const opponent: FighterSnapshot = { name: 'O', dogType: 'BULLY', wins: 0, losses: 0, round: 6, items: [] }
+
+    const result = simulateBattle(player, opponent, 'scratch-post-count-self')
+    const firstPlayerRoll = result.events.find((event) => event.kind === 'ROLL' && event.actor === 'player')
+    const postEvent = result.events.find((event) =>
+      event.kind === 'ITEM'
+      && event.actor === 'player'
+      && event.time === firstPlayerRoll?.time
+      && event.itemId === 'post'
+    )
+    const biteEvent = result.events.find((event) =>
+      event.kind === 'ITEM'
+      && event.actor === 'player'
+      && event.time === firstPlayerRoll?.time
+      && event.itemId === 'bite'
+      && event.effectType === 'DAMAGE'
+    )
+
+    expect(postEvent).toMatchObject({
+      defId: 'v3-chew-scratch-post',
+      itemTriggerCount: 1,
+      effectType: 'UTILITY',
+    })
+    expect(biteEvent?.amount).toBeGreaterThan(5)
+  })
+
   it('reflects two damage per thorn stack when attacked', () => {
     const player: FighterSnapshot = {
       name: 'P',
