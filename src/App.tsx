@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react'
+﻿import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react'
 import { createPortal } from 'react-dom'
 import {
   DndContext,
@@ -620,89 +620,89 @@ const shopNames: Record<ShopType, string> = {
   POTION: '药水商店',
 }
 const itemIcons: Record<string, string> = {
-  'starter-1': '/assets/items/bite.webp',
-  'starter-2': '/assets/items/bite.webp',
-  'starter-3': '/assets/items/bite.webp',
-  'starter-4': '/assets/items/bite.webp',
-  'starter-5': '/assets/items/bite.webp',
-  'starter-6': '/assets/items/bite.webp',
-  'small-bite': '/assets/items/small-bite.webp',
-  'lucky-paw': '/assets/items/lucky-paw.webp',
-  'milk-bone': '/assets/items/milk-bone.webp',
-  'rubber-ball': '/assets/items/rubber-ball.webp',
-  'spiked-collar': '/assets/items/spiked-collar.webp',
-  'training-disc': '/assets/items/training-disc.webp',
-  'guard-vest': '/assets/items/guard-vest.webp',
-  'giant-bone': '/assets/items/giant-bone.webp',
-  'dog-house': '/assets/items/dog-house.webp',
-  'dog-gold-ingot': '/assets/items/dog-gold-ingot.webp',
-  'dog-silver-ingot': '/assets/items/dog-silver-ingot.webp',
-  'patting-bear': '/assets/items/patting-bear.webp',
-  'poisoned-dog-fang': '/assets/items/poisoned-dog-fang.webp',
-  'v3-broken-canine': '/assets/items/v3-broken-canine.webp',
-  'v3-chew-scratch-post': '/assets/items/v3-chew-scratch-post.webp',
-  'v3-cone-collar': '/assets/items/v3-cone-collar.webp',
-  'v3-dog-catnip': '/assets/items/v3-dog-catnip.webp',
-  'v3-flea-disc': '/assets/items/v3-flea-disc.webp',
-  'v3-large-bone-sword': '/assets/items/v3-large-bone-sword.webp',
-  'v3-wooden-shield': '/assets/items/v3-wooden-shield.webp',
-  'v3-spiked-vest': '/assets/items/v3-spiked-vest.webp',
-  'v3-hydrant-axe': '/assets/items/v3-hydrant-axe.webp',
-  'v3-dinosaur-leg-bone': '/assets/items/v3-dinosaur-leg-bone.webp',
-  'v3-auto-waterer': '/assets/items/v3-auto-waterer.webp',
-  'v3-night-patrol-light': '/assets/items/v3-night-patrol-light.webp',
-  'v3-blood-mad-fang': '/assets/items/v3-blood-mad-fang.webp',
-  'v3-fermented-trash-bin': '/assets/items/v3-fermented-trash-bin.webp',
-  'v3-golden-kennel': '/assets/items/v3-golden-kennel.webp',
-  'v4-blood-contract-fang': '/assets/items/v4-blood-contract-fang.webp',
-  'v4-boom-counter': '/assets/items/v4-boom-counter.webp',
-  'v4-growing-chew-sword': '/assets/items/v4-growing-chew-sword.webp',
-  'v4-reverse-fur-comb': '/assets/items/v4-reverse-fur-comb.webp',
-  'shiba-speed-katana': '/assets/items/shiba-speed-katana.webp',
-  'shiba-great-katana': '/assets/items/shiba-great-katana.webp',
-  'shiba-swallow-katana': '/assets/items/shiba-swallow-katana.webp',
-  'shiba-shadow-clone': '/assets/items/shiba-shadow-clone.webp',
-  'shiba-break': '/assets/items/shiba-break.webp',
-  'shiba-poison': '/assets/items/shiba-poison.webp',
-  'samoyed-soft-fur': '/assets/items/samoyed-soft-fur.webp',
-  'samoyed-thorn-fur': '/assets/items/samoyed-thorn-fur.webp',
-  'samoyed-frost-fur': '/assets/items/samoyed-frost-fur.webp',
-  'samoyed-avalanche-core': '/assets/items/samoyed-avalanche-core.webp',
-  'samoyed-absolute-zero': '/assets/items/samoyed-absolute-zero.webp',
-  'samoyed-cold-proof': '/assets/items/samoyed-cold-proof.webp',
-  'mutt-old-collar': '/assets/items/mutt-old-collar.webp',
-  'mutt-counting-collar': '/assets/items/mutt-counting-collar.webp',
-  'mutt-charged-collar': '/assets/items/mutt-charged-collar.webp',
-  'mutt-chase-tail': '/assets/items/mutt-chase-tail.webp',
-  'mutt-chase-car': '/assets/items/mutt-chase-car.webp',
-  'mutt-eat-air': '/assets/items/mutt-eat-air.webp',
-  'bully-vault': '/assets/items/bully-vault.webp',
-  'bully-gym': '/assets/items/bully-gym.webp',
-  'bully-armband': '/assets/items/bully-armband.webp',
-  'bully-sacrifice': '/assets/items/bully-sacrifice.webp',
-  'bully-colossus': '/assets/items/bully-colossus.webp',
-  'bully-demolish': '/assets/items/bully-demolish.webp',
-  'emperor-dice-cup': '/assets/items/emperor-dice-cup.webp',
-  'emperor-minister': '/assets/items/emperor-minister.webp',
-  'emperor-robe': '/assets/items/emperor-robe.webp',
-  'emperor-curtain': '/assets/items/emperor-curtain.webp',
-  'emperor-edict': '/assets/items/emperor-edict.webp',
-  'emperor-fallen': '/assets/items/emperor-fallen.webp',
+  'starter-1': '/assets/items/bite.svg',
+  'starter-2': '/assets/items/bite.svg',
+  'starter-3': '/assets/items/bite.svg',
+  'starter-4': '/assets/items/bite.svg',
+  'starter-5': '/assets/items/bite.svg',
+  'starter-6': '/assets/items/bite.svg',
+  'small-bite': '/assets/items/small-bite.svg',
+  'lucky-paw': '/assets/items/lucky-paw.svg',
+  'milk-bone': '/assets/sticker-icons/milk-bone.webp',
+  'rubber-ball': '/assets/sticker-icons/green-disc.webp',
+  'spiked-collar': '/assets/sticker-icons/spiked-collar.webp',
+  'training-disc': '/assets/sticker-icons/green-disc.webp',
+  'guard-vest': '/assets/items/guard-vest.svg',
+  'giant-bone': '/assets/items/giant-bone.svg',
+  'dog-house': '/assets/sticker-icons/dog-kennel.webp',
+  'dog-gold-ingot': '/assets/items/dog-gold-ingot.svg',
+  'dog-silver-ingot': '/assets/items/dog-silver-ingot.svg',
+  'patting-bear': '/assets/items/patting-bear.svg',
+  'poisoned-dog-fang': '/assets/sticker-icons/wrapped-fang.webp',
+  'v3-broken-canine': '/assets/sticker-icons/wrapped-fang.webp',
+  'v3-chew-scratch-post': '/assets/items/v3-chew-scratch-post.svg',
+  'v3-cone-collar': '/assets/items/v3-cone-collar.svg',
+  'v3-dog-catnip': '/assets/items/v3-dog-catnip.svg',
+  'v3-flea-disc': '/assets/sticker-icons/green-disc.webp',
+  'v3-large-bone-sword': '/assets/items/v3-large-bone-sword.svg',
+  'v3-wooden-shield': '/assets/sticker-icons/wooden-shield.webp',
+  'v3-spiked-vest': '/assets/sticker-icons/wooden-shield.webp',
+  'v3-hydrant-axe': '/assets/items/v3-hydrant-axe.svg',
+  'v3-dinosaur-leg-bone': '/assets/items/v3-dinosaur-leg-bone.svg',
+  'v3-auto-waterer': '/assets/sticker-icons/food-bowl.webp',
+  'v3-night-patrol-light': '/assets/items/v3-night-patrol-light.svg',
+  'v3-blood-mad-fang': '/assets/sticker-icons/wrapped-fang.webp',
+  'v3-fermented-trash-bin': '/assets/sticker-icons/trash-bin.webp',
+  'v3-golden-kennel': '/assets/sticker-icons/dog-kennel.webp',
+  'v4-blood-contract-fang': '/assets/sticker-icons/wrapped-fang.webp',
+  'v4-boom-counter': '/assets/sticker-icons/boom-counter.webp',
+  'v4-growing-chew-sword': '/assets/items/v4-growing-chew-sword.svg',
+  'v4-reverse-fur-comb': '/assets/items/v4-reverse-fur-comb.svg',
+  'shiba-speed-katana': '/assets/sticker-icons/katana.webp',
+  'shiba-great-katana': '/assets/sticker-icons/katana.webp',
+  'shiba-swallow-katana': '/assets/sticker-icons/katana.webp',
+  'shiba-shadow-clone': '/assets/items/shiba-shadow-clone.svg',
+  'shiba-break': '/assets/items/shiba-break.svg',
+  'shiba-poison': '/assets/items/shiba-poison.svg',
+  'samoyed-soft-fur': '/assets/sticker-icons/ice-fur.webp',
+  'samoyed-thorn-fur': '/assets/sticker-icons/ice-fur.webp',
+  'samoyed-frost-fur': '/assets/sticker-icons/ice-fur.webp',
+  'samoyed-avalanche-core': '/assets/sticker-icons/ice-fur.webp',
+  'samoyed-absolute-zero': '/assets/sticker-icons/ice-fur.webp',
+  'samoyed-cold-proof': '/assets/sticker-icons/ice-fur.webp',
+  'mutt-old-collar': '/assets/items/mutt-old-collar.svg',
+  'mutt-counting-collar': '/assets/items/mutt-counting-collar.svg',
+  'mutt-charged-collar': '/assets/items/mutt-charged-collar.svg',
+  'mutt-chase-tail': '/assets/sticker-icons/foxtail.webp',
+  'mutt-chase-car': '/assets/items/mutt-chase-car.svg',
+  'mutt-eat-air': '/assets/items/mutt-eat-air.svg',
+  'bully-vault': '/assets/items/bully-vault.svg',
+  'bully-gym': '/assets/items/bully-gym.svg',
+  'bully-armband': '/assets/items/bully-armband.svg',
+  'bully-sacrifice': '/assets/items/bully-sacrifice.svg',
+  'bully-colossus': '/assets/items/bully-colossus.svg',
+  'bully-demolish': '/assets/items/bully-demolish.svg',
+  'emperor-dice-cup': '/assets/items/emperor-dice-cup.svg',
+  'emperor-minister': '/assets/sticker-icons/dog-scroll.webp',
+  'emperor-robe': '/assets/items/emperor-robe.svg',
+  'emperor-curtain': '/assets/items/emperor-curtain.svg',
+  'emperor-edict': '/assets/sticker-icons/dog-scroll.webp',
+  'emperor-fallen': '/assets/items/emperor-fallen.svg',
 }
 const relicIcons: Record<string, string> = {
-  'midas-left': '/assets/relics/midas-left.webp',
-  'midas-right': '/assets/relics/midas-right.webp',
-  'half-die-left': '/assets/relics/half-die-left.webp',
-  'half-die-right': '/assets/relics/half-die-right.webp',
-  'carrot': '/assets/relics/carrot.webp',
-  'tissue': '/assets/relics/tissue.webp',
-  'v3-two-sided-gold-tag': '/assets/relics/v3-two-sided-gold-tag.webp',
-  'v3-balanced-food-bowl': '/assets/relics/v3-balanced-food-bowl.webp',
-  'v3-lucky-foxtail': '/assets/relics/v3-lucky-foxtail.webp',
-  'v3-bad-dog-manual': '/assets/relics/v3-bad-dog-manual.webp',
-  'v3-fluffed-spike-collar': '/assets/relics/v3-fluffed-spike-collar.webp',
-  'v3-husky-engine': '/assets/relics/v3-husky-engine.webp',
-  'v3-fourth-dimensional-kennel': '/assets/relics/v3-fourth-dimensional-kennel.webp',
+  'midas-left': '/assets/sticker-icons/midas-hand.webp',
+  'midas-right': '/assets/sticker-icons/midas-hand.webp',
+  'half-die-left': '/assets/relics/half-die-left.svg',
+  'half-die-right': '/assets/relics/half-die-right.svg',
+  'carrot': '/assets/sticker-icons/carrot.webp',
+  'tissue': '/assets/relics/tissue.svg',
+  'v3-two-sided-gold-tag': '/assets/relics/v3-two-sided-gold-tag.svg',
+  'v3-balanced-food-bowl': '/assets/sticker-icons/food-bowl.webp',
+  'v3-lucky-foxtail': '/assets/sticker-icons/foxtail.webp',
+  'v3-bad-dog-manual': '/assets/sticker-icons/dog-scroll.webp',
+  'v3-fluffed-spike-collar': '/assets/sticker-icons/spiked-collar.webp',
+  'v3-husky-engine': '/assets/sticker-icons/husky-engine.webp',
+  'v3-fourth-dimensional-kennel': '/assets/sticker-icons/dog-kennel.webp',
 }
 const qualityOrder: ItemQuality[] = ['BRONZE', 'SILVER', 'GOLD', 'DIAMOND']
 const qualityLabel: Record<ItemQuality, string> = {
@@ -854,7 +854,7 @@ function itemTone(def: ItemDef) {
 }
 
 function itemIcon(def: ItemDef) {
-  return itemIcons[def.id] ?? '/assets/items/bite.webp'
+  return itemIcons[def.id] ?? '/assets/items/bite.svg'
 }
 
 function isItemArtDebugRoute() {
@@ -862,7 +862,7 @@ function isItemArtDebugRoute() {
 }
 
 function relicIcon(def: RelicDef) {
-  return relicIcons[def.id] ?? '/assets/relics/v3-two-sided-gold-tag.webp'
+  return relicIcons[def.id] ?? '/assets/relics/v3-two-sided-gold-tag.svg'
 }
 
 function normalizeQuality(quality?: string): ItemQuality {
@@ -2061,7 +2061,129 @@ function CasualTutorialGuide({ state, run, battle, eventIndex, onSkip }: { state
   )
 }
 
-function ModeLobby({ run, runHistory, onOpen, onEnterCasual, onReplayTutorial, onEnterLadder, onEnterDogfight, onEnterPeak }: { run: Run | null; runHistory: PlayerRunHistory; onOpen: () => void; onEnterCasual: () => void; onReplayTutorial: () => void; onEnterLadder: () => void; onEnterDogfight: () => void; onEnterPeak: () => void }) {
+function AccountShopScreen() {
+  const [shop, setShop] = useState<AccountShopResponse | null>(null)
+  const [cosmetics, setCosmetics] = useState<CosmeticsResponse | null>(null)
+  const [error, setError] = useState('')
+  const load = useCallback(async () => {
+    const [shopData, cosmeticsData] = await Promise.all([api<AccountShopResponse>('/shop'), api<CosmeticsResponse>('/cosmetics/me')])
+    setShop(shopData)
+    setCosmetics(cosmeticsData)
+  }, [])
+  useEffect(() => { void load().catch((err) => setError(err instanceof Error ? err.message : '加载失败')) }, [load])
+  const purchase = async (catalogItemId: string) => {
+    setShop(await api<AccountShopResponse>('/shop/purchase', { method: 'POST', body: JSON.stringify({ catalogItemId }) }))
+    setCosmetics(await api<CosmeticsResponse>('/cosmetics/me'))
+  }
+  const equip = async (catalogItemId: string) => {
+    setCosmetics(await api<CosmeticsResponse>('/cosmetics/equip', { method: 'POST', body: JSON.stringify({ catalogItemId }) }))
+    setShop(await api<AccountShopResponse>('/shop'))
+  }
+  return (
+    <section className="account-shop-screen">
+      <div className="screen-heading">
+        <div><p className="eyebrow">账号商城</p><h1>外观商店</h1></div>
+        <span className="account-currency-pill"><Coins size={18} /> {shop?.wallet.balance ?? 0}</span>
+      </div>
+      {error && <p className="error">{error}</p>}
+      {shop && <>
+        <ShopCatalogSection title="常驻区" items={shop.sections.permanent} equipped={cosmetics?.equipped ?? []} onPurchase={purchase} onEquip={equip} />
+        <ShopCatalogSection title="精选轮换区" items={shop.sections.featured} equipped={cosmetics?.equipped ?? []} onPurchase={purchase} onEquip={equip} />
+      </>}
+    </section>
+  )
+}
+
+function ShopCatalogSection({ title, items, equipped, onPurchase, onEquip }: { title: string; items: ShopCatalogItem[]; equipped: CosmeticsResponse['equipped']; onPurchase: (catalogItemId: string) => Promise<void>; onEquip: (catalogItemId: string) => Promise<void> }) {
+  const equippedIds = new Set(equipped.map((entry) => entry.catalogItemId))
+  return (
+    <section className="shop-section">
+      <h2>{title}</h2>
+      <div className="shop-section-grid">
+        {items.map((item) => {
+          const isEquipped = equippedIds.has(item.id) || item.equipped
+          return (
+            <article key={item.id} className={`shop-cosmetic-card rarity-${item.rarity.toLowerCase()}`}>
+              <CosmeticBadge type={item.type} rarity={item.rarity} />
+              <strong>{item.name}</strong>
+              <p>{item.description}</p>
+              <span className="cosmetic-type">{cosmeticTypeLabel(item.type)} · {rarityLabel(item.rarity)}</span>
+              <div className="shop-card-actions">
+                <span><Coins size={14} /> {item.price}</span>
+                {isEquipped ? <button disabled>已装备</button> : item.owned ? <button onClick={() => void onEquip(item.id)}>装备</button> : <button onClick={() => void onPurchase(item.id)}>购买</button>}
+              </div>
+            </article>
+          )
+        })}
+      </div>
+    </section>
+  )
+}
+
+function AchievementsScreen() {
+  const [achievements, setAchievements] = useState<AchievementsResponse | null>(null)
+  const [daily, setDaily] = useState<DailyTasksResponse | null>(null)
+  const [category, setCategory] = useState('全部')
+  const load = useCallback(async () => {
+    const [achievementData, dailyData] = await Promise.all([api<AchievementsResponse>('/achievements'), api<DailyTasksResponse>('/daily-tasks')])
+    setAchievements(achievementData)
+    setDaily(dailyData)
+  }, [])
+  useEffect(() => { void load() }, [load])
+  const claimAchievement = async (achievementId: string) => setAchievements(await api<AchievementsResponse>(`/achievements/${achievementId}/claim`, { method: 'POST' }))
+  const claimTask = async (taskId: string) => setDaily(await api<DailyTasksResponse>(`/daily-tasks/${taskId}/claim`, { method: 'POST' }))
+  const refreshTasks = async () => setDaily(await api<DailyTasksResponse>('/daily-tasks/refresh', { method: 'POST' }))
+  const list = achievements?.achievements ?? []
+  const categories = ['全部', ...Array.from(new Set(list.map((entry) => entry.category)))]
+  const visible = category === '全部' ? list : list.filter((entry) => entry.category === category)
+  return (
+    <section className="achievements-screen">
+      <div className="screen-heading">
+        <div><p className="eyebrow">长期目标</p><h1>成就与每日任务</h1></div>
+        <span className="account-currency-pill"><Coins size={18} /> {achievements?.wallet.balance ?? 0}</span>
+      </div>
+      <section className="daily-task-panel">
+        <div className="panel-title-row"><h2>每日任务 {daily?.dateKey}</h2><button disabled={daily?.refreshUsed} onClick={() => void refreshTasks()}><RefreshCcw size={16} /> 刷新</button></div>
+        {daily?.tasks.map((task) => (
+          <div key={task.taskId} className="daily-task-row">
+            <div><strong>{task.def?.title ?? task.taskId}</strong><span>{task.def?.description}</span></div>
+            <progress value={task.progress} max={task.target} />
+            {task.claimedAt ? <button disabled>已领取</button> : task.progress >= task.target ? <button onClick={() => void claimTask(task.taskId)}>领取 {task.reward}</button> : <span>{task.progress}/{task.target}</span>}
+          </div>
+        ))}
+      </section>
+      <div className="achievement-tabs">{categories.map((item) => <button key={item} className={category === item ? 'active' : ''} onClick={() => setCategory(item)}>{item}</button>)}</div>
+      <div className="achievement-grid">
+        {visible.map((entry) => (
+          <article key={entry.id} className={`achievement-card ${entry.hidden ? 'hidden' : ''} ${entry.claimable ? 'claimable' : ''}`}>
+            <div><strong>{entry.title}</strong><span>{entry.category}</span></div>
+            <p>{entry.description}</p>
+            <progress value={entry.progress} max={entry.target} />
+            <div className="shop-card-actions">
+              <span>{entry.progress}/{entry.target} · {entry.reward}</span>
+              {entry.claimed ? <button disabled>已领取</button> : entry.claimable ? <button onClick={() => void claimAchievement(entry.id)}>领取</button> : <button disabled>未完成</button>}
+            </div>
+          </article>
+        ))}
+      </div>
+    </section>
+  )
+}
+
+function CosmeticBadge({ type, rarity }: { type: CosmeticType; rarity: CosmeticRarity }) {
+  const icon = type === 'TITLE' ? <Medal size={20} /> : type === 'AVATAR' ? <PawPrint size={20} /> : type === 'BACKGROUND' ? <House size={20} /> : type === 'DOG_SKIN' ? <Crown size={20} /> : <Sparkles size={20} />
+  return <span className={`cosmetic-badge rarity-${rarity.toLowerCase()}`}>{icon}</span>
+}
+
+function cosmeticTypeLabel(type: CosmeticType) {
+  return ({ TITLE: '称号', AVATAR: '头像', BACKGROUND: '主页背景', DOG_SKIN: '狗狗皮肤', BATTLE_EFFECT: '战斗特效' } as Record<CosmeticType, string>)[type]
+}
+
+function rarityLabel(rarity: CosmeticRarity) {
+  return ({ COMMON: '普通', RARE: '稀有', EPIC: '史诗', LEGENDARY: '传说' } as Record<CosmeticRarity, string>)[rarity]
+}
+
+function ModeLobby({ run, runHistory, onOpen, onEnterCasual, onReplayTutorial, onEnterLadder, onEnterDogfight, onEnterPeak, onEnterShop, onEnterAchievements }: { run: Run | null; runHistory: PlayerRunHistory; onOpen: () => void; onEnterCasual: () => void; onReplayTutorial: () => void; onEnterLadder: () => void; onEnterDogfight: () => void; onEnterPeak: () => void; onEnterShop: () => void; onEnterAchievements: () => void }) {
   const casualAction = run?.mode === 'CASUAL' ? '继续休闲模式' : '开始休闲模式'
   const ladderAction = run?.mode === 'LADDER' ? '继续天梯模式' : '进入天梯模式'
   return (
@@ -2071,6 +2193,10 @@ function ModeLobby({ run, runHistory, onOpen, onEnterCasual, onReplayTutorial, o
         <p>选择本次要进入的竞技方式。休闲或天梯完成后的狗可以送入巅峰竞技场。</p>
       </div>
         <ActionButton variant="secondary" className="tutorial-replay-button" type="button" onClick={onReplayTutorial}>新手引导</ActionButton>
+      <div className="account-hub-actions">
+        <button className="account-hub-button" onClick={onEnterShop}><ShoppingBag size={18} /> 商城</button>
+        <button className="account-hub-button" onClick={onEnterAchievements}><Medal size={18} /> 成就</button>
+      </div>
       <div className="mode-grid">
         {modeCards.map((mode) => (
           <HanddrawnFrame as="article" variant="card" ornament="corner" key={mode.id} className={`mode-card paper-card sticker-card ${mode.locked ? 'locked' : 'available'}`}>
@@ -5002,3 +5128,5 @@ function battleLogFilterLabel(filter: BattleLogFilter, t: ReturnType<typeof useL
   if (filter === 'equipment') return t('battleLogFilterEquipment')
   return t('battleLogFilterAll')
 }
+
+
