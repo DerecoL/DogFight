@@ -5255,9 +5255,9 @@ function BattleFxStage({ event, eventIndex, presentation, speed }: { event?: Bat
   return (
     <div ref={stageRef} className="battle-fx-stage" data-vfx-kind={battleVfxKind(event)} data-timeline={timeline.map((step) => step.phase).join(' ')}>
       <canvas ref={canvasRef} className="battle-fx-canvas handdrawn-fx-canvas" data-vfx-kind={battleVfxKind(event)} aria-hidden="true" />
-      {activeFxInstances.map((instance) => (
+      {activeFxInstances.filter((instance) => instance.presentation.kind === 'roll').map((instance) => (
         <span key={instance.id} className={`battle-feedback-burst ${instance.presentation.kind}`} aria-hidden="true">
-          {instance.presentation.kind === 'roll' ? instance.event.roll ?? '' : instance.presentation.amount ?? ''}
+          {instance.event.roll ?? ''}
         </span>
       ))}
     </div>

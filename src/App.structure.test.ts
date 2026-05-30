@@ -951,7 +951,7 @@ describe('selection screen structure', () => {
     expect(app).toContain('instancesRef.current')
     expect(app).toContain('battleFxCueKey(event, presentation, eventIndex)')
     expect(app).toContain('setActiveFxInstances')
-    expect(app).toContain('activeFxInstances.map')
+    expect(app).toContain("activeFxInstances.filter((instance) => instance.presentation.kind === 'roll').map")
     expect(app).toContain('survivors')
   })
 

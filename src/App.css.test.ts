@@ -359,21 +359,35 @@ describe('equipment layout scale', () => {
     expect(cssRule('.battle-item .battle-card-effect')).toContain('overflow: hidden')
   })
 
-  it('keeps the animated battle dice cube while hiding extra visible roll copy', () => {
+  it('keeps the animated battle dice cube and only puts roll results in the center burst', () => {
     expect(primitives).toContain('className="dynamic-dice-cube"')
     expect(primitives).toContain('className="dynamic-dice-face front"')
     expect(primitives).toContain('className="dynamic-dice-value"')
     expect(primitives).not.toContain('<span>{label}</span>')
     expect(app).not.toContain("instance.presentation.kind === 'roll' ? '掷'")
-    expect(app).toContain("instance.presentation.kind === 'roll' ? instance.event.roll ?? ''")
+    expect(app).toContain("{instance.event.roll ?? ''}")
+    expect(app).toContain("activeFxInstances.filter((instance) => instance.presentation.kind === 'roll').map((instance)")
+    expect(app).not.toContain("instance.presentation.kind === 'roll' ? instance.event.roll ?? '' : instance.presentation.amount ?? ''")
     expect(cssRule('.battle-dice.dynamic-dice .dynamic-dice-cube')).not.toContain('display: none')
     expect(cssRule('.battle-dice.dynamic-dice .dynamic-dice-cube')).toContain('transform-style: preserve-3d')
     expect(cssRule('.dynamic-dice-face')).toContain('position: absolute')
     expect(cssRule('.dynamic-dice-pips')).toContain('display: grid')
-    expect(cssRule('.dynamic-dice-player .dynamic-dice-value')).toContain('color: #14532d')
-    expect(cssRule('.dynamic-dice-opponent .dynamic-dice-value')).toContain('color: #7f1d1d')
+    expect(cssRule('.battle-dice b.dynamic-dice-value')).toContain('display: grid')
+    expect(cssRule('.battle-dice b.dynamic-dice-value')).toContain('border-radius: 999px')
     expect(cssRule('.battle-dice.rolling .dynamic-dice-value')).toContain('battleRollResultPop')
     expect(css).toContain('@keyframes battleRollResultPop')
+  })
+
+  it('renders the center battle dice as a tilted physical die with a stronger roll pop', () => {
+    expect(cssRule('.battle-dice.dynamic-dice')).toContain('--dice-size')
+    expect(cssRule('.battle-dice.dynamic-dice')).toContain('--dice-depth')
+    expect(cssRule('.battle-dice.dynamic-dice .dynamic-dice-cube')).toContain('filter: drop-shadow')
+    expect(cssRule('.battle-dice.dynamic-dice .dynamic-dice-cube')).toContain('rotateX(58deg) rotateZ(-10deg)')
+    expect(cssRule('.dynamic-dice-face.front')).toContain('border-radius: 18px')
+    expect(cssRule('.dynamic-dice-face.top')).toContain('translateZ(calc(var(--dice-size) - var(--dice-depth)))')
+    expect(cssRule('.dynamic-dice-face.side')).toContain('translateZ(calc(var(--dice-size) - var(--dice-depth)))')
+    expect(css).toContain('42% { transform: rotateX(238deg) rotateZ(30deg) translateY(-18px) scale(1.22); }')
+    expect(css).toContain('48% { transform: scale(1.48) rotate(4deg); filter: brightness(1.24); }')
   })
 
   it('keeps battle playback controls in one compact three-button row', () => {
