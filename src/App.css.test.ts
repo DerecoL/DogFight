@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 
 const css = readFileSync(new URL('./App.css', import.meta.url), 'utf8')
 const app = readFileSync(new URL('./App.tsx', import.meta.url), 'utf8')
+const primitives = readFileSync(new URL('./ui/primitives.tsx', import.meta.url), 'utf8')
 const uiCss = existsSync(new URL('./ui/handdrawn.css', import.meta.url))
   ? readFileSync(new URL('./ui/handdrawn.css', import.meta.url), 'utf8')
   : ''
@@ -66,15 +67,13 @@ describe('equipment layout scale', () => {
   })
 
   it('styles battle health as a bone framed bar with shield and poison layers', () => {
-    expect(uiCssRule('.bone-health .bone-health-bar')).toContain('border-radius: 999px')
-    expect(uiCssRule('.bone-health .bone-health-bar::before')).toContain('box-shadow')
-    expect(uiCssRule('.bone-health .bone-health-knob.left')).toContain('border-radius: 999px')
-    expect(uiCssRule('.bone-health .bone-health-knob::before, .bone-health .bone-health-knob::after')).toContain('border: 3px solid var(--handdrawn-bone-edge)')
-    expect(uiCssRule('.bone-health .bone-health-knob.left::before, .bone-health .bone-health-knob.right::before')).toContain('top: 0')
-    expect(uiCssRule('.bone-health .bone-health-knob.left::after, .bone-health .bone-health-knob.right::after')).toContain('bottom: 0')
+    expect(uiCssRule('.bone-health .bone-health-bar')).toContain('height: 44px')
+    expect(uiCssRule('.bone-health .bone-health-bar')).toContain('overflow: hidden')
+    expect(uiCssRule('.bone-health .bone-health-track')).toContain('fill: var(--handdrawn-bone-paper)')
+    expect(uiCssRule('.bone-health .bone-health-outline')).toContain('stroke: var(--handdrawn-bone-edge)')
     expect(uiCssRule('.bone-health .bone-health-fill')).toContain('transition: width')
-    expect(uiCssRule('.bone-health .bone-health-shield')).toContain('background')
-    expect(uiCssRule('.bone-health .bone-health-poison')).toContain('background')
+    expect(uiCssRule('.bone-health .bone-health-shield')).toContain('fill')
+    expect(uiCssRule('.bone-health .bone-health-poison')).toContain('fill')
   })
 
   it('keeps legacy hp descendant rules from overriding the bone health bar shape', () => {
@@ -82,18 +81,24 @@ describe('equipment layout scale', () => {
     expect(css).not.toContain('.hp i {')
     expect(css).not.toContain('.hp .hp-bar {')
     expect(css).not.toContain('.hp .hp-bar i {')
-    expect(uiCssRule('.bone-health .bone-health-bar')).toContain('overflow: visible')
-    expect(uiCssRule('.bone-health .bone-health-fill')).toContain('background: linear-gradient(90deg, #ff9f9f, #ec5f6d)')
+    expect(uiCssRule('.bone-health .bone-health-bar')).toContain('overflow: hidden')
+    expect(uiCssRule('.bone-health .bone-health-fill')).toContain('fill: #ec5f6d')
   })
 
-  it('keeps bone health endpoints separate from the fill track', () => {
-    expect(uiCssRule('.bone-health .bone-health-bar')).toContain('overflow: visible')
-    expect(uiCssRule('.bone-health .bone-health-bar')).toContain('background: linear-gradient(180deg, #fffdf6, var(--handdrawn-bone-paper))')
-    expect(uiCssRule('.bone-health .bone-health-bar > i.bone-health-knob')).toContain('bottom: auto')
-    expect(uiCssRule('.bone-health .bone-health-bar > i.bone-health-knob')).toContain('background: var(--handdrawn-bone-paper)')
-    expect(uiCssRule('.bone-health .bone-health-bar > i.bone-health-fill')).toContain('background: linear-gradient(90deg, #ff9f9f, #ec5f6d)')
-    expect(uiCssRule('.bone-health .bone-health-bar > i.bone-health-shield')).toContain('background: linear-gradient(90deg, rgba(96, 165, 250, .78), rgba(56, 189, 248, .9))')
-    expect(uiCssRule('.bone-health .bone-health-bar > i.bone-health-poison')).toContain('background: repeating-linear-gradient')
+  it('renders battle health as one clipped bone shape instead of separate endpoint pieces', () => {
+    expect(primitives).toContain('<svg className="bone-health-svg"')
+    expect(primitives).toContain('<clipPath id={clipId}>')
+    expect(primitives).toContain('className="bone-health-track"')
+    expect(primitives).toContain('className="bone-health-outline"')
+    expect(primitives).not.toContain('bone-health-knob')
+    expect(uiCssRule('.bone-health .bone-health-bar')).toContain('overflow: hidden')
+    expect(uiCssRule('.bone-health .bone-health-svg')).toContain('display: block')
+    expect(uiCssRule('.bone-health .bone-health-track')).toContain('fill: var(--handdrawn-bone-paper)')
+    expect(uiCssRule('.bone-health .bone-health-outline')).toContain('stroke: var(--handdrawn-bone-edge)')
+    expect(primitives).toContain('className="bone-health-fill hp-current"')
+    expect(primitives).toContain('className="bone-health-shield hp-shield"')
+    expect(primitives).toContain('className="bone-health-poison hp-preview poison"')
+    expect(primitives).toContain('clipPath={`url(#${clipId})`}')
   })
 
   it('styles the center dice as a readable front-facing handdrawn die', () => {
@@ -375,9 +380,10 @@ describe('equipment layout scale', () => {
     expect(cssRule('.paper-shop-card')).toContain('border: 0')
     expect(cssRule('.paper-shop-card')).toContain('filter: var(--shop-paper-filter)')
     expect(cssRule('.paper-shop-card::before')).toContain('inset: 0')
-    expect(cssRule('.paper-shop-card::before')).toContain('box-shadow: inset 0 0 0 var(--shop-paper-edge-width) var(--shop-paper-edge-ink)')
-    expect(cssRule('.paper-shop-card::before')).toContain('clip-path: inherit')
-    expect(cssRule('.paper-shop-card::after')).toContain('clip-path: inherit')
+    expect(cssRule('.paper-shop-card::before')).toContain('inset 0 0 0 var(--shop-paper-edge-width) var(--shop-paper-edge-ink)')
+    expect(cssRule('.paper-shop-card::before')).toContain('filter: var(--shop-paper-filter)')
+    expect(cssRule('.paper-shop-card::before')).toContain('clip-path: var(--shop-paper-cut)')
+    expect(cssRule('.paper-shop-card::after')).toContain('clip-path: var(--shop-paper-cut)')
     expect(css).not.toMatch(/\.item-card\.quality-bronze,\s*\.shop-card\.quality-bronze,\s*\.tip-tag\.quality-bronze\s*\{[^}]*border-width:\s*5px/s)
     expect(css).not.toMatch(/\.item-card\.quality-silver,\s*\.shop-card\.quality-silver,\s*\.tip-tag\.quality-silver\s*\{[^}]*border-width:\s*5px/s)
     expect(css).not.toMatch(/\.paper-shop-card\.quality-bronze,\s*\.paper-shop-card\.quality-silver,\s*\.paper-shop-card\.quality-gold,\s*\.paper-shop-card\.quality-diamond\s*\{[^}]*border:/s)
@@ -423,9 +429,30 @@ describe('equipment layout scale', () => {
     expect(cssRule('.paper-shop-card::after')).toContain('z-index: 1')
     expect(cssRule('.paper-shop-card > *')).toContain('z-index: 2')
     expect(cssRule('.paper-shop-card:hover')).not.toContain('var(--paper-edge-stroke)')
-    expect(lastCssRule('.paper-shop-card.paper-item-card.item-card')).toContain('box-shadow: var(--shop-paper-shadow)')
+    expect(lastCssRule('.paper-shop-card.paper-item-card.item-card::before')).toContain('box-shadow: var(--shop-paper-shadow)')
     expect(lastCssRule('.paper-shop-card.paper-item-card.item-card::before')).toContain('-webkit-mask: none')
     expect(lastCssRule('.paper-shop-card.paper-item-card.item-card::after')).toContain('animation: none')
+  })
+
+  it('gives shop paper notes visible depth without changing their note silhouette', () => {
+    expect(cssRule('.paper-shop-card')).toContain('--shop-paper-contact-shadow')
+    expect(cssRule('.paper-shop-card')).toContain('--shop-paper-depth-filter')
+    expect(cssRule('.paper-shop-card')).toContain('var(--shop-paper-contact-shadow)')
+    expect(cssRule('.paper-shop-card')).toContain('filter: var(--shop-paper-filter)')
+    expect(cssRule('.paper-shop-card::before')).toContain('inset 0 -7px 0 rgba(112, 72, 30, .16)')
+    expect(cssRule('.paper-shop-card:hover')).toContain('--shop-paper-contact-shadow-hover')
+    expect(cssRule('.paper-shop-card:hover')).toContain('filter: var(--shop-paper-filter-hover)')
+  })
+
+  it('renders shop quality glow from the clipped paper outline instead of the host rectangle', () => {
+    expect(cssRule('.paper-shop-card')).not.toContain('clip-path: var(--shop-paper-cut')
+    expect(lastCssRule('.paper-shop-card.paper-item-card.item-card')).toContain('background: transparent')
+    expect(lastCssRule('.paper-shop-card.paper-item-card.item-card')).toContain('box-shadow: none')
+    expect(lastCssRule('.paper-shop-card.paper-item-card.item-card::before')).toContain('clip-path: var(--shop-paper-cut')
+    expect(lastCssRule('.paper-shop-card.paper-item-card.item-card::before')).toContain('box-shadow: var(--shop-paper-shadow)')
+    expect(lastCssRule('.paper-shop-card.paper-item-card.item-card::before')).toContain('filter: var(--shop-paper-filter)')
+    expect(lastCssRule('.paper-shop-card.paper-item-card.item-card:hover::before')).toContain('filter: var(--shop-paper-filter-hover)')
+    expect(lastCssRule('.paper-shop-card.paper-item-card.item-card.selected::before')).toContain('filter: var(--shop-paper-filter-hover)')
   })
 
   it('adds fourth-pass handdrawn detail to history, tips, relics, and reward choices', () => {
@@ -454,6 +481,14 @@ describe('equipment layout scale', () => {
     expect(cssRule('.player-history-page::before')).toContain('radial-gradient')
     expect(cssRule('.history-detail-row.selected::before')).toContain('var(--selection-wash)')
     expect(cssRule('.history-empty-state::before')).toContain('border')
+  })
+
+  it('keeps historical equipment previews bounded inside the run detail panel', () => {
+    expect(cssRule('.history-equipment-preview')).toContain('--slot-h: 82px')
+    expect(cssRule('.history-equipment-preview .battle-slot-grid')).toContain('overflow: hidden')
+    expect(cssRule('.history-equipment-preview .battle-item')).toContain('overflow: hidden')
+    expect(cssRule('.history-equipment-preview .item-effect')).toContain('display: none')
+    expect(cssRule('.history-equipment-preview .item-card-icon-art')).toContain('width: 34px')
   })
 
   it('adds battle vfx causality styling for triggers, targets, and handwritten feedback', () => {

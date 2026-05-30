@@ -3716,6 +3716,47 @@ input {
   --slot-h: 82px;
 }
 
+.history-equipment-preview .battle-slot-grid {
+  overflow: hidden;
+}
+
+.history-equipment-preview .battle-item {
+  min-height: 0;
+  padding: 6px 4px;
+  overflow: hidden;
+  align-content: center;
+  gap: 2px;
+  font-size: 10px;
+}
+
+.history-equipment-preview .item-art-window {
+  width: 42px;
+  height: 42px;
+  min-height: 0;
+  max-width: 42px;
+}
+
+.history-equipment-preview .item-card-icon-art {
+  width: 34px;
+  height: 34px;
+}
+
+.history-equipment-preview .item-card-copy {
+  width: 100%;
+  display: grid;
+  gap: 1px;
+  background: transparent;
+}
+
+.history-equipment-preview .item-effect {
+  display: none;
+}
+
+.history-equipment-preview .size-preview,
+.history-equipment-preview .item-card small {
+  display: none;
+}
+
 .mode-card {
   position: relative;
   min-height: 230px;
@@ -4761,30 +4802,48 @@ input {
     0 0 0 2px color-mix(in srgb, var(--shop-quality-glow) 64%, transparent),
     0 0 26px color-mix(in srgb, var(--shop-quality-glow) 86%, transparent),
     0 0 58px var(--shop-quality-glow-strong);
+  --shop-paper-contact-shadow:
+    0 2px 0 rgba(255, 255, 255, .46),
+    0 7px 0 -2px rgba(61, 45, 37, .18),
+    0 16px 24px -10px rgba(61, 45, 37, .24);
+  --shop-paper-contact-shadow-hover:
+    0 2px 0 rgba(255, 255, 255, .52),
+    0 9px 0 -3px rgba(61, 45, 37, .16),
+    0 22px 30px -12px rgba(61, 45, 37, .26);
+  --shop-paper-depth-filter:
+    drop-shadow(3px 6px 0 rgba(61, 45, 37, .16))
+    drop-shadow(0 14px 11px rgba(61, 45, 37, .14));
+  --shop-paper-depth-filter-hover:
+    drop-shadow(4px 8px 0 rgba(61, 45, 37, .14))
+    drop-shadow(0 19px 14px rgba(61, 45, 37, .16));
   --shop-paper-filter:
     drop-shadow(0 0 5px var(--shop-quality-glow))
     drop-shadow(0 0 16px var(--shop-quality-glow))
     drop-shadow(0 0 36px var(--shop-quality-glow-strong))
-    drop-shadow(0 0 70px color-mix(in srgb, var(--shop-quality-glow) 62%, transparent));
+    drop-shadow(0 0 70px color-mix(in srgb, var(--shop-quality-glow) 62%, transparent))
+    var(--shop-paper-depth-filter);
   --shop-paper-filter-hover:
     drop-shadow(0 0 7px var(--shop-quality-glow))
     drop-shadow(0 0 22px var(--shop-quality-glow))
     drop-shadow(0 0 46px var(--shop-quality-glow-strong))
-    drop-shadow(0 0 86px color-mix(in srgb, var(--shop-quality-glow) 70%, transparent));
+    drop-shadow(0 0 86px color-mix(in srgb, var(--shop-quality-glow) 70%, transparent))
+    var(--shop-paper-depth-filter);
   --shop-paper-tone:
     var(--paper-grain),
     radial-gradient(circle at 16% 18%, rgba(255, 255, 255, .55), transparent 24%),
     linear-gradient(180deg, #fffdf4, #f3dfbd);
-  --shop-paper-shadow: var(--shop-quality-glow-ring), 0 12px 22px rgba(112, 72, 30, .16), 2px 4px 0 rgba(61, 45, 37, .12);
-  --shop-paper-shadow-hover: var(--shop-quality-glow-ring-hover), 0 16px 30px rgba(112, 72, 30, .18), 3px 5px 0 rgba(61, 45, 37, .14);
+  --shop-paper-cut: polygon(1% 2%, 28% 0, 58% 1.4%, 98% 0, 100% 78%, 98% 99%, 61% 98%, 31% 100%, 0 98%, 1.2% 54%);
+  --shop-paper-shadow: var(--shop-quality-glow-ring), var(--shop-paper-contact-shadow);
+  --shop-paper-shadow-hover: var(--shop-quality-glow-ring-hover), var(--shop-paper-contact-shadow-hover);
   transform-origin: 50% 65%;
   transform: translateY(var(--shop-paper-y, 0)) rotate(var(--paper-tilt));
   border: 0;
   border-radius: var(--shop-paper-radius, 10px 13px 9px 12px);
-  background: var(--shop-paper-tone);
+  background: transparent;
   box-shadow: var(--shop-paper-shadow);
   filter: var(--shop-paper-filter);
-  clip-path: var(--shop-paper-cut, polygon(1% 2%, 28% 0, 58% 1.4%, 98% 0, 100% 78%, 98% 99%, 61% 98%, 31% 100%, 0 98%, 1.2% 54%));
+  clip-path: none;
+  overflow: visible;
 }
 
 .paper-shop-card > * {
@@ -4876,10 +4935,12 @@ input {
   border: 0;
   background:
     linear-gradient(100deg, rgba(255, 255, 255, .24), transparent 36%, rgba(112, 72, 30, .07)),
-    var(--paper-fiber);
-  box-shadow: inset 0 0 0 var(--shop-paper-edge-width) var(--shop-paper-edge-ink), inset 0 2px 0 rgba(255, 255, 255, .64), inset 0 -4px 0 rgba(112, 72, 30, .10);
+    var(--paper-fiber),
+    var(--shop-paper-tone);
+  box-shadow: var(--shop-paper-shadow), inset 0 0 0 var(--shop-paper-edge-width) var(--shop-paper-edge-ink), inset 0 2px 0 rgba(255, 255, 255, .64), inset 0 -7px 0 rgba(112, 72, 30, .16), inset 0 -13px 18px rgba(61, 45, 37, .08);
+  filter: var(--shop-paper-filter);
   opacity: .9;
-  clip-path: inherit;
+  clip-path: var(--shop-paper-cut);
   transform: none;
 }
 
@@ -4892,7 +4953,7 @@ input {
   box-shadow: none;
   opacity: .64;
   mix-blend-mode: multiply;
-  clip-path: inherit;
+  clip-path: var(--shop-paper-cut);
 }
 
 .paper-shop-card.quality-gold::before,
@@ -4905,12 +4966,16 @@ input {
   border-radius: inherit;
   background:
     linear-gradient(100deg, rgba(255, 255, 255, .24), transparent 36%, rgba(112, 72, 30, .07)),
-    var(--paper-fiber);
+    var(--paper-fiber),
+    var(--shop-paper-tone);
   box-shadow:
+    var(--shop-paper-shadow),
     inset 0 0 0 var(--shop-paper-edge-width) var(--shop-paper-edge-ink),
     inset 0 2px 0 rgba(255, 255, 255, .64),
-    inset 0 -4px 0 rgba(112, 72, 30, .10);
-  clip-path: inherit;
+    inset 0 -7px 0 rgba(112, 72, 30, .16),
+    inset 0 -13px 18px rgba(61, 45, 37, .08);
+  filter: var(--shop-paper-filter);
+  clip-path: var(--shop-paper-cut);
 }
 
 .paper-shop-card.quality-diamond::after {
@@ -4927,16 +4992,28 @@ input {
     radial-gradient(circle at 20% 26%, rgba(61, 45, 37, .035) 0 1px, transparent 1.7px),
     repeating-linear-gradient(88deg, rgba(61, 45, 37, .025) 0 1px, transparent 1px 13px);
   transform: none;
-  clip-path: inherit;
+  clip-path: var(--shop-paper-cut);
 }
 
 .paper-shop-card:hover {
+  --shop-paper-contact-shadow: var(--shop-paper-contact-shadow-hover);
+  --shop-paper-depth-filter: var(--shop-paper-depth-filter-hover);
   transform: translateY(calc(var(--shop-paper-y, 0px) - 2px)) rotate(var(--paper-tilt));
   box-shadow: var(--shop-paper-shadow-hover);
   filter: var(--shop-paper-filter-hover);
 }
 
+.paper-shop-card:hover::before {
+  box-shadow: var(--shop-paper-shadow-hover), inset 0 0 0 var(--shop-paper-edge-width) var(--shop-paper-edge-ink), inset 0 2px 0 rgba(255, 255, 255, .64), inset 0 -7px 0 rgba(112, 72, 30, .16), inset 0 -13px 18px rgba(61, 45, 37, .08);
+  filter: var(--shop-paper-filter-hover);
+}
+
 .paper-shop-card.selected {
+  filter: var(--shop-paper-filter-hover);
+}
+
+.paper-shop-card.selected::before {
+  box-shadow: var(--shop-paper-shadow-hover), inset 0 0 0 var(--shop-paper-edge-width) var(--shop-paper-edge-ink), inset 0 2px 0 rgba(255, 255, 255, .64), inset 0 -7px 0 rgba(112, 72, 30, .16), inset 0 -13px 18px rgba(61, 45, 37, .08);
   filter: var(--shop-paper-filter-hover);
 }
 
@@ -5169,7 +5246,11 @@ input {
 
 .paper-shop-card.paper-item-card.item-card {
   border: 0;
-  box-shadow: var(--shop-paper-shadow);
+  background: transparent;
+  box-shadow: none;
+  filter: none;
+  clip-path: none;
+  overflow: visible;
 }
 
 .paper-shop-card.paper-item-card.item-card::before {
@@ -5182,11 +5263,13 @@ input {
   border-radius: inherit;
   background:
     linear-gradient(100deg, rgba(255, 255, 255, .24), transparent 36%, rgba(112, 72, 30, .07)),
-    var(--paper-fiber);
-  box-shadow: inset 0 0 0 var(--shop-paper-edge-width) var(--shop-paper-edge-ink), inset 0 2px 0 rgba(255, 255, 255, .64), inset 0 -4px 0 rgba(112, 72, 30, .10);
+    var(--paper-fiber),
+    var(--shop-paper-tone);
+  box-shadow: var(--shop-paper-shadow), inset 0 0 0 var(--shop-paper-edge-width) var(--shop-paper-edge-ink), inset 0 2px 0 rgba(255, 255, 255, .64), inset 0 -7px 0 rgba(112, 72, 30, .16), inset 0 -13px 18px rgba(61, 45, 37, .08);
+  filter: var(--shop-paper-filter);
   opacity: .9;
   mix-blend-mode: normal;
-  clip-path: inherit;
+  clip-path: var(--shop-paper-cut);
   transform: none;
   -webkit-mask: none;
   mask: none;
@@ -5210,7 +5293,7 @@ input {
   box-shadow: none;
   opacity: .64;
   mix-blend-mode: multiply;
-  clip-path: inherit;
+  clip-path: var(--shop-paper-cut);
   transform: none;
   animation: none;
   -webkit-mask: none;
@@ -5218,14 +5301,28 @@ input {
 }
 
 .paper-shop-card.paper-item-card.item-card:hover {
-  box-shadow: var(--shop-paper-shadow-hover);
+  box-shadow: none;
+}
+
+.paper-shop-card.paper-item-card.item-card:hover::before {
+  box-shadow: var(--shop-paper-shadow-hover), inset 0 0 0 var(--shop-paper-edge-width) var(--shop-paper-edge-ink), inset 0 2px 0 rgba(255, 255, 255, .64), inset 0 -7px 0 rgba(112, 72, 30, .16), inset 0 -13px 18px rgba(61, 45, 37, .08);
+  filter: var(--shop-paper-filter-hover);
 }
 
 .paper-shop-card.paper-item-card.item-card.selected {
-  box-shadow: 0 0 0 4px var(--selection-wash), var(--shop-paper-shadow-hover);
+  box-shadow: none;
+}
+
+.paper-shop-card.paper-item-card.item-card.selected::before {
+  box-shadow: 0 0 0 4px var(--selection-wash), var(--shop-paper-shadow-hover), inset 0 0 0 var(--shop-paper-edge-width) var(--shop-paper-edge-ink), inset 0 2px 0 rgba(255, 255, 255, .64), inset 0 -7px 0 rgba(112, 72, 30, .16), inset 0 -13px 18px rgba(61, 45, 37, .08);
+  filter: var(--shop-paper-filter-hover);
 }
 
 .paper-shop-card.paper-item-card.item-card.shop-card-owned {
+  box-shadow: none;
+}
+
+.paper-shop-card.paper-item-card.item-card.shop-card-owned::before {
   box-shadow:
     var(--shop-quality-glow-ring),
     inset 0 -22px 0 rgba(34, 168, 111, .10),
@@ -5235,7 +5332,12 @@ input {
 
 .paper-shop-card.paper-item-card.item-card.shop-card-unaffordable,
 .paper-shop-card.paper-item-card.item-card.shop-card-unaffordable:hover {
-  box-shadow: var(--shop-paper-shadow);
+  box-shadow: none;
+}
+
+.paper-shop-card.paper-item-card.item-card.shop-card-unaffordable::before,
+.paper-shop-card.paper-item-card.item-card.shop-card-unaffordable:hover::before {
+  box-shadow: var(--shop-paper-shadow), inset 0 0 0 var(--shop-paper-edge-width) var(--shop-paper-edge-ink), inset 0 2px 0 rgba(255, 255, 255, .64), inset 0 -7px 0 rgba(112, 72, 30, .16), inset 0 -13px 18px rgba(61, 45, 37, .08);
 }
 
 .paper-shop-card.shop-card {

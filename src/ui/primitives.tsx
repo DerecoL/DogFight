@@ -1,4 +1,4 @@
-import { forwardRef } from 'react'
+import { forwardRef, useId } from 'react'
 import type { ButtonHTMLAttributes, ForwardedRef, HTMLAttributes, ReactNode } from 'react'
 
 function joinClasses(...classes: Array<string | false | null | undefined>) {
@@ -210,27 +210,36 @@ export function BoneHealthBar({
   children,
   ...props
 }: BoneHealthBarProps) {
+  const rawClipId = useId()
+  const clipId = `bone-health-${rawClipId.replace(/:/g, '')}`
   const hpPercent = maxHp > 0 ? (hp / maxHp) * 100 : 0
   const shieldValue = Math.max(0, Math.round(shield))
   const shieldPercent = maxHp > 0 ? (shieldValue / maxHp) * 100 : 0
   const poisonPreviewPercent = maxHp > 0 ? (poisonPreviewDamage / maxHp) * 100 : 0
   const poisonPreviewLeft = Math.max(0, Math.min(100, hpPercent - poisonPreviewPercent))
+  const hpWidth = Math.max(0, Math.min(100, hpPercent))
+  const shieldWidth = Math.max(6, Math.min(100, shieldPercent))
+  const poisonLeft = Math.max(0, Math.min(100, poisonPreviewLeft))
+  const poisonWidth = Math.max(3, Math.min(100, poisonPreviewPercent))
+  const bonePath = 'M31 10 C33 5 38 2 43 4 C48 6 50 11 48 16 L192 16 C190 11 192 6 197 4 C202 2 207 5 209 10 C214 8 220 10 223 15 C226 20 224 26 219 29 C222 35 219 41 213 42 C207 43 203 39 202 34 L38 34 C37 39 33 43 27 42 C21 41 18 35 21 29 C16 26 14 20 17 15 C20 10 26 8 31 10 Z'
 
   return (
     <div className={joinClasses('hp', 'bone-health', side && `bone-health-${side}`, className)} {...props}>
       <span className="bone-health-title">{name}</span>
       {statusSlotTop}
       <div className="bone-health-bar hp-bar" aria-label={`${name} ${Math.max(0, Math.round(hp))}/${maxHp}`}>
-        <i className="bone-health-knob left" aria-hidden="true" />
-        <i className="bone-health-knob right" aria-hidden="true" />
-        {shieldValue > 0 && <i className="bone-health-shield hp-shield" style={{ width: `${Math.max(6, Math.min(100, shieldPercent))}%` }} />}
-        <i className="bone-health-fill hp-current" style={{ width: `${Math.max(0, Math.min(100, hpPercent))}%` }} />
-        {poisonPreviewPercent > 0 && (
-          <i
-            className="bone-health-poison hp-preview poison"
-            style={{ left: `${poisonPreviewLeft}%`, width: `${Math.max(3, Math.min(100, poisonPreviewPercent))}%` }}
-          />
-        )}
+        <svg className="bone-health-svg" viewBox="0 0 240 44" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+          <defs>
+            <clipPath id={clipId}>
+              <path d={bonePath} />
+            </clipPath>
+          </defs>
+          <path className="bone-health-track" d={bonePath} />
+          <rect className="bone-health-fill hp-current" x="0" y="0" width={`${hpWidth}%`} height="44" clipPath={`url(#${clipId})`} />
+          {shieldValue > 0 && <rect className="bone-health-shield hp-shield" x="0" y="0" width={`${shieldWidth}%`} height="44" clipPath={`url(#${clipId})`} />}
+          {poisonPreviewPercent > 0 && <rect className="bone-health-poison hp-preview poison" x={`${poisonLeft}%`} y="0" width={`${poisonWidth}%`} height="44" clipPath={`url(#${clipId})`} />}
+          <path className="bone-health-outline" d={bonePath} />
+        </svg>
       </div>
       {statusSlotBottom}
       <b>{Math.max(0, Math.round(hp))}/{maxHp}</b>
