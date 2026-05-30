@@ -500,55 +500,6 @@ export function buildApp() {
     return { history: publicRunHistory(runs) }
   })
 
-  app.get('/api/achievements', async (request) => {
-    const userId = requireUser(request.userId)
-    return getAchievements(userId)
-  })
-
-  app.post('/api/achievements/:achievementId/claim', async (request) => {
-    const userId = requireUser(request.userId)
-    const { achievementId } = z.object({ achievementId: z.string() }).parse(request.params)
-    return claimAchievement(userId, achievementId)
-  })
-
-  app.get('/api/daily-tasks', async (request) => {
-    const userId = requireUser(request.userId)
-    return getDailyTasks(userId)
-  })
-
-  app.post('/api/daily-tasks/refresh', async (request) => {
-    const userId = requireUser(request.userId)
-    return refreshDaily(userId)
-  })
-
-  app.post('/api/daily-tasks/:taskId/claim', async (request) => {
-    const userId = requireUser(request.userId)
-    const { taskId } = z.object({ taskId: z.string() }).parse(request.params)
-    return claimDaily(userId, taskId)
-  })
-
-  app.get('/api/shop', async (request) => {
-    const userId = requireUser(request.userId)
-    return getShop(userId)
-  })
-
-  app.post('/api/shop/purchase', async (request) => {
-    const userId = requireUser(request.userId)
-    const body = z.object({ catalogItemId: z.string() }).parse(request.body)
-    return purchaseShopItem(userId, body.catalogItemId)
-  })
-
-  app.get('/api/cosmetics/me', async (request) => {
-    const userId = requireUser(request.userId)
-    return getCosmetics(userId)
-  })
-
-  app.post('/api/cosmetics/equip', async (request) => {
-    const userId = requireUser(request.userId)
-    const body = z.object({ catalogItemId: z.string() }).parse(request.body)
-    return equipUserCosmetic(userId, body.catalogItemId)
-  })
-
   app.post('/api/runs', async (request, reply) => {
     const userId = requireUser(request.userId)
     const parsed = z.object({
