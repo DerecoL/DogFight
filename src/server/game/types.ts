@@ -245,6 +245,10 @@ export type BattleEvent = {
   boomCounterValue?: number
   boomCounterMax?: number
   boomCounterChanged?: boolean
+  freezeStackItemId?: string
+  freezeStackValue?: number
+  freezeStackMax?: number
+  freezeStackChanged?: boolean
   effectType?: ItemDef['effect']['type'] | 'POISON' | 'ROLL'
   amount?: number
   target?: 'player' | 'opponent' | 'both' | 'none'

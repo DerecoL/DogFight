@@ -120,6 +120,7 @@ type SurpriseBackgroundId = 'classReward' | 'enchant' | 'settlement'
 type PendingShopAction = 'buy' | 'reroll' | null
 
 const BOOM_COUNTER_TRIGGER_THRESHOLD = 50
+const FREEZE_STACK_TRIGGER_THRESHOLD = 10
 const HANDDRAWN_FONT_STACK = '"Comic Sans MS", "Microsoft YaHei", "KaiTi", "Kaiti SC", "DFKai-SB", cursive, sans-serif'
 
 type ItemDef = {
@@ -204,6 +205,10 @@ type BattleEvent = {
   boomCounterValue?: number
   boomCounterMax?: number
   boomCounterChanged?: boolean
+  freezeStackItemId?: string
+  freezeStackValue?: number
+  freezeStackMax?: number
+  freezeStackChanged?: boolean
   effectType?: string
   amount?: number
   target?: BattleTarget
@@ -1176,6 +1181,16 @@ function boomCounterStateForBattleItem(item: Item, owner: 'player' | 'opponent',
   const count = Math.max(0, Math.min(max, latest?.boomCounterValue ?? 0))
   const progress = max > 0 ? Math.round((count / max) * 100) : 0
   const popping = activeEvent?.actor === owner && activeEvent.boomCounterItemId === item.id && activeEvent.boomCounterChanged === true
+  return { count, max, progress, popping }
+}
+
+function freezeStackStateForBattleItem(item: Item, owner: 'player' | 'opponent', events: BattleEvent[], displayIndex: number, activeEvent?: BattleEvent) {
+  if (item.def.advancedEffect !== 'FREEZE_STACK') return null
+  const latest = events.slice(0, displayIndex + 1).reverse().find((event) => event.actor === owner && event.freezeStackItemId === item.id)
+  const max = latest?.freezeStackMax ?? FREEZE_STACK_TRIGGER_THRESHOLD
+  const count = Math.max(0, Math.min(max, latest?.freezeStackValue ?? 0))
+  const progress = max > 0 ? Math.round((count / max) * 100) : 0
+  const popping = activeEvent?.actor === owner && activeEvent.freezeStackItemId === item.id && activeEvent.freezeStackChanged === true
   return { count, max, progress, popping }
 }
 
@@ -5024,6 +5039,7 @@ function BattleEquipmentRow({ owner, snapshot, events, displayIndex, activeEvent
         {items.map((item) => {
           const growthText = growthDamageTextForBattleItem(item, owner, events, displayIndex)
           const boomCounterState = boomCounterStateForBattleItem(item, owner, events, displayIndex, activeEvent)
+          const freezeStackState = freezeStackStateForBattleItem(item, owner, events, displayIndex, activeEvent)
           const reservoirState = reservoirStateForBattleItem(activeEvent, owner, item.id)
           const triggerDice = triggerDiceLabel(itemTriggerDisplay(item), snapshot.relics ?? [])
           const extraTriggerDice = extraTriggerDiceLabel(itemTriggerDisplay(item), snapshot.relics ?? [])
@@ -5039,7 +5055,7 @@ function BattleEquipmentRow({ owner, snapshot, events, displayIndex, activeEvent
             as="button"
             type="button"
             key={item.id}
-            className={`battle-item item-card paper-item-card ${itemTone(item.def)} ${qualityClass(item.quality)} ${activeItemId === item.id ? `active battle-item-trigger vfx-trigger-${activeVfxKind}` : ''} ${targetItemIds.includes(item.id) ? 'battle-item-vfx-target' : ''} ${boomCounterState ? 'boom-counter' : ''} ${boomCounterState?.popping ? 'boom-counter-pop' : ''} ${reservoirState ? 'frog-reservoir-card' : ''} ${triggerCountPopping ? 'trigger-count-pop' : ''}`}
+            className={`battle-item item-card paper-item-card ${itemTone(item.def)} ${qualityClass(item.quality)} ${activeItemId === item.id ? `active battle-item-trigger vfx-trigger-${activeVfxKind}` : ''} ${targetItemIds.includes(item.id) ? 'battle-item-vfx-target' : ''} ${boomCounterState ? 'boom-counter' : ''} ${boomCounterState?.popping ? 'boom-counter-pop' : ''} ${freezeStackState ? 'freeze-stack' : ''} ${freezeStackState?.popping ? 'freeze-stack-pop' : ''} ${reservoirState ? 'frog-reservoir-card' : ''} ${triggerCountPopping ? 'trigger-count-pop' : ''}`}
             {...battleVfxAnchorAttrs('equipment-row', owner, item.id)}
             data-vfx-kind={battleVfxKind(activeEvent)}
             style={{
@@ -5071,6 +5087,12 @@ function BattleEquipmentRow({ owner, snapshot, events, displayIndex, activeEvent
               <span className="boom-counter-meter" aria-label={`爆鸣计数 ${boomCounterState.count}/${boomCounterState.max}`}>
                 <i style={{ width: `${boomCounterState.progress}%` }} />
                 <b>{boomCounterState?.count}/{boomCounterState.max}</b>
+              </span>
+            )}
+            {freezeStackState && (
+              <span className="freeze-stack-meter" aria-label={`冻结计数 ${freezeStackState.count}/${freezeStackState.max}`}>
+                <i style={{ width: `${freezeStackState.progress}%` }} />
+                <b>{freezeStackState.count}/{freezeStackState.max}</b>
               </span>
             )}
             <span className={`trigger-count-stamp ${triggerCountLabel === 'x0' ? 'empty' : ''}`} aria-label={`褰撳眬瑙﹀彂娆℃暟 ${triggerCountLabel}`}>

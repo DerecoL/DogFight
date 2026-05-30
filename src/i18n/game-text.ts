@@ -161,6 +161,7 @@ export const ruleTermTextByTerm: Record<string, RuleTermText> = {
   '虚弱': { term: 'Weak', description: 'Negative effect. The target next attack deals 50% less damage, then consumes 1 stack.', note: 'Some shield-immunity gear halves incoming Weak stacks.' },
   '伤口': { term: 'Wound', description: 'Negative effect. Each stack increases direct attack damage taken by 1. It does not affect Poison, Thorns, or other non-direct damage.', note: 'Patting Bear applies Wound.' },
   '冻结': { term: 'Freeze', description: 'Negative effect. While frozen, rolls and item triggers are skipped until the remaining time reaches zero.', note: 'Absolute Zero freezes the enemy after 10 Freeze counts.' },
+  '冻结计数': { term: 'Freeze Count', description: 'Absolute Zero count. Each successful high-roll Absolute Zero trigger adds 1 count.', note: 'At 10 counts, it clears and freezes the enemy for 2 seconds.' },
   '大型物品': { term: 'Large Item', description: 'An item with size 4. With Bully Armband, size-3 items also count as large.', note: 'Bully class and some shops or relics care about large items.' },
   '中型物品': { term: 'Medium Item', description: 'An item with size 2 or 3.', note: 'Medium shops favor these items.' },
   '小型物品': { term: 'Small Item', description: 'An item with size 1.', note: 'Small shops favor these items.' },

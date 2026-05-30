@@ -58,6 +58,7 @@ const BULLY_LARGE_EFFECT_CHANCE = 0.4
 const EMPEROR_LUCKY_EFFECT_CHANCE = 0.5
 const TRIGGER_QUEUE_CAP = 40
 const EXTRA_ROLL_CHAIN_CAP = 12
+const FREEZE_STACK_TRIGGER_THRESHOLD = 10
 const MAX_BATTLE_TIME = 120
 const TIME_EPSILON = 0.000001
 const BASE_MAX_HP = 100
@@ -90,6 +91,10 @@ type ItemTrigger = {
   boomCounterValue?: number
   boomCounterMax?: number
   boomCounterChanged?: boolean
+  freezeStackItemId?: string
+  freezeStackValue?: number
+  freezeStackMax?: number
+  freezeStackChanged?: boolean
   safetyCode?: BattleSafetyCode
 }
 
@@ -1314,11 +1319,20 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
       }
     }
     if (!sacrificeReplacesSmallEffect && advanced === 'FREEZE_STACK' && roll >= 4) {
-      actorState.freezeStacks += 1
-      if (actorState.freezeStacks >= 10) {
+      const nextFreezeStacks = actorState.freezeStacks + 1
+      const freezeStackSignal = {
+        freezeStackItemId: item.id,
+        freezeStackValue: nextFreezeStacks >= FREEZE_STACK_TRIGGER_THRESHOLD ? 0 : nextFreezeStacks,
+        freezeStackMax: FREEZE_STACK_TRIGGER_THRESHOLD,
+        freezeStackChanged: true,
+      }
+      actorState.freezeStacks = nextFreezeStacks
+      if (actorState.freezeStacks >= FREEZE_STACK_TRIGGER_THRESHOLD) {
         actorState.freezeStacks = 0
         targetState.frozenUntil = Math.max(targetState.frozenUntil, time + 2)
-        triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'UTILITY', amount: 2, target: targetSide, sourceHp: getHp(actorSide), targetHp: getHp(targetSide), sourceHpDelta: 0, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 【冻结】敌人 2 秒` })
+        triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'UTILITY', amount: 2, target: targetSide, sourceHp: getHp(actorSide), targetHp: getHp(targetSide), sourceHpDelta: 0, targetHpDelta: 0, roll, ...freezeStackSignal, text: `${itemName(def, quality)} 【冻结】敌人 2 秒` })
+      } else {
+        triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'UTILITY', amount: nextFreezeStacks, target: actorSide, sourceHp: getHp(actorSide), targetHp: getHp(targetSide), sourceHpDelta: 0, targetHpDelta: 0, roll, ...freezeStackSignal, text: `${itemName(def, quality)} 【冻结计数】 +${nextFreezeStacks}/${FREEZE_STACK_TRIGGER_THRESHOLD}` })
       }
     }
     if (!sacrificeReplacesSmallEffect && advanced === 'PURGE_ENEMY_BUFFS') {
@@ -1595,6 +1609,10 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
           boomCounterValue: trigger.boomCounterValue,
           boomCounterMax: trigger.boomCounterMax,
           boomCounterChanged: trigger.boomCounterChanged,
+          freezeStackItemId: trigger.freezeStackItemId,
+          freezeStackValue: trigger.freezeStackValue,
+          freezeStackMax: trigger.freezeStackMax,
+          freezeStackChanged: trigger.freezeStackChanged,
           effectType: trigger.effectType,
           amount: trigger.amount,
           target: trigger.target,

@@ -26,11 +26,17 @@ describe('missing equipment effect regressions', () => {
       ],
     }
     const result = simulateBattle(player, opponent, 'freeze-audit')
-    const freezeEvent = result.events.find((event) => event.kind === 'ITEM' && event.itemId === 'zero')
+    const freezeStackEvents = result.events.filter((event) =>
+      event.kind === 'ITEM' && event.itemId === 'zero' && event.freezeStackChanged,
+    )
+    const firstFreezeCycle = freezeStackEvents.slice(0, 10)
+    const freezeEvent = firstFreezeCycle.find((event) => event.freezeStackValue === 0)
     const enemyRollsDuringFreeze = result.events.filter(
       (event) => event.kind === 'ROLL' && event.actor === 'opponent' && event.time >= 10 && event.time < 12,
     )
 
+    expect(firstFreezeCycle.map((event) => event.freezeStackValue)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 0])
+    expect(firstFreezeCycle.every((event) => event.freezeStackItemId === 'zero' && event.freezeStackMax === 10)).toBe(true)
     expect(freezeEvent).toMatchObject({ time: 10, target: 'opponent', amount: 2 })
     expect(enemyRollsDuringFreeze).toEqual([])
   })

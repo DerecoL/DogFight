@@ -2566,10 +2566,12 @@ input {
   pointer-events: none;
   animation: meteorTargetSweep .72s ease-out 1;
 }
-.battle-item.boom-counter {
+.battle-item.boom-counter,
+.battle-item.freeze-stack {
   padding-bottom: 52px;
 }
-.boom-counter-meter {
+.boom-counter-meter,
+.freeze-stack-meter {
   position: absolute;
   left: 7px;
   right: 7px;
@@ -2587,7 +2589,8 @@ input {
   line-height: 1;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, .68);
 }
-.boom-counter-meter i {
+.boom-counter-meter i,
+.freeze-stack-meter i {
   position: absolute;
   inset: 0 auto 0 0;
   min-width: 0;
@@ -2595,15 +2598,21 @@ input {
   background: linear-gradient(90deg, rgba(251, 191, 36, .72), rgba(239, 68, 68, .72));
   transition: width .22s ease-out;
 }
-.boom-counter-meter b {
+.freeze-stack-meter i {
+  background: linear-gradient(90deg, rgba(186, 230, 253, .78), rgba(14, 165, 233, .78));
+}
+.boom-counter-meter b,
+.freeze-stack-meter b {
   position: relative;
   z-index: 1;
   text-shadow: 0 1px 0 rgba(255, 255, 255, .75);
 }
-.battle-item.boom-counter-pop .boom-counter-meter {
+.battle-item.boom-counter-pop .boom-counter-meter,
+.battle-item.freeze-stack-pop .freeze-stack-meter {
   animation: boomCounterCharge .42s ease-out 1;
 }
-.battle-item.boom-counter-pop::before {
+.battle-item.boom-counter-pop::before,
+.battle-item.freeze-stack-pop::before {
   content: "+1";
   position: absolute;
   right: 8px;
@@ -2618,6 +2627,10 @@ input {
   font-weight: 950;
   pointer-events: none;
   animation: boomCounterFloat .56s ease-out both;
+}
+.battle-item.freeze-stack-pop::before {
+  background: #effaff;
+  color: #0284c7;
 }
 .trigger-count-stamp {
   position: absolute;
