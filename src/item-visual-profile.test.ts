@@ -17,6 +17,13 @@ describe('item visual profiles', () => {
     expect(itemVisualProfile(itemDef('v4-growing-chew-sword')).tone).toBe('growth')
     expect(itemVisualProfile(itemDef('v4-boom-counter')).tone).toBe('counter')
     expect(itemVisualProfile(itemDef('v3-night-patrol-light')).tone).toBe('trigger')
+    expect(itemVisualProfile(itemDef('v5-shattered-tooth-gear')).tone).toBe('counter')
+    expect(itemVisualProfile(itemDef('v5-poison-blood-pump')).tone).toBe('poison')
+    expect(itemVisualProfile(itemDef('v5-biteback-shield')).tone).toBe('thorns')
+    expect(itemVisualProfile(itemDef('v5-barkproof-earmuffs')).tone).toBe('counter')
+    expect(itemVisualProfile(itemDef('v5-offbeat-metronome')).tone).toBe('counter')
+    expect(itemVisualProfile(itemDef('v5-bitter-kibble')).tone).toBe('poison')
+    expect(itemVisualProfile(itemDef('v5-thornbreaker-chew')).tone).toBe('thorns')
   })
 
   it('exposes tone class names, art paths, and size-aware crop hints', () => {

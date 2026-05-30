@@ -18,6 +18,18 @@ import {
   kyushuBracerDamageBonus,
   kyushuBracerShieldBonus,
   nightPatrolLightTriggerCount,
+  shatteredToothGearDamage,
+  poisonBloodPumpHealPerTier,
+  bitebackShieldGain,
+  bitebackShieldDamageRatio,
+  bitebackShieldDamageCap,
+  barkproofEarmuffsThreshold,
+  offbeatMetronomeReduction,
+  offbeatMetronomeCooldown,
+  bitterKibbleCleanseLimit,
+  bitterKibbleShieldPerPoison,
+  thornbreakerThornsRemoved,
+  thornbreakerShieldDamageMultiplier,
   THORNS_DAMAGE_PER_STACK,
 } from './data'
 import { triggerOrder } from './grid'
@@ -90,6 +102,8 @@ type TriggerQueueEntry = {
   chainEdgeIds: Set<string>
 }
 
+type MultiCountTransform = (item: GameItem, multiTotal: number) => number
+
 type BattleSideState = {
   shield: number
   thorns: number
@@ -116,6 +130,11 @@ type BattleSideState = {
   shibaSpeedStacks: number
   furyStacks: number
   boomCountersByItemId: Record<string, number>
+  smallTriggerCountersByItemId: Record<string, number>
+  antiFrequencyStreak: number
+  antiFrequencyLastAt: number | null
+  disabledNextSmall: number
+  antiMultiNextReadyByItemId: Record<string, number>
   frogRainyUntil: number
 }
 
@@ -153,6 +172,11 @@ function createSideState(maxHp: number): BattleSideState {
     shibaSpeedStacks: 0,
     furyStacks: 0,
     boomCountersByItemId: {},
+    smallTriggerCountersByItemId: {},
+    antiFrequencyStreak: 0,
+    antiFrequencyLastAt: null,
+    disabledNextSmall: 0,
+    antiMultiNextReadyByItemId: {},
     frogRainyUntil: 0,
   }
 }
@@ -365,10 +389,17 @@ function queueItems(
   allowLargeTriggerFanout = true,
   chainEdgeIds?: Set<string>,
   sourceItemId?: string,
+  multiCountTransform?: MultiCountTransform,
 ) {
+  const transformedMultiCount = (item: GameItem) => {
+    const base = effectiveMultiCount(actor, item)
+    const transformed = multiCountTransform ? multiCountTransform(item, base) : base
+    return Math.max(1, Math.min(MULTI_TRIGGER_CAP, Math.floor(transformed)))
+  }
+
   if (!sourceItemId) {
     for (const item of items) {
-      const multiTotal = effectiveMultiCount(actor, item)
+      const multiTotal = transformedMultiCount(item)
       for (let multiIndex = 1; multiIndex <= multiTotal; multiIndex += 1) {
         queue.push({ item, allowExtraRollFanout, allowLargeTriggerFanout, multiIndex, multiTotal, chainEdgeIds: new Set() })
       }
@@ -383,7 +414,7 @@ function queueItems(
     const edgeId = `${sourceItemId}->${item.id}`
     if (blockedEdgeIds.has(edgeId)) continue
     newEdgeIds.add(edgeId)
-    const multiTotal = effectiveMultiCount(actor, item)
+    const multiTotal = transformedMultiCount(item)
     for (let multiIndex = 1; multiIndex <= multiTotal; multiIndex += 1) {
       queue.push({ item, allowExtraRollFanout, allowLargeTriggerFanout, multiIndex, multiTotal, chainEdgeIds: rootChainEdgeIds })
     }
@@ -714,6 +745,35 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
     for (const item of triggerOrder(fighter.items)) refreshReservoir(side, item, 0, FROG_STARTING_RESERVOIR_PROGRESS)
   }
 
+  const antiMultiTransform = (time: number, actorSide: Side): MultiCountTransform => (_item, multiTotal) => {
+    if (multiTotal <= 1) return multiTotal
+    const defenderSide = opponentOf(actorSide)
+    const defender = defenderSide === 'player' ? player : opponent
+    const defenderState = state[defenderSide]
+    for (const source of equippedItemsWithEffect(defender, 'ANTI_MULTI_SUPPRESS')) {
+      const readyAt = defenderState.antiMultiNextReadyByItemId[source.id] ?? 0
+      if (time + TIME_EPSILON < readyAt) continue
+      const sourceQuality = normalizeQuality(source.quality)
+      const reduction = offbeatMetronomeReduction(sourceQuality)
+      const cooldown = offbeatMetronomeCooldown(sourceQuality)
+      defenderState.antiMultiNextReadyByItemId[source.id] = Number.isFinite(cooldown) ? roundBattleTime(time + cooldown) : Number.POSITIVE_INFINITY
+      return Math.max(1, multiTotal - reduction)
+    }
+    return multiTotal
+  }
+
+  const queueBattleItems = (
+    queue: TriggerQueueEntry[],
+    actorSide: Side,
+    actor: FighterSnapshot,
+    items: GameItem[],
+    time: number,
+    allowExtraRollFanout = true,
+    allowLargeTriggerFanout = true,
+    chainEdgeIds?: Set<string>,
+    sourceItemId?: string,
+  ) => queueItems(queue, actor, items, allowExtraRollFanout, allowLargeTriggerFanout, chainEdgeIds, sourceItemId, antiMultiTransform(time, actorSide))
+
   const executeItem = (
     actorSide: Side,
     actor: FighterSnapshot,
@@ -786,6 +846,25 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
       return finishTriggers()
     }
 
+    if (actorState.disabledNextSmall > 0 && def.size === 1) {
+      actorState.disabledNextSmall -= 1
+      triggers.push({
+        itemId: item.id,
+        defId: item.defId,
+        quality,
+        effectType: 'UTILITY',
+        amount: 0,
+        target: 'none',
+        sourceHp: getHp(actorSide),
+        targetHp: getHp(targetSide),
+        sourceHpDelta: 0,
+        targetHpDelta: 0,
+        roll,
+        text: `${itemName(def, quality)} 被【失效】抵消`,
+      })
+      return finishTriggers()
+    }
+
     if (advanced === 'BOOM_COUNTER') return triggers
 
     const boomCounterItems = equippedItemsWithEffect(actor, 'BOOM_COUNTER')
@@ -838,6 +917,84 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
             roll,
             ...boomCounterSignal,
             text: `${itemName(boomDef, boomQuality)} 【爆鸣计数】 +${nextCount}/${BOOM_COUNTER_TRIGGER_THRESHOLD}`,
+          })
+        }
+      }
+    }
+
+    if (!sacrificeReplacesSmallEffect) {
+      if (def.size === 1 && advanced !== 'SMALL_TRIGGER_COUNTER') {
+        for (const counterItem of equippedItemsWithEffect(actor, 'SMALL_TRIGGER_COUNTER')) {
+          if (counterItem.id === item.id) continue
+          const counterQuality = normalizeQuality(counterItem.quality)
+          const counterDef = itemDef(counterItem.defId)
+          const nextCount = (actorState.smallTriggerCountersByItemId[counterItem.id] ?? 0) + 1
+          if (nextCount >= 4) {
+            actorState.smallTriggerCountersByItemId[counterItem.id] = 0
+            const damage = shatteredToothGearDamage(counterQuality)
+            const result = applyDirectHealthDamage(targetSide, damage)
+            triggers.push({
+              itemId: counterItem.id,
+              defId: counterItem.defId,
+              quality: counterQuality,
+              effectType: 'DAMAGE',
+              amount: result.before - result.after,
+              target: targetSide,
+              sourceHp: getHp(actorSide),
+              targetHp: result.after,
+              sourceHpDelta: 0,
+              targetHpDelta: result.delta,
+              roll,
+              text: `${itemName(counterDef, counterQuality)} 碎牙计数达到 4 次，造成 ${result.before - result.after} 点直接伤害`,
+            })
+          } else {
+            actorState.smallTriggerCountersByItemId[counterItem.id] = nextCount
+            triggers.push({
+              itemId: counterItem.id,
+              defId: counterItem.defId,
+              quality: counterQuality,
+              effectType: 'UTILITY',
+              amount: nextCount,
+              target: actorSide,
+              sourceHp: getHp(actorSide),
+              targetHp: getHp(targetSide),
+              sourceHpDelta: 0,
+              targetHpDelta: 0,
+              roll,
+              text: `${itemName(counterDef, counterQuality)} 碎牙计数 +${nextCount}/4`,
+            })
+          }
+        }
+      }
+
+      const antiFrequencyItems = equippedItemsWithEffect(targetFighter, 'ANTI_FREQUENCY_DISABLE_SMALL')
+      if (antiFrequencyItems.length > 0) {
+        actorState.antiFrequencyStreak = actorState.antiFrequencyLastAt == null || time - actorState.antiFrequencyLastAt <= 2 + TIME_EPSILON
+          ? actorState.antiFrequencyStreak + 1
+          : 1
+        actorState.antiFrequencyLastAt = time
+        const bestThreshold = Math.min(...antiFrequencyItems.map((source) => barkproofEarmuffsThreshold(normalizeQuality(source.quality))))
+        if (actorState.antiFrequencyStreak >= bestThreshold) {
+          actorState.antiFrequencyStreak = 0
+          actorState.disabledNextSmall += 1
+          const source = antiFrequencyItems
+            .map((entry) => ({ entry, threshold: barkproofEarmuffsThreshold(normalizeQuality(entry.quality)) }))
+            .sort((left, right) => left.threshold - right.threshold)[0].entry
+          const sourceQuality = normalizeQuality(source.quality)
+          const sourceDef = itemDef(source.defId)
+          triggers.push({
+            itemId: source.id,
+            defId: source.defId,
+            quality: sourceQuality,
+            effectType: 'UTILITY',
+            amount: 1,
+            target: actorSide,
+            sourceHp: getHp(targetSide),
+            targetHp: getHp(actorSide),
+            sourceHpDelta: 0,
+            targetHpDelta: 0,
+            roll,
+            text: `${itemName(sourceDef, sourceQuality)} 侦测到连续触发，使下一件 1 格装备【失效】`,
           })
         }
       }
@@ -926,9 +1083,32 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
       }
     }
 
+    if (!sacrificeReplacesSmallEffect && advanced === 'BREAK_SHIELD_THORNS' && targetState.thorns > 0) {
+      const removed = Math.min(targetState.thorns, thornbreakerThornsRemoved(quality))
+      targetState.thorns -= removed
+      triggers.push({
+        itemId: item.id,
+        defId: item.defId,
+        quality,
+        effectType: 'UTILITY',
+        amount: removed,
+        target: targetSide,
+        sourceHp: getHp(actorSide),
+        targetHp: getHp(targetSide),
+        sourceHpDelta: 0,
+        targetHpDelta: 0,
+        roll,
+        text: `${itemName(def, quality)} 清除 ${removed} 层【荆棘】`,
+      })
+    }
+
     if (!sacrificeReplacesSmallEffect && (def.effect.type === 'DAMAGE' || def.effect.type === 'DAMAGE_SELF_SHIELD')) {
       const before = getHp(targetSide)
-      const shieldDamage = advanced === 'DOUBLE_SHIELD_DAMAGE' ? amount * 2 : amount
+      const shieldDamage = advanced === 'DOUBLE_SHIELD_DAMAGE'
+        ? amount * 2
+        : advanced === 'BREAK_SHIELD_THORNS'
+          ? Math.round(amount * thornbreakerShieldDamageMultiplier(quality))
+          : amount
       const result = applyAttackDamage(targetSide, amount, shieldDamage)
       const weakScale = actorState.weak > 0 ? 0.5 : 1
       if (actorState.weak > 0) actorState.weak -= 1
@@ -1154,6 +1334,33 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
         triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'HEAL', amount: healAmount, target: actorSide, sourceHp: healed.after, targetHp: getHp(targetSide), sourceHpDelta: healed.delta, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 【净化】清除 ${removed} 层增益，恢复 ${healAmount} 点生命` })
       }
     }
+    if (!sacrificeReplacesSmallEffect && !recoveryBlocked && advanced === 'POISON_TO_HEAL') {
+      const tiers = Math.min(4, Math.floor(targetState.poison / 5))
+      const healAmount = tiers * poisonBloodPumpHealPerTier(quality)
+      if (healAmount > 0) {
+        const healed = applyHeal(actorSide, healAmount)
+        triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'HEAL', amount: healAmount, target: actorSide, sourceHp: healed.after, targetHp: getHp(targetSide), sourceHpDelta: healed.delta, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 将 ${tiers} 档【中毒】转为 ${healAmount} 点治疗` })
+      } else {
+        triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'UTILITY', amount: 0, target: actorSide, sourceHp: getHp(actorSide), targetHp: getHp(targetSide), sourceHpDelta: 0, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 没有可转化的【中毒】层数` })
+      }
+    }
+    if (!sacrificeReplacesSmallEffect && !recoveryBlocked && advanced === 'SHIELD_TO_DAMAGE') {
+      const shield = bitebackShieldGain(quality)
+      applyShield(actorSide, shield)
+      triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'UTILITY', amount: shield, target: actorSide, sourceHp: getHp(actorSide), targetHp: getHp(targetSide), sourceHpDelta: 0, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 获得 ${shield} 点【护盾】` })
+      const damage = Math.min(bitebackShieldDamageCap(quality), Math.floor(state[actorSide].shield * bitebackShieldDamageRatio(quality)))
+      if (damage > 0) {
+        const result = applyDirectHealthDamage(targetSide, damage)
+        triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'DAMAGE', amount: result.before - result.after, target: targetSide, sourceHp: getHp(actorSide), targetHp: result.after, sourceHpDelta: 0, targetHpDelta: result.delta, roll, text: `${itemName(def, quality)} 反咬造成 ${result.before - result.after} 点直接伤害` })
+      }
+    }
+    if (!sacrificeReplacesSmallEffect && !recoveryBlocked && advanced === 'CLEANSE_POISON_TO_SHIELD') {
+      const cleansed = Math.min(actorState.poison, bitterKibbleCleanseLimit(quality))
+      actorState.poison -= cleansed
+      const shield = cleansed * bitterKibbleShieldPerPoison(quality)
+      if (shield > 0) applyShield(actorSide, shield)
+      triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'UTILITY', amount: shield, target: actorSide, sourceHp: getHp(actorSide), targetHp: getHp(targetSide), sourceHpDelta: 0, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 【净化】 ${cleansed} 层【中毒】，获得 ${shield} 点【护盾】` })
+    }
     if (!sacrificeReplacesSmallEffect && !recoveryBlocked && advanced === 'SHIELD_ON_NON_LUCKY' && actor.luckyNumber !== roll) {
       applyShield(actorSide, qualityAmount(5, quality))
       triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'UTILITY', amount: qualityAmount(5, quality), target: actorSide, sourceHp: getHp(actorSide), targetHp: getHp(targetSide), sourceHpDelta: 0, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 获得 ${qualityAmount(5, quality)} 点【护盾】` })
@@ -1192,7 +1399,7 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
         .sort((left, right) => ((time - right.lastResetAt) / right.duration) - ((time - left.lastResetAt) / left.duration))
       const target = candidates[0]?.item
       if (target) {
-        queueItems(queue, actor, [target], true, allowLargeTriggerFanout, chainEdgeIds, item.id)
+        queueBattleItems(queue, actorSide, actor, [target], time, true, allowLargeTriggerFanout, chainEdgeIds, item.id)
         triggers.push({ itemId: item.id, targetItemId: target.id, defId: item.defId, quality, effectType: 'UTILITY', amount: 1, target: actorSide, sourceHp: getHp(actorSide), targetHp: getHp(targetSide), sourceHpDelta: 0, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 立即触发水位最高的装备` })
       }
     }
@@ -1203,27 +1410,27 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
     if (!sacrificeReplacesSmallEffect && advanced === 'ADJACENT_TEMP_TRIGGER') {
       const adjacent = adjacentItems(actor, item)
       const repeatedAdjacent = Array.from({ length: nightPatrolLightTriggerCount(quality) }, () => adjacent).flat()
-      queueItems(queue, actor, repeatedAdjacent, true, allowLargeTriggerFanout, chainEdgeIds, item.id)
+      queueBattleItems(queue, actorSide, actor, repeatedAdjacent, time, true, allowLargeTriggerFanout, chainEdgeIds, item.id)
     }
     if (!sacrificeReplacesSmallEffect && (advanced === 'TRIGGER_ADJACENT' || (advanced === 'ADJACENT_ON_EXTRA_ROLL' && extra))) {
-      queueItems(queue, actor, adjacentItems(actor, item), true, allowLargeTriggerFanout, chainEdgeIds, item.id)
+      queueBattleItems(queue, actorSide, actor, adjacentItems(actor, item), time, true, allowLargeTriggerFanout, chainEdgeIds, item.id)
     }
     if (!sacrificeReplacesSmallEffect && advanced === 'TRIGGER_MINUS_THREE' && roll >= 4) {
-      queueItems(queue, actor, triggerOrder(actor.items).filter((entry) => itemDef(entry.defId).dice.includes(roll - 3)), true, allowLargeTriggerFanout, chainEdgeIds, item.id)
+      queueBattleItems(queue, actorSide, actor, triggerOrder(actor.items).filter((entry) => itemDef(entry.defId).dice.includes(roll - 3)), time, true, allowLargeTriggerFanout, chainEdgeIds, item.id)
     }
     if (!sacrificeReplacesSmallEffect && allowLargeTriggerFanout && hasEquippedEffect(actor, 'LARGE_TRIGGERS_NON_LARGE') && isLarge(def, actor)) {
       const candidates = triggerOrder(actor.items).filter((entry) => {
         const candidateDef = itemDef(entry.defId)
         return !isLarge(candidateDef, actor) && candidateDef.advancedEffect !== 'LARGE_TRIGGERS_NON_LARGE'
       })
-      if (candidates.length > 0) queueItems(queue, actor, [candidates[Math.floor(rng() * candidates.length)]], true, false, chainEdgeIds, item.id)
+      if (candidates.length > 0) queueBattleItems(queue, actorSide, actor, [candidates[Math.floor(rng() * candidates.length)]], time, true, false, chainEdgeIds, item.id)
     }
     if (sacrificeReplacesSmallEffect) {
-      queueItems(queue, actor, triggerOrder(actor.items).filter((entry) => isLarge(itemDef(entry.defId), actor)), true, allowLargeTriggerFanout, chainEdgeIds, item.id)
+      queueBattleItems(queue, actorSide, actor, triggerOrder(actor.items).filter((entry) => isLarge(itemDef(entry.defId), actor)), time, true, allowLargeTriggerFanout, chainEdgeIds, item.id)
     }
     if (!sacrificeReplacesSmallEffect && advanced === 'EXTRA_ROLL_TRIGGERS_ALL' && extra && allowExtraRollFanout) {
       const target = triggerOrder(actor.items).find((entry) => entry.id !== item.id)
-      if (target) queueItems(queue, actor, [target, target], false, allowLargeTriggerFanout, chainEdgeIds, item.id)
+      if (target) queueBattleItems(queue, actorSide, actor, [target, target], time, false, allowLargeTriggerFanout, chainEdgeIds, item.id)
     }
     if (!sacrificeReplacesSmallEffect && advanced === 'ROLL_COUNTER_EXTRA' && actorState.rollCount % 4 === 0) {
       processed.extraRollRequests += 1
@@ -1273,7 +1480,7 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
         }
       }
       if (enchant.kind === 'TRIGGER_NEIGHBOR') {
-        queueItems(queue, actor, neighborItems(actor, item, enchant.target), true, allowLargeTriggerFanout, chainEdgeIds, item.id)
+        queueBattleItems(queue, actorSide, actor, neighborItems(actor, item, enchant.target), time, true, allowLargeTriggerFanout, chainEdgeIds, item.id)
       }
       if (enchant.kind === 'BUFF_NEIGHBOR_EFFECT') {
         for (const targetItem of neighborItems(actor, item, enchant.target)) {
@@ -1324,7 +1531,7 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
   ) => {
     const processed = { count: 0, capped: false, extraRollRequests: 0, frogRollRequests: 0 }
     const fighterState = state[actorSide]
-    while (queue.length > 0 && processed.count < TRIGGER_QUEUE_CAP) {
+    while (queue.length > 0 && processed.count < TRIGGER_QUEUE_CAP && !hasDefeatedFighter()) {
       const entry = queue.shift()
       if (!entry) continue
       const { item, allowExtraRollFanout, allowLargeTriggerFanout, chainEdgeIds, multiIndex, multiTotal } = entry
@@ -1360,7 +1567,7 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
         })
       }
     }
-    if (queue.length > 0 && !processed.capped) {
+    if (queue.length > 0 && !processed.capped && !hasDefeatedFighter()) {
       push({
         time,
         actor: actorSide,
@@ -1427,10 +1634,12 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
       if (echoTarget) queuedItems.push(echoTarget)
     }
     const queue: TriggerQueueEntry[] = []
-    queueItems(queue, fighter, queuedItems)
+    queueBattleItems(queue, actorSide, fighter, queuedItems, time)
     const processed = processTriggerQueue(time, actorSide, fighter, roll, queue, extra, extraDepth, frogClassRoll)
+    if (hasDefeatedFighter()) return 0
     for (let index = 0; index < processed.frogRollRequests && index < 3; index += 1) {
       resolveActor(time, actorSide, false, 0, true)
+      if (hasDefeatedFighter()) return 0
     }
     return processed.extraRollRequests
   }
@@ -1438,16 +1647,17 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
   const resolveActorChain = (time: number, actorSide: Side, extra = false, allowMuttTrait = false) => {
     const fighter = actorSide === 'player' ? player : opponent
     let pendingExtraRolls = resolveActor(time, actorSide, extra, extra ? 1 : 0)
+    if (hasDefeatedFighter()) return
     if (allowMuttTrait && fighter.dogType === 'MUTT' && rng() < 0.2) pendingExtraRolls += 1
 
     let resolvedExtraRolls = 0
-    while (pendingExtraRolls > 0 && resolvedExtraRolls < EXTRA_ROLL_CHAIN_CAP) {
+    while (pendingExtraRolls > 0 && resolvedExtraRolls < EXTRA_ROLL_CHAIN_CAP && !hasDefeatedFighter()) {
       pendingExtraRolls -= 1
       resolvedExtraRolls += 1
       pendingExtraRolls += resolveActor(time, actorSide, true, resolvedExtraRolls)
     }
 
-    if (pendingExtraRolls > 0) {
+    if (pendingExtraRolls > 0 && !hasDefeatedFighter()) {
       push({
         time,
         actor: actorSide,
@@ -1475,6 +1685,8 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
   )
 
   const currentLeadText = () => currentWinner() === 'player' ? '玩家胜利' : '对手胜利'
+
+  const hasDefeatedFighter = () => playerHp <= 0 || opponentHp <= 0
 
   const finish = (time: number, text: string): BattleResult => {
     const winner = currentWinner()
@@ -1564,7 +1776,7 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
         for (const entry of Object.values(reservoirs[actor]).filter((candidate) => Math.abs(candidate.nextAt - time) <= TIME_EPSILON)) {
           resetReservoir(actor, entry.item, time)
           const queue: TriggerQueueEntry[] = []
-          queueItems(queue, fighter, [entry.item])
+          queueBattleItems(queue, actor, fighter, [entry.item], time)
           const processed = processTriggerQueue(time, actor, fighter, 0, queue)
           for (let index = 0; index < processed.frogRollRequests && index < 3; index += 1) {
             resolveActor(time, actor, false, 0, true)

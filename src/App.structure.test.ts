@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 const app = readFileSync(new URL('./App.tsx', import.meta.url), 'utf8')
 const css = readFileSync(new URL('./App.css', import.meta.url), 'utf8')
 const data = readFileSync(new URL('./server/game/data.ts', import.meta.url), 'utf8')
+const agents = readFileSync(new URL('../AGENTS.md', import.meta.url), 'utf8')
 const uiIndexUrl = new URL('./ui/index.ts', import.meta.url)
 const uiCssUrl = new URL('./ui/handdrawn.css', import.meta.url)
 
@@ -651,6 +652,35 @@ describe('selection screen structure', () => {
     expect(relicDefIds().filter((id) => !relicIconIds.includes(id))).toEqual([])
     expect(itemIconEntries.filter((entry) => !existsSync(new URL(`../public${entry.path}`, import.meta.url)))).toEqual([])
     expect(relicIconEntries.filter((entry) => !existsSync(new URL(`../public${entry.path}`, import.meta.url)))).toEqual([])
+  })
+
+  it('wires V5 equipment icons and keeps sticker assets lightweight', () => {
+    const newEquipmentIds = [
+      'v5-shattered-tooth-gear',
+      'v5-poison-blood-pump',
+      'v5-biteback-shield',
+      'v5-barkproof-earmuffs',
+      'v5-offbeat-metronome',
+      'v5-bitter-kibble',
+      'v5-thornbreaker-chew',
+    ]
+
+    for (const id of newEquipmentIds) {
+      const svg = new URL(`../public/assets/items/${id}.svg`, import.meta.url)
+      const webp = new URL(`../public/assets/sticker-icons/${id}.webp`, import.meta.url)
+      expect(app).toContain(`'${id}': '/assets/sticker-icons/${id}.webp'`)
+      expect(existsSync(svg)).toBe(true)
+      expect(existsSync(webp)).toBe(true)
+      expect(readFileSync(svg, 'utf8')).toContain('viewBox="0 0 96 96"')
+      expect(statSync(webp).size).toBeLessThanOrEqual(15_000)
+    }
+  })
+
+  it('documents the required icon workflow for future equipment and relics', () => {
+    expect(agents).toContain('新增装备/遗物资源规则')
+    expect(agents).toContain('public/assets/items/<id>.svg')
+    expect(agents).toContain('public/assets/sticker-icons/<id>.webp')
+    expect(agents).toContain('15KB')
   })
 
   it('wires account shop, achievements, personal settings, daily tasks, and cosmetics into the lobby shell', () => {

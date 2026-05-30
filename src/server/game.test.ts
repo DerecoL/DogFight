@@ -334,6 +334,105 @@ describe('dog and item definitions', () => {
     expect(shopPool('SMALL').map((item) => item.id)).toContain('v4-reverse-fur-comb')
   })
 
+  it('defines V5 converter and counter equipment with exact tuning', () => {
+    expect(itemDef('v5-shattered-tooth-gear')).toMatchObject({
+      size: 1,
+      price: 7,
+      dice: [],
+      tags: ['small', 'counter', 'damage'],
+      effect: { type: 'UTILITY', amount: 10, qualityBase: 'SILVER' },
+      advancedEffect: 'SMALL_TRIGGER_COUNTER',
+      defaultQuality: 'SILVER',
+    })
+    expect(itemDef('v5-poison-blood-pump')).toMatchObject({
+      size: 2,
+      price: 9,
+      dice: [1, 3, 5],
+      tags: ['poison', 'heal', 'converter'],
+      effect: { type: 'UTILITY', amount: 6, qualityBase: 'SILVER' },
+      advancedEffect: 'POISON_TO_HEAL',
+      defaultQuality: 'SILVER',
+    })
+    expect(itemDef('v5-biteback-shield')).toMatchObject({
+      size: 3,
+      price: 11,
+      dice: [4, 5],
+      tags: ['shield', 'thorn', 'damage', 'converter'],
+      effect: { type: 'UTILITY', amount: 10, qualityBase: 'GOLD' },
+      advancedEffect: 'SHIELD_TO_DAMAGE',
+      defaultQuality: 'GOLD',
+    })
+    expect(itemDef('v5-barkproof-earmuffs')).toMatchObject({
+      size: 2,
+      price: 9,
+      dice: [],
+      tags: ['counter', 'disable', 'anti-frequency'],
+      effect: { type: 'UTILITY', amount: 0 },
+      advancedEffect: 'ANTI_FREQUENCY_DISABLE_SMALL',
+      defaultQuality: 'SILVER',
+    })
+    expect(itemDef('v5-offbeat-metronome')).toMatchObject({
+      size: 1,
+      price: 7,
+      dice: [],
+      tags: ['counter', 'multi', 'tempo'],
+      effect: { type: 'UTILITY', amount: 1, qualityBase: 'SILVER' },
+      advancedEffect: 'ANTI_MULTI_SUPPRESS',
+      defaultQuality: 'SILVER',
+    })
+    expect(itemDef('v5-bitter-kibble')).toMatchObject({
+      size: 1,
+      price: 6,
+      dice: [1, 6],
+      tags: ['cleanse', 'poison', 'shield', 'counter'],
+      effect: { type: 'UTILITY', amount: 0 },
+      advancedEffect: 'CLEANSE_POISON_TO_SHIELD',
+      defaultQuality: 'SILVER',
+    })
+    expect(itemDef('v5-thornbreaker-chew')).toMatchObject({
+      size: 2,
+      price: 8,
+      dice: [4, 6],
+      tags: ['shield-break', 'thorn', 'counter', 'damage'],
+      effect: { type: 'DAMAGE', amount: 8, qualityBase: 'SILVER' },
+      advancedEffect: 'BREAK_SHIELD_THORNS',
+      defaultQuality: 'SILVER',
+    })
+
+    expect(shopPool('GENERAL').map((item) => item.id)).toEqual(expect.arrayContaining([
+      'v5-shattered-tooth-gear',
+      'v5-poison-blood-pump',
+      'v5-biteback-shield',
+      'v5-barkproof-earmuffs',
+      'v5-offbeat-metronome',
+      'v5-bitter-kibble',
+      'v5-thornbreaker-chew',
+    ]))
+    expect(shopPool('SMALL').map((item) => item.id)).toEqual(expect.arrayContaining([
+      'v5-shattered-tooth-gear',
+      'v5-offbeat-metronome',
+      'v5-bitter-kibble',
+    ]))
+    expect(shopPool('MEDIUM').map((item) => item.id)).toEqual(expect.arrayContaining([
+      'v5-poison-blood-pump',
+      'v5-biteback-shield',
+      'v5-barkproof-earmuffs',
+      'v5-thornbreaker-chew',
+    ]))
+  })
+
+  it('describes V5 equipment with quality-scaled values', () => {
+    expect(itemDefForQuality('v5-shattered-tooth-gear', 'SILVER').description).toContain('4 次')
+    expect(itemDefForQuality('v5-shattered-tooth-gear', 'SILVER').description).toContain('10 点直接伤害')
+    expect(itemDefForQuality('v5-shattered-tooth-gear', 'DIAMOND').description).toContain('23 点直接伤害')
+    expect(itemDefForQuality('v5-poison-blood-pump', 'GOLD').description).toContain('每档恢复 9 点生命')
+    expect(itemDefForQuality('v5-biteback-shield', 'GOLD').description).toContain('获得 10 点【护盾】')
+    expect(itemDefForQuality('v5-barkproof-earmuffs', 'DIAMOND').description).toContain('连续成功触发 4 次')
+    expect(itemDefForQuality('v5-offbeat-metronome', 'DIAMOND').description).toContain('减少 2 次')
+    expect(itemDefForQuality('v5-bitter-kibble', 'GOLD').description).toContain('最多【净化】 9 层【中毒】')
+    expect(itemDefForQuality('v5-thornbreaker-chew', 'DIAMOND').description).toContain('清除 3 层【荆棘】')
+  })
+
   it('defines carrot and tissue as trigger point remapping relics', () => {
     expect(RELIC_DEFS).toEqual(expect.arrayContaining([
       expect.objectContaining({
@@ -394,6 +493,197 @@ describe('battle simulation', () => {
       && event.defId === 'v4-reverse-fur-comb'
     )
   }
+
+  const allDice = [1, 2, 3, 4, 5, 6]
+
+  it('shattered tooth gear converts four other small triggers into direct damage', () => {
+    const player: FighterSnapshot = {
+      name: 'P',
+      dogType: 'SHIBA',
+      wins: 0,
+      losses: 0,
+      round: 6,
+      items: [
+        equipment('gear', 'v5-shattered-tooth-gear', 0, 'SILVER'),
+        ...Array.from({ length: 4 }, (_, index) => ({
+          ...equipment(`tooth-${index}`, 'starter-1', index + 1, 'BRONZE'),
+          triggerDiceOverride: allDice,
+        })),
+      ],
+    }
+    const opponent: FighterSnapshot = { name: 'O', dogType: 'SHIBA', wins: 0, losses: 0, round: 6, items: [] }
+
+    const result = simulateBattle(player, opponent, 'shattered-tooth-gear')
+    const burst = result.events.find((event) => event.itemId === 'gear' && event.defId === 'v5-shattered-tooth-gear' && event.effectType === 'DAMAGE')
+
+    expect(burst).toMatchObject({
+      actor: 'player',
+      amount: 10,
+      target: 'opponent',
+      boomCounterChanged: undefined,
+    })
+  })
+
+  it('poison blood pump converts enemy poison stacks into capped healing tiers', () => {
+    const player: FighterSnapshot = {
+      name: 'P',
+      dogType: 'SHIBA',
+      wins: 0,
+      losses: 0,
+      round: 6,
+      items: [
+        { ...equipment('flea-left', 'v3-flea-disc', 0, 'DIAMOND'), triggerDiceOverride: allDice },
+        { ...equipment('flea-right', 'v3-flea-disc', 1, 'DIAMOND'), triggerDiceOverride: allDice },
+        { ...equipment('pump', 'v5-poison-blood-pump', 2, 'SILVER'), triggerDiceOverride: allDice },
+      ],
+    }
+    const opponent: FighterSnapshot = { name: 'O', dogType: 'SHIBA', wins: 0, losses: 0, round: 6, items: [] }
+
+    const result = simulateBattle(player, opponent, 'poison-blood-pump')
+    const heal = result.events.find((event) => event.itemId === 'pump' && event.defId === 'v5-poison-blood-pump' && event.effectType === 'HEAL')
+
+    expect(heal).toMatchObject({
+      actor: 'player',
+      amount: 12,
+      target: 'player',
+    })
+  })
+
+  it('biteback shield gains shield and converts current shield into capped direct damage', () => {
+    const player: FighterSnapshot = {
+      name: 'P',
+      dogType: 'SAMOYED',
+      wins: 0,
+      losses: 0,
+      round: 6,
+      items: [
+        { ...equipment('shield', 'v5-biteback-shield', 0, 'GOLD'), triggerDiceOverride: allDice },
+      ],
+    }
+    const opponent: FighterSnapshot = { name: 'O', dogType: 'SHIBA', wins: 0, losses: 0, round: 6, items: [] }
+
+    const result = simulateBattle(player, opponent, 'biteback-shield')
+    const shieldGain = result.events.find((event) => event.itemId === 'shield' && event.defId === 'v5-biteback-shield' && event.effectType === 'UTILITY')
+    const counterDamage = result.events.find((event) => event.itemId === 'shield' && event.defId === 'v5-biteback-shield' && event.effectType === 'DAMAGE')
+
+    expect(shieldGain).toMatchObject({ amount: 10, playerShield: 10 })
+    expect(counterDamage).toMatchObject({ amount: 2, target: 'opponent' })
+  })
+
+  it('barkproof earmuffs disables the enemy next small item after six consecutive triggers', () => {
+    const player: FighterSnapshot = {
+      name: 'P',
+      dogType: 'SHIBA',
+      wins: 0,
+      losses: 0,
+      round: 6,
+      items: [equipment('earmuffs', 'v5-barkproof-earmuffs', 0, 'SILVER')],
+    }
+    const opponent: FighterSnapshot = {
+      name: 'O',
+      dogType: 'SHIBA',
+      wins: 0,
+      losses: 0,
+      round: 6,
+      items: Array.from({ length: 7 }, (_, index) => ({
+        ...equipment(`enemy-${index}`, 'starter-1', index, 'BRONZE'),
+        triggerDiceOverride: allDice,
+      })),
+    }
+
+    const result = simulateBattle(player, opponent, 'barkproof-earmuffs')
+    const disabled = result.events.find((event) => event.actor === 'opponent' && event.itemId === 'enemy-6' && event.effectType === 'UTILITY' && event.amount === 0)
+
+    expect(disabled).toMatchObject({
+      defId: 'starter-1',
+      target: 'none',
+    })
+  })
+
+  it('offbeat metronome suppresses enemy multi repeats without removing the base trigger', () => {
+    const opponentWithDisc: FighterSnapshot = {
+      name: 'O',
+      dogType: 'BULLY',
+      wins: 0,
+      losses: 0,
+      round: 6,
+      items: [{ ...equipment('disc', 'training-disc', 0, 'BRONZE'), triggerDiceOverride: allDice }],
+    }
+    const fighterWithMetronome = (quality: GameItem['quality']): FighterSnapshot => ({
+      name: 'P',
+      dogType: 'BULLY',
+      wins: 0,
+      losses: 0,
+      round: 6,
+      items: [equipment('metronome', 'v5-offbeat-metronome', 0, quality)],
+    })
+    const discEvents = (quality: GameItem['quality']) => simulateBattle(fighterWithMetronome(quality), opponentWithDisc, `offbeat-${quality}`).events
+      .filter((event) => event.actor === 'opponent' && event.itemId === 'disc' && event.time === 1 && event.kind === 'ITEM')
+
+    expect(discEvents('SILVER').map((event) => event.multiIndex)).toEqual([1, 2])
+    expect(discEvents('SILVER').map((event) => event.multiTotal)).toEqual([2, 2])
+    expect(discEvents('DIAMOND').map((event) => event.multiIndex)).toEqual([1])
+    expect(discEvents('DIAMOND').map((event) => event.multiTotal)).toEqual([1])
+  })
+
+  it('bitter kibble cleanses poison into shield with a quality-scaled cap', () => {
+    const player: FighterSnapshot = {
+      name: 'P',
+      dogType: 'SHIBA',
+      wins: 0,
+      losses: 0,
+      round: 6,
+      items: [{ ...equipment('kibble', 'v5-bitter-kibble', 0, 'GOLD'), triggerDiceOverride: allDice }],
+    }
+    const opponent: FighterSnapshot = {
+      name: 'O',
+      dogType: 'SHIBA',
+      wins: 0,
+      losses: 0,
+      round: 6,
+      items: [
+        { ...equipment('flea-left', 'v3-flea-disc', 0, 'DIAMOND'), triggerDiceOverride: allDice },
+        { ...equipment('flea-right', 'v3-flea-disc', 1, 'DIAMOND'), triggerDiceOverride: allDice },
+      ],
+    }
+
+    const result = simulateBattle(player, opponent, 'bitter-kibble')
+    const cleanse = result.events.find((event) => event.itemId === 'kibble' && event.time === 2 && event.defId === 'v5-bitter-kibble')
+
+    expect(cleanse).toMatchObject({
+      amount: 18,
+      playerShield: 18,
+      effectType: 'UTILITY',
+      target: 'player',
+    })
+  })
+
+  it('thornbreaker chew removes thorns and deals bonus shield damage', () => {
+    const player: FighterSnapshot = {
+      name: 'P',
+      dogType: 'SHIBA',
+      wins: 0,
+      losses: 0,
+      round: 6,
+      items: [{ ...equipment('chew', 'v5-thornbreaker-chew', 0, 'SILVER'), triggerDiceOverride: allDice }],
+    }
+    const opponent: FighterSnapshot = {
+      name: 'O',
+      dogType: 'SAMOYED',
+      wins: 0,
+      losses: 0,
+      round: 6,
+      items: [{ ...equipment('wood', 'v3-wooden-shield', 0, 'BRONZE'), triggerDiceOverride: allDice }],
+      relics: [openingThornsRelic],
+    }
+
+    const result = simulateBattle(player, opponent, 'thornbreaker-chew')
+    const clear = result.events.find((event) => event.itemId === 'chew' && event.defId === 'v5-thornbreaker-chew' && event.effectType === 'UTILITY')
+    const shieldBreak = result.events.find((event) => event.itemId === 'chew' && event.defId === 'v5-thornbreaker-chew' && event.time === 2 && event.effectType === 'DAMAGE')
+
+    expect(clear).toMatchObject({ amount: 1, target: 'opponent' })
+    expect(shieldBreak).toMatchObject({ opponentShield: 0 })
+  })
 
   it('night patrol light upgrade increases adjacent trigger count', () => {
     const fighterWithLight = (quality: GameItem['quality']): FighterSnapshot => ({
@@ -1282,6 +1572,24 @@ describe('battle simulation', () => {
     expect(result.duration).toBeGreaterThan(0)
     expect(result.events.some((event) => event.kind === 'ROLL')).toBe(true)
     expect(result.events.at(-1)?.kind).toBe('END')
+  })
+
+  it('stops resolving queued equipment once a fighter reaches zero hp', () => {
+    const player: FighterSnapshot = { name: 'P', dogType: 'SHIBA', wins: 0, losses: 0, round: 0, items: [] }
+    const opponent: FighterSnapshot = {
+      name: 'O',
+      dogType: 'SHIBA',
+      wins: 0,
+      losses: 0,
+      round: 0,
+      items: repeatedEquipment('v3-large-bone-sword', 5).map((item) => ({ ...item, triggerDiceOverride: [1, 2, 3, 4, 5, 6] })),
+    }
+    const result = simulateBattle(player, opponent, 'queued-death-stop')
+    const firstZeroHpIndex = result.events.findIndex((event) => event.playerHp <= 0 || event.opponentHp <= 0)
+
+    expect(firstZeroHpIndex).toBeGreaterThanOrEqual(0)
+    expect(result.events[firstZeroHpIndex + 1]?.kind).toBe('END')
+    expect(result.events.slice(firstZeroHpIndex + 1, -1)).toEqual([])
   })
 
   it('applies escalating sudden-death poison after one minute without producing a draw', () => {

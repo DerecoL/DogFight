@@ -117,6 +117,39 @@ describe('BD tag and counter helpers', () => {
     expect(rolesForComponent('DOG', 'FROG')).toEqual([{ archetype: 'RESERVOIR', role: 'CORE' }])
   })
 
+  it('maps V5 converter and counter equipment to their BD roles', () => {
+    expect(rolesForComponent('ITEM', 'v5-shattered-tooth-gear')).toEqual(
+      expect.arrayContaining([
+        { archetype: 'SMALL_DICE', role: 'PAYOFF' },
+        { archetype: 'BOOM_FREQUENCY', role: 'PAYOFF' },
+      ]),
+    )
+    expect(rolesForComponent('ITEM', 'v5-poison-blood-pump')).toEqual([
+      { archetype: 'POISON', role: 'DEFENSE' },
+    ])
+    expect(rolesForComponent('ITEM', 'v5-biteback-shield')).toEqual([
+      { archetype: 'SHIELD_THORNS', role: 'PAYOFF' },
+    ])
+    expect(rolesForComponent('ITEM', 'v5-barkproof-earmuffs')).toEqual(
+      expect.arrayContaining([
+        { archetype: 'BOOM_FREQUENCY', role: 'COUNTER' },
+        { archetype: 'MULTI', role: 'COUNTER' },
+      ]),
+    )
+    expect(rolesForComponent('ITEM', 'v5-offbeat-metronome')).toEqual([
+      { archetype: 'MULTI', role: 'COUNTER' },
+    ])
+    expect(rolesForComponent('ITEM', 'v5-bitter-kibble')).toEqual(
+      expect.arrayContaining([
+        { archetype: 'POISON', role: 'COUNTER' },
+        { archetype: 'SHIELD_THORNS', role: 'DEFENSE' },
+      ]),
+    )
+    expect(rolesForComponent('ITEM', 'v5-thornbreaker-chew')).toEqual([
+      { archetype: 'SHIELD_THORNS', role: 'COUNTER' },
+    ])
+  })
+
   it('describes first-stage counter directions', () => {
     expect(BUILD_COUNTER_RELATIONS.length).toBeGreaterThanOrEqual(7)
     expect(countersForArchetype('BOOM_FREQUENCY').map((relation) => relation.method).join(' ')).toContain('反高频')

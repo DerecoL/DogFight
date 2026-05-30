@@ -181,6 +181,41 @@ export const ITEM_DEFS: ItemDef[] = [
     advancedEffect: 'PURGE_ENEMY_BUFFS',
     defaultQuality: 'SILVER',
   }),
+  slotItem('v5-shattered-tooth-gear', '碎牙齿轮', 1, 7, [], ['small', 'counter', 'damage'], { type: 'UTILITY', amount: 10, qualityBase: 'SILVER' }, {
+    description: '己方其他 1 格装备每成功触发 1 次，获得 1 点碎牙计数。达到 4 点后清零，对敌方造成 10 点直接伤害。',
+    advancedEffect: 'SMALL_TRIGGER_COUNTER',
+    defaultQuality: 'SILVER',
+  }),
+  slotItem('v5-poison-blood-pump', '毒血泵', 2, 9, [1, 3, 5], ['poison', 'heal', 'converter'], { type: 'UTILITY', amount: 6, qualityBase: 'SILVER' }, {
+    description: '触发时，敌方每有 5 层【中毒】结算 1 档，最多 4 档；每档恢复 6 点生命。',
+    advancedEffect: 'POISON_TO_HEAL',
+    defaultQuality: 'SILVER',
+  }),
+  slotItem('v5-biteback-shield', '反咬盾牌', 3, 11, [4, 5], ['shield', 'thorn', 'damage', 'converter'], { type: 'UTILITY', amount: 10, qualityBase: 'GOLD' }, {
+    description: '获得 10 点【护盾】，并按当前【护盾】的 20% 对敌方造成直接伤害，最高 30 点。',
+    advancedEffect: 'SHIELD_TO_DAMAGE',
+    defaultQuality: 'GOLD',
+  }),
+  slotItem('v5-barkproof-earmuffs', '防吠耳罩', 2, 9, [], ['counter', 'disable', 'anti-frequency'], { type: 'UTILITY', amount: 0 }, {
+    description: '敌方连续成功触发 6 次装备后，使其下一件 1 格装备【失效】1 次；敌方 2 秒内没有触发装备时，连续计数清零。',
+    advancedEffect: 'ANTI_FREQUENCY_DISABLE_SMALL',
+    defaultQuality: 'SILVER',
+  }),
+  slotItem('v5-offbeat-metronome', '断拍节拍器', 1, 7, [], ['counter', 'multi', 'tempo'], { type: 'UTILITY', amount: 1, qualityBase: 'SILVER' }, {
+    description: '敌方每场战斗第一次触发【多重】装备时，减少该次【多重】的 1 次额外触发，最低保留 1 次基础触发。',
+    advancedEffect: 'ANTI_MULTI_SUPPRESS',
+    defaultQuality: 'SILVER',
+  }),
+  slotItem('v5-bitter-kibble', '苦味狗粮', 1, 6, [1, 6], ['cleanse', 'poison', 'shield', 'counter'], { type: 'UTILITY', amount: 0 }, {
+    description: '触发时最多【净化】 6 层【中毒】，每实际【净化】 1 层获得 2 点【护盾】。',
+    advancedEffect: 'CLEANSE_POISON_TO_SHIELD',
+    defaultQuality: 'SILVER',
+  }),
+  slotItem('v5-thornbreaker-chew', '破刺磨牙棒', 2, 8, [4, 6], ['shield-break', 'thorn', 'counter', 'damage'], { type: 'DAMAGE', amount: 8, qualityBase: 'SILVER' }, {
+    description: '造成 8 点伤害。若敌方有【荆棘】，先清除 1 层【荆棘】；本次伤害对【护盾】提高 50%。',
+    advancedEffect: 'BREAK_SHIELD_THORNS',
+    defaultQuality: 'SILVER',
+  }),
   slotItem('patting-bear', '拍拍熊', 2, 10, [1, 6], ['wound', 'attack'], { type: 'UTILITY', amount: 1, qualityBase: 'SILVER' }, {
     description: '每次触发对敌人叠加 1 层【伤口】。',
     advancedEffect: 'APPLY_WOUND',
@@ -301,6 +336,68 @@ export function kyushuBracerShieldBonus(quality?: string | null) {
   return Math.max(1, qualityAmountFrom(1, quality, 'GOLD'))
 }
 
+export function shatteredToothGearDamage(quality?: string | null) {
+  return qualityAmountFrom(10, quality, 'SILVER')
+}
+
+export function poisonBloodPumpHealPerTier(quality?: string | null) {
+  return qualityAmountFrom(6, quality, 'SILVER')
+}
+
+export function bitebackShieldGain(quality?: string | null) {
+  return qualityAmountFrom(10, quality, 'GOLD')
+}
+
+export function bitebackShieldDamageRatio(quality?: string | null) {
+  return normalizeQuality(quality) === 'DIAMOND' ? 0.25 : 0.2
+}
+
+export function bitebackShieldDamageCap(quality?: string | null) {
+  return qualityAmountFrom(30, quality, 'GOLD')
+}
+
+export function barkproofEarmuffsThreshold(quality?: string | null) {
+  const currentQuality = normalizeQuality(quality)
+  if (currentQuality === 'DIAMOND') return 4
+  if (currentQuality === 'GOLD') return 5
+  return 6
+}
+
+export function offbeatMetronomeReduction(quality?: string | null) {
+  return normalizeQuality(quality) === 'DIAMOND' ? 2 : 1
+}
+
+export function offbeatMetronomeCooldown(quality?: string | null) {
+  return normalizeQuality(quality) === 'SILVER' || normalizeQuality(quality) === 'BRONZE' ? Number.POSITIVE_INFINITY : 12
+}
+
+export function bitterKibbleCleanseLimit(quality?: string | null) {
+  const currentQuality = normalizeQuality(quality)
+  if (currentQuality === 'DIAMOND') return 12
+  if (currentQuality === 'GOLD') return 9
+  if (currentQuality === 'SILVER') return 6
+  return 4
+}
+
+export function bitterKibbleShieldPerPoison(quality?: string | null) {
+  return normalizeQuality(quality) === 'DIAMOND' ? 3 : 2
+}
+
+export function thornbreakerThornsRemoved(quality?: string | null) {
+  const currentQuality = normalizeQuality(quality)
+  if (currentQuality === 'DIAMOND') return 3
+  if (currentQuality === 'GOLD') return 2
+  return 1
+}
+
+export function thornbreakerShieldDamageMultiplier(quality?: string | null) {
+  const currentQuality = normalizeQuality(quality)
+  if (currentQuality === 'DIAMOND') return 2
+  if (currentQuality === 'GOLD') return 1.75
+  if (currentQuality === 'SILVER') return 1.5
+  return 1.25
+}
+
 export function itemDescription(itemId: string, quality?: string | null) {
   const def = itemDef(itemId)
   const currentQuality = normalizeQuality(quality)
@@ -347,6 +444,24 @@ export function itemDescription(itemId: string, quality?: string | null) {
     ? '光环：左右【相邻】的【多重】装备多重值 +1。'
     : '光环：左侧【相邻】的【多重】装备多重值 +1。'
   if (advanced === 'MULTI_REPEAT_BONUS') return `光环：己方【多重】装备第 2 次及之后触发时，若为攻击则额外伤害 +${kyushuBracerDamageBonus(currentQuality)}，并获得 ${kyushuBracerShieldBonus(currentQuality)} 点【护盾】。`
+  if (advanced === 'SMALL_TRIGGER_COUNTER') return `己方其他 1 格装备每成功触发 1 次，获得 1 点碎牙计数。达到 4 次后清零，对敌方造成 ${shatteredToothGearDamage(currentQuality)} 点直接伤害。`
+  if (advanced === 'POISON_TO_HEAL') return `触发时，敌方每有 5 层【中毒】结算 1 档，最多 4 档；每档恢复 ${poisonBloodPumpHealPerTier(currentQuality)} 点生命。`
+  if (advanced === 'SHIELD_TO_DAMAGE') {
+    const ratio = Math.round(bitebackShieldDamageRatio(currentQuality) * 100)
+    return `获得 ${bitebackShieldGain(currentQuality)} 点【护盾】，并按当前【护盾】的 ${ratio}% 对敌方造成直接伤害，最高 ${bitebackShieldDamageCap(currentQuality)} 点。`
+  }
+  if (advanced === 'ANTI_FREQUENCY_DISABLE_SMALL') return `敌方连续成功触发 ${barkproofEarmuffsThreshold(currentQuality)} 次装备后，使其下一件 1 格装备【失效】1 次；敌方 2 秒内没有触发装备时，连续计数清零。`
+  if (advanced === 'ANTI_MULTI_SUPPRESS') {
+    const cooldown = offbeatMetronomeCooldown(currentQuality)
+    return Number.isFinite(cooldown)
+      ? `敌方触发【多重】装备时，减少 ${offbeatMetronomeReduction(currentQuality)} 次该次【多重】的额外触发，最低保留 1 次基础触发；触发后冷却 ${cooldown} 秒。`
+      : `敌方每场战斗第一次触发【多重】装备时，减少 ${offbeatMetronomeReduction(currentQuality)} 次该次【多重】的额外触发，最低保留 1 次基础触发。`
+  }
+  if (advanced === 'CLEANSE_POISON_TO_SHIELD') return `触发时最多【净化】 ${bitterKibbleCleanseLimit(currentQuality)} 层【中毒】，每实际【净化】 1 层获得 ${bitterKibbleShieldPerPoison(currentQuality)} 点【护盾】。`
+  if (advanced === 'BREAK_SHIELD_THORNS') {
+    const shieldBonus = Math.round((thornbreakerShieldDamageMultiplier(currentQuality) - 1) * 100)
+    return `${baseEffect}若敌方有【荆棘】，先清除 ${thornbreakerThornsRemoved(currentQuality)} 层【荆棘】；本次伤害对【护盾】提高 ${shieldBonus}%。`
+  }
   if (advanced === 'FROG_RESERVOIR_SPEED') return '被动：所有【蓄水】装备充水速度 +15%。'
   if (advanced === 'FROG_ROLL_ON_RESERVOIR') return `${baseEffect}【蓄水】触发后，进行一次普通投骰，按骰点激活装备；该投骰不会再次触发蛙鸣鼓的投骰效果。`
   if (advanced === 'FROG_CHARGE_ADJACENT') return `${baseEffect}【蓄水】触发后，使【相邻】装备立刻获得 50% 水位。`
