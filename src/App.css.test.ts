@@ -72,6 +72,17 @@ describe('equipment layout scale', () => {
     expect(css).toContain('.dog-avatar')
   })
 
+  it('styles equipped account shop cosmetics as visible UI effects', () => {
+    expect(cssRule('.app-shell.cosmetic-background-dog-park-night')).toContain('--app-illustration-bg')
+    expect(cssRule('.app-shell.cosmetic-background-royal-kennel')).toContain('--app-illustration-bg')
+    expect(cssRule('.cosmetic-avatar-bone')).toContain('background')
+    expect(cssRule('.cosmetic-avatar-crown')).toContain('background')
+    expect(cssRule('.dog-badge-skin-shiba-scarf::after')).toContain('content: ""')
+    expect(cssRule('.dog-badge-skin-samoyed-snow::after')).toContain('content: ""')
+    expect(cssRule('.battle-fx-gold-dice .battle-dice')).toContain('filter')
+    expect(cssRule('.battle-fx-aurora-roll .battle-fx-canvas')).toContain('filter')
+  })
+
   it('styles battle health as a bone framed bar with shield and poison layers', () => {
     expect(uiCssRule('.bone-health .bone-health-bar')).toContain('height: 44px')
     expect(uiCssRule('.bone-health .bone-health-bar')).toContain('overflow: hidden')
@@ -504,15 +515,20 @@ describe('equipment layout scale', () => {
     expect(cssRule('.paper-shop-card:hover')).toContain('filter: var(--shop-paper-filter-hover)')
   })
 
-  it('adds two extra randomized paper styles to shop choice tabs', () => {
-    expect(cssRule('.shop-choice-screen .choice-grid')).toContain('perspective')
+  it('adds two extra randomized paper styles to shop choice tabs without 3d hit target skew', () => {
+    expect(cssRule('.shop-choice-screen .choice-grid')).not.toContain('perspective')
     expect(cssRule('.shop-choice-screen .choice')).toContain('--choice-tab-contact-shadow')
-    expect(cssRule('.shop-choice-screen .choice')).toContain('rotateX(var(--choice-tab-lift))')
+    expect(cssRule('.shop-choice-screen .choice')).not.toContain('rotateX')
     expect(cssRule('.shop-choice-screen .choice:nth-child(4n)')).toContain('--choice-tab-cut')
     expect(cssRule('.shop-choice-screen .choice:nth-child(4n)')).toContain('--choice-tab-contact-shadow')
     expect(cssRule('.shop-choice-screen .choice:nth-child(5n)')).toContain('--choice-tab-cut')
     expect(cssRule('.shop-choice-screen .choice:nth-child(5n)')).toContain('--choice-tab-paper')
     expect(cssRule('.shop-choice-screen .choice.placeholder')).toContain('transform: none')
+  })
+
+  it('keeps shop and relic choice card hit targets rectangular even with paper silhouettes', () => {
+    expect(cssRule('.shop-choice-screen .choice')).not.toContain('clip-path: var(--choice-tab-cut)')
+    expect(cssRule('.shop-choice-screen .choice')).not.toContain('clip-path')
   })
 
   it('adds two more shop paper card silhouettes while preserving quality glow depth', () => {
@@ -769,9 +785,9 @@ describe('equipment layout scale', () => {
     expect(css).toContain('/assets/backgrounds/dog-brawl-town.jpg')
     expect(app).not.toContain('/assets/backgrounds/dog-brawl-town.png')
     expect(css).not.toContain('/assets/backgrounds/dog-brawl-town.png')
-    expect(app).not.toContain('/assets/backgrounds/storybook-dog-park.webp')
+    expect(app).toContain('/assets/backgrounds/storybook-dog-park.webp')
     expect(app).not.toContain('/assets/backgrounds/storybook-back-alley.webp')
-    expect(app).not.toContain('/assets/backgrounds/storybook-royal-kennel.webp')
+    expect(app).toContain('/assets/backgrounds/storybook-royal-kennel.webp')
 
     expect(app).toContain("type VisualThemeId = 'dogPark' | 'backAlley' | 'royalKennel'")
     expect(app).toContain('function visualThemeForRound(round: number): VisualThemeId')

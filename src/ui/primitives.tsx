@@ -154,6 +154,7 @@ export type DogBadgeProps = HTMLAttributes<HTMLSpanElement> & {
   side?: 'player' | 'opponent'
   selected?: boolean
   status?: 'poison' | 'shield' | 'winner' | 'loser'
+  skinClass?: string
 }
 
 export function DogBadge({
@@ -164,6 +165,7 @@ export function DogBadge({
   side,
   selected = false,
   status,
+  skinClass,
   className,
   ...props
 }: DogBadgeProps) {
@@ -175,6 +177,7 @@ export function DogBadge({
         side && `dog-badge-${side}`,
         selected && 'selected',
         status && `dog-badge-${status}`,
+        skinClass,
         className,
       )}
       data-dog-type={dogType}

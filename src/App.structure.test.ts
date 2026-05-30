@@ -277,6 +277,25 @@ describe('selection screen structure', () => {
     expect(css).toContain('.daily-task-row')
   })
 
+  it('makes equipped account shop cosmetics feed real presentation surfaces', () => {
+    expect(app).toContain('const [equippedCosmetics, setEquippedCosmetics] = useState<CosmeticsResponse | null>(null)')
+    expect(app).toContain("api<CosmeticsResponse>('/cosmetics/me')")
+    expect(app).toContain('const loadCosmetics = useCallback')
+    expect(app).toContain('<Shell feedbacks={uiFeedbacks} cosmetics={equippedCosmetics}')
+    expect(app).toContain('<AccountShopScreen onCosmeticsChange={loadCosmetics} />')
+    expect(app).toContain('<AccountSettingsScreen onCosmeticsChange={loadCosmetics} />')
+    expect(app).toContain('function equippedCosmeticByType')
+    expect(app).toContain('function cosmeticDogAsset')
+    expect(app).toContain('function cosmeticDogSkinClass')
+    expect(app).toContain('function cosmeticBattleFxClass')
+    expect(app).toContain('cosmeticBackgroundClass(equippedCosmetics)')
+    expect(app).toContain('cosmeticAvatarClass(profile.avatar)')
+    expect(app).toContain('cosmeticTitleLabel(profile.title)')
+    expect(app).toContain('battleFxClass={cosmeticBattleFxClass(equippedCosmetics)}')
+    expect(app).toContain('skinClass={cosmeticDogSkinClass(equippedCosmetics, snapshot.dogType, side)}')
+    expect(app).toContain('src={cosmeticDogAsset(equippedCosmetics, snapshot.dogType, side)}')
+  })
+
   it('shows five-loss tolerance for casual runs in the top banner', () => {
     expect(app).toContain('value={`${5 - run.losses}`}')
     expect(app).toContain("tone={5 - run.losses <= 1 ? 'danger' : 'safe'}")
@@ -376,7 +395,7 @@ describe('selection screen structure', () => {
   })
 
   it('keeps shop choices in a fixed board and pads missing choices with blanks', () => {
-    expect(app).toContain('SHOP_CHOICE_SLOT_COUNT = shopChoiceOrder.length')
+    expect(app).toContain('SHOP_CHOICE_SLOT_COUNT = 9')
     expect(app).toContain('choice placeholder')
     expect(app).toContain('ShopChoiceSelect')
     expect(app).toContain('<HanddrawnChoiceCard key={choice} role="button" tabIndex={0} selected={selectedChoice === choice}')
@@ -388,9 +407,10 @@ describe('selection screen structure', () => {
     expect(css).toContain('.choice.placeholder')
   })
 
-  it('allocates a shop choice slot for every shop type including potion', () => {
-    expect(app).toContain('SHOP_CHOICE_SLOT_COUNT = shopChoiceOrder.length')
-    expect(app).toContain("const shopChoiceOrder: ShopType[] = ['GENERAL', 'LARGE', 'MEDIUM', 'SMALL', 'SMALL_DICE', 'BIG_DICE', 'RELIC', 'UPGRADE', 'UPGRADE_SILVER', 'UPGRADE_GOLD', 'UPGRADE_DIAMOND', 'POTION']")
+  it('keeps potion and advanced shop definitions available while rendering nine visible slots', () => {
+    expect(app).toContain('SHOP_CHOICE_SLOT_COUNT = 9')
+    expect(app).toContain("type ShopType = 'GENERAL' | 'LARGE' | 'MEDIUM' | 'SMALL' | 'SMALL_DICE' | 'BIG_DICE' | 'RELIC' | 'UPGRADE' | 'UPGRADE_SILVER' | 'UPGRADE_GOLD' | 'UPGRADE_DIAMOND' | 'POTION'")
+    expect(app).toContain("POTION: '药水商店'")
   })
 
   it('places normal three shop choices into the first three slots', () => {
@@ -434,7 +454,7 @@ describe('selection screen structure', () => {
   })
 
   it('uses the same compact top banner on setup and gameplay screens', () => {
-    expect(app).toContain('<main className="app-shell">')
+    expect(app).toContain('<main className={`app-shell ${cosmeticBackgroundClass(equippedCosmetics)}`}')
     expect(app).not.toContain('entry-shell')
     expect(app).not.toContain('const shellClass')
     expect(css).not.toContain('.entry-shell')
@@ -448,7 +468,7 @@ describe('selection screen structure', () => {
   })
 
   it('uses the same compact banner and rectangular action rhythm on gameplay screens', () => {
-    expect(app).toContain('<main className="app-shell">')
+    expect(app).toContain('<main className={`app-shell ${cosmeticBackgroundClass(equippedCosmetics)}`}')
     expect(app).not.toContain('entry-shell')
     expect(app).toContain('window.scrollTo(0, 0)')
     expect(app).toContain('run?.phase')
@@ -653,6 +673,10 @@ describe('selection screen structure', () => {
     expect(itemIconEntries.filter((entry) => !existsSync(new URL(`../public${entry.path}`, import.meta.url)))).toEqual([])
     expect(relicIconEntries.filter((entry) => !existsSync(new URL(`../public${entry.path}`, import.meta.url)))).toEqual([])
     expect([...itemIconEntries, ...relicIconEntries].filter((entry) => !entry.path.startsWith('/assets/sticker-icons/') || !entry.path.endsWith('.webp'))).toEqual([])
+    expect(app).toContain("const iconAssetVersion = 'sticker-")
+    expect(app).toContain("return src.startsWith('data:') ? src : `${src}?v=${iconAssetVersion}`")
+    expect(app).toContain('return versionedIconSrc(itemIcons[def.id]')
+    expect(app).toContain('return versionedIconSrc(relicIcons[def.id]')
   })
 
   it('wires V5 equipment icons and keeps sticker assets lightweight', () => {
@@ -823,7 +847,7 @@ describe('selection screen structure', () => {
     expect(app).toContain('audio.play().then(() => setMusicBlocked(false)).catch(() => setMusicBlocked(true))')
     expect(app).toContain('musicEnabled={musicEnabled}')
     expect(app).toContain('onToggleMusic={toggleMusic}')
-    expect(app).toContain('function TopBar({ run, musicEnabled, musicBlocked, onToggleMusic, onOpenLobby, onLogout }')
+    expect(app).toContain('function TopBar({ run, user, profile, musicEnabled, musicBlocked, onToggleMusic, onOpenLobby, onLogout }')
     expect(app).toContain('<Music size={18} />')
     expect(app).toContain('<VolumeX size={18} />')
     expect(css).toContain('.topbar-actions')
@@ -835,7 +859,7 @@ describe('selection screen structure', () => {
     expect(app).toContain('soundCueForBattlePresentation(presentation.kind)')
     expect(app).toContain('playFeedbackSound')
     expect(app).toContain('soundEnabled={musicEnabled}')
-    expect(app).toContain('function BattleView({ run, battle, currentEvent, eventIndex, speed, score, soundEnabled, onSpeed, onContinue, onRestart }')
+    expect(app).toContain('function BattleView({ run, battle, cosmetics: equippedCosmetics, currentEvent, eventIndex, speed, score, soundEnabled, onSpeed, onContinue, onRestart }')
     expect(app).toContain('<DogfightLobby soundEnabled={musicEnabled} />')
     expect(app).toContain('<DogfightRoomView room={room} onRoomChange={setRoom} onLeave={() => void leaveRoom()} soundEnabled={soundEnabled} />')
   })

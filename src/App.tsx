@@ -471,6 +471,30 @@ const dogAssets: Record<DogType, string> = {
   EMPEROR: '/assets/dogs/emperor.webp',
   FROG: '/assets/dogs/zuling.jpg',
 }
+const cosmeticBackgroundAssets: Record<string, string> = {
+  'bg-dog-park-night': '/assets/backgrounds/storybook-dog-park.webp',
+  'bg-royal-kennel': '/assets/backgrounds/storybook-royal-kennel.webp',
+}
+const cosmeticBackgroundClasses: Record<string, string> = {
+  'bg-dog-park-night': 'cosmetic-background-dog-park-night',
+  'bg-royal-kennel': 'cosmetic-background-royal-kennel',
+}
+const cosmeticAvatarClasses: Record<string, string> = {
+  'avatar-bone': 'cosmetic-avatar-bone',
+  'avatar-crown': 'cosmetic-avatar-crown',
+}
+const cosmeticAvatarGlyphs: Record<string, string> = {
+  'avatar-bone': '骨',
+  'avatar-crown': '冠',
+}
+const cosmeticDogSkinClasses: Record<string, { dogType: DogType; className: string }> = {
+  'skin-shiba-scarf': { dogType: 'SHIBA', className: 'dog-badge-skin-shiba-scarf' },
+  'skin-samoyed-snow': { dogType: 'SAMOYED', className: 'dog-badge-skin-samoyed-snow' },
+}
+const cosmeticBattleFxClasses: Record<string, string> = {
+  'fx-gold-dice': 'battle-fx-gold-dice',
+  'fx-aurora-roll': 'battle-fx-aurora-roll',
+}
 const dogBrawlTownBackground = '/assets/backgrounds/dog-brawl-town.jpg'
 const visualThemeAssets: Record<VisualThemeId, string> = {
   dogPark: dogBrawlTownBackground,
@@ -589,6 +613,60 @@ function visualThemeStyle(visualTheme: VisualThemeId) {
 
 function surpriseBackgroundStyle(background: SurpriseBackgroundId) {
   return { '--surprise-bg': `url("${surpriseBackgrounds[background]}")` } as React.CSSProperties
+}
+
+function equippedCosmeticByType(cosmetics: CosmeticsResponse | null | undefined, type: CosmeticType) {
+  const equipped = cosmetics?.equipped.find((entry) => entry.slot === type)
+  return equipped?.item ?? cosmetics?.inventory.find((entry) => entry.catalogItemId === equipped?.catalogItemId)?.item ?? null
+}
+
+function equippedCosmeticProfile(cosmetics: CosmeticsResponse | null | undefined) {
+  return {
+    title: equippedCosmeticByType(cosmetics, 'TITLE'),
+    avatar: equippedCosmeticByType(cosmetics, 'AVATAR'),
+    background: equippedCosmeticByType(cosmetics, 'BACKGROUND'),
+    dogSkin: equippedCosmeticByType(cosmetics, 'DOG_SKIN'),
+    battleEffect: equippedCosmeticByType(cosmetics, 'BATTLE_EFFECT'),
+  }
+}
+
+function cosmeticTitleLabel(title: ShopCatalogItem | null | undefined) {
+  return title?.name ?? '未装备称号'
+}
+
+function cosmeticAvatarClass(avatar: ShopCatalogItem | null | undefined) {
+  return avatar ? cosmeticAvatarClasses[avatar.id] ?? '' : ''
+}
+
+function cosmeticAvatarGlyph(avatar: ShopCatalogItem | null | undefined) {
+  return avatar ? cosmeticAvatarGlyphs[avatar.id] ?? '像' : '狗'
+}
+
+function cosmeticBackgroundClass(equippedCosmetics: CosmeticsResponse | null | undefined) {
+  const background = equippedCosmeticByType(equippedCosmetics, 'BACKGROUND')
+  return background ? cosmeticBackgroundClasses[background.id] ?? '' : ''
+}
+
+function cosmeticBackgroundStyle(equippedCosmetics: CosmeticsResponse | null | undefined) {
+  const background = equippedCosmeticByType(equippedCosmetics, 'BACKGROUND')
+  const asset = background ? cosmeticBackgroundAssets[background.id] : null
+  return asset ? { '--app-illustration-bg': `url("${asset}")` } as React.CSSProperties : undefined
+}
+
+function cosmeticDogSkinClass(equippedCosmetics: CosmeticsResponse | null | undefined, dogType: DogType, side: 'player' | 'opponent' = 'player') {
+  if (side !== 'player') return ''
+  const skin = equippedCosmeticByType(equippedCosmetics, 'DOG_SKIN')
+  const config = skin ? cosmeticDogSkinClasses[skin.id] : null
+  return config?.dogType === dogType ? config.className : ''
+}
+
+function cosmeticDogAsset(equippedCosmetics: CosmeticsResponse | null | undefined, dogType: DogType, side: 'player' | 'opponent' = 'player') {
+  return cosmeticDogSkinClass(equippedCosmetics, dogType, side) ? dogAssets[dogType] : dogAssets[dogType]
+}
+
+function cosmeticBattleFxClass(equippedCosmetics: CosmeticsResponse | null | undefined) {
+  const battleEffect = equippedCosmeticByType(equippedCosmetics, 'BATTLE_EFFECT')
+  return battleEffect ? cosmeticBattleFxClasses[battleEffect.id] ?? '' : ''
 }
 
 function hasBoughtTutorialItem(run: Run | null) {
@@ -787,8 +865,7 @@ const ladderTierLabel: Record<LadderTier, string> = {
   DOG_KING: '犬王',
 }
 const dogOptions: DogType[] = ['SHIBA', 'SAMOYED', 'MUTT', 'BULLY', 'EMPEROR', 'FROG']
-const shopChoiceOrder: ShopType[] = ['GENERAL', 'LARGE', 'MEDIUM', 'SMALL', 'SMALL_DICE', 'BIG_DICE', 'RELIC', 'UPGRADE', 'UPGRADE_SILVER', 'UPGRADE_GOLD', 'UPGRADE_DIAMOND', 'POTION']
-const SHOP_CHOICE_SLOT_COUNT = shopChoiceOrder.length
+const SHOP_CHOICE_SLOT_COUNT = 9
 const battleLogFilters: BattleLogFilter[] = ['all', 'damage', 'sustain', 'status', 'equipment']
 const dogStrategies: Record<DogType, string> = {
   SHIBA: '适合新手，专注于持续输出伤害',
@@ -894,8 +971,14 @@ function itemTone(def: ItemDef) {
   return itemVisualProfile(def).className
 }
 
+const iconAssetVersion = 'sticker-20260530-v2'
+
+function versionedIconSrc(src: string) {
+  return src.startsWith('data:') ? src : `${src}?v=${iconAssetVersion}`
+}
+
 function itemIcon(def: ItemDef) {
-  return itemIcons[def.id] ?? '/assets/sticker-icons/starter-1.webp'
+  return versionedIconSrc(itemIcons[def.id] ?? '/assets/sticker-icons/starter-1.webp')
 }
 
 function ItemArtIcon({ def, className }: { def: ItemDef; className: string }) {
@@ -920,7 +1003,7 @@ function isItemArtDebugRoute() {
 }
 
 function relicIcon(def: RelicDef) {
-  return relicIcons[def.id] ?? '/assets/sticker-icons/v3-two-sided-gold-tag.webp'
+  return versionedIconSrc(relicIcons[def.id] ?? '/assets/sticker-icons/v3-two-sided-gold-tag.webp')
 }
 
 function normalizeQuality(quality?: string): ItemQuality {
@@ -1365,6 +1448,7 @@ export default function App() {
   const [appHasAudioFocus, setAppHasAudioFocus] = useState(() => !document.hidden && document.hasFocus())
   const [runHistory, setRunHistory] = useState<PlayerRunHistory>(emptyRunHistory)
   const [ladderProfile, setLadderProfile] = useState<LadderProfile | null>(null)
+  const [equippedCosmetics, setEquippedCosmetics] = useState<CosmeticsResponse | null>(null)
   const [historyOverlayOpen, setHistoryOverlayOpen] = useState(false)
   const [casualTutorialState, setCasualTutorialState] = useState<CasualTutorialState>(defaultCasualTutorialState)
   const [tutorialOfferInspected, setTutorialOfferInspected] = useState(false)
@@ -1385,6 +1469,12 @@ export default function App() {
     setLadderProfile(data.profile)
   }, [])
 
+  const loadCosmetics = useCallback(async () => {
+    const data = await api<CosmeticsResponse>('/cosmetics/me')
+    setEquippedCosmetics(data)
+    return data
+  }, [])
+
   useEffect(() => {
     api<{ user: AuthUser; activeRun: Run | null }>('/me')
       .then((data) => {
@@ -1393,9 +1483,10 @@ export default function App() {
         setRun(data.activeRun)
         void loadRunHistory().catch(() => undefined)
         void loadLadderProfile().catch(() => undefined)
+        void loadCosmetics().catch(() => undefined)
       })
       .catch(() => undefined)
-  }, [loadLadderProfile, loadRunHistory])
+  }, [loadCosmetics, loadLadderProfile, loadRunHistory])
 
   useEffect(() => {
     if (!run) {
@@ -1566,6 +1657,7 @@ export default function App() {
           setCasualTutorialState(defaultCasualTutorialState)
           setRunHistory(emptyRunHistory)
           setLadderProfile(null)
+          setEquippedCosmetics(null)
         } else if ('activeRun' in data) {
           setRun(data.activeRun ?? null)
           setCasualTutorialState(readCasualTutorialState(data.user.id))
@@ -1574,6 +1666,7 @@ export default function App() {
         if (data.user) {
           void loadRunHistory().catch(() => undefined)
           void loadLadderProfile().catch(() => undefined)
+          void loadCosmetics().catch(() => undefined)
         }
       } else {
         setRun(data.run)
@@ -1889,7 +1982,7 @@ export default function App() {
 
   if (needsNicknameSetup) {
     return (
-      <Shell feedbacks={uiFeedbacks} error={error} musicEnabled={musicEnabled} musicBlocked={musicBlocked} onToggleMusic={toggleMusic} onLogout={() => action(() => api('/auth/logout', { method: 'POST' }).then(() => ({ user: null })))}>
+      <Shell feedbacks={uiFeedbacks} cosmetics={equippedCosmetics} user={user} error={error} musicEnabled={musicEnabled} musicBlocked={musicBlocked} onToggleMusic={toggleMusic} onLogout={() => action(() => api('/auth/logout', { method: 'POST' }).then(() => ({ user: null })))}>
         <NicknameSetup onSubmit={(nickname) => action(() => api('/profile/nickname', { method: 'POST', body: JSON.stringify({ nickname }) }))} />
       </Shell>
     )
@@ -1897,7 +1990,7 @@ export default function App() {
 
   if (appScreen === 'LOBBY') {
     return (
-      <Shell feedbacks={uiFeedbacks} error={error} musicEnabled={musicEnabled} musicBlocked={musicBlocked} onToggleMusic={toggleMusic} onLogout={() => action(() => api('/auth/logout', { method: 'POST' }).then(() => ({ user: null })))}>
+      <Shell feedbacks={uiFeedbacks} cosmetics={equippedCosmetics} user={user} error={error} musicEnabled={musicEnabled} musicBlocked={musicBlocked} onToggleMusic={toggleMusic} onLogout={() => action(() => api('/auth/logout', { method: 'POST' }).then(() => ({ user: null })))}>
         <PlayerRunHistoryPanel history={runHistory} ladderProfile={ladderProfile} onOpen={() => setHistoryOverlayOpen(true)} onEnterShop={() => setAppScreen('SHOP')} onEnterAchievements={() => setAppScreen('ACHIEVEMENTS')} onEnterSettings={() => setAppScreen('SETTINGS')} />
         <ModeLobby run={run} runHistory={runHistory} onOpen={() => setHistoryOverlayOpen(true)} onEnterCasual={handleEnterCasual} onReplayTutorial={startCasualTutorial} onEnterLadder={() => setAppScreen('LADDER')} onEnterDogfight={() => setAppScreen('DOGFIGHT')} onEnterPeak={() => setAppScreen('PEAK')} />
         {historyOverlayOpen && <PlayerHistoryOverlay history={runHistory} onClose={() => setHistoryOverlayOpen(false)} />}
@@ -1908,15 +2001,15 @@ export default function App() {
 
   if (appScreen === 'SHOP') {
     return (
-      <Shell feedbacks={uiFeedbacks} run={run ?? undefined} error={error} musicEnabled={musicEnabled} musicBlocked={musicBlocked} onToggleMusic={toggleMusic} onOpenLobby={() => setAppScreen('LOBBY')} onLogout={() => action(() => api('/auth/logout', { method: 'POST' }).then(() => ({ user: null })))}>
-        <AccountShopScreen />
+      <Shell feedbacks={uiFeedbacks} cosmetics={equippedCosmetics} user={user} run={run ?? undefined} error={error} musicEnabled={musicEnabled} musicBlocked={musicBlocked} onToggleMusic={toggleMusic} onOpenLobby={() => setAppScreen('LOBBY')} onLogout={() => action(() => api('/auth/logout', { method: 'POST' }).then(() => ({ user: null })))}>
+        <AccountShopScreen onCosmeticsChange={loadCosmetics} />
       </Shell>
     )
   }
 
   if (appScreen === 'ACHIEVEMENTS') {
     return (
-      <Shell feedbacks={uiFeedbacks} run={run ?? undefined} error={error} musicEnabled={musicEnabled} musicBlocked={musicBlocked} onToggleMusic={toggleMusic} onOpenLobby={() => setAppScreen('LOBBY')} onLogout={() => action(() => api('/auth/logout', { method: 'POST' }).then(() => ({ user: null })))}>
+      <Shell feedbacks={uiFeedbacks} cosmetics={equippedCosmetics} user={user} run={run ?? undefined} error={error} musicEnabled={musicEnabled} musicBlocked={musicBlocked} onToggleMusic={toggleMusic} onOpenLobby={() => setAppScreen('LOBBY')} onLogout={() => action(() => api('/auth/logout', { method: 'POST' }).then(() => ({ user: null })))}>
         <AchievementsScreen />
       </Shell>
     )
@@ -1924,15 +2017,15 @@ export default function App() {
 
   if (appScreen === 'SETTINGS') {
     return (
-      <Shell feedbacks={uiFeedbacks} run={run ?? undefined} error={error} musicEnabled={musicEnabled} musicBlocked={musicBlocked} onToggleMusic={toggleMusic} onOpenLobby={() => setAppScreen('LOBBY')} onLogout={() => action(() => api('/auth/logout', { method: 'POST' }).then(() => ({ user: null })))}>
-        <AccountSettingsScreen />
+      <Shell feedbacks={uiFeedbacks} cosmetics={equippedCosmetics} user={user} run={run ?? undefined} error={error} musicEnabled={musicEnabled} musicBlocked={musicBlocked} onToggleMusic={toggleMusic} onOpenLobby={() => setAppScreen('LOBBY')} onLogout={() => action(() => api('/auth/logout', { method: 'POST' }).then(() => ({ user: null })))}>
+        <AccountSettingsScreen onCosmeticsChange={loadCosmetics} />
       </Shell>
     )
   }
 
   if (appScreen === 'LADDER' && run?.mode !== 'LADDER') {
     return (
-      <Shell feedbacks={uiFeedbacks} run={run ?? undefined} error={error} musicEnabled={musicEnabled} musicBlocked={musicBlocked} onToggleMusic={toggleMusic} onOpenLobby={() => setAppScreen('LOBBY')} onLogout={() => action(() => api('/auth/logout', { method: 'POST' }).then(() => ({ user: null })))}>
+      <Shell feedbacks={uiFeedbacks} cosmetics={equippedCosmetics} user={user} run={run ?? undefined} error={error} musicEnabled={musicEnabled} musicBlocked={musicBlocked} onToggleMusic={toggleMusic} onOpenLobby={() => setAppScreen('LOBBY')} onLogout={() => action(() => api('/auth/logout', { method: 'POST' }).then(() => ({ user: null })))}>
         <LadderHome onStart={(choice) => action(() => api('/runs', { method: 'POST', body: JSON.stringify({ ...choice, mode: 'LADDER' }) }))} />
         {tutorialGuide}
       </Shell>
@@ -1941,7 +2034,7 @@ export default function App() {
 
   if (appScreen === 'DOGFIGHT') {
     return (
-      <Shell feedbacks={uiFeedbacks} run={run ?? undefined} error={error} musicEnabled={musicEnabled} musicBlocked={musicBlocked} onToggleMusic={toggleMusic} onOpenLobby={() => setAppScreen('LOBBY')} onLogout={() => action(() => api('/auth/logout', { method: 'POST' }).then(() => ({ user: null })))}>
+      <Shell feedbacks={uiFeedbacks} cosmetics={equippedCosmetics} user={user} run={run ?? undefined} error={error} musicEnabled={musicEnabled} musicBlocked={musicBlocked} onToggleMusic={toggleMusic} onOpenLobby={() => setAppScreen('LOBBY')} onLogout={() => action(() => api('/auth/logout', { method: 'POST' }).then(() => ({ user: null })))}>
         <DogfightLobby soundEnabled={musicEnabled} />
         {tutorialGuide}
       </Shell>
@@ -1950,7 +2043,7 @@ export default function App() {
 
   if (appScreen === 'PEAK') {
     return (
-      <Shell feedbacks={uiFeedbacks} run={run ?? undefined} error={error} musicEnabled={musicEnabled} musicBlocked={musicBlocked} onToggleMusic={toggleMusic} onOpenLobby={() => setAppScreen('LOBBY')} onLogout={() => action(() => api('/auth/logout', { method: 'POST' }).then(() => ({ user: null })))}>
+      <Shell feedbacks={uiFeedbacks} cosmetics={equippedCosmetics} user={user} run={run ?? undefined} error={error} musicEnabled={musicEnabled} musicBlocked={musicBlocked} onToggleMusic={toggleMusic} onOpenLobby={() => setAppScreen('LOBBY')} onLogout={() => action(() => api('/auth/logout', { method: 'POST' }).then(() => ({ user: null })))}>
         <ApexArena />
         {tutorialGuide}
       </Shell>
@@ -1959,14 +2052,14 @@ export default function App() {
 
   if (!run) {
     return (
-      <Shell feedbacks={uiFeedbacks} error={error} musicEnabled={musicEnabled} musicBlocked={musicBlocked} onToggleMusic={toggleMusic} onOpenLobby={() => setAppScreen('LOBBY')} onLogout={() => action(() => api('/auth/logout', { method: 'POST' }).then(() => ({ user: null })))}>
+      <Shell feedbacks={uiFeedbacks} cosmetics={equippedCosmetics} user={user} error={error} musicEnabled={musicEnabled} musicBlocked={musicBlocked} onToggleMusic={toggleMusic} onOpenLobby={() => setAppScreen('LOBBY')} onLogout={() => action(() => api('/auth/logout', { method: 'POST' }).then(() => ({ user: null })))}>
         <DogSelect onPick={(choice) => action(() => api('/runs', { method: 'POST', body: JSON.stringify(choice) }))} />
         {tutorialGuide}
       </Shell>
     )
   }
   return (
-    <Shell feedbacks={uiFeedbacks} run={run} error={error} musicEnabled={musicEnabled} musicBlocked={musicBlocked} onToggleMusic={toggleMusic} onOpenLobby={() => setAppScreen('LOBBY')} onLogout={() => action(() => api('/auth/logout', { method: 'POST' }).then(() => ({ user: null })))}>
+    <Shell feedbacks={uiFeedbacks} cosmetics={equippedCosmetics} user={user} run={run} error={error} musicEnabled={musicEnabled} musicBlocked={musicBlocked} onToggleMusic={toggleMusic} onOpenLobby={() => setAppScreen('LOBBY')} onLogout={() => action(() => api('/auth/logout', { method: 'POST' }).then(() => ({ user: null })))}>
       {!battle && run.phase === 'CHOICE' && (
         <ShopChoiceSelect choices={run.choices} onPick={(shopType) => action(() => api(`/runs/${run.id}/choice/select`, { method: 'POST', body: JSON.stringify({ shopType }) }))} />
       )}
@@ -2133,6 +2226,7 @@ export default function App() {
         <BattleView
           run={run}
           battle={battle}
+          cosmetics={equippedCosmetics}
           currentEvent={currentEvent}
           eventIndex={eventIndex}
           speed={speed}
@@ -2224,7 +2318,7 @@ function CasualTutorialGuide({ state, run, battle, eventIndex, onSkip }: { state
   )
 }
 
-function AccountShopScreen() {
+function AccountShopScreen({ onCosmeticsChange }: { onCosmeticsChange: () => Promise<CosmeticsResponse> }) {
   const [shop, setShop] = useState<AccountShopResponse | null>(null)
   const [cosmetics, setCosmetics] = useState<CosmeticsResponse | null>(null)
   const [error, setError] = useState('')
@@ -2237,10 +2331,12 @@ function AccountShopScreen() {
   const purchase = async (catalogItemId: string) => {
     setShop(await api<AccountShopResponse>('/shop/purchase', { method: 'POST', body: JSON.stringify({ catalogItemId }) }))
     setCosmetics(await api<CosmeticsResponse>('/cosmetics/me'))
+    await onCosmeticsChange()
   }
   const equip = async (catalogItemId: string) => {
     setCosmetics(await api<CosmeticsResponse>('/cosmetics/equip', { method: 'POST', body: JSON.stringify({ catalogItemId }) }))
     setShop(await api<AccountShopResponse>('/shop'))
+    await onCosmeticsChange()
   }
   return (
     <section className="account-shop-screen">
@@ -2335,7 +2431,7 @@ function AchievementsScreen() {
 
 const cosmeticTypeOrder: CosmeticType[] = ['TITLE', 'AVATAR', 'BACKGROUND', 'DOG_SKIN', 'BATTLE_EFFECT']
 
-function AccountSettingsScreen() {
+function AccountSettingsScreen({ onCosmeticsChange }: { onCosmeticsChange: () => Promise<CosmeticsResponse> }) {
   const [cosmetics, setCosmetics] = useState<CosmeticsResponse | null>(null)
   const [error, setError] = useState('')
   const load = useCallback(async () => setCosmetics(await api<CosmeticsResponse>('/cosmetics/me')), [])
@@ -2344,6 +2440,7 @@ function AccountSettingsScreen() {
     setError('')
     try {
       setCosmetics(await api<CosmeticsResponse>('/cosmetics/equip', { method: 'POST', body: JSON.stringify({ catalogItemId }) }))
+      await onCosmeticsChange()
     } catch (err) {
       setError(err instanceof Error ? err.message : '装备失败')
     }
@@ -3716,12 +3813,13 @@ function DogSelect({ onPick }: { onPick: (choice: { dogType: DogType; luckyNumbe
   )
 }
 
-function Shell({ children, run, error, feedbacks = [], musicEnabled, musicBlocked, onToggleMusic, onOpenLobby, onLogout }: { children: React.ReactNode; run?: Run; error?: string; feedbacks?: UiFeedbackEvent[]; musicEnabled: boolean; musicBlocked: boolean; onToggleMusic: () => void; onOpenLobby?: () => void; onLogout: () => void }) {
+function Shell({ children, run, error, feedbacks = [], cosmetics: equippedCosmetics, user, musicEnabled, musicBlocked, onToggleMusic, onOpenLobby, onLogout }: { children: React.ReactNode; run?: Run; error?: string; feedbacks?: UiFeedbackEvent[]; cosmetics?: CosmeticsResponse | null; user?: AuthUser | null; musicEnabled: boolean; musicBlocked: boolean; onToggleMusic: () => void; onOpenLobby?: () => void; onLogout: () => void }) {
   const { language } = useLanguage()
   const visualTheme = run ? visualThemeForRound(run.round) : 'dogPark'
+  const profile = equippedCosmeticProfile(equippedCosmetics)
   return (
-    <main className="app-shell">
-      <TopBar run={run} musicEnabled={musicEnabled} musicBlocked={musicBlocked} onToggleMusic={onToggleMusic} onOpenLobby={onOpenLobby} onLogout={onLogout} />
+    <main className={`app-shell ${cosmeticBackgroundClass(equippedCosmetics)}`} style={cosmeticBackgroundStyle(equippedCosmetics)}>
+      <TopBar run={run} user={user} profile={profile} musicEnabled={musicEnabled} musicBlocked={musicBlocked} onToggleMusic={onToggleMusic} onOpenLobby={onOpenLobby} onLogout={onLogout} />
       {error && <p className="error">{localizeServerError(error, language)}</p>}
       <div className={`app-visual-layer visual-theme-${visualTheme} high-impact-vfx`} data-visual-theme={visualTheme} style={visualThemeStyle(visualTheme)}>
         <div className="screen-content">{children}</div>
@@ -3768,7 +3866,7 @@ function FeedbackLayer({ feedbacks }: { feedbacks: UiFeedbackEvent[] }) {
   )
 }
 
-function TopBar({ run, musicEnabled, musicBlocked, onToggleMusic, onOpenLobby, onLogout }: { run?: Run; musicEnabled: boolean; musicBlocked: boolean; onToggleMusic: () => void; onOpenLobby?: () => void; onLogout: () => void }) {
+function TopBar({ run, user, profile, musicEnabled, musicBlocked, onToggleMusic, onOpenLobby, onLogout }: { run?: Run; user?: AuthUser | null; profile: ReturnType<typeof equippedCosmeticProfile>; musicEnabled: boolean; musicBlocked: boolean; onToggleMusic: () => void; onOpenLobby?: () => void; onLogout: () => void }) {
   const musicTitle = musicEnabled ? (musicBlocked ? '音乐待播放，点击重试' : '关闭音乐') : '开启音乐'
   return (
     <header className="topbar paper-card">
@@ -3785,6 +3883,15 @@ function TopBar({ run, musicEnabled, musicBlocked, onToggleMusic, onOpenLobby, o
           <ResourcePill icon={<Shield size={16} />} label="容错" value={`${5 - run.losses}`} tone={5 - run.losses <= 1 ? 'danger' : 'safe'} />
           <ResourcePill icon={<Coins size={16} />} label="金币" value={run.gold} tone="gold" />
           <ResourcePill icon={<Dice5 size={16} />} label="回合" value={run.round} tone="round" />
+        </div>
+      )}
+      {user && (
+        <div className="topbar-profile" title={`${user.nickname ?? user.account} · ${cosmeticTitleLabel(profile.title)}`}>
+          <span className={`topbar-profile-avatar ${cosmeticAvatarClass(profile.avatar)}`}>{cosmeticAvatarGlyph(profile.avatar)}</span>
+          <div>
+            <strong>{user.nickname ?? user.account}</strong>
+            <small>{cosmeticTitleLabel(profile.title)}</small>
+          </div>
         </div>
       )}
       <div className="topbar-actions">
@@ -4690,7 +4797,7 @@ function ForfeitRunAction({ run, onForfeit }: { run: Run; onForfeit: () => void 
   )
 }
 
-function BattleView({ run, battle, currentEvent, eventIndex, speed, score, soundEnabled, onSpeed, onContinue, onRestart }: { run: Run; battle: Battle | null; currentEvent?: BattleEvent; eventIndex: number; speed: number; score: number; soundEnabled: boolean; onSpeed: (speed: number) => void; onContinue: () => void; onRestart: () => void }) {
+function BattleView({ run, battle, cosmetics: equippedCosmetics, currentEvent, eventIndex, speed, score, soundEnabled, onSpeed, onContinue, onRestart }: { run: Run; battle: Battle | null; cosmetics?: CosmeticsResponse | null; currentEvent?: BattleEvent; eventIndex: number; speed: number; score: number; soundEnabled: boolean; onSpeed: (speed: number) => void; onContinue: () => void; onRestart: () => void }) {
   const { language } = useLanguage()
   const [logOpen, setLogOpen] = useState(false)
   const [battleTip, setBattleTip] = useState<{ item: Item; owner: 'player' | 'opponent'; anchor: TipAnchor } | null>(null)
@@ -4732,8 +4839,9 @@ function BattleView({ run, battle, currentEvent, eventIndex, speed, score, sound
     setSettlementHidden(false)
   }, [run.id, run.phase])
 
+  const battleFxClass = cosmeticBattleFxClass(equippedCosmetics)
   return (
-    <section className={`battle-panel visual-battle sketch-panel visual-theme-${visualTheme}`} data-visual-theme={visualTheme} style={visualThemeStyle(visualTheme)}>
+    <section className={`battle-panel visual-battle sketch-panel visual-theme-${visualTheme} ${battleFxClass}`} data-visual-theme={visualTheme} style={visualThemeStyle(visualTheme)}>
       <div className="battle-toolbar">
         <div className="battle-status">
           <h2>自动战斗</h2>
@@ -4744,7 +4852,7 @@ function BattleView({ run, battle, currentEvent, eventIndex, speed, score, sound
         </div>
       </div>
 
-      <BattleFxStage event={event} eventIndex={displayIndex} presentation={presentation} speed={speed} />
+      <BattleFxStage event={event} eventIndex={displayIndex} presentation={presentation} speed={speed} battleFxClass={cosmeticBattleFxClass(equippedCosmetics)} />
       <BattleEquipmentRow owner="opponent" snapshot={opponentSnapshot} events={events} displayIndex={displayIndex} activeEvent={event} targetItemIds={targetEquipment.owner === 'opponent' ? targetEquipment.itemIds : []} onInspect={(item, element) => setBattleTip({ item, owner: 'opponent', anchor: getFloatingTipPosition(element) })} />
       <BattleStage
         player={playerSnapshot}
@@ -4755,6 +4863,8 @@ function BattleView({ run, battle, currentEvent, eventIndex, speed, score, sound
         finished={isFinished}
         winner={playback?.winner}
         visualTheme={visualTheme}
+        cosmetics={equippedCosmetics}
+        battleFxClass={cosmeticBattleFxClass(equippedCosmetics)}
       />
       <BattleEquipmentRow owner="player" snapshot={playerSnapshot} events={events} displayIndex={displayIndex} activeEvent={event} targetItemIds={targetEquipment.owner === 'player' ? targetEquipment.itemIds : []} onInspect={(item, element) => setBattleTip({ item, owner: 'player', anchor: getFloatingTipPosition(element) })} />
       {battleTip && (
@@ -4975,7 +5085,7 @@ function BattleEquipmentRow({ owner, snapshot, events, displayIndex, activeEvent
   )
 }
 
-function BattleStage({ player, opponent, event, presentation, lastRoll, finished, winner, visualTheme }: { player: BattleSnapshot; opponent: BattleSnapshot; event?: BattleEvent; presentation: PresentationEvent | null; lastRoll?: BattleEvent; finished: boolean; winner?: string; visualTheme: VisualThemeId }) {
+function BattleStage({ player, opponent, event, presentation, lastRoll, finished, winner, visualTheme, cosmetics, battleFxClass }: { player: BattleSnapshot; opponent: BattleSnapshot; event?: BattleEvent; presentation: PresentationEvent | null; lastRoll?: BattleEvent; finished: boolean; winner?: string; visualTheme: VisualThemeId; cosmetics?: CosmeticsResponse | null; battleFxClass?: string }) {
   const [statusTip, setStatusTip] = useState<StatusTipState | null>(null)
   const inspectStatus = (status: BattleStatusEntry, side: 'player' | 'opponent', polarity: 'positive' | 'negative', element: HTMLElement) => {
     setStatusTip({ status, side, polarity, anchor: getFloatingTipPosition(element) })
@@ -4989,7 +5099,7 @@ function BattleStage({ player, opponent, event, presentation, lastRoll, finished
   const opponentShield = event?.opponentShield ?? 0
   const activePresentationKind = presentation?.kind ?? 'none'
   return (
-    <div className={`battle-stage handdrawn-stage visual-theme-surface visual-theme-${visualTheme}`} data-visual-theme={visualTheme} style={visualThemeStyle(visualTheme)} data-tutorial-anchor="battle-stage" data-presentation-kind={activePresentationKind}>
+    <div className={`battle-stage handdrawn-stage visual-theme-surface visual-theme-${visualTheme} ${battleFxClass ?? ''}`} data-visual-theme={visualTheme} style={visualThemeStyle(visualTheme)} data-tutorial-anchor="battle-stage" data-presentation-kind={activePresentationKind}>
       <BattleDog
         side="opponent"
         snapshot={opponent}
@@ -5001,8 +5111,9 @@ function BattleStage({ player, opponent, event, presentation, lastRoll, finished
         winner={winner}
         onStatusInspect={inspectStatus}
         activeStatusKey={activeStatusKey}
+        cosmetics={cosmetics}
       />
-      <BattleDice event={event} lastRoll={lastRoll} />
+      <BattleDice event={event} lastRoll={lastRoll} battleFxClass={battleFxClass} />
       <BattleDog
         side="player"
         snapshot={player}
@@ -5014,13 +5125,14 @@ function BattleStage({ player, opponent, event, presentation, lastRoll, finished
         winner={winner}
         onStatusInspect={inspectStatus}
         activeStatusKey={activeStatusKey}
+        cosmetics={cosmetics}
       />
       <StatusFloatingTip statusTip={statusTip} onClose={() => setStatusTip(null)} />
     </div>
   )
 }
 
-function BattleDog({ side, snapshot, hp, maxHp, shield, event, finished, winner, onStatusInspect, activeStatusKey }: { side: 'player' | 'opponent'; snapshot: BattleSnapshot; hp: number; maxHp: number; shield: number; event?: BattleEvent; finished: boolean; winner?: string; onStatusInspect: (status: BattleStatusEntry, side: 'player' | 'opponent', polarity: 'positive' | 'negative', element: HTMLElement) => void; activeStatusKey: string | null }) {
+function BattleDog({ side, snapshot, hp, maxHp, shield, event, finished, winner, onStatusInspect, activeStatusKey, cosmetics: equippedCosmetics }: { side: 'player' | 'opponent'; snapshot: BattleSnapshot; hp: number; maxHp: number; shield: number; event?: BattleEvent; finished: boolean; winner?: string; onStatusInspect: (status: BattleStatusEntry, side: 'player' | 'opponent', polarity: 'positive' | 'negative', element: HTMLElement) => void; activeStatusKey: string | null; cosmetics?: CosmeticsResponse | null }) {
   const isActor = event?.actor === side
   const vfxKind = battleVfxKind(event)
   const vfxTargetSide = battleVfxTargetSide(event)
@@ -5061,7 +5173,7 @@ function BattleDog({ side, snapshot, hp, maxHp, shield, event, finished, winner,
           </div>
         )}
       </BoneHealthBar>
-      <DogBadge dogType={snapshot.dogType} src={dogAssets[snapshot.dogType]} size="battle" side={side} status={poisonStatus ? 'poison' : shieldValue > 0 ? 'shield' : won ? 'winner' : lost ? 'loser' : undefined} className="battle-dog-img" {...battleVfxAnchorAttrs('dog-avatar', side)} />
+      <DogBadge dogType={snapshot.dogType} src={cosmeticDogAsset(equippedCosmetics, snapshot.dogType, side)} size="battle" side={side} status={poisonStatus ? 'poison' : shieldValue > 0 ? 'shield' : won ? 'winner' : lost ? 'loser' : undefined} skinClass={cosmeticDogSkinClass(equippedCosmetics, snapshot.dogType, side)} className="battle-dog-img" {...battleVfxAnchorAttrs('dog-avatar', side)} />
       <strong>{dogNames[snapshot.dogType]}</strong>
     </div>
   )
@@ -5137,7 +5249,7 @@ function statusDescription(status: BattleStatusEntry) {
   return `${values}；${detail.timing}；${detail.description}`
 }
 
-function BattleDice({ event, lastRoll }: { event?: BattleEvent; lastRoll?: BattleEvent }) {
+function BattleDice({ event, lastRoll, battleFxClass = '' }: { event?: BattleEvent; lastRoll?: BattleEvent; battleFxClass?: string }) {
   const actor = event?.kind === 'ROLL' ? event.actor : lastRoll?.actor ?? event?.actor
   const roll = event?.roll ?? lastRoll?.roll
   return (
@@ -5146,12 +5258,12 @@ function BattleDice({ event, lastRoll }: { event?: BattleEvent; lastRoll?: Battl
       actor={actor === 'opponent' || actor === 'player' ? actor : 'system'}
       rolling={event?.kind === 'ROLL'}
       label={actor === 'opponent' ? '对手掷骰' : actor === 'player' ? '玩家掷骰' : '战斗结算'}
-      className="battle-dice handdrawn-dice"
+      className={`battle-dice handdrawn-dice ${battleFxClass}`}
     />
   )
 }
 
-function BattleFxStage({ event, eventIndex, presentation, speed }: { event?: BattleEvent; eventIndex: number; presentation: PresentationEvent | null; speed: number }) {
+function BattleFxStage({ event, eventIndex, presentation, speed, battleFxClass = '' }: { event?: BattleEvent; eventIndex: number; presentation: PresentationEvent | null; speed: number; battleFxClass?: string }) {
   const stageRef = useRef<HTMLDivElement | null>(null)
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const [activeFxInstances, setActiveFxInstances] = useState<BattleFxInstance[]>([])
@@ -5253,7 +5365,7 @@ function BattleFxStage({ event, eventIndex, presentation, speed }: { event?: Bat
   }, [activeFxInstances.length])
 
   return (
-    <div ref={stageRef} className="battle-fx-stage" data-vfx-kind={battleVfxKind(event)} data-timeline={timeline.map((step) => step.phase).join(' ')}>
+    <div ref={stageRef} className={`battle-fx-stage ${battleFxClass}`} data-vfx-kind={battleVfxKind(event)} data-timeline={timeline.map((step) => step.phase).join(' ')}>
       <canvas ref={canvasRef} className="battle-fx-canvas handdrawn-fx-canvas" data-vfx-kind={battleVfxKind(event)} aria-hidden="true" />
       {activeFxInstances.filter((instance) => instance.presentation.kind === 'roll').map((instance) => (
         <span key={instance.id} className={`battle-feedback-burst ${instance.presentation.kind}`} aria-hidden="true">
