@@ -710,6 +710,20 @@ describe('equipment layout scale', () => {
     expect(cssRule('.battle-feedback-burst')).toContain('z-index: 3')
   })
 
+  it('styles the battle review dashboard and categorized log filters as compact paper surfaces', () => {
+    expect(cssRule('.battle-review-dashboard')).toContain('grid-template-columns')
+    expect(cssRule('.battle-review-dashboard')).toContain('var(--paper-fiber)')
+    expect(cssRule('.battle-review-side-grid')).toContain('grid-template-columns')
+    expect(cssRule('.battle-review-side-card.player')).toContain('border-color')
+    expect(cssRule('.battle-review-side-card.opponent')).toContain('border-color')
+    expect(cssRule('.battle-review-metric')).toContain('min-width: 0')
+    expect(cssRule('.battle-review-top-item')).toContain('border')
+    expect(cssRule('.battle-log-filters')).toContain('flex-wrap: wrap')
+    expect(cssRule('.battle-log-filter.active')).toContain('box-shadow')
+    expect(cssRule('@media (max-width: 720px)')).toContain('.battle-review-side-grid')
+    expect(cssRule('@media (prefers-reduced-motion: reduce)')).toContain('.battle-log-filter')
+  })
+
   it('adds ornate border, manuscript, hud, and paper-bounce polish for the refined handdrawn direction', () => {
     expect(cssRule(':root')).toContain('--ornament-ink')
     expect(cssRule(':root')).toContain('--ornament-ink: rgba(')

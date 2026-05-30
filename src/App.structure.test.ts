@@ -522,6 +522,20 @@ describe('selection screen structure', () => {
     expect(app).toContain('title={statusDescription(status)}')
   })
 
+  it('wires battle review dashboard and categorized log filters into battle playback surfaces', () => {
+    expect(app).toContain("from './battle-review'")
+    expect(app).toContain('buildBattleReview(run.lastBattle)')
+    expect(app).toContain('function BattleReviewDashboard')
+    expect(app).toContain('function BattleReviewSideCard')
+    expect(app).toContain('className="battle-review-dashboard"')
+    expect(app).toContain('className="battle-review-side-grid"')
+    expect(app).toContain('className="battle-review-top-item"')
+    expect(app).toContain('const [activeFilter, setActiveFilter] = useState<BattleLogFilter>')
+    expect(app).toContain('battleLogFilters.map')
+    expect(app).toContain('filterBattleEvents(indexedEvents, activeFilter)')
+    expect(app).toContain('data-log-filter={filter}')
+  })
+
   it('highlights poison battle effects with green damage and log styling', () => {
     expect(app).toContain("poison: { kind: 'poison', color: '#22c55e'")
     expect(app).toContain("poison: { kind: 'poison', color: '#22c55e', accent: '#a7f3d0', prefix: '-'")
@@ -583,7 +597,7 @@ describe('selection screen structure', () => {
     expect(data).not.toContain('export const TERM_DEFS = [')
   })
 
-  it('maps every item and relic definition to a dedicated SVG icon asset', () => {
+  it('maps every item and relic definition to a dedicated static icon asset', () => {
     const itemIconEntries = mappedAssetIds('itemIcons')
     const relicIconEntries = mappedAssetIds('relicIcons')
     const itemIconIds = itemIconEntries.map((entry) => entry.id)
@@ -593,6 +607,29 @@ describe('selection screen structure', () => {
     expect(relicDefIds().filter((id) => !relicIconIds.includes(id))).toEqual([])
     expect(itemIconEntries.filter((entry) => !existsSync(new URL(`../public${entry.path}`, import.meta.url)))).toEqual([])
     expect(relicIconEntries.filter((entry) => !existsSync(new URL(`../public${entry.path}`, import.meta.url)))).toEqual([])
+  })
+
+  it('wires account shop, achievements, daily tasks, and cosmetics into the lobby shell', () => {
+    expect(app).toContain("type AppScreen = 'LOBBY' | 'CASUAL' | 'LADDER' | 'DOGFIGHT' | 'PEAK' | 'SHOP' | 'ACHIEVEMENTS'")
+    expect(app).toContain("api<AccountShopResponse>('/shop')")
+    expect(app).toContain("api<AchievementsResponse>('/achievements')")
+    expect(app).toContain("api<DailyTasksResponse>('/daily-tasks')")
+    expect(app).toContain("api<CosmeticsResponse>('/cosmetics/me')")
+    expect(app).toContain("api<AccountShopResponse>('/shop/purchase'")
+    expect(app).toContain("api<CosmeticsResponse>('/cosmetics/equip'")
+    expect(app).toContain("`/achievements/${achievementId}/claim`")
+    expect(app).toContain("`/daily-tasks/${taskId}/claim`")
+    expect(app).toContain("api<DailyTasksResponse>('/daily-tasks/refresh'")
+    expect(app).toContain('function AccountShopScreen')
+    expect(app).toContain('function AchievementsScreen')
+    expect(app).toContain('function CosmeticBadge')
+    expect(app).toContain("onEnterShop={() => setAppScreen('SHOP')}")
+    expect(app).toContain("onEnterAchievements={() => setAppScreen('ACHIEVEMENTS')}")
+    expect(css).toContain('.account-hub-actions')
+    expect(css).toContain('.account-currency-pill')
+    expect(css).toContain('.shop-section-grid')
+    expect(css).toContain('.achievement-card')
+    expect(css).toContain('.daily-task-row')
   })
 
   it('places the relic rail to the left of the bag grid', () => {

@@ -11,6 +11,7 @@ import { nextQuality, normalizeQuality } from './game/quality'
 import { simulateBattle } from './game/battle'
 import type { BattleEvent, BattleResult, DogType, EnchantmentChoice, FighterSnapshot, GameItem, PotionChoice, ShopType } from './game/types'
 import { applyRelicChoice, initialItems, makeChoices, makePotionChoices, makeRelicChoices, makeShop, nextPhaseData as buildNextPhaseData, parseJson, phaseDataAfterEnchant, postBattleLargeItemReward, postBattleSellBonusItemGrowths, publicRun, relicsFromRun, seedGhost, snapshotFromRun, toGameItems } from './state'
+import { recordAccountEvent } from './account-services'
 
 const DOGFIGHT_TARGET_PLAYERS = 8
 const DOGFIGHT_LOBBY_MS = 15_000
@@ -635,6 +636,9 @@ async function settleShopToBattle(tx: Tx, roomId: string, force = false) {
         placement: eliminated ? placementBase : null,
       },
     })
+    if (participant.userId) {
+      await recordAccountEvent(participant.userId, { kind: 'DOGFIGHT_ROUND_FINISHED', winner: participantResult.wins > 0 }, tx)
+    }
   }
 
   const complete = survivingIds.length <= 1

@@ -2014,6 +2014,30 @@ input {
   color: #22c55e;
   font-weight: 900;
 }
+.battle-log-filters {
+  width: min(860px, 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 2px auto 8px;
+}
+.battle-log-filter {
+  min-height: 30px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+}
+.battle-log-filter.active {
+  color: #fff;
+  background: var(--blue);
+  box-shadow: 0 3px 0 rgba(61, 45, 37, .22), inset 0 0 0 1px rgba(255, 255, 255, .4);
+}
+.battle-log-empty {
+  color: rgba(255, 250, 241, .72);
+  font-weight: 850;
+}
 .speed-row {
   display: flex;
   align-items: center;
@@ -4660,6 +4684,26 @@ input {
   background: #7fe3a7;
 }
 
+.battle-log-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  justify-content: flex-start;
+  margin: 4px 0 8px;
+}
+
+.battle-log-filter {
+  min-height: 30px;
+  padding: 5px 9px;
+  border-width: 2px;
+  font-size: 12px;
+}
+
+.battle-log-filter.active {
+  box-shadow: 2px 3px 0 rgba(61, 45, 37, .18), inset 0 0 0 999px rgba(255, 236, 179, .36);
+}
+
 .shop-shelf.sketch-panel {
   overflow: visible;
   background-image: none;
@@ -5647,6 +5691,98 @@ input {
   gap: 10px;
 }
 
+.battle-review-dashboard {
+  width: min(760px, 100%);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+  padding: 14px;
+  border: 3px solid rgba(112, 78, 48, .36);
+  border-radius: 16px;
+  background:
+    var(--paper-fiber),
+    linear-gradient(180deg, rgba(255, 250, 241, .9), rgba(245, 226, 195, .78));
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, .38), 4px 5px 0 rgba(61, 45, 37, .12);
+}
+
+.battle-review-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  color: var(--ink);
+}
+
+.battle-review-side-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.battle-review-side-card {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 3px solid rgba(112, 78, 48, .32);
+  border-radius: 14px;
+  background: rgba(255, 250, 241, .74);
+  text-align: left;
+}
+
+.battle-review-side-card.player {
+  border-color: rgba(68, 119, 183, .58);
+}
+
+.battle-review-side-card.opponent {
+  border-color: rgba(178, 83, 83, .58);
+}
+
+.battle-review-side-card header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.battle-review-side-card header span,
+.battle-review-top-item small,
+.battle-review-metric small {
+  color: rgba(61, 45, 37, .66);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.battle-review-metrics {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.battle-review-metric {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+  padding: 7px 6px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, .46);
+  box-shadow: inset 0 0 0 1px rgba(112, 78, 48, .13);
+}
+
+.battle-review-metric strong {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.battle-review-top-item {
+  display: grid;
+  gap: 3px;
+  padding: 8px 10px;
+  border: 2px dashed rgba(112, 78, 48, .34);
+  border-radius: 12px;
+  background: rgba(255, 246, 218, .68);
+}
+
 .settlement-score-grid span {
   min-height: 92px;
   display: grid;
@@ -5671,6 +5807,89 @@ input {
   color: var(--ink);
   font-size: 34px;
   line-height: 1;
+}
+
+.battle-review-dashboard {
+  width: min(560px, 100%);
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 3px solid var(--ink);
+  border-radius: 10px;
+  background:
+    var(--paper-fiber),
+    linear-gradient(180deg, rgba(255, 252, 239, .88), rgba(255, 239, 214, .78));
+  box-shadow: 4px 5px 0 rgba(61, 45, 37, .16);
+}
+
+.battle-review-heading,
+.battle-review-side-card header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.battle-review-side-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.battle-review-side-card {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding: 12px;
+  border: 2px solid rgba(61, 45, 37, .72);
+  border-radius: 8px;
+  background: rgba(255, 252, 239, .72);
+}
+
+.battle-review-side-card.player {
+  border-color: rgba(37, 99, 235, .7);
+}
+
+.battle-review-side-card.opponent {
+  border-color: rgba(190, 18, 60, .68);
+}
+
+.battle-review-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.battle-review-metric {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+  padding: 8px;
+  border: 1px dashed rgba(61, 45, 37, .34);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, .48);
+}
+
+.battle-review-metric small,
+.battle-review-top-item small {
+  color: rgba(61, 45, 37, .68);
+  font-size: 11px;
+  font-weight: 950;
+}
+
+.battle-review-metric strong,
+.battle-review-top-item strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.battle-review-top-item {
+  display: grid;
+  gap: 3px;
+  padding: 9px;
+  border: 2px solid rgba(61, 45, 37, .54);
+  border-radius: 8px;
+  background: rgba(255, 247, 237, .78);
 }
 
 .high-impact-vfx .battle-fx-stage::after {
@@ -6362,6 +6581,9 @@ input {
   .settlement-score-grid {
     grid-template-columns: 1fr;
   }
+  .battle-review-side-grid {
+    grid-template-columns: 1fr;
+  }
   .settlement-score-grid span {
     min-height: 72px;
     grid-template-columns: 1fr auto;
@@ -6457,13 +6679,28 @@ input {
   }
 }
 
+@media (max-width: 720px) {
+  .battle-review-side-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .battle-review-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .battle-log-filters {
+    justify-content: flex-start;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
   *::after,
   .item-card::after,
   .visual-theme-surface::before,
-  .battle-item-vfx-target {
+  .battle-item-vfx-target,
+  .battle-log-filter {
     animation-duration: .001ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: .001ms !important;
@@ -6480,5 +6717,164 @@ input {
 
   .visual-theme-surface::before {
     opacity: .18;
+  }
+}
+.account-hub-actions {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin: 12px 0 18px;
+  flex-wrap: wrap;
+}
+
+.account-hub-button,
+.shop-card-actions button,
+.panel-title-row button,
+.achievement-tabs button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 2px solid #4b3527;
+  background: #fff7dc;
+  color: #352217;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.account-hub-button:hover,
+.shop-card-actions button:hover,
+.panel-title-row button:hover,
+.achievement-tabs button:hover,
+.achievement-tabs button.active {
+  background: #ffe39a;
+}
+
+.account-shop-screen,
+.achievements-screen {
+  width: min(1180px, 100%);
+  margin: 0 auto;
+  display: grid;
+  gap: 18px;
+}
+
+.account-currency-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 2px solid #5b3a21;
+  background: #fff2b8;
+  padding: 8px 12px;
+  border-radius: 999px;
+  font-weight: 900;
+}
+
+.shop-section,
+.daily-task-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.shop-section-grid,
+.achievement-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.shop-cosmetic-card,
+.achievement-card,
+.daily-task-row {
+  border: 2px solid rgba(75, 53, 39, .35);
+  background: rgba(255, 250, 232, .92);
+  border-radius: 8px;
+  padding: 14px;
+  display: grid;
+  gap: 8px;
+}
+
+.shop-cosmetic-card p,
+.achievement-card p,
+.daily-task-row span {
+  margin: 0;
+  color: #6d5849;
+}
+
+.cosmetic-badge {
+  width: 38px;
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: 2px solid #5b3a21;
+  background: #f4d78b;
+}
+
+.rarity-common { --rarity: #a3a3a3; }
+.rarity-rare { --rarity: #2f80ed; }
+.rarity-epic { --rarity: #8b5cf6; }
+.rarity-legendary { --rarity: #d97706; }
+
+.shop-cosmetic-card {
+  border-color: var(--rarity, rgba(75, 53, 39, .35));
+}
+
+.cosmetic-type {
+  font-size: .86rem;
+  font-weight: 800;
+}
+
+.shop-card-actions,
+.panel-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.shop-card-actions span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 900;
+}
+
+.daily-task-row {
+  grid-template-columns: minmax(0, 1fr) minmax(120px, 220px) auto;
+  align-items: center;
+}
+
+.daily-task-row > div {
+  display: grid;
+  gap: 2px;
+}
+
+.achievement-tabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.achievement-card.hidden {
+  opacity: .72;
+  filter: grayscale(.25);
+}
+
+.achievement-card.claimable {
+  box-shadow: 0 0 0 3px rgba(217, 119, 6, .18);
+}
+
+progress {
+  width: 100%;
+  height: 10px;
+  accent-color: #d97706;
+}
+
+@media (max-width: 720px) {
+  .daily-task-row {
+    grid-template-columns: 1fr;
   }
 }
