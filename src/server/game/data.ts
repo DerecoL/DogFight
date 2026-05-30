@@ -8,7 +8,8 @@ export const DOGS: Record<DogType, { name: string; trait: string }> = {
   SAMOYED: { name: '萨摩耶', trait: '20% 概率改掷为【大点】 4/5/6' },
   MUTT: { name: '土狗', trait: '20% 概率【额外投掷】一次' },
   BULLY: { name: '恶霸', trait: '40% 概率使本次触发的【大型物品】效果翻倍' },
-  EMPEROR: { name: '狗皇帝', trait: '指定【天命数字】（幸运数字），命中时 50% 概率使触发效果翻倍' },
+  EMPEROR: { name: '狗皇帝', trait: '指定【天命数字】，命中时 50% 概率使触发效果翻倍' },
+  FROG: { name: '祖灵', trait: '显式点数装备改为【蓄水】触发，可被职业装备提速' },
 }
 
 export const SHIBA_POISON_ON_ROLL_AMOUNT = 6
@@ -16,6 +17,7 @@ export const THORNS_DAMAGE_PER_STACK = 2
 export const BOOM_COUNTER_TRIGGER_THRESHOLD = 50
 export const POST_BATTLE_EQUIPPED_SELL_BONUS_AMOUNT = 3
 export const POST_BATTLE_CARRIED_SELL_BONUS_AMOUNT = 1
+export const MULTI_TRIGGER_CAP = 5
 
 function slotItem(
   id: string,
@@ -61,14 +63,14 @@ export const ITEM_DEFS: ItemDef[] = [
     description: '造成 4 点伤害。命中后有 20% 概率给敌人施加 1 层【虚弱】。',
     advancedEffect: 'APPLY_WEAK_20_ON_HIT',
   }),
-  slotItem('lucky-paw', '幸运爪垫', 1, 4, [6], ['big'], { type: 'DAMAGE', amount: 12 }),
-  slotItem('milk-bone', '牛奶骨头', 1, 4, [2, 4], ['heal'], { type: 'HEAL', amount: 6 }),
-  slotItem('rubber-ball', '橡胶球', 2, 6, [3, 5], ['medium'], { type: 'DAMAGE', amount: 9 }),
+  slotItem('lucky-paw', '幸运爪垫', 1, 4, [6], ['big', 'multi'], { type: 'DAMAGE', amount: 5 }, { multi: 2 }),
+  slotItem('milk-bone', '牛奶骨头', 1, 4, [2, 4], ['heal', 'multi'], { type: 'HEAL', amount: 3 }, { multi: 2 }),
+  slotItem('rubber-ball', '橡胶球', 2, 6, [3, 5], ['medium', 'multi'], { type: 'DAMAGE', amount: 4 }, { multi: 2 }),
   slotItem('spiked-collar', '尖刺项圈', 2, 7, [4, 5, 6], ['big', 'medium'], { type: 'DAMAGE', amount: 8 }),
-  slotItem('training-disc', '训练飞盘', 2, 6, [1, 6], ['medium'], { type: 'DAMAGE', amount: 10 }),
+  slotItem('training-disc', '训练飞盘', 2, 6, [1, 6], ['medium', 'multi'], { type: 'DAMAGE', amount: 3 }, { multi: 3 }),
   slotItem('guard-vest', '护卫背心', 3, 8, [1, 3, 5], ['medium', 'heal'], { type: 'HEAL', amount: 8 }),
   slotItem('giant-bone', '巨型骨棒', 4, 10, [5, 6], ['large', 'big', 'fury'], { type: 'DAMAGE', amount: 16 }, {
-    description: '造成 16 点伤害。攻击时有 50% 概率触发【激昂】；【激昂】使所有攻击伤害 +1，可叠加。',
+    description: '造成 16 点伤害。攻击时有 50% 概率触发【激昂】。',
     advancedEffect: 'GAIN_FURY_ON_ATTACK',
   }),
   slotItem('dog-house', '小狗窝', 4, 9, [1, 2], ['large', 'small'], { type: 'HEAL', amount: 12 }, {
@@ -145,7 +147,7 @@ export const ITEM_DEFS: ItemDef[] = [
     defaultQuality: 'GOLD',
   }),
   slotItem('v3-blood-mad-fang', '嗜血疯狗之牙', 2, 12, [1, 6], ['extreme', 'heal'], { type: 'DAMAGE', amount: 6 }, {
-    description: '造成 6 点伤害，并将造成伤害的 100% 转化为自身治疗。',
+    description: '造成 6 点伤害，并触发【吸血】。',
     advancedEffect: 'LIFESTEAL',
     defaultQuality: 'GOLD',
   }),
@@ -180,7 +182,7 @@ export const ITEM_DEFS: ItemDef[] = [
     defaultQuality: 'SILVER',
   }),
   slotItem('patting-bear', '拍拍熊', 2, 10, [1, 6], ['wound', 'attack'], { type: 'UTILITY', amount: 1, qualityBase: 'SILVER' }, {
-    description: '每次触发对敌人叠加 1 层【伤口】；【伤口】使受到的直接攻击伤害 +1，可叠加，不影响【中毒】、【荆棘】等非直接攻击伤害。',
+    description: '每次触发对敌人叠加 1 层【伤口】。',
     advancedEffect: 'APPLY_WOUND',
     defaultQuality: 'SILVER',
   }),
@@ -188,6 +190,16 @@ export const ITEM_DEFS: ItemDef[] = [
     description: '无需触发。每次攻击命中时，对敌人施加 1 层【中毒】。',
     advancedEffect: 'POISON_ON_ATTACK_HIT',
     defaultQuality: 'SILVER',
+  }),
+  slotItem('lotus-sea', '荷叶之海', 2, 11, [], ['multi', 'support', 'aura'], { type: 'UTILITY', amount: 0 }, {
+    description: '光环：左侧【相邻】【多重】装备的【多重】值 +1。钻石品质改为左右【相邻】【多重】装备的【多重】值 +1。',
+    advancedEffect: 'MULTI_ADJACENT_BONUS',
+    defaultQuality: 'GOLD',
+  }),
+  slotItem('kyushu-bracer', '九州护腕', 2, 12, [], ['multi', 'support', 'shield'], { type: 'UTILITY', amount: 0 }, {
+    description: '光环：己方【多重】装备第 2 次及之后触发时，若为攻击则额外伤害 +2，并获得 1 点【护盾】。',
+    advancedEffect: 'MULTI_REPEAT_BONUS',
+    defaultQuality: 'GOLD',
   }),
 ]
 
@@ -226,6 +238,13 @@ export const CLASS_REWARD_DEFS: ItemDef[] = [
   classItem('EMPEROR', 6, 'emperor-curtain', '垂帘听政', 2, [1, 2, 3, 4, 5, 6], ['lucky'], '原【天命数字】无效，该装备【相邻】的装备的触发数字为【天命数字】', 'ADJACENT_USES_LUCKY', 'DIAMOND'),
   classItem('EMPEROR', 6, 'emperor-edict', '蛮横圣旨', 2, [1, 2, 3, 4, 5, 6], ['lucky'], '战斗开始时，强行将敌我双方最左侧的 2 个道具的触发点数，强行篡改为你的【天命数字】', 'OPENING_FORCE_LUCKY', 'DIAMOND'),
   classItem('EMPEROR', 6, 'emperor-fallen', '亡国之君', 1, [1, 2, 3, 4, 5, 6], ['lucky'], '仅【天命数字】的装备才能生效（包含不计入），但是【天命数字】装备生效2次', 'ONLY_LUCKY_DOUBLE', 'DIAMOND'),
+
+  classItem('FROG', 3, 'frog-lily-pump', '荷叶水泵', 1, [], ['reservoir', 'speed'], '被动：所有【蓄水】装备充水速度 +15%。', 'FROG_RESERVOIR_SPEED', 'GOLD'),
+  classItem('FROG', 3, 'frog-croak-drum', '蛙鸣鼓', 1, [1, 2, 3], ['reservoir', 'roll'], '【蓄水】触发后，进行一次普通投骰，按骰点激活装备；该投骰不会再次触发蛙鸣鼓的投骰效果。', 'FROG_ROLL_ON_RESERVOIR', 'GOLD'),
+  classItem('FROG', 3, 'frog-raindrop-funnel', '雨滴漏斗', 1, [1, 2, 3], ['reservoir', 'support'], '【蓄水】触发后，使【相邻】装备立刻获得 50% 水位。', 'FROG_CHARGE_ADJACENT', 'GOLD'),
+  classItem('FROG', 6, 'frog-lotus-echo', '莲池回声', 1, [], ['reservoir', 'roll'], '被动：由职业装备产生的普通投骰，命中的第一件非职业装备额外触发 1 次。', 'FROG_ROLL_ECHO', 'DIAMOND'),
+  classItem('FROG', 6, 'frog-rainy-season', '暴雨季', 2, [1, 2, 3], ['reservoir', 'speed'], '【蓄水】触发后，刷新 4 秒全体充水速度 +50%。', 'FROG_RAINY_SEASON', 'DIAMOND'),
+  classItem('FROG', 6, 'frog-full-pond-gate', '满池闸门', 2, [1, 2, 3], ['reservoir', 'trigger'], '【蓄水】触发后，立即触发当前水位最高的一件非职业装备。', 'FROG_TRIGGER_HIGHEST_RESERVOIR', 'DIAMOND'),
 ]
 
 export const RELIC_DEFS: RelicDef[] = [
@@ -274,6 +293,14 @@ export function nightPatrolLightTriggerCount(quality?: string | null) {
   return Math.max(1, qualityAmountFrom(1, quality, 'GOLD'))
 }
 
+export function kyushuBracerDamageBonus(quality?: string | null) {
+  return qualityAmountFrom(2, quality, 'GOLD')
+}
+
+export function kyushuBracerShieldBonus(quality?: string | null) {
+  return Math.max(1, qualityAmountFrom(1, quality, 'GOLD'))
+}
+
 export function itemDescription(itemId: string, quality?: string | null) {
   const def = itemDef(itemId)
   const currentQuality = normalizeQuality(quality)
@@ -293,17 +320,17 @@ export function itemDescription(itemId: string, quality?: string | null) {
   if (advanced === 'GAIN_SHIELD_THORNS') return `获得 ${amount} 点【护盾】，并获得 ${one} 层【荆棘】。`
   if (advanced === 'APPLY_WEAK_ON_HIT') return `${baseEffect}并给敌人施加 ${one} 层【虚弱】。`
   if (advanced === 'APPLY_WEAK_20_ON_HIT') return `${baseEffect}命中后有 20% 概率给敌人施加 ${one} 层【虚弱】。`
-  if (advanced === 'GAIN_FURY_ON_ATTACK') return `${baseEffect}攻击时有 50% 概率触发【激昂】；【激昂】使所有攻击伤害 +1，可叠加。`
+  if (advanced === 'GAIN_FURY_ON_ATTACK') return `${baseEffect}攻击时有 50% 概率触发【激昂】。`
   if (advanced === 'DOUBLE_SHIELD_DAMAGE') return `${baseEffect}如果敌方有【护盾】，该次伤害直接对【护盾】造成 2 倍伤害。`
   if (advanced === 'HEAL_OR_MAX_HP') return `恢复 ${amount} 点生命值。如果你当前处于满血，则永久提升自身 ${one} 点最大生命值。`
   if (advanced === 'ADJACENT_TEMP_TRIGGER') return `触发时，额外触发【相邻】装备 ${nightPatrolLightTriggerCount(currentQuality)} 次。`
-  if (advanced === 'LIFESTEAL') return `${baseEffect}并将造成生命伤害的 100% 转化为自身【吸血】治疗。`
+  if (advanced === 'LIFESTEAL') return `${baseEffect}并触发【吸血】。`
   if (advanced === 'POISON_AND_DISABLE_RIGHTMOST') return `对敌方施加 ${amount} 层【中毒】，并使敌方最右侧的一个装备【失效】一次。`
   if (advanced === 'SHIELD_IMMUNITY') return `获得 ${amount} 点【护盾】。只要你拥有【护盾】，你受到的【中毒】和【虚弱】层数减半（向上取整）。`
   if (advanced === 'STEAL_ENEMY_BUFF') return `恢复 ${amount} 点生命值，并偷取敌方 1 层增益（优先【荆棘】，其次【加速】；【护盾】不算增益，不会被偷取）。`
   if (advanced === 'GRANT_LIFESTEAL_ADJACENT') return currentQuality === 'DIAMOND'
-    ? '光环：战斗开始时，使左右【相邻】装备都获得【吸血】直到战斗结束。被赋予【吸血】的装备按实际造成的生命伤害 100% 治疗自己。'
-    : '光环：战斗开始时，使左边 1 个【相邻】装备获得【吸血】直到战斗结束。被赋予【吸血】的装备按实际造成的生命伤害 100% 治疗自己。'
+    ? '光环：战斗开始时，使左右【相邻】装备都获得【吸血】直到战斗结束。'
+    : '光环：战斗开始时，使左边 1 个【相邻】装备获得【吸血】直到战斗结束。'
   if (advanced === 'BOOM_COUNTER') return `只能通过计数触发。己方其他装备每成功触发 1 次，获得 1 点【爆鸣计数】。达到 ${BOOM_COUNTER_TRIGGER_THRESHOLD} 点后清零，对敌方造成 ${amount} 点直接伤害。`
   if (advanced === 'GROWTH_DAMAGE') {
     const growth = growthDamageStep(currentQuality)
@@ -316,10 +343,20 @@ export function itemDescription(itemId: string, quality?: string | null) {
   }
   if (advanced === 'POST_BATTLE_EQUIPPED_SELL_BONUS') return `无需触发。放在装备栏时，参战结束后出售价格 +${POST_BATTLE_EQUIPPED_SELL_BONUS_AMOUNT}。`
   if (advanced === 'POST_BATTLE_CARRIED_SELL_BONUS') return `无需触发。放在装备栏或背包时，参战结束后出售价格 +${POST_BATTLE_CARRIED_SELL_BONUS_AMOUNT}。`
+  if (advanced === 'MULTI_ADJACENT_BONUS') return currentQuality === 'DIAMOND'
+    ? '光环：左右【相邻】的【多重】装备多重值 +1。'
+    : '光环：左侧【相邻】的【多重】装备多重值 +1。'
+  if (advanced === 'MULTI_REPEAT_BONUS') return `光环：己方【多重】装备第 2 次及之后触发时，若为攻击则额外伤害 +${kyushuBracerDamageBonus(currentQuality)}，并获得 ${kyushuBracerShieldBonus(currentQuality)} 点【护盾】。`
+  if (advanced === 'FROG_RESERVOIR_SPEED') return '被动：所有【蓄水】装备充水速度 +15%。'
+  if (advanced === 'FROG_ROLL_ON_RESERVOIR') return `${baseEffect}【蓄水】触发后，进行一次普通投骰，按骰点激活装备；该投骰不会再次触发蛙鸣鼓的投骰效果。`
+  if (advanced === 'FROG_CHARGE_ADJACENT') return `${baseEffect}【蓄水】触发后，使【相邻】装备立刻获得 50% 水位。`
+  if (advanced === 'FROG_ROLL_ECHO') return '被动：由职业装备产生的普通投骰，命中的第一件非职业装备额外触发 1 次。'
+  if (advanced === 'FROG_RAINY_SEASON') return `${baseEffect}【蓄水】触发后，刷新 4 秒全体充水速度 +50%。`
+  if (advanced === 'FROG_TRIGGER_HIGHEST_RESERVOIR') return `${baseEffect}【蓄水】触发后，立即触发当前水位最高的一件非职业装备。`
   if (advanced === 'POISON_ON_ROLL') return `${baseEffect}每次投掷都会对敌人叠加 ${SHIBA_POISON_ON_ROLL_AMOUNT} 层【中毒】（不随品质提升）。`
   if (advanced === 'GAIN_THORNS') return `${baseEffect}每次触发有 50% 概率获得 ${one} 层【荆棘】。`
   if (advanced === 'APPLY_WEAK') return `${baseEffect}每次触发有 50% 概率给敌人施加 ${one} 层【虚弱】。`
-  if (advanced === 'APPLY_WOUND') return `对敌人叠加 ${amount} 层【伤口】；目标受到的直接攻击伤害 +${amount}。`
+  if (advanced === 'APPLY_WOUND') return `对敌人叠加 ${amount} 层【伤口】。`
   if (advanced === 'MAX_HP_ON_EXTRA_ROLL') return `每当系统触发职业特性的【额外投掷】时，永久使你最大生命值 +${one}。`
   if (advanced === 'SHIELD_ON_NON_LUCKY') return `非【天命数字】时获得 ${qualityAmount(5, currentQuality)} 点【护盾】。`
   if (advanced === 'AVALANCHE') return `每当掷出【小点】时，积攒 1 层【雪崩】。5 层【雪崩】时会清空层数同时对敌人造成 ${qualityAmount(50, currentQuality)} 点伤害。每次【雪崩】后下次【雪崩】伤害加倍。`
@@ -329,7 +366,7 @@ export function itemDescription(itemId: string, quality?: string | null) {
   if (advanced === 'TRIGGER_MINUS_THREE') return `${baseEffect}${def.description}`
   if (advanced === 'LARGE_TRIGGERS_NON_LARGE') return `${baseEffect}${def.description}`
   if (advanced === 'DISABLE_ENEMY_LARGE') return `${baseEffect}${def.description}`
-  if (baseEffect) return baseEffect
+  if (baseEffect) return def.multi && def.multi > 1 ? `${baseEffect}【多重】 ${def.multi}。` : baseEffect
   if (def.description) return def.description
   return def.description
 }

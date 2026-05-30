@@ -2,6 +2,10 @@ type TriggerDisplayItem = {
   dice: number[]
   advancedEffect?: string
   triggerDiceOverride?: number[] | null
+  enchant?: {
+    kind?: string
+    dice?: number[]
+  } | null
 }
 
 type TriggerDisplayRelic = {
@@ -38,6 +42,8 @@ const nonSelfTriggeredEffects = new Set([
   'OPENING_FORCE_LUCKY',
   'ONLY_LUCKY_DOUBLE',
   'GRANT_LIFESTEAL_ADJACENT',
+  'MULTI_ADJACENT_BONUS',
+  'MULTI_REPEAT_BONUS',
   'BOOM_COUNTER',
   'POISON_ON_ATTACK_HIT',
 ])
@@ -66,12 +72,37 @@ function triggerDiceText(dice: number[]) {
   return extras.length > 0 ? `${baseText} ${extras.map((die) => `+${die}`).join(' ')}` : baseText
 }
 
-export function triggerDiceLabel(item: TriggerDisplayItem, relics: TriggerDisplayRelic[] = []) {
-  if (item.advancedEffect && nonSelfTriggeredEffects.has(item.advancedEffect)) return null
-  let dice = item.triggerDiceOverride && item.triggerDiceOverride.length > 0 ? item.triggerDiceOverride : item.dice
+function itemBaseDice(item: TriggerDisplayItem) {
+  return item.triggerDiceOverride && item.triggerDiceOverride.length > 0 ? item.triggerDiceOverride : item.dice
+}
+
+function itemExtraDice(item: TriggerDisplayItem) {
+  return item.enchant?.kind === 'EXTRA_DICE' && Array.isArray(item.enchant.dice) ? item.enchant.dice : []
+}
+
+function applyRelicDiceRemapping(dice: number[], relics: TriggerDisplayRelic[]) {
   if (relics.some((relic) => relic.def?.effect === 'SHIFT_TRIGGER_DICE_UP')) dice = dice.map(shiftDieUp)
   if (relics.some((relic) => relic.def?.effect === 'SHIFT_TRIGGER_DICE_DOWN')) dice = dice.map(shiftDieDown)
-  return triggerDiceText(dice)
+  return dice
+}
+
+function normalizedDiceLabel(dice: number[]) {
+  return [...new Set(dice.filter((die) => Number.isInteger(die) && die >= 1 && die <= 6))].sort((left, right) => left - right).join('/')
+}
+
+export function triggerDiceLabel(item: TriggerDisplayItem, relics: TriggerDisplayRelic[] = []) {
+  if (item.advancedEffect && nonSelfTriggeredEffects.has(item.advancedEffect)) return null
+  const baseDice = applyRelicDiceRemapping([...itemBaseDice(item)], relics)
+  const baseDiceSet = new Set(baseDice)
+  const extraDice = applyRelicDiceRemapping([...itemExtraDice(item)], relics).filter((die) => !baseDiceSet.has(die))
+  return triggerDiceText([...baseDice, ...extraDice])
+}
+
+export function extraTriggerDiceLabel(item: TriggerDisplayItem, relics: TriggerDisplayRelic[] = []) {
+  if (item.advancedEffect && nonSelfTriggeredEffects.has(item.advancedEffect)) return null
+  const baseDice = new Set(applyRelicDiceRemapping([...itemBaseDice(item)], relics))
+  const extraDice = applyRelicDiceRemapping([...itemExtraDice(item)], relics).filter((die) => !baseDice.has(die))
+  return extraDice.length > 0 ? normalizedDiceLabel(extraDice) : null
 }
 
 export function itemTriggerCount(events: TriggerCountEvent[], owner: string, itemId: string, displayIndex: number) {

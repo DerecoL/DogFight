@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="rainy season">
+  <rect width="128" height="128" rx="28" fill="#eef8ff"/>
+  <path d="M34 59c-6-25 12-43 34-33 20-9 39 8 35 31 12 3 18 17 10 28-6 8-18 10-33 6H42c-15 3-27-1-30-12-3-10 6-20 22-20Z" fill="#d7e9f7" stroke="#506a86" stroke-width="7" stroke-linejoin="round"/>
+  <path d="M36 90l-8 18m35-18l-8 18m35-18l-8 18" stroke="#29a9e1" stroke-width="7" stroke-linecap="round"/>
+  <path d="M51 48h26" stroke="#fff" stroke-width="7" stroke-linecap="round" opacity=".8"/>
+  <path d="M58 25c5 7 8 12 8 17a8 8 0 1 1-16 0c0-5 3-10 8-17Z" fill="#49c2ff"/>
+</svg>
