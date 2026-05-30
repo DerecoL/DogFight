@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify'
 import { type DogfightBattle, type DogfightParticipant, type DogfightRoom, type ItemInstance, type Prisma, type Run } from '@prisma/client'
 import { z } from 'zod'
 import { prisma } from './db'
+import { recordAccountEvent } from './account-services'
 import { itemDef } from './game/data'
 import { findSlot } from './game/grid'
 import { STARTING_GOLD } from './game/matchmaking'
@@ -635,6 +636,9 @@ async function settleShopToBattle(tx: Tx, roomId: string, force = false) {
         placement: eliminated ? placementBase : null,
       },
     })
+    if (participant.userId) {
+      await recordAccountEvent(participant.userId, { kind: 'DOGFIGHT_ROUND_FINISHED', winner: participantResult.wins > 0 }, tx)
+    }
   }
 
   const complete = survivingIds.length <= 1

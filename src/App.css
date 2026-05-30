@@ -6053,3 +6053,165 @@ input {
     opacity: .18;
   }
 }
+.account-hub-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  margin: 0 auto 14px;
+}
+
+.account-hub-button {
+  min-width: 132px;
+}
+
+.account-shop-screen,
+.achievements-screen {
+  display: grid;
+  gap: 16px;
+  align-content: start;
+}
+
+.account-currency-pill {
+  justify-self: center;
+  display: inline-grid;
+  grid-auto-flow: column;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border: 3px solid var(--ink);
+  border-radius: 8px;
+  background: rgba(255, 250, 241, .82);
+  box-shadow: var(--control-bevel);
+  font-weight: 950;
+}
+
+.cosmetic-badge {
+  justify-self: center;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: rgba(255, 250, 241, .78);
+}
+
+.cosmetic-badge small {
+  padding: 3px 7px;
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .55);
+}
+
+.shop-section,
+.achievement-section {
+  display: grid;
+  gap: 10px;
+}
+
+.shop-section > h3,
+.achievement-section > h3 {
+  margin: 0;
+  text-align: center;
+}
+
+.shop-section-grid,
+.achievement-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.shop-cosmetic-card,
+.achievement-card {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  min-height: 188px;
+  background: rgba(255, 250, 241, .78);
+}
+
+.shop-cosmetic-card strong,
+.achievement-card strong {
+  font-size: 20px;
+}
+
+.cosmetic-type,
+.achievement-card > span {
+  font-size: 13px;
+  font-weight: 950;
+  color: rgba(61, 45, 37, .72);
+}
+
+.shop-card-actions {
+  display: grid;
+  grid-template-columns: auto minmax(96px, 1fr);
+  gap: 8px;
+  align-items: center;
+  margin-top: auto;
+}
+
+.shop-card-actions > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 950;
+}
+
+.rarity-common { border-color: #7c5f49; }
+.rarity-rare { border-color: #2563eb; }
+.rarity-epic { border-color: #7c3aed; }
+.rarity-legendary { border-color: #d97706; }
+
+.daily-task-panel {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  background: rgba(255, 250, 241, .78);
+}
+
+.panel-title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.panel-title-row h3 {
+  margin: 0;
+}
+
+.daily-task-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) minmax(120px, 240px) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 8px;
+  border: 2px solid rgba(61, 45, 37, .28);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, .38);
+}
+
+.daily-task-row > div {
+  display: grid;
+  gap: 2px;
+}
+
+.daily-task-row progress,
+.achievement-card progress {
+  width: 100%;
+  height: 12px;
+  accent-color: #d97706;
+}
+
+.achievement-card.hidden {
+  filter: saturate(.82);
+  border-style: dashed;
+}
+
+@media (max-width: 760px) {
+  .daily-task-row {
+    grid-template-columns: 1fr;
+  }
+}

@@ -21,6 +21,103 @@ model User {
   runs         Run[]
   ladderProfiles LadderProfile[]
   ladderSettlements LadderSettlement[]
+  wallet       AccountWallet?
+  currencyLedger CurrencyLedger[]
+  achievementProgress AchievementProgress[]
+  dailyTaskSets DailyTaskSet[]
+  cosmeticInventory CosmeticInventory[]
+  cosmeticEquips CosmeticEquip[]
+}
+
+model AccountWallet {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  balance     Int      @default(0)
+  dailyDate   String?
+  dailyEarned Int      @default(0)
+  updatedAt   DateTime @updatedAt
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model CurrencyLedger {
+  id        String   @id @default(cuid())
+  userId    String
+  amount    Int
+  reason    String
+  source    String?
+  dailyDate String?
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([userId, dailyDate])
+}
+
+model AchievementProgress {
+  id            String    @id @default(cuid())
+  userId        String
+  achievementId String
+  progress      Int       @default(0)
+  completedAt   DateTime?
+  claimedAt     DateTime?
+  updatedAt     DateTime  @updatedAt
+
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, achievementId])
+  @@index([userId, completedAt])
+}
+
+model DailyTaskSet {
+  id          String   @id @default(cuid())
+  userId      String
+  dateKey     String
+  refreshUsed Boolean  @default(false)
+  tasks       String   @default("[]")
+  updatedAt   DateTime @updatedAt
+  createdAt   DateTime @default(now())
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, dateKey])
+}
+
+model CosmeticInventory {
+  id            String   @id @default(cuid())
+  userId        String
+  catalogItemId String
+  acquiredAt    DateTime @default(now())
+
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, catalogItemId])
+  @@index([userId])
+}
+
+model CosmeticEquip {
+  id            String   @id @default(cuid())
+  userId        String
+  slot          String
+  catalogItemId String
+  updatedAt     DateTime @updatedAt
+
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, slot])
+}
+
+model ShopCatalogOverride {
+  id            String   @id @default(cuid())
+  catalogItemId String   @unique
+  enabled       Boolean  @default(true)
+  price         Int?
+  section       String?
+  purchaseType  String?
+  sku           String?
+  source        String   @default("DB_OVERRIDE")
+  updatedAt     DateTime @updatedAt
 }
 
 model Run {

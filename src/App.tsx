@@ -59,6 +59,7 @@ import { resolveSlotPlacement } from './placement'
 import { itemTriggerCountLabel } from './item-trigger-display'
 import { triggerDiceLabel } from './item-trigger-display'
 import { itemVisualProfile } from './item-visual-profile'
+import { mergeDogfightRunPreview, previewShopPurchase, previewShopReroll } from './shop-optimistic'
 import { ALL_ITEM_DEFS } from './server/game/data'
 import { queryBattleFxAnchor, resolveBattleFxPoints } from './battle-vfx-coordinates'
 import { TERM_DEFS } from './shared/rule-terms'
@@ -99,13 +100,14 @@ type Area = 'EQUIPMENT' | 'BAG'
 type ShopType = 'GENERAL' | 'LARGE' | 'MEDIUM' | 'SMALL' | 'SMALL_DICE' | 'BIG_DICE' | 'RELIC' | 'UPGRADE' | 'POTION'
 type ItemQuality = 'BRONZE' | 'SILVER' | 'GOLD' | 'DIAMOND'
 type GameMode = 'CASUAL' | 'LADDER' | 'DOGFIGHT' | 'PEAK'
-type AppScreen = 'LOBBY' | 'CASUAL' | 'LADDER' | 'DOGFIGHT' | 'PEAK'
+type AppScreen = 'LOBBY' | 'CASUAL' | 'LADDER' | 'DOGFIGHT' | 'PEAK' | 'SHOP' | 'ACHIEVEMENTS'
 type HistoryModeTab = 'ALL' | 'CASUAL' | 'DOGFIGHT' | 'PEAK' | 'LADDER'
 type HistoryRunMode = Exclude<HistoryModeTab, 'ALL'>
 type RunMode = 'CASUAL' | 'LADDER'
 type LadderTier = 'BRONZE' | 'SILVER' | 'GOLD' | 'PLATINUM' | 'DIAMOND' | 'MASTER' | 'DOG_KING'
 type VisualThemeId = 'dogPark' | 'backAlley' | 'royalKennel'
 type SurpriseBackgroundId = 'classReward' | 'enchant' | 'settlement'
+type PendingShopAction = 'buy' | 'reroll' | null
 
 const BOOM_COUNTER_TRIGGER_THRESHOLD = 50
 const HANDDRAWN_FONT_STACK = '"Comic Sans MS", "Microsoft YaHei", "KaiTi", "Kaiti SC", "DFKai-SB", cursive, sans-serif'
@@ -294,6 +296,42 @@ type PlayerRunHistory = {
   recentRuns: PlayerRunHistoryEntry[]
 }
 type AuthUser = { id: string; account: string; nickname: string | null }
+type AccountWallet = { balance: number; dailyDate: string; dailyEarned: number; dailyLimit: number }
+type CosmeticType = 'TITLE' | 'AVATAR' | 'BACKGROUND' | 'DOG_SKIN' | 'BATTLE_EFFECT'
+type CosmeticRarity = 'COMMON' | 'RARE' | 'EPIC' | 'LEGENDARY'
+type ShopCatalogItem = {
+  id: string
+  name: string
+  description: string
+  type: CosmeticType
+  rarity: CosmeticRarity
+  price: number
+  section: 'PERMANENT' | 'FEATURED'
+  assetKey: string
+  purchaseType: 'SOFT_CURRENCY' | 'PAID_READY' | 'GRANT_ONLY'
+  sku?: string
+  source: 'CODE' | 'DB_OVERRIDE'
+  owned: boolean
+  equipped: boolean
+}
+type AccountShopResponse = { wallet: AccountWallet; permanent: ShopCatalogItem[]; featured: ShopCatalogItem[] }
+type AchievementEntry = {
+  id: string
+  title: string
+  description: string
+  category: string
+  hidden: boolean
+  target: number
+  reward: number
+  progress: number
+  completedAt: string | null
+  claimedAt: string | null
+  claimable: boolean
+}
+type AchievementsResponse = { wallet: AccountWallet; achievements: AchievementEntry[] }
+type DailyTaskEntry = { taskId: string; slot: 'PARTICIPATION' | 'BUILD' | 'BATTLE'; progress: number; target: number; reward: number; claimedAt: string | null }
+type DailyTasksResponse = { wallet?: AccountWallet; daily: { dateKey: string; refreshUsed: boolean; tasks: DailyTaskEntry[] } }
+type CosmeticsResponse = { inventory: Array<{ catalogItemId: string; acquiredAt: string }>; equipped: Array<{ slot: CosmeticType; catalogItemId: string }> }
 type CasualTutorialStepId = 'LOBBY' | 'DOG_SELECT' | 'SHOP_INSPECT' | 'SHOP_BUY' | 'PLACE_ITEM' | 'MATCH' | 'BATTLE_WATCH' | 'CONTINUE'
 type CasualTutorialStatus = 'idle' | 'active' | 'completed' | 'skipped' | 'replaying'
 type CasualTutorialState = { status: CasualTutorialStatus; stepId: CasualTutorialStepId }
@@ -1247,6 +1285,7 @@ export default function App() {
   const [selectedPotionId, setSelectedPotionId] = useState<string | null>(null)
   const [tipAnchor, setTipAnchor] = useState<TipAnchor | null>(null)
   const [draggingItemId, setDraggingItemId] = useState<string | null>(null)
+  const [pendingShopAction, setPendingShopAction] = useState<PendingShopAction>(null)
   const [battle, setBattle] = useState<Battle | null>(null)
   const [eventIndex, setEventIndex] = useState(0)
   const [speed, setSpeed] = useState(1)
@@ -1480,6 +1519,67 @@ export default function App() {
       const message = err instanceof Error ? err.message : '操作失败'
       setError(message)
       pushUiFeedback(feedback?.failure ?? (message.includes('金币') ? 'gold-shortage' : 'action-failed'), feedback?.failureLabel ?? message)
+    }
+  }
+
+  const rerollShop = async () => {
+    if (!run || pendingShopAction) return
+    const previousRun = run
+    const preview = previewShopReroll(run)
+    if (!preview) {
+      pushUiFeedback('gold-shortage')
+      return
+    }
+
+    setError('')
+    setPendingShopAction('reroll')
+    setSelectedOfferId(null)
+    setTipAnchor(null)
+    setRun(preview)
+    pushUiFeedback('reroll-success')
+    try {
+      const data = await api<{ run: Run }>(`/runs/${run.id}/shop/reroll`, { method: 'POST' })
+      setRun(data.run)
+      void loadRunHistory().catch(() => undefined)
+      void loadLadderProfile().catch(() => undefined)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : '操作失败'
+      setRun(previousRun)
+      setError(message)
+      pushUiFeedback(message.includes('金币') ? 'gold-shortage' : 'action-failed', message)
+    } finally {
+      setPendingShopAction(null)
+    }
+  }
+
+  const buySelectedOffer = async () => {
+    if (!run || !selectedOffer || pendingShopAction) return
+    const previousRun = run
+    const preview = previewShopPurchase(run, selectedOffer.offerId)
+    if (!preview) {
+      pushUiFeedback('gold-shortage')
+      return
+    }
+
+    markBoughtForTutorial()
+    setError('')
+    setPendingShopAction('buy')
+    setSelectedOfferId(null)
+    setTipAnchor(null)
+    setRun(preview)
+    pushUiFeedback('buy-success')
+    try {
+      const data = await api<{ run: Run }>(`/runs/${run.id}/shop/buy`, { method: 'POST', body: JSON.stringify({ offerId: selectedOffer.offerId, area: 'BAG' }) })
+      setRun(data.run)
+      void loadRunHistory().catch(() => undefined)
+      void loadLadderProfile().catch(() => undefined)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : '操作失败'
+      setRun(previousRun)
+      setError(message)
+      pushUiFeedback(message.includes('金币') ? 'gold-shortage' : 'action-failed', message)
+    } finally {
+      setPendingShopAction(null)
     }
   }
 
@@ -1723,8 +1823,26 @@ export default function App() {
     return (
       <Shell feedbacks={uiFeedbacks} run={run ?? undefined} error={error} musicEnabled={musicEnabled} musicBlocked={musicBlocked} onToggleMusic={toggleMusic} onLogout={() => action(() => api('/auth/logout', { method: 'POST' }).then(() => ({ user: null })))}>
         <PlayerRunHistoryPanel history={runHistory} ladderProfile={ladderProfile} onOpen={() => setHistoryOverlayOpen(true)} />
-        <ModeLobby run={run} runHistory={runHistory} onOpen={() => setHistoryOverlayOpen(true)} onEnterCasual={handleEnterCasual} onReplayTutorial={startCasualTutorial} onEnterLadder={() => setAppScreen('LADDER')} onEnterDogfight={() => setAppScreen('DOGFIGHT')} onEnterPeak={() => setAppScreen('PEAK')} />
+        <ModeLobby run={run} runHistory={runHistory} onOpen={() => setHistoryOverlayOpen(true)} onEnterCasual={handleEnterCasual} onReplayTutorial={startCasualTutorial} onEnterLadder={() => setAppScreen('LADDER')} onEnterDogfight={() => setAppScreen('DOGFIGHT')} onEnterPeak={() => setAppScreen('PEAK')} onEnterShop={() => setAppScreen('SHOP')} onEnterAchievements={() => setAppScreen('ACHIEVEMENTS')} />
         {historyOverlayOpen && <PlayerHistoryOverlay history={runHistory} onClose={() => setHistoryOverlayOpen(false)} />}
+        {tutorialGuide}
+      </Shell>
+    )
+  }
+
+  if (appScreen === 'SHOP') {
+    return (
+      <Shell feedbacks={uiFeedbacks} run={run ?? undefined} error={error} musicEnabled={musicEnabled} musicBlocked={musicBlocked} onToggleMusic={toggleMusic} onOpenLobby={() => setAppScreen('LOBBY')} onLogout={() => action(() => api('/auth/logout', { method: 'POST' }).then(() => ({ user: null })))}>
+        <AccountShopScreen />
+        {tutorialGuide}
+      </Shell>
+    )
+  }
+
+  if (appScreen === 'ACHIEVEMENTS') {
+    return (
+      <Shell feedbacks={uiFeedbacks} run={run ?? undefined} error={error} musicEnabled={musicEnabled} musicBlocked={musicBlocked} onToggleMusic={toggleMusic} onOpenLobby={() => setAppScreen('LOBBY')} onLogout={() => action(() => api('/auth/logout', { method: 'POST' }).then(() => ({ user: null })))}>
+        <AchievementsScreen />
         {tutorialGuide}
       </Shell>
     )
@@ -1864,7 +1982,8 @@ export default function App() {
               selectedOfferId={selectedOfferId}
               draggingItemId={draggingItemId}
               onInspectOffer={onInspectOffer}
-              onReroll={() => action(() => api(`/runs/${run.id}/shop/reroll`, { method: 'POST' }), { success: 'reroll-success' })}
+              pendingAction={pendingShopAction}
+              onReroll={() => void rerollShop()}
               onMatch={() => action(() => api(`/runs/${run.id}/battle/match`, { method: 'POST' }), { success: 'battle-start' })}
             />
             <InventoryBoard
@@ -1881,11 +2000,8 @@ export default function App() {
               offer={selectedOffer}
               anchor={tipAnchor}
               onClose={closeShopTip}
-              onBuy={() => {
-                if (!selectedOffer) return
-                markBoughtForTutorial()
-                void action(() => api(`/runs/${run.id}/shop/buy`, { method: 'POST', body: JSON.stringify({ offerId: selectedOffer.offerId, area: 'BAG' }) }), { success: 'buy-success', failure: 'gold-shortage' })
-              }}
+              busy={pendingShopAction === 'buy'}
+              onBuy={selectedOffer ? () => void buySelectedOffer() : null}
               onSell={() => selectedItem && action(() => api(`/runs/${run.id}/shop/sell`, { method: 'POST', body: JSON.stringify({ itemId: selectedItem.id }) }), { success: 'sell-success' })}
               onUpgrade={selectedItem && canUpgradeItem(selectedItem, run.items) ? () => upgradeItem(selectedItem.id) : null}
             />
@@ -2027,7 +2143,7 @@ function CasualTutorialGuide({ state, run, battle, eventIndex, onSkip }: { state
   )
 }
 
-function ModeLobby({ run, runHistory, onOpen, onEnterCasual, onReplayTutorial, onEnterLadder, onEnterDogfight, onEnterPeak }: { run: Run | null; runHistory: PlayerRunHistory; onOpen: () => void; onEnterCasual: () => void; onReplayTutorial: () => void; onEnterLadder: () => void; onEnterDogfight: () => void; onEnterPeak: () => void }) {
+function ModeLobby({ run, runHistory, onOpen, onEnterCasual, onReplayTutorial, onEnterLadder, onEnterDogfight, onEnterPeak, onEnterShop, onEnterAchievements }: { run: Run | null; runHistory: PlayerRunHistory; onOpen: () => void; onEnterCasual: () => void; onReplayTutorial: () => void; onEnterLadder: () => void; onEnterDogfight: () => void; onEnterPeak: () => void; onEnterShop: () => void; onEnterAchievements: () => void }) {
   const casualAction = run?.mode === 'CASUAL' ? '继续休闲模式' : '开始休闲模式'
   const ladderAction = run?.mode === 'LADDER' ? '继续天梯模式' : '进入天梯模式'
   return (
@@ -2036,7 +2152,11 @@ function ModeLobby({ run, runHistory, onOpen, onEnterCasual, onReplayTutorial, o
         <h2>模式大厅</h2>
         <p>选择本次要进入的竞技方式。休闲或天梯完成后的狗可以送入巅峰竞技场。</p>
       </div>
+      <div className="account-hub-actions">
+        <ActionButton className="account-hub-button" type="button" onClick={onEnterShop}><ShoppingBag size={18} /> 商城</ActionButton>
+        <ActionButton className="account-hub-button" type="button" onClick={onEnterAchievements}><Trophy size={18} /> 成就</ActionButton>
         <ActionButton variant="secondary" className="tutorial-replay-button" type="button" onClick={onReplayTutorial}>新手引导</ActionButton>
+      </div>
       <div className="mode-grid">
         {modeCards.map((mode) => (
           <HanddrawnFrame as="article" variant="card" ornament="corner" key={mode.id} className={`mode-card paper-card sticker-card ${mode.locked ? 'locked' : 'available'}`}>
@@ -2069,6 +2189,232 @@ function ModeLobby({ run, runHistory, onOpen, onEnterCasual, onReplayTutorial, o
       </div>
     </section>
   )
+}
+
+function AccountShopScreen() {
+  const [shop, setShop] = useState<AccountShopResponse | null>(null)
+  const [cosmetics, setCosmetics] = useState<CosmeticsResponse | null>(null)
+  const [message, setMessage] = useState('')
+
+  const load = useCallback(async () => {
+    const [shopData, cosmeticData] = await Promise.all([
+      api<AccountShopResponse>('/shop'),
+      api<CosmeticsResponse>('/cosmetics/me'),
+    ])
+    setShop(shopData)
+    setCosmetics(cosmeticData)
+  }, [])
+
+  useEffect(() => {
+    void load().catch((error) => setMessage(error instanceof Error ? error.message : '商城加载失败'))
+  }, [load])
+
+  const purchase = async (catalogItemId: string) => {
+    setMessage('')
+    try {
+      const updated = await api<AccountShopResponse>('/shop/purchase', { method: 'POST', body: JSON.stringify({ catalogItemId }) })
+      setShop(updated)
+      const cosmeticData = await api<CosmeticsResponse>('/cosmetics/me')
+      setCosmetics(cosmeticData)
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : '购买失败')
+    }
+  }
+
+  const equip = async (catalogItemId: string) => {
+    setMessage('')
+    try {
+      const updated = await api<CosmeticsResponse>('/cosmetics/equip', { method: 'POST', body: JSON.stringify({ catalogItemId }) })
+      setCosmetics(updated)
+      setShop(await api<AccountShopResponse>('/shop'))
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : '装备失败')
+    }
+  }
+
+  return (
+    <section className="account-shop-screen">
+      <div className="screen-heading centered">
+        <h2>狗狗商城</h2>
+        <p>购买永久外观，不影响战斗数值。</p>
+      </div>
+      <div className="account-currency-pill">
+        <Coins size={18} />
+        <strong>{shop?.wallet.balance ?? 0}</strong>
+        <span>骨头币 · 今日对局 {shop?.wallet.dailyEarned ?? 0}/{shop?.wallet.dailyLimit ?? 240}</span>
+      </div>
+      <CosmeticBadge cosmetics={cosmetics} />
+      {message && <p className="error">{message}</p>}
+      <ShopCatalogSection title="精选轮换" items={shop?.featured ?? []} onPurchase={purchase} onEquip={equip} />
+      <ShopCatalogSection title="常驻商品" items={shop?.permanent ?? []} onPurchase={purchase} onEquip={equip} />
+    </section>
+  )
+}
+
+function ShopCatalogSection({ title, items, onPurchase, onEquip }: { title: string; items: ShopCatalogItem[]; onPurchase: (catalogItemId: string) => Promise<void>; onEquip: (catalogItemId: string) => Promise<void> }) {
+  return (
+    <section className="shop-section">
+      <h3>{title}</h3>
+      <div className="shop-section-grid">
+        {items.map((item) => (
+          <article key={item.id} className={`shop-cosmetic-card paper-card rarity-${item.rarity.toLowerCase()}`}>
+            <span className="cosmetic-type">{cosmeticTypeLabel(item.type)} · {cosmeticRarityLabel(item.rarity)}</span>
+            <strong>{item.name}</strong>
+            <p>{item.description}</p>
+            <small>{item.purchaseType === 'PAID_READY' ? '预留付费 SKU' : '游戏内货币'}</small>
+            <div className="shop-card-actions">
+              <span><Coins size={14} /> {item.price}</span>
+              {item.equipped ? (
+                <ActionButton disabled>已装备</ActionButton>
+              ) : item.owned ? (
+                <ActionButton variant="secondary" onClick={() => void onEquip(item.id)}>装备</ActionButton>
+              ) : (
+                <ActionButton onClick={() => void onPurchase(item.id)}>购买</ActionButton>
+              )}
+            </div>
+          </article>
+        ))}
+      </div>
+    </section>
+  )
+}
+
+function AchievementsScreen() {
+  const [achievements, setAchievements] = useState<AchievementsResponse | null>(null)
+  const [dailyTasks, setDailyTasks] = useState<DailyTasksResponse | null>(null)
+  const [message, setMessage] = useState('')
+
+  const load = useCallback(async () => {
+    const [achievementData, dailyData] = await Promise.all([
+      api<AchievementsResponse>('/achievements'),
+      api<DailyTasksResponse>('/daily-tasks'),
+    ])
+    setAchievements(achievementData)
+    setDailyTasks(dailyData)
+  }, [])
+
+  useEffect(() => {
+    void load().catch((error) => setMessage(error instanceof Error ? error.message : '成就加载失败'))
+  }, [load])
+
+  const claimAchievementById = async (achievementId: string) => {
+    setMessage('')
+    try {
+      setAchievements(await api<AchievementsResponse>(`/achievements/${achievementId}/claim`, { method: 'POST' }))
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : '领取失败')
+    }
+  }
+
+  const claimDailyById = async (taskId: string) => {
+    setMessage('')
+    try {
+      setDailyTasks(await api<DailyTasksResponse>(`/daily-tasks/${taskId}/claim`, { method: 'POST' }))
+      setAchievements(await api<AchievementsResponse>('/achievements'))
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : '领取失败')
+    }
+  }
+
+  const refreshDailyTasks = async () => {
+    setMessage('')
+    try {
+      setDailyTasks(await api<DailyTasksResponse>('/daily-tasks/refresh', { method: 'POST' }))
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : '刷新失败')
+    }
+  }
+
+  const grouped = (achievements?.achievements ?? []).reduce<Record<string, AchievementEntry[]>>((result, achievement) => {
+    result[achievement.category] = [...(result[achievement.category] ?? []), achievement]
+    return result
+  }, {})
+
+  return (
+    <section className="achievements-screen">
+      <div className="screen-heading centered">
+        <h2>成就与每日任务</h2>
+        <p>完成目标后手动领取骨头币，再去商城解锁外观。</p>
+      </div>
+      <div className="account-currency-pill">
+        <Coins size={18} />
+        <strong>{achievements?.wallet.balance ?? dailyTasks?.wallet?.balance ?? 0}</strong>
+        <span>骨头币</span>
+      </div>
+      {message && <p className="error">{message}</p>}
+      <section className="daily-task-panel paper-card">
+        <div className="panel-title-row">
+          <h3>每日任务 · {dailyTasks?.daily.dateKey ?? ''}</h3>
+          <ActionButton variant="secondary" disabled={dailyTasks?.daily.refreshUsed} onClick={() => void refreshDailyTasks()}>免费刷新</ActionButton>
+        </div>
+        {(dailyTasks?.daily.tasks ?? []).map((task) => (
+          <div key={task.taskId} className="daily-task-row">
+            <div>
+              <strong>{dailyTaskSlotLabel(task.slot)}</strong>
+              <span>{task.progress}/{task.target} · +{task.reward}</span>
+            </div>
+            <progress max={task.target} value={task.progress} />
+            <ActionButton disabled={Boolean(task.claimedAt) || task.progress < task.target} onClick={() => void claimDailyById(task.taskId)}>{task.claimedAt ? '已领取' : '领取'}</ActionButton>
+          </div>
+        ))}
+      </section>
+      {Object.entries(grouped).map(([category, entries]) => (
+        <section key={category} className="achievement-section">
+          <h3>{category}</h3>
+          <div className="achievement-grid">
+            {entries.map((achievement) => (
+              <article key={achievement.id} className={achievement.hidden && !achievement.completedAt ? 'achievement-card hidden paper-card' : 'achievement-card paper-card'}>
+                <span>{achievement.hidden ? '隐藏' : '公开'} · +{achievement.reward}</span>
+                <strong>{achievement.title}</strong>
+                <p>{achievement.description}</p>
+                <progress max={achievement.target} value={achievement.progress} />
+                <small>{achievement.progress}/{achievement.target}</small>
+                <ActionButton disabled={!achievement.claimable} onClick={() => void claimAchievementById(achievement.id)}>{achievement.claimedAt ? '已领取' : achievement.claimable ? '领取' : '未完成'}</ActionButton>
+              </article>
+            ))}
+          </div>
+        </section>
+      ))}
+    </section>
+  )
+}
+
+function CosmeticBadge({ cosmetics }: { cosmetics: CosmeticsResponse | null }) {
+  const equipped = cosmetics?.equipped ?? []
+  return (
+    <div className="cosmetic-badge paper-card">
+      <Sparkles size={18} />
+      <span>已装备 {equipped.length} 个外观槽位</span>
+      {equipped.map((entry) => <small key={entry.slot}>{cosmeticTypeLabel(entry.slot)}</small>)}
+    </div>
+  )
+}
+
+function cosmeticTypeLabel(type: CosmeticType) {
+  const labels: Record<CosmeticType, string> = {
+    TITLE: '称号',
+    AVATAR: '头像',
+    BACKGROUND: '背景',
+    DOG_SKIN: '狗狗皮肤',
+    BATTLE_EFFECT: '战斗特效',
+  }
+  return labels[type]
+}
+
+function cosmeticRarityLabel(rarity: CosmeticRarity) {
+  const labels: Record<CosmeticRarity, string> = {
+    COMMON: '普通',
+    RARE: '稀有',
+    EPIC: '史诗',
+    LEGENDARY: '传说',
+  }
+  return labels[rarity]
+}
+
+function dailyTaskSlotLabel(slot: DailyTaskEntry['slot']) {
+  if (slot === 'PARTICIPATION') return '参与'
+  if (slot === 'BUILD') return '构筑'
+  return '战斗'
 }
 
 function PlayerRunHistoryPanel({ history, ladderProfile, onOpen }: { history: PlayerRunHistory; ladderProfile: LadderProfile | null; onOpen: () => void }) {
@@ -2475,6 +2821,9 @@ function DogfightRoomView({ room, onRoomChange, onLeave, soundEnabled }: { room:
       const data = await fn()
       if ('room' in data) {
         onRoomChange(data.room)
+      } else if (data.run) {
+        onRoomChange(mergeDogfightRunPreview(room, data.run))
+        void refreshRoom().catch(() => undefined)
       } else {
         await refreshRoom()
       }
@@ -3691,9 +4040,10 @@ function PotionChoiceSelect({ choices, selectedId, visualTheme, onSelect }: { ch
   )
 }
 
-function ShopShelf({ run, selectedOfferId, draggingItemId, onInspectOffer, onReroll, onMatch }: { run: Run; selectedOfferId: string | null; draggingItemId: string | null; onInspectOffer: (offerId: string, element: HTMLElement) => void; onReroll: () => void; onMatch: () => void }) {
+function ShopShelf({ run, selectedOfferId, draggingItemId, pendingAction = null, onInspectOffer, onReroll, onMatch }: { run: Run; selectedOfferId: string | null; draggingItemId: string | null; pendingAction?: PendingShopAction; onInspectOffer: (offerId: string, element: HTMLElement) => void; onReroll: () => void; onMatch: () => void }) {
   const { language } = useLanguage()
   const visualTheme = visualThemeForRound(run.round)
+  const busy = pendingAction !== null
   return (
     <HanddrawnFrame as="section" variant="tray" ornament="wood" className={`shop-shelf sketch-panel visual-theme-surface visual-theme-${visualTheme}`} data-visual-theme={visualTheme} style={visualThemeStyle(visualTheme)} data-tutorial-anchor="shop-offers">
       <div className="section-title">
@@ -3703,7 +4053,7 @@ function ShopShelf({ run, selectedOfferId, draggingItemId, onInspectOffer, onRer
         </div>
         <div className="shop-actions">
           <SellDropZone active={Boolean(draggingItemId)} />
-          <HanddrawnButton variant="secondary" className="reroll-button" onClick={onReroll} title={`刷新商店：${run.refreshCost} 金币`}>
+          <HanddrawnButton variant="secondary" className="reroll-button" onClick={onReroll} disabled={busy || run.gold < run.refreshCost} aria-busy={pendingAction === 'reroll'} title={`刷新商店：${run.refreshCost} 金币`}>
             <RefreshCcw size={18} />
             <span className="price-tag"><Coins size={14} />{run.refreshCost}</span>
           </HanddrawnButton>
@@ -3711,10 +4061,10 @@ function ShopShelf({ run, selectedOfferId, draggingItemId, onInspectOffer, onRer
       </div>
       <div className="offer-row">
         {run.shopItems.map((offer) => (
-          <ShopCard key={offer.offerId} offer={offer} selected={selectedOfferId === offer.offerId} ownedCount={shopOfferOwnedCount(run, offer)} affordable={run.gold >= offer.price} onClick={(element) => onInspectOffer(offer.offerId, element)} />
+          <ShopCard key={offer.offerId} offer={offer} selected={selectedOfferId === offer.offerId} ownedCount={shopOfferOwnedCount(run, offer)} affordable={run.gold >= offer.price} disabled={busy} onClick={(element) => onInspectOffer(offer.offerId, element)} />
         ))}
       </div>
-      <ActionButton className="match-button" data-tutorial-anchor="match-button" onClick={onMatch}>
+      <ActionButton className="match-button" data-tutorial-anchor="match-button" onClick={onMatch} disabled={busy}>
         <Swords size={18} /> 匹配
       </ActionButton>
     </HanddrawnFrame>
@@ -3731,7 +4081,7 @@ function SellDropZone({ active }: { active: boolean }) {
   )
 }
 
-function ShopCard({ offer, selected, ownedCount, affordable, onClick }: { offer: ShopOffer; selected: boolean; ownedCount: number; affordable: boolean; onClick: (element: HTMLElement) => void }) {
+function ShopCard({ offer, selected, ownedCount, affordable, disabled = false, onClick }: { offer: ShopOffer; selected: boolean; ownedCount: number; affordable: boolean; disabled?: boolean; onClick: (element: HTMLElement) => void }) {
   const { language } = useLanguage()
   const def = offer.def
   const quality = normalizeQuality(offer.quality)
@@ -3740,7 +4090,7 @@ function ShopCard({ offer, selected, ownedCount, affordable, onClick }: { offer:
   const triggerDice = def ? triggerDiceLabel(def) : null
   const visual = def ? itemVisualProfile(def) : null
   return (
-    <ItemFrame as="button" className={`shop-card paper-shop-card paper-card ${visual?.className ?? 'item-tone-utility'} ${qualityClass(offer.quality)} ${owned ? 'shop-card-owned' : ''} ${affordable ? '' : 'shop-card-unaffordable'} ${selected ? 'selected' : ''}`} onClick={(event) => onClick(event.currentTarget)}>
+    <ItemFrame as="button" disabled={disabled} className={`shop-card paper-shop-card paper-card ${visual?.className ?? 'item-tone-utility'} ${qualityClass(offer.quality)} ${owned ? 'shop-card-owned' : ''} ${affordable ? '' : 'shop-card-unaffordable'} ${selected ? 'selected' : ''}`} onClick={(event) => onClick(event.currentTarget)}>
       <span className="quality-chip shop-quality-chip">{language === 'en-US' ? localizeQuality(quality, language) : qualityLabel[quality]}</span>
       {owned && <span className="owned-badge" aria-label={`已拥有 ${ownedCount} 件同名装备`}>已拥有 x{ownedCount}</span>}
       {def && visual && (
@@ -4039,7 +4389,7 @@ function DraggingItemOverlay({ item, relics = [] }: { item: Item | null; relics?
   )
 }
 
-function FloatingTip({ run, item, offer, anchor, descriptionOverride, relicsOverride, onClose, onBuy, onSell, onUpgrade }: { run: Run; item: Item | null; offer: ShopOffer | null; anchor: TipAnchor | null; descriptionOverride?: string | null; relicsOverride?: Relic[] | null; onClose: () => void; onBuy: (() => void) | null; onSell: (() => void) | null; onUpgrade: (() => void) | null }) {
+function FloatingTip({ run, item, offer, anchor, descriptionOverride, relicsOverride, busy = false, onClose, onBuy, onSell, onUpgrade }: { run: Run; item: Item | null; offer: ShopOffer | null; anchor: TipAnchor | null; descriptionOverride?: string | null; relicsOverride?: Relic[] | null; busy?: boolean; onClose: () => void; onBuy: (() => void) | null; onSell: (() => void) | null; onUpgrade: (() => void) | null }) {
   const { language } = useLanguage()
   const def = item?.def ?? offer?.def
   useOutsideTipDismiss(Boolean(def), onClose)
@@ -4093,7 +4443,7 @@ function FloatingTip({ run, item, offer, anchor, descriptionOverride, relicsOver
       )}
       <div className="tip-actions">
         {isOffer && onBuy ? (
-          <ActionButton className="wide" data-tutorial-anchor="shop-buy" disabled={!canAfford} onClick={onBuy}>
+          <ActionButton className="wide" data-tutorial-anchor="shop-buy" disabled={!canAfford || busy} aria-busy={busy} onClick={onBuy}>
             <PackagePlus size={18} /> 购买到背包
           </ActionButton>
         ) : (
