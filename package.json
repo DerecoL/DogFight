@@ -10,6 +10,7 @@
     "dev:server": "tsx watch src/server/index.ts",
     "start": "tsx src/server/index.ts",
     "guard:chains": "tsx scripts/battle-chain-guard.ts",
+    "balance:report": "tsx scripts/balance-report.ts",
     "build": "npm run guard:chains && tsc -b && vite build && tsx scripts/package-click-index.mjs",
     "lint": "eslint .",
     "preview": "vite preview",
