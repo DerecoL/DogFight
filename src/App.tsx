@@ -61,6 +61,7 @@ import {
 import { resolveSlotPlacement } from './placement'
 import { extraTriggerDiceLabel, itemTriggerCountLabel, triggerDiceLabel } from './item-trigger-display'
 import { itemVisualProfile } from './item-visual-profile'
+import { mergeDogfightRunPreview, previewShopPurchase, previewShopReroll } from './shop-optimistic'
 import { ALL_ITEM_DEFS } from './server/game/data'
 import { queryBattleFxAnchor, resolveBattleFxPoints } from './battle-vfx-coordinates'
 import { battleProjectileCues, type BattleProjectileCue } from './battle-vfx-projectiles'
@@ -116,6 +117,7 @@ type RunMode = 'CASUAL' | 'LADDER'
 type LadderTier = 'BRONZE' | 'SILVER' | 'GOLD' | 'PLATINUM' | 'DIAMOND' | 'MASTER' | 'DOG_KING'
 type VisualThemeId = 'dogPark' | 'backAlley' | 'royalKennel'
 type SurpriseBackgroundId = 'classReward' | 'enchant' | 'settlement'
+type PendingShopAction = 'buy' | 'reroll' | null
 
 const BOOM_COUNTER_TRIGGER_THRESHOLD = 50
 const HANDDRAWN_FONT_STACK = '"Comic Sans MS", "Microsoft YaHei", "KaiTi", "Kaiti SC", "DFKai-SB", cursive, sans-serif'
@@ -1145,32 +1147,6 @@ function sortedDogfightMembers(members: DogfightMember[]) {
   })
 }
 
-function mergeDogfightRoomRun(room: DogfightRoom, nextRun: Run) {
-  let updatedCurrentRunMember = room.currentRunMember
-  const members = room.members.map((member) => {
-    if (member.runId !== nextRun.id) return member
-    const updatedMember = {
-      ...member,
-      dogType: nextRun.dogType,
-      wins: nextRun.wins,
-      losses: nextRun.losses,
-      round: nextRun.round,
-      gold: nextRun.gold,
-      phase: nextRun.phase,
-      status: nextRun.phase,
-    }
-    if (room.currentRunMember?.id === member.id) updatedCurrentRunMember = updatedMember
-    return updatedMember
-  })
-
-  return {
-    ...room,
-    members,
-    currentRun: room.currentRun?.id === nextRun.id ? nextRun : room.currentRun,
-    currentRunMember: updatedCurrentRunMember,
-  }
-}
-
 function diceToneText(def: ItemDef) {
   const min = Math.min(...def.dice)
   const max = Math.max(...def.dice)
@@ -1359,6 +1335,7 @@ export default function App() {
   const [selectedEnchantId, setSelectedEnchantId] = useState<string | null>(null)
   const [selectedPotionId, setSelectedPotionId] = useState<string | null>(null)
   const [tipAnchor, setTipAnchor] = useState<TipAnchor | null>(null)
+  const [pendingShopAction, setPendingShopAction] = useState<PendingShopAction>(null)
   const [battle, setBattle] = useState<Battle | null>(null)
   const [eventIndex, setEventIndex] = useState(0)
   const [speed, setSpeed] = useState(1)
@@ -1592,6 +1569,67 @@ export default function App() {
       const message = err instanceof Error ? err.message : '操作失败'
       setError(message)
       pushUiFeedback(feedback?.failure ?? (message.includes('金币') ? 'gold-shortage' : 'action-failed'), feedback?.failureLabel ?? message)
+    }
+  }
+
+  const rerollShop = async () => {
+    if (!run || pendingShopAction) return
+    const previousRun = run
+    const preview = previewShopReroll(run)
+    if (!preview) {
+      pushUiFeedback('gold-shortage')
+      return
+    }
+
+    setError('')
+    setPendingShopAction('reroll')
+    setSelectedOfferId(null)
+    setTipAnchor(null)
+    setRun(preview)
+    pushUiFeedback('reroll-success')
+    try {
+      const data = await api<{ run: Run }>(`/runs/${run.id}/shop/reroll`, { method: 'POST' })
+      setRun(data.run)
+      void loadRunHistory().catch(() => undefined)
+      void loadLadderProfile().catch(() => undefined)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : '操作失败'
+      setRun(previousRun)
+      setError(message)
+      pushUiFeedback(message.includes('金币') ? 'gold-shortage' : 'action-failed', message)
+    } finally {
+      setPendingShopAction(null)
+    }
+  }
+
+  const buySelectedOffer = async () => {
+    if (!run || !selectedOffer || pendingShopAction) return
+    const previousRun = run
+    const preview = previewShopPurchase(run, selectedOffer.offerId)
+    if (!preview) {
+      pushUiFeedback('gold-shortage')
+      return
+    }
+
+    markBoughtForTutorial()
+    setError('')
+    setPendingShopAction('buy')
+    setSelectedOfferId(null)
+    setTipAnchor(null)
+    setRun(preview)
+    pushUiFeedback('buy-success')
+    try {
+      const data = await api<{ run: Run }>(`/runs/${run.id}/shop/buy`, { method: 'POST', body: JSON.stringify({ offerId: selectedOffer.offerId, area: 'BAG' }) })
+      setRun(data.run)
+      void loadRunHistory().catch(() => undefined)
+      void loadLadderProfile().catch(() => undefined)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : '操作失败'
+      setRun(previousRun)
+      setError(message)
+      pushUiFeedback(message.includes('金币') ? 'gold-shortage' : 'action-failed', message)
+    } finally {
+      setPendingShopAction(null)
     }
   }
 
@@ -1997,7 +2035,8 @@ export default function App() {
               run={run}
               selectedOfferId={selectedOfferId}
               onInspectOffer={onInspectOffer}
-              onReroll={() => action(() => api(`/runs/${run.id}/shop/reroll`, { method: 'POST' }), { success: 'reroll-success' })}
+              pendingAction={pendingShopAction}
+              onReroll={() => void rerollShop()}
               onMatch={() => action(() => api(`/runs/${run.id}/battle/match`, { method: 'POST' }), { success: 'battle-start' })}
             />
             <InventoryBoard
@@ -2014,11 +2053,8 @@ export default function App() {
               offer={selectedOffer}
               anchor={tipAnchor}
               onClose={closeShopTip}
-              onBuy={() => {
-                if (!selectedOffer) return
-                markBoughtForTutorial()
-                void action(() => api(`/runs/${run.id}/shop/buy`, { method: 'POST', body: JSON.stringify({ offerId: selectedOffer.offerId, area: 'BAG' }) }), { success: 'buy-success', failure: 'gold-shortage' })
-              }}
+              busy={pendingShopAction === 'buy'}
+              onBuy={selectedOffer ? () => void buySelectedOffer() : null}
               onSell={() => selectedItem && action(() => api(`/runs/${run.id}/shop/sell`, { method: 'POST', body: JSON.stringify({ itemId: selectedItem.id }) }), { success: 'sell-success' })}
               onUpgrade={selectedItem && canUpgradeItem(selectedItem, run.items) ? () => upgradeItem(selectedItem.id) : null}
             />
@@ -2737,8 +2773,8 @@ function DogfightRoomView({ room, onRoomChange, onLeave, soundEnabled }: { room:
       if ('room' in data) {
         onRoomChange(data.room)
       } else if (data.run) {
-        onRoomChange(mergeDogfightRoomRun(room, data.run))
-        void refreshRoom()
+        onRoomChange(mergeDogfightRunPreview(room, data.run))
+        void refreshRoom().catch(() => undefined)
       } else {
         void refreshRoom()
       }
@@ -3965,9 +4001,10 @@ function PotionChoiceSelect({ choices, selectedId, visualTheme, onSelect }: { ch
   )
 }
 
-function ShopShelf({ run, selectedOfferId, onInspectOffer, onReroll, onMatch }: { run: Run; selectedOfferId: string | null; onInspectOffer: (offerId: string, element: HTMLElement) => void; onReroll: () => void; onMatch: () => void }) {
+function ShopShelf({ run, selectedOfferId, pendingAction = null, onInspectOffer, onReroll, onMatch }: { run: Run; selectedOfferId: string | null; pendingAction?: PendingShopAction; onInspectOffer: (offerId: string, element: HTMLElement) => void; onReroll: () => void; onMatch: () => void }) {
   const { language } = useLanguage()
   const visualTheme = visualThemeForRound(run.round)
+  const busy = pendingAction !== null
   return (
     <HanddrawnFrame as="section" variant="tray" ornament="wood" className={`shop-shelf sketch-panel visual-theme-surface visual-theme-${visualTheme}`} data-visual-theme={visualTheme} style={visualThemeStyle(visualTheme)} data-tutorial-anchor="shop-offers">
       <div className="section-title">
@@ -3977,7 +4014,7 @@ function ShopShelf({ run, selectedOfferId, onInspectOffer, onReroll, onMatch }: 
         </div>
         <div className="shop-actions">
           <SellDropZone />
-          <HanddrawnButton variant="secondary" className="reroll-button" onClick={onReroll} title={`刷新商店：${run.refreshCost} 金币`}>
+          <HanddrawnButton variant="secondary" className="reroll-button" onClick={onReroll} disabled={busy || run.gold < run.refreshCost} aria-busy={pendingAction === 'reroll'} title={`刷新商店：${run.refreshCost} 金币`}>
             <RefreshCcw size={18} />
             <span className="price-tag"><Coins size={14} />{run.refreshCost}</span>
           </HanddrawnButton>
@@ -3985,10 +4022,10 @@ function ShopShelf({ run, selectedOfferId, onInspectOffer, onReroll, onMatch }: 
       </div>
       <div className="offer-row">
         {run.shopItems.map((offer) => (
-          <ShopCard key={offer.offerId} offer={offer} selected={selectedOfferId === offer.offerId} ownedCount={shopOfferOwnedCount(run, offer)} affordable={run.gold >= offer.price} onClick={(element) => onInspectOffer(offer.offerId, element)} />
+          <ShopCard key={offer.offerId} offer={offer} selected={selectedOfferId === offer.offerId} ownedCount={shopOfferOwnedCount(run, offer)} affordable={run.gold >= offer.price} disabled={busy} onClick={(element) => onInspectOffer(offer.offerId, element)} />
         ))}
       </div>
-      <ActionButton className="match-button" data-tutorial-anchor="match-button" onClick={onMatch}>
+      <ActionButton className="match-button" data-tutorial-anchor="match-button" onClick={onMatch} disabled={busy}>
         <Swords size={18} /> 匹配
       </ActionButton>
     </HanddrawnFrame>
@@ -4005,7 +4042,7 @@ function SellDropZone() {
   )
 }
 
-function ShopCard({ offer, selected, ownedCount, affordable, onClick }: { offer: ShopOffer; selected: boolean; ownedCount: number; affordable: boolean; onClick: (element: HTMLElement) => void }) {
+function ShopCard({ offer, selected, ownedCount, affordable, disabled = false, onClick }: { offer: ShopOffer; selected: boolean; ownedCount: number; affordable: boolean; disabled?: boolean; onClick: (element: HTMLElement) => void }) {
   const { language } = useLanguage()
   const def = offer.def
   const quality = normalizeQuality(offer.quality)
@@ -4014,7 +4051,7 @@ function ShopCard({ offer, selected, ownedCount, affordable, onClick }: { offer:
   const triggerDice = def ? triggerDiceLabel(def) : null
   const visual = def ? itemVisualProfile(def) : null
   return (
-    <ItemFrame as="button" className={`shop-card paper-shop-card paper-card ${visual?.className ?? 'item-tone-utility'} ${qualityClass(offer.quality)} ${owned ? 'shop-card-owned' : ''} ${affordable ? '' : 'shop-card-unaffordable'} ${selected ? 'selected' : ''}`} onClick={(event) => onClick(event.currentTarget)}>
+    <ItemFrame as="button" disabled={disabled} className={`shop-card paper-shop-card paper-card ${visual?.className ?? 'item-tone-utility'} ${qualityClass(offer.quality)} ${owned ? 'shop-card-owned' : ''} ${affordable ? '' : 'shop-card-unaffordable'} ${selected ? 'selected' : ''}`} onClick={(event) => onClick(event.currentTarget)}>
       <span className="quality-chip shop-quality-chip">{language === 'en-US' ? localizeQuality(quality, language) : qualityLabel[quality]}</span>
       {owned && <span className="owned-badge" aria-label={`已拥有 ${ownedCount} 件同名装备`}>已拥有 x{ownedCount}</span>}
       {def && visual && (
@@ -4401,7 +4438,7 @@ function DraggingItemOverlay({ item = null }: { item?: Item | null }) {
   return item ? <DraggingItemGhost item={item} /> : null
 }
 
-function FloatingTip({ run, item, offer, anchor, descriptionOverride, relicsOverride, onClose, onBuy, onSell, onUpgrade }: { run: Run; item: Item | null; offer: ShopOffer | null; anchor: TipAnchor | null; descriptionOverride?: string | null; relicsOverride?: Relic[] | null; onClose: () => void; onBuy: (() => void) | null; onSell: (() => void) | null; onUpgrade: (() => void) | null }) {
+function FloatingTip({ run, item, offer, anchor, descriptionOverride, relicsOverride, busy = false, onClose, onBuy, onSell, onUpgrade }: { run: Run; item: Item | null; offer: ShopOffer | null; anchor: TipAnchor | null; descriptionOverride?: string | null; relicsOverride?: Relic[] | null; busy?: boolean; onClose: () => void; onBuy: (() => void) | null; onSell: (() => void) | null; onUpgrade: (() => void) | null }) {
   const { language } = useLanguage()
   const def = item?.def ?? offer?.def
   useOutsideTipDismiss(Boolean(def && anchor), onClose)
@@ -4460,7 +4497,7 @@ function FloatingTip({ run, item, offer, anchor, descriptionOverride, relicsOver
       )}
       <div className="tip-actions">
         {isOffer && onBuy ? (
-          <ActionButton className="wide" data-tutorial-anchor="shop-buy" disabled={!canAfford} onClick={onBuy}>
+          <ActionButton className="wide" data-tutorial-anchor="shop-buy" disabled={!canAfford || busy} aria-busy={busy} onClick={onBuy}>
             <PackagePlus size={18} /> 购买到背包
           </ActionButton>
         ) : (

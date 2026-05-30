@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify'
 import { type DogfightBattle, type DogfightParticipant, type DogfightRoom, type ItemInstance, type Prisma, type Run } from '@prisma/client'
 import { z } from 'zod'
 import { prisma } from './db'
+import { recordAccountEvent } from './account-services'
 import { itemDef } from './game/data'
 import { findSlot } from './game/grid'
 import { STARTING_GOLD } from './game/matchmaking'
@@ -11,7 +12,6 @@ import { nextQuality, normalizeQuality } from './game/quality'
 import { simulateBattle } from './game/battle'
 import type { BattleEvent, BattleResult, DogType, EnchantmentChoice, FighterSnapshot, GameItem, PotionChoice, ShopType } from './game/types'
 import { applyRelicChoice, initialItems, makeChoices, makePotionChoices, makeRelicChoices, makeShop, nextPhaseData as buildNextPhaseData, parseJson, phaseDataAfterEnchant, postBattleLargeItemReward, postBattleSellBonusItemGrowths, publicRun, relicsFromRun, seedGhost, snapshotFromRun, toGameItems } from './state'
-import { recordAccountEvent } from './account-services'
 
 const DOGFIGHT_TARGET_PLAYERS = 8
 const DOGFIGHT_LOBBY_MS = 15_000
