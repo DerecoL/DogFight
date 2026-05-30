@@ -652,6 +652,7 @@ describe('selection screen structure', () => {
     expect(relicDefIds().filter((id) => !relicIconIds.includes(id))).toEqual([])
     expect(itemIconEntries.filter((entry) => !existsSync(new URL(`../public${entry.path}`, import.meta.url)))).toEqual([])
     expect(relicIconEntries.filter((entry) => !existsSync(new URL(`../public${entry.path}`, import.meta.url)))).toEqual([])
+    expect([...itemIconEntries, ...relicIconEntries].filter((entry) => !entry.path.startsWith('/assets/sticker-icons/') || !entry.path.endsWith('.webp'))).toEqual([])
   })
 
   it('wires V5 equipment icons and keeps sticker assets lightweight', () => {
@@ -666,20 +667,20 @@ describe('selection screen structure', () => {
     ]
 
     for (const id of newEquipmentIds) {
-      const svg = new URL(`../public/assets/items/${id}.svg`, import.meta.url)
       const webp = new URL(`../public/assets/sticker-icons/${id}.webp`, import.meta.url)
       expect(app).toContain(`'${id}': '/assets/sticker-icons/${id}.webp'`)
-      expect(existsSync(svg)).toBe(true)
       expect(existsSync(webp)).toBe(true)
-      expect(readFileSync(svg, 'utf8')).toContain('viewBox="0 0 96 96"')
+      expect(statSync(webp).size).toBeGreaterThan(3_500)
       expect(statSync(webp).size).toBeLessThanOrEqual(15_000)
     }
   })
 
   it('documents the required icon workflow for future equipment and relics', () => {
     expect(agents).toContain('新增装备/遗物资源规则')
-    expect(agents).toContain('public/assets/items/<id>.svg')
     expect(agents).toContain('public/assets/sticker-icons/<id>.webp')
+    expect(agents).toContain('透明底手绘贴纸风格')
+    expect(agents).toContain('不得使用临时占位图')
+    expect(agents).toContain('无旧 `items/relics` SVG 引用')
     expect(agents).toContain('15KB')
   })
 

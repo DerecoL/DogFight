@@ -339,6 +339,136 @@
   display: none;
 }
 
+.battle-dice.dynamic-dice {
+  --dice-size: 76px;
+  --dice-depth: 18px;
+  min-height: 116px;
+  grid-template-rows: var(--dice-size);
+  align-content: center;
+  justify-items: center;
+  perspective: 720px;
+}
+
+.battle-dice.dynamic-dice .dynamic-dice-cube {
+  position: relative;
+  width: var(--dice-size);
+  height: var(--dice-size);
+  transform-style: preserve-3d;
+  transform: rotateX(58deg) rotateZ(-10deg);
+  filter: drop-shadow(12px 18px 8px rgba(61, 45, 37, .25));
+}
+
+.battle-dice.dynamic-dice.rolling .dynamic-dice-cube {
+  animation: battleDiceCubeSpin .58s cubic-bezier(.2, 1.35, .28, 1);
+}
+
+.battle-dice.dynamic-dice .dynamic-dice-face {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  border: 3px solid rgba(61, 45, 37, .84);
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at 30% 20%, rgba(255, 255, 255, .86), transparent 28%),
+    linear-gradient(145deg, #fffdf1 0%, #fff4bf 58%, #f2ca76 100%);
+  color: #3d2d25;
+  box-shadow:
+    inset 0 7px 0 rgba(255, 255, 255, .62),
+    inset -7px -9px 0 rgba(142, 92, 36, .13);
+  backface-visibility: hidden;
+}
+
+.battle-dice.dynamic-dice .dynamic-dice-face.front {
+  width: auto;
+  height: auto;
+  border-radius: 18px;
+  transform: translateZ(var(--dice-depth));
+}
+
+.battle-dice.dynamic-dice .dynamic-dice-face.top, .battle-dice.dynamic-dice .dynamic-dice-face.side {
+  display: grid;
+}
+
+.battle-dice.dynamic-dice .dynamic-dice-face.top {
+  height: var(--dice-depth);
+  bottom: auto;
+  border-radius: 14px 14px 8px 8px;
+  filter: brightness(1.06) saturate(.95);
+  transform-origin: bottom center;
+  transform: rotateX(90deg) translateZ(calc(var(--dice-size) - var(--dice-depth)));
+  background: linear-gradient(180deg, #fff7cf, #e4b765);
+}
+
+.battle-dice.dynamic-dice .dynamic-dice-face.side {
+  width: var(--dice-depth);
+  left: auto;
+  border-radius: 8px 14px 14px 8px;
+  filter: brightness(.86) saturate(.92);
+  transform-origin: left center;
+  transform: rotateY(90deg) translateZ(calc(var(--dice-size) - var(--dice-depth)));
+  background: linear-gradient(90deg, #eecb81, #c99048);
+}
+
+.battle-dice.dynamic-dice .dynamic-dice-pips {
+  display: grid;
+  grid-template-columns: repeat(3, 14px);
+  grid-template-rows: repeat(3, 14px);
+  width: auto;
+  height: auto;
+  gap: 6px;
+}
+
+.battle-dice.dynamic-dice .dynamic-dice-pips i {
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  background: currentColor;
+  opacity: .12;
+  box-shadow: inset 1px 1px 0 rgba(255, 255, 255, .24), 1px 1px 0 rgba(255, 255, 255, .5);
+}
+
+.battle-dice.dynamic-dice .dynamic-dice-pips i.active {
+  opacity: 1;
+  transform: none;
+}
+
+.battle-dice.dynamic-dice .dynamic-dice-value {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  margin-top: -4px;
+  border: 3px solid rgba(61, 45, 37, .78);
+  border-radius: 999px;
+  background:
+    radial-gradient(circle at 34% 24%, rgba(255, 255, 255, .82), transparent 30%),
+    linear-gradient(180deg, #fff7d6, #f2cd78);
+  color: var(--ink);
+  font-size: 24px;
+  line-height: 1;
+  box-shadow: inset 0 4px 0 rgba(255, 255, 255, .55), 4px 5px 0 rgba(61, 45, 37, .16);
+}
+
+.battle-dice.dynamic-dice.dynamic-dice-player .dynamic-dice-value {
+  color: #14532d;
+  background: linear-gradient(180deg, #dcfce7, #86efac);
+}
+
+.battle-dice.dynamic-dice.dynamic-dice-opponent .dynamic-dice-value {
+  color: #7f1d1d;
+  background: linear-gradient(180deg, #fee2e2, #fca5a5);
+}
+
+.battle-dice.dynamic-dice.dynamic-dice-system .dynamic-dice-value {
+  color: #4b3b2f;
+  background: linear-gradient(180deg, #fff7ed, #fed7aa);
+}
+
+.battle-dice.dynamic-dice.rolling .dynamic-dice-value {
+  animation: battleRollResultPop .58s cubic-bezier(.16, 1.55, .22, 1);
+}
+
 .handdrawn-choice-card {
   position: relative;
   border: 3px solid var(--ink);

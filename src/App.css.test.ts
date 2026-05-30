@@ -32,6 +32,12 @@ function uiCssRule(selector: string) {
   return match?.[1] ?? ''
 }
 
+function lastUiCssRule(selector: string) {
+  const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const matches = [...uiCss.matchAll(new RegExp(`${escaped}\\s*\\{([^}]*)\\}`, 'gs'))]
+  return matches.at(-1)?.[1] ?? ''
+}
+
 function cssVariableValue(name: string) {
   const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   const match = css.match(new RegExp(`${escaped}:\\s*([\\s\\S]*?);\\s*--`, 's'))
@@ -101,17 +107,15 @@ describe('equipment layout scale', () => {
     expect(primitives).toContain('clipPath={`url(#${clipId})`}')
   })
 
-  it('styles the center dice as a readable front-facing handdrawn die', () => {
-    expect(uiCssRule('.dynamic-dice')).toContain('--dice-size')
-    expect(uiCssRule('.dynamic-dice')).not.toContain('perspective')
-    expect(uiCssRule('.dynamic-dice-cube')).toContain('width: var(--dice-size)')
-    expect(uiCssRule('.dynamic-dice-cube')).not.toContain('transform-style: preserve-3d')
-    expect(uiCssRule('.dynamic-dice-face.front')).toContain('position: relative')
-    expect(uiCssRule('.dynamic-dice-face.top, .dynamic-dice-face.side')).toContain('display: none')
-    expect(uiCssRule('.dynamic-dice-value')).toContain('display: none')
-    expect(uiCssRule('.dynamic-dice-pips i.active')).toContain('transform: scale')
-    expect(uiCssRule('.dynamic-dice.rolling .dynamic-dice-cube')).toContain('animation')
-    expect(uiCss).toContain('@keyframes handdrawnDiceRoll')
+  it('keeps the center dice as a three-dimensional handdrawn die after shared UI styles load', () => {
+    expect(lastUiCssRule('.battle-dice.dynamic-dice')).toContain('perspective')
+    expect(lastUiCssRule('.battle-dice.dynamic-dice .dynamic-dice-cube')).toContain('transform-style: preserve-3d')
+    expect(lastUiCssRule('.battle-dice.dynamic-dice .dynamic-dice-cube')).toContain('rotateX')
+    expect(lastUiCssRule('.battle-dice.dynamic-dice .dynamic-dice-face')).toContain('position: absolute')
+    expect(lastUiCssRule('.battle-dice.dynamic-dice .dynamic-dice-face.top, .battle-dice.dynamic-dice .dynamic-dice-face.side')).toContain('display: grid')
+    expect(lastUiCssRule('.battle-dice.dynamic-dice .dynamic-dice-face.front')).toContain('translateZ(var(--dice-depth))')
+    expect(lastUiCssRule('.battle-dice.dynamic-dice .dynamic-dice-value')).toContain('display: grid')
+    expect(lastUiCssRule('.battle-dice.dynamic-dice.rolling .dynamic-dice-cube')).toContain('battleDiceCubeSpin')
   })
 
   it('keeps equipment and bag slots large enough to be the core play surface', () => {
