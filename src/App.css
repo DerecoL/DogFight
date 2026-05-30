@@ -5178,17 +5178,13 @@ input {
     drop-shadow(4px 8px 0 rgba(61, 45, 37, .14))
     drop-shadow(0 19px 14px rgba(61, 45, 37, .16));
   --shop-paper-filter:
-    drop-shadow(0 0 5px var(--shop-quality-glow))
-    drop-shadow(0 0 16px var(--shop-quality-glow))
-    drop-shadow(0 0 36px var(--shop-quality-glow-strong))
-    drop-shadow(0 0 70px color-mix(in srgb, var(--shop-quality-glow) 62%, transparent))
+    drop-shadow(0 0 10px color-mix(in srgb, var(--shop-quality-glow) 78%, transparent))
+    drop-shadow(0 0 28px color-mix(in srgb, var(--shop-quality-glow) 58%, transparent))
     var(--shop-paper-depth-filter);
   --shop-paper-filter-hover:
-    drop-shadow(0 0 7px var(--shop-quality-glow))
-    drop-shadow(0 0 22px var(--shop-quality-glow))
-    drop-shadow(0 0 46px var(--shop-quality-glow-strong))
-    drop-shadow(0 0 86px color-mix(in srgb, var(--shop-quality-glow) 70%, transparent))
-    var(--shop-paper-depth-filter);
+    drop-shadow(0 0 14px color-mix(in srgb, var(--shop-quality-glow) 88%, transparent))
+    drop-shadow(0 0 36px color-mix(in srgb, var(--shop-quality-glow) 68%, transparent))
+    var(--shop-paper-depth-filter-hover);
   --shop-paper-tone:
     var(--paper-grain),
     radial-gradient(circle at 16% 18%, rgba(255, 255, 255, .55), transparent 24%),
@@ -5321,7 +5317,7 @@ input {
     var(--paper-fiber),
     var(--shop-paper-tone);
   box-shadow: var(--shop-paper-shadow), inset 0 0 0 var(--shop-paper-edge-width) var(--shop-paper-edge-ink), inset 0 2px 0 rgba(255, 255, 255, .64), inset 0 -7px 0 rgba(112, 72, 30, .16), inset 0 -13px 18px rgba(61, 45, 37, .08);
-  filter: var(--shop-paper-filter);
+  filter: none;
   opacity: .9;
   clip-path: var(--shop-paper-cut);
   transform: none;
@@ -5357,7 +5353,7 @@ input {
     inset 0 2px 0 rgba(255, 255, 255, .64),
     inset 0 -7px 0 rgba(112, 72, 30, .16),
     inset 0 -13px 18px rgba(61, 45, 37, .08);
-  filter: var(--shop-paper-filter);
+  filter: none;
   clip-path: var(--shop-paper-cut);
 }
 
@@ -5388,7 +5384,7 @@ input {
 
 .paper-shop-card:hover::before {
   box-shadow: var(--shop-paper-shadow-hover), inset 0 0 0 var(--shop-paper-edge-width) var(--shop-paper-edge-ink), inset 0 2px 0 rgba(255, 255, 255, .64), inset 0 -7px 0 rgba(112, 72, 30, .16), inset 0 -13px 18px rgba(61, 45, 37, .08);
-  filter: var(--shop-paper-filter-hover);
+  filter: none;
 }
 
 .paper-shop-card.selected {
@@ -5397,7 +5393,7 @@ input {
 
 .paper-shop-card.selected::before {
   box-shadow: var(--shop-paper-shadow-hover), inset 0 0 0 var(--shop-paper-edge-width) var(--shop-paper-edge-ink), inset 0 2px 0 rgba(255, 255, 255, .64), inset 0 -7px 0 rgba(112, 72, 30, .16), inset 0 -13px 18px rgba(61, 45, 37, .08);
-  filter: var(--shop-paper-filter-hover);
+  filter: none;
 }
 
 .paper-shop-card.shop-card-owned {
@@ -5680,7 +5676,7 @@ input {
   border: 0;
   background: transparent;
   box-shadow: none;
-  filter: none;
+  filter: var(--shop-paper-filter);
   clip-path: none;
   overflow: visible;
 }
@@ -5698,7 +5694,7 @@ input {
     var(--paper-fiber),
     var(--shop-paper-tone);
   box-shadow: var(--shop-paper-shadow), inset 0 0 0 var(--shop-paper-edge-width) var(--shop-paper-edge-ink), inset 0 2px 0 rgba(255, 255, 255, .64), inset 0 -7px 0 rgba(112, 72, 30, .16), inset 0 -13px 18px rgba(61, 45, 37, .08);
-  filter: var(--shop-paper-filter);
+  filter: none;
   opacity: .9;
   mix-blend-mode: normal;
   clip-path: var(--shop-paper-cut);
@@ -5734,20 +5730,22 @@ input {
 
 .paper-shop-card.paper-item-card.item-card:hover {
   box-shadow: none;
+  filter: var(--shop-paper-filter-hover);
 }
 
 .paper-shop-card.paper-item-card.item-card:hover::before {
   box-shadow: var(--shop-paper-shadow-hover), inset 0 0 0 var(--shop-paper-edge-width) var(--shop-paper-edge-ink), inset 0 2px 0 rgba(255, 255, 255, .64), inset 0 -7px 0 rgba(112, 72, 30, .16), inset 0 -13px 18px rgba(61, 45, 37, .08);
-  filter: var(--shop-paper-filter-hover);
+  filter: none;
 }
 
 .paper-shop-card.paper-item-card.item-card.selected {
   box-shadow: none;
+  filter: var(--shop-paper-filter-hover);
 }
 
 .paper-shop-card.paper-item-card.item-card.selected::before {
   box-shadow: 0 0 0 4px var(--selection-wash), var(--shop-paper-shadow-hover), inset 0 0 0 var(--shop-paper-edge-width) var(--shop-paper-edge-ink), inset 0 2px 0 rgba(255, 255, 255, .64), inset 0 -7px 0 rgba(112, 72, 30, .16), inset 0 -13px 18px rgba(61, 45, 37, .08);
-  filter: var(--shop-paper-filter-hover);
+  filter: none;
 }
 
 .paper-shop-card.paper-item-card.item-card.shop-card-owned {
@@ -5765,6 +5763,7 @@ input {
 .paper-shop-card.paper-item-card.item-card.shop-card-unaffordable,
 .paper-shop-card.paper-item-card.item-card.shop-card-unaffordable:hover {
   box-shadow: none;
+  filter: grayscale(.82) brightness(.68) saturate(.55) drop-shadow(0 0 7px rgba(61, 45, 37, .18));
 }
 
 .paper-shop-card.paper-item-card.item-card.shop-card-unaffordable::before,

@@ -41,7 +41,8 @@ describe('item quality upgrade UI', () => {
     expect(css).toContain('--shop-quality-glow: rgba(255, 207, 66, 1)')
     expect(css).toContain('--shop-quality-glow: rgba(102, 231, 255, 1)')
     expect(css).toContain('.upgrade-indicator')
-    expect(css).toContain('drop-shadow(0 0 46px var(--shop-quality-glow-strong))')
+    expect(css).toContain('filter: var(--shop-paper-filter)')
+    expect(css).toContain('drop-shadow(0 0 36px color-mix(in srgb, var(--shop-quality-glow) 68%, transparent))')
     expect(css).not.toMatch(/\.shop-card\.quality-bronze\s*\{/)
   })
 

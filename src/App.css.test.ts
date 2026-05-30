@@ -433,7 +433,7 @@ describe('equipment layout scale', () => {
     expect(cssRule('.paper-shop-card')).toContain('filter: var(--shop-paper-filter)')
     expect(cssRule('.paper-shop-card::before')).toContain('inset: 0')
     expect(cssRule('.paper-shop-card::before')).toContain('inset 0 0 0 var(--shop-paper-edge-width) var(--shop-paper-edge-ink)')
-    expect(cssRule('.paper-shop-card::before')).toContain('filter: var(--shop-paper-filter)')
+    expect(cssRule('.paper-shop-card::before')).toContain('filter: none')
     expect(cssRule('.paper-shop-card::before')).toContain('clip-path: var(--shop-paper-cut)')
     expect(cssRule('.paper-shop-card::after')).toContain('clip-path: var(--shop-paper-cut)')
     expect(css).not.toMatch(/\.item-card\.quality-bronze,\s*\.shop-card\.quality-bronze,\s*\.tip-tag\.quality-bronze\s*\{[^}]*border-width:\s*5px/s)
@@ -518,15 +518,16 @@ describe('equipment layout scale', () => {
     expect(cssRule('.paper-shop-card:hover::before')).toContain('var(--shop-paper-shadow-hover)')
   })
 
-  it('renders shop quality glow from the clipped paper outline instead of the host rectangle', () => {
+  it('renders shop quality glow from the actual shop card host so it stays visible behind the paper note', () => {
     expect(cssRule('.paper-shop-card')).not.toContain('clip-path: var(--shop-paper-cut')
     expect(lastCssRule('.paper-shop-card.paper-item-card.item-card')).toContain('background: transparent')
     expect(lastCssRule('.paper-shop-card.paper-item-card.item-card')).toContain('box-shadow: none')
+    expect(lastCssRule('.paper-shop-card.paper-item-card.item-card')).toContain('filter: var(--shop-paper-filter)')
     expect(lastCssRule('.paper-shop-card.paper-item-card.item-card::before')).toContain('clip-path: var(--shop-paper-cut')
     expect(lastCssRule('.paper-shop-card.paper-item-card.item-card::before')).toContain('box-shadow: var(--shop-paper-shadow)')
-    expect(lastCssRule('.paper-shop-card.paper-item-card.item-card::before')).toContain('filter: var(--shop-paper-filter)')
-    expect(lastCssRule('.paper-shop-card.paper-item-card.item-card:hover::before')).toContain('filter: var(--shop-paper-filter-hover)')
-    expect(lastCssRule('.paper-shop-card.paper-item-card.item-card.selected::before')).toContain('filter: var(--shop-paper-filter-hover)')
+    expect(lastCssRule('.paper-shop-card.paper-item-card.item-card::before')).toContain('filter: none')
+    expect(lastCssRule('.paper-shop-card.paper-item-card.item-card:hover')).toContain('filter: var(--shop-paper-filter-hover)')
+    expect(lastCssRule('.paper-shop-card.paper-item-card.item-card.selected')).toContain('filter: var(--shop-paper-filter-hover)')
   })
 
   it('adds visible quality glow behind inventory equipment cards inside the shop', () => {
