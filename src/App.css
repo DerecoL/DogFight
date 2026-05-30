@@ -2870,19 +2870,18 @@ input {
 .battle-dice.rolling b { animation: dicePop .38s ease; }
 .battle-dice.dynamic-dice {
   --dice-size: 82px;
-  --dice-depth: 28px;
+  --dice-depth: 18px;
   min-height: 126px;
   grid-template-rows: var(--dice-size);
   align-content: center;
   justify-items: center;
-  perspective: 760px;
+  perspective: 0;
 }
 .battle-dice.dynamic-dice .dynamic-dice-cube {
   position: relative;
   width: var(--dice-size);
   height: var(--dice-size);
-  transform-style: preserve-3d;
-  transform: rotateX(-10deg) rotateY(-24deg) rotateZ(-7deg);
+  transform: rotate(-7deg);
   filter: drop-shadow(14px 16px 9px rgba(61, 45, 37, .28));
 }
 .battle-dice.rolling .dynamic-dice-cube {
@@ -2905,23 +2904,30 @@ input {
   backface-visibility: hidden;
 }
 .dynamic-dice-face.front {
+  z-index: 3;
   border-radius: 18px;
-  transform: translateZ(calc(var(--dice-depth) / 2));
+  transform: none;
 }
 .dynamic-dice-face.top {
-  height: var(--dice-size);
-  border-radius: 14px 14px 8px 8px;
+  z-index: 1;
+  inset: auto auto calc(100% - 2px) 8px;
+  width: calc(var(--dice-size) - 2px);
+  height: var(--dice-depth);
+  border-radius: 12px 14px 5px 5px;
   filter: brightness(1.06) saturate(.95);
-  transform-origin: center top;
-  transform: rotateX(90deg) translateZ(calc(var(--dice-depth) / 2));
+  transform: skewX(32deg);
+  transform-origin: left bottom;
   background: linear-gradient(180deg, #fff7cf, #e4b765);
 }
 .dynamic-dice-face.side {
-  width: var(--dice-size);
-  border-radius: 8px 14px 14px 8px;
+  z-index: 2;
+  inset: 8px auto auto calc(100% - 2px);
+  width: var(--dice-depth);
+  height: calc(var(--dice-size) - 2px);
+  border-radius: 5px 13px 14px 5px;
   filter: brightness(.86) saturate(.92);
-  transform-origin: right center;
-  transform: rotateY(90deg) translateZ(calc(var(--dice-depth) / 2));
+  transform: skewY(32deg);
+  transform-origin: left top;
   background: linear-gradient(90deg, #eecb81, #c99048);
 }
 .dynamic-dice-pips {
@@ -2935,11 +2941,14 @@ input {
   height: 14px;
   border-radius: 999px;
   background: currentColor;
-  opacity: .12;
+  opacity: 0;
   box-shadow: inset 1px 1px 0 rgba(255, 255, 255, .24), 1px 1px 0 rgba(255, 255, 255, .5);
 }
 .dynamic-dice-pips i.active {
   opacity: 1;
+}
+.dynamic-dice-face.top .dynamic-dice-pips, .dynamic-dice-face.side .dynamic-dice-pips {
+  display: none;
 }
 .battle-dice b.dynamic-dice-value {
   width: 38px;
@@ -2973,9 +2982,9 @@ input {
   animation: battleRollResultPop .58s cubic-bezier(.16, 1.55, .22, 1);
 }
 @keyframes battleDiceCubeSpin {
-  0% { transform: rotateX(-10deg) rotateY(-24deg) rotateZ(-7deg) translateY(0) scale(.96); }
-  42% { transform: rotateX(-22deg) rotateY(-42deg) rotateZ(13deg) translateY(-18px) scale(1.24); }
-  100% { transform: rotateX(-10deg) rotateY(-24deg) rotateZ(-7deg) translateY(0) scale(1); }
+  0% { transform: rotate(-7deg) translateY(0) scale(.96); }
+  42% { transform: rotate(11deg) translateY(-18px) scale(1.26); }
+  100% { transform: rotate(-7deg) translateY(0) scale(1); }
 }
 .handdrawn-stage {
   background:

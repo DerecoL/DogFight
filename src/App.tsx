@@ -976,7 +976,7 @@ function itemTone(def: ItemDef) {
   return itemVisualProfile(def).className
 }
 
-const iconAssetVersion = 'sticker-20260530-v2'
+const iconAssetVersion = 'sticker-20260530-v3'
 
 function versionedIconSrc(src: string) {
   return src.startsWith('data:') ? src : `${src}?v=${iconAssetVersion}`
