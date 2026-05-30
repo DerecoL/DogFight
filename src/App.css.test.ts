@@ -454,6 +454,28 @@ describe('equipment layout scale', () => {
     expect(cssRule('.paper-shop-card:hover')).toContain('filter: var(--shop-paper-filter-hover)')
   })
 
+  it('adds two extra randomized paper styles to shop choice tabs', () => {
+    expect(cssRule('.shop-choice-screen .choice-grid')).toContain('perspective')
+    expect(cssRule('.shop-choice-screen .choice')).toContain('--choice-tab-contact-shadow')
+    expect(cssRule('.shop-choice-screen .choice')).toContain('rotateX(var(--choice-tab-lift))')
+    expect(cssRule('.shop-choice-screen .choice:nth-child(4n)')).toContain('--choice-tab-cut')
+    expect(cssRule('.shop-choice-screen .choice:nth-child(4n)')).toContain('--choice-tab-contact-shadow')
+    expect(cssRule('.shop-choice-screen .choice:nth-child(5n)')).toContain('--choice-tab-cut')
+    expect(cssRule('.shop-choice-screen .choice:nth-child(5n)')).toContain('--choice-tab-paper')
+    expect(cssRule('.shop-choice-screen .choice.placeholder')).toContain('transform: none')
+  })
+
+  it('adds two more shop paper card silhouettes while preserving quality glow depth', () => {
+    expect(cssRule('.paper-shop-card')).toContain('--shop-paper-depth-filter-hover')
+    expect(cssRule('.paper-shop-card')).toContain('--shop-paper-contact-shadow')
+    expect(cssRule('.paper-shop-card')).toContain('--shop-quality-glow-ring')
+    expect(cssRule('.offer-row .paper-shop-card:nth-child(6n + 2)')).toContain('--shop-paper-cut')
+    expect(cssRule('.offer-row .paper-shop-card:nth-child(6n + 2)')).toContain('--shop-paper-contact-shadow')
+    expect(cssRule('.offer-row .paper-shop-card:nth-child(6n + 5)')).toContain('--shop-paper-cut')
+    expect(cssRule('.offer-row .paper-shop-card:nth-child(6n + 5)')).toContain('--shop-paper-tone')
+    expect(cssRule('.paper-shop-card:hover::before')).toContain('var(--shop-paper-shadow-hover)')
+  })
+
   it('renders shop quality glow from the clipped paper outline instead of the host rectangle', () => {
     expect(cssRule('.paper-shop-card')).not.toContain('clip-path: var(--shop-paper-cut')
     expect(lastCssRule('.paper-shop-card.paper-item-card.item-card')).toContain('background: transparent')
@@ -614,20 +636,20 @@ describe('equipment layout scale', () => {
     expect(cssRule('.class-reward-ceremony.surprise-surface::before, .class-reward-ceremony.surprise-surface::after')).toContain('content: none')
     expect(cssRule('.class-reward-ceremony.surprise-surface .ceremony-stage')).toContain('overflow: hidden')
     expect(cssRule('.class-reward-ceremony.surprise-surface .ceremony-stage::before')).toContain('var(--surprise-bg)')
-    expect(cssRule('.class-reward-ceremony.surprise-surface .ceremony-stage::before')).toContain('background-size: cover, cover, auto 122%')
+    expect(cssRule('.class-reward-ceremony.surprise-surface .ceremony-stage::before')).toContain('background-size: cover, cover, auto 142%')
     expect(cssRule('.class-reward-ceremony.surprise-surface .ceremony-stage::before')).toContain('background-position: center, center, center 48%')
     expect(cssRule('.class-reward-ceremony.surprise-surface .ceremony-stage > *')).toContain('z-index: 1')
   })
 
   it('uses stronger parchment contrast on awakening and settlement manuscript pages', () => {
-    expect(cssRule('.class-reward-ceremony.surprise-surface .ceremony-stage::after')).toContain('rgba(255, 248, 226, .46)')
+    expect(cssRule('.class-reward-ceremony.surprise-surface .ceremony-stage::after')).toContain('rgba(255, 248, 226, .62)')
     expect(cssRule('.ceremony-copy h2')).toContain('color: #2b1f19')
     expect(cssRule('.ceremony-copy p')).toContain('color: rgba(43, 31, 25, .94)')
     expect(cssRule('.ceremony-reward-chip')).toContain('background: rgba(255, 251, 241, .92)')
-    expect(cssRule('.settlement-page.surprise-surface::before')).toContain('background-size: cover, cover, auto 118%')
+    expect(cssRule('.settlement-page.surprise-surface::before')).toContain('background-size: cover, cover, auto 132%')
     expect(cssRule('.settlement-card h2')).toContain('color: #2b1f19')
     expect(cssRule('.settlement-card > p')).toContain('color: rgba(43, 31, 25, .9)')
-    expect(cssRule('.settlement-score-grid small')).toContain('color: rgba(43, 31, 25, .82)')
+    expect(lastCssRule('.settlement-score-grid small')).toContain('color: rgba(43, 31, 25, .82)')
   })
 
   it('presents completed run settlement as a full-screen overlay with top-right visibility controls', () => {
