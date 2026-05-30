@@ -16,6 +16,9 @@
   --green: #aeeac8;
   --gold: #ffd86b;
   --danger: #ff9db7;
+  --z-modal-overlay: 1200;
+  --z-item-tip: 1300;
+  --z-rule-tip: 1301;
   --paper-fiber:
     radial-gradient(circle at 12% 18%, rgba(61, 45, 37, .045) 0 1px, transparent 1.5px),
     radial-gradient(circle at 78% 64%, rgba(61, 45, 37, .035) 0 1px, transparent 1.5px),
@@ -1007,7 +1010,7 @@ input {
   position: absolute;
   left: 0;
   bottom: calc(100% + 8px);
-  z-index: 1301;
+  z-index: var(--z-rule-tip);
   width: min(260px, 80vw);
   max-width: calc(100vw - 32px);
   display: grid;
@@ -1625,7 +1628,7 @@ input {
   position: fixed;
   left: var(--tip-x);
   top: var(--tip-y);
-  z-index: 20;
+  z-index: var(--z-item-tip);
   width: min(380px, calc(100vw - 28px));
   min-width: 0;
   max-width: calc(100vw - 28px);
@@ -4081,7 +4084,7 @@ input {
 .apex-config-overlay {
   position: fixed;
   inset: 0;
-  z-index: 85;
+  z-index: var(--z-modal-overlay);
   display: grid;
   place-items: center;
   padding: 18px;

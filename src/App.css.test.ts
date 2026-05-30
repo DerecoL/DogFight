@@ -535,7 +535,7 @@ describe('equipment layout scale', () => {
 
   it('presents apex equipment details in a wide callout overlay', () => {
     expect(cssRule('.apex-config-overlay')).toContain('position: fixed')
-    expect(cssRule('.apex-config-overlay')).toContain('z-index: 85')
+    expect(cssRule('.apex-config-overlay')).toContain('z-index: var(--z-modal-overlay)')
     expect(cssRule('.apex-config-sheet')).toContain('width: min(1040px, calc(100vw - 36px))')
     expect(cssRule('.apex-config-sheet')).toContain('grid-template-rows: auto minmax(0, 1fr)')
     expect(cssRule('.apex-equipment-preview')).toContain('--slot-h: 104px')

@@ -86,7 +86,16 @@ describe('item detail tooltip interactions', () => {
   })
 
   it('raises opened rule tips above neighboring panels', () => {
-    expect(cssRule('.rule-tip')).toContain('z-index: 1301')
+    expect(cssRule('.rule-tip')).toContain('z-index: var(--z-rule-tip)')
+  })
+
+  it('keeps item detail tips in the global tip layer above modal overlays', () => {
+    expect(cssRule(':root')).toContain('--z-modal-overlay: 1200')
+    expect(cssRule(':root')).toContain('--z-item-tip: 1300')
+    expect(cssRule(':root')).toContain('--z-rule-tip: 1301')
+    expect(cssRule('.apex-config-overlay')).toContain('z-index: var(--z-modal-overlay)')
+    expect(cssRule('.floating-tip')).toContain('z-index: var(--z-item-tip)')
+    expect(cssRule('.rule-tip')).toContain('z-index: var(--z-rule-tip)')
   })
 
   it('renders opened rule tips outside the parent text flow so the copy card keeps its size', () => {
