@@ -2463,8 +2463,8 @@ input {
 .battle-item .item-icon {
   position: relative;
   z-index: 1;
-  width: 46px;
-  height: 46px;
+  width: 56px;
+  height: 56px;
   object-fit: contain;
   filter: drop-shadow(0 8px 10px rgba(112, 72, 30, .22));
 }
