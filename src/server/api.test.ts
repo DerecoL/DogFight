@@ -1931,7 +1931,7 @@ describeWithDatabase('run API', () => {
     const battleRound = await agents[2].post(`/api/dogfight/rooms/${roomId}/ready`).send({}).expect(200)
     expect(battleRound.body.room).toMatchObject({ phase: 'BATTLE', currentRound: 0 })
     expect(battleRound.body.room.battles.filter((battle: { round: number; opponentKind: string }) => battle.round === 0 && battle.opponentKind === 'OFFLINE')).toHaveLength(8)
-    expect(battleRound.body.room.members.map((member: { losses: number }) => 3 - member.losses)).toEqual([...battleRound.body.room.members.map((member: { losses: number }) => 3 - member.losses)].sort((a, b) => b - a))
+    expect(battleRound.body.room.members.map((member: { losses: number }) => 6 - member.losses)).toEqual([...battleRound.body.room.members.map((member: { losses: number }) => 6 - member.losses)].sort((a, b) => b - a))
     expect(battleRound.body.room.members.find((member: { kind: string; currentBattleId: string | null }) => member.kind === 'BOT' && member.currentBattleId)).toBeTruthy()
 
     const ownBattleId = battleRound.body.room.currentRunMember.currentBattleId

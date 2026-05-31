@@ -144,4 +144,62 @@ describe('dogfight public room display state', () => {
     expect(visibleBattle.winnerSide).toBeNull()
     expect(visibleBattle.winnerParticipantId).toBeNull()
   })
+
+  it('keeps dogfight elimination separate from the standard run loss limit', () => {
+    const participantA = makeParticipant({
+      id: 'participant-a',
+      userId: 'user-a',
+      runId: 'run-a',
+      nickname: 'A',
+      run: makeRun({ id: 'run-a', userId: 'user-a', wins: 2, losses: 4, round: 4 }),
+    })
+    const participantB = makeParticipant({
+      id: 'participant-b',
+      userId: 'user-b',
+      runId: 'run-b',
+      nickname: 'B',
+      eliminated: true,
+      eliminatedRound: 5,
+      placement: 2,
+      run: makeRun({ id: 'run-b', userId: 'user-b', wins: 1, losses: 6, round: 5, status: 'DOGFIGHT_ELIMINATED', phase: 'COMPLETE' }),
+    })
+    const room = {
+      id: 'room',
+      hostUserId: 'user-a',
+      status: 'ACTIVE',
+      phase: 'BATTLE',
+      currentRound: 5,
+      maxPlayers: 2,
+      targetPlayerCount: 2,
+      readyDeadline: null,
+      phaseDeadline: new Date('2026-05-22T00:00:25.000Z'),
+      winnerParticipantId: null,
+      createdAt: new Date('2026-05-22T00:00:00.000Z'),
+      updatedAt: new Date('2026-05-22T00:00:00.000Z'),
+      participants: [participantA, participantB],
+      battles: [{
+        id: 'battle',
+        roomId: 'room',
+        round: 5,
+        participantAId: 'participant-a',
+        participantBId: 'participant-b',
+        opponentKind: 'PLAYER',
+        winnerSide: 'player',
+        winnerParticipantId: 'participant-a',
+        result: '{}',
+        createdAt: new Date('2026-05-22T00:00:00.000Z'),
+        updatedAt: new Date('2026-05-22T00:00:00.000Z'),
+      }],
+    }
+
+    const publicRoom = publicDogfightRoom(room as never, 'user-b')
+    const visibleB = publicRoom.members.find((member) => member.id === 'participant-b')
+
+    expect(visibleB).toMatchObject({
+      losses: 5,
+      eliminated: false,
+      eliminatedRound: null,
+      placement: null,
+    })
+  })
 })

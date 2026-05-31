@@ -214,6 +214,8 @@ describe('selection screen structure', () => {
   it('wires dogfight mode to room APIs and shows room actions plus spectator entry points', () => {
     expect(app).toContain('function DogfightLobby')
     expect(app).toContain('function DogfightRoomView')
+    expect(app).toContain('DOGFIGHT_LOSS_LIMIT')
+    expect(app).toContain('DOGFIGHT_LOSS_LIMIT - member.losses')
     expect(app).toContain("api<DogfightRoomsResponse>('/dogfight/rooms')")
     expect(app).toContain("api<DogfightRoomResponse>('/dogfight/rooms'")
     expect(app).toContain("api<DogfightRoomResponse>('/dogfight/match'")

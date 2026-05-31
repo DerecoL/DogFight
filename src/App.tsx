@@ -77,7 +77,7 @@ import {
   type BattleReviewSideStats,
 } from './battle-review'
 import { TERM_DEFS } from './shared/rule-terms'
-import { RUN_LOSS_LIMIT } from './shared/game-rules'
+import { DOGFIGHT_LOSS_LIMIT, RUN_LOSS_LIMIT } from './shared/game-rules'
 import { LANGUAGE_STORAGE_KEY, useLanguage, type Language } from './i18n'
 import {
   localizeDog,
@@ -1384,7 +1384,7 @@ function dogfightPhaseLabel(phase: DogfightRoomPhase) {
 }
 
 function dogfightLives(member: DogfightMember) {
-  return member.eliminated ? 0 : Math.max(0, RUN_LOSS_LIMIT - member.losses)
+  return member.eliminated ? 0 : Math.max(0, DOGFIGHT_LOSS_LIMIT - member.losses)
 }
 
 function sortedDogfightMembers(members: DogfightMember[]) {
