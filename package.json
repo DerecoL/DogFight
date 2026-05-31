@@ -12,6 +12,8 @@
     "guard:chains": "tsx scripts/battle-chain-guard.ts",
     "balance:report": "tsx scripts/balance-report.ts",
     "build": "npm run guard:chains && tsc -b && vite build && tsx scripts/package-click-index.mjs",
+    "build:web": "npm run build",
+    "build:taptap": "npm run guard:chains && tsc -b && vite build --mode taptap && tsx scripts/package-click-index.mjs",
     "lint": "eslint .",
     "preview": "vite preview",
     "db:deploy": "prisma migrate deploy",

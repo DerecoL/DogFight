@@ -21,6 +21,7 @@ beforeEach(async () => {
   await prisma.ghostSnapshot.deleteMany()
   await prisma.itemInstance.deleteMany()
   await prisma.run.deleteMany()
+  await prisma.userIdentity.deleteMany()
   await prisma.user.deleteMany()
   await prisma.season.deleteMany()
 })

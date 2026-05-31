@@ -52,4 +52,32 @@ describe('server config', () => {
       path: '/',
     })
   })
+
+  it('reads TapTap miniapp credentials from the environment', () => {
+    process.env.TAPTAP_MINIAPP_ID = 'miniapp-id'
+    process.env.TAPTAP_MINIAPP_SECRET = 'miniapp-secret'
+    process.env.TAPTAP_MINIAPP_REGION = 'io'
+
+    expect(resolveServerConfig().taptap).toEqual({
+      appId: 'miniapp-id',
+      secret: 'miniapp-secret',
+      region: 'io',
+    })
+  })
+
+  it('defaults TapTap miniapp region to cn when credentials are configured', () => {
+    process.env.TAPTAP_MINIAPP_ID = 'miniapp-id'
+    process.env.TAPTAP_MINIAPP_SECRET = 'miniapp-secret'
+    delete process.env.TAPTAP_MINIAPP_REGION
+
+    expect(resolveServerConfig().taptap?.region).toBe('cn')
+  })
+
+  it('rejects unsupported TapTap miniapp regions', () => {
+    process.env.TAPTAP_MINIAPP_ID = 'miniapp-id'
+    process.env.TAPTAP_MINIAPP_SECRET = 'miniapp-secret'
+    process.env.TAPTAP_MINIAPP_REGION = 'us'
+
+    expect(() => resolveServerConfig()).toThrow('TAPTAP_MINIAPP_REGION must be cn or io')
+  })
 })

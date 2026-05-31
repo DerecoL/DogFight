@@ -31,6 +31,9 @@ describe('production deployment assets', () => {
 
     expect(example).toContain('DATABASE_URL=postgresql://')
     expect(example).toContain('JWT_SECRET=')
+    expect(example).toContain('TAPTAP_MINIAPP_ID=')
+    expect(example).toContain('TAPTAP_MINIAPP_SECRET=')
+    expect(example).toContain('TAPTAP_MINIAPP_REGION=cn')
     expect(example).toContain('DOMAIN=')
     expect(example).toContain('BACKUP_DIR=/opt/dogfight/backups')
     expect(example).toContain('LOCAL_BACKUP_RETENTION_HOURS=72')

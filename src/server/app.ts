@@ -9,6 +9,7 @@ import { cookieOptionsForEnv, resolveServerConfig } from './config'
 import { prisma } from './db'
 import { registerDogfightRoutes } from './dogfight'
 import { publicErrorMessage } from './errors'
+import { exchangeTapTapCode } from './taptap-auth'
 import { buildApexSeedEntries, dailyApexBoardKey, resolveApexChallenge, type ApexBoardType, type ApexChallengeReport, type ApexOpponent } from './game/apex'
 import { itemDef, itemDefForQuality, relicDef, relicDefForQuality } from './game/data'
 import { canPlace, findSlot, type PlacementOptions } from './game/grid'
@@ -438,6 +439,49 @@ export function buildApp() {
     const token = app.jwt.sign({ userId: user.id })
     reply.setCookie('token', token, authCookieOptions)
     return { user: publicUser(user) }
+  })
+
+  app.post('/api/auth/taptap', async (request, reply) => {
+    if (!config.taptap) return reply.code(503).send({ error: 'TapTap 登录未配置' })
+
+    const body = z.object({ code: z.string().trim().min(1) }).parse(request.body)
+    const session = await exchangeTapTapCode(config.taptap, body.code).catch(() => null)
+    if (!session) return reply.code(401).send({ error: 'TapTap 登录失败，请重试' })
+
+    const user = await prisma.$transaction(async (tx) => {
+      const existing = await tx.userIdentity.findUnique({
+        where: { provider_providerUserId: { provider: 'taptap', providerUserId: session.openid } },
+        include: { user: true },
+      })
+      if (existing) {
+        await tx.userIdentity.update({
+          where: { id: existing.id },
+          data: { unionId: session.unionid ?? null, sessionKey: session.sessionKey },
+        })
+        return existing.user
+      }
+
+      const createdUser = await tx.user.create({
+        data: {
+          account: `taptap:${session.openid}`,
+          passwordHash: 'external-provider:taptap',
+        },
+      })
+      await tx.userIdentity.create({
+        data: {
+          userId: createdUser.id,
+          provider: 'taptap',
+          providerUserId: session.openid,
+          unionId: session.unionid ?? null,
+          sessionKey: session.sessionKey,
+        },
+      })
+      return createdUser
+    })
+
+    const token = app.jwt.sign({ userId: user.id })
+    reply.setCookie('token', token, authCookieOptions)
+    return { user: publicUser(user), needsNickname: !user.nickname }
   })
 
   app.post('/api/auth/logout', async (_, reply) => {

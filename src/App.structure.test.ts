@@ -883,6 +883,15 @@ describe('selection screen structure', () => {
     expect(css).toContain('width: 100%')
   })
 
+  it('wires TapTap channel login without removing web auth controls', () => {
+    expect(app).toContain("import.meta.env.VITE_CHANNEL === 'taptap'")
+    expect(app).toContain('globalWithTap.tap')
+    expect(app).toContain('tap.login')
+    expect(app).toContain("api('/auth/taptap'")
+    expect(app).toContain('TapTap 登录')
+    expect(app).toContain('JSON.stringify({ account, password })')
+  })
+
   it('wires default-on background music through the logged-in shell', () => {
     expect(app).toContain("backgroundMusicSrc = '/assets/audio/the-final-inventory.mp3'")
     expect(app).toContain("musicPreferenceKey = 'dogfight:background-music'")

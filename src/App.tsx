@@ -123,6 +123,7 @@ type PendingShopAction = 'buy' | 'reroll' | null
 const BOOM_COUNTER_TRIGGER_THRESHOLD = 50
 const FREEZE_STACK_TRIGGER_THRESHOLD = 10
 const HANDDRAWN_FONT_STACK = '"Comic Sans MS", "Microsoft YaHei", "KaiTi", "Kaiti SC", "DFKai-SB", cursive, sans-serif'
+const isTapTapChannel = import.meta.env.VITE_CHANNEL === 'taptap'
 
 type ItemDef = {
   id: string
@@ -371,6 +372,14 @@ type SeasonPlayerSummary = {
 }
 type PlayerRunHistoryResponse = { history: PlayerRunHistory; seasonSummaries: SeasonPlayerSummary[] }
 type AuthUser = { id: string; account: string; nickname: string | null }
+type TapTapCallbackResult = { code?: string; errMsg?: string }
+type TapTapApi = {
+  checkSession?: (options: { success?: () => void; fail?: (error: TapTapCallbackResult) => void; complete?: () => void }) => void | Promise<void>
+  login: (options: { timeout?: number; success?: (result: TapTapCallbackResult) => void; fail?: (error: TapTapCallbackResult) => void; complete?: () => void }) => void
+}
+declare global {
+  var tap: TapTapApi | undefined
+}
 type AccountWallet = { balance: number; dailyEarned: number; dailyKey: string }
 type CosmeticType = 'TITLE' | 'AVATAR' | 'BACKGROUND' | 'DOG_SKIN' | 'BATTLE_EFFECT'
 type CosmeticRarity = 'COMMON' | 'RARE' | 'EPIC' | 'LEGENDARY'
@@ -1031,6 +1040,31 @@ async function api<T>(url: string, options: RequestInit = {}): Promise<T> {
   const data = await res.json().catch(() => ({}))
   if (!res.ok) throw new Error(data.error || data.message || '请求失败')
   return data
+}
+
+function currentTapTapApi() {
+  const globalWithTap = globalThis as typeof globalThis & { tap?: TapTapApi }
+  return globalWithTap.tap
+}
+
+function requestTapTapLoginCode(tap: TapTapApi) {
+  tap.checkSession?.({
+    success: () => undefined,
+    fail: () => undefined,
+  })
+  return new Promise<string>((resolve, reject) => {
+    tap.login({
+      timeout: 10_000,
+      success: (result) => {
+        if (result.code) {
+          resolve(result.code)
+          return
+        }
+        reject(new Error(result.errMsg || 'TapTap 登录失败，请重试'))
+      },
+      fail: (error) => reject(new Error(error.errMsg || 'TapTap 登录失败，请重试')),
+    })
+  })
 }
 
 function itemTone(def: ItemDef) {
@@ -1770,6 +1804,19 @@ export default function App() {
     }
   }
 
+  const tapTapLoginAvailable = isTapTapChannel && Boolean(currentTapTapApi()?.login)
+  const loginWithTapTap = () => {
+    const tap = currentTapTapApi()
+    if (!tap) {
+      setError('当前环境未检测到 TapTap 登录能力')
+      return
+    }
+    void action(async () => {
+      const code = await requestTapTapLoginCode(tap)
+      return api('/auth/taptap', { method: 'POST', body: JSON.stringify({ code }) })
+    }, { failure: 'action-failed', failureLabel: 'TapTap 登录失败，请重试' })
+  }
+
   const rerollShop = async () => {
     if (!run || pendingShopAction) return
     const previousRun = run
@@ -2092,6 +2139,12 @@ export default function App() {
             </div>
           </div>
           <LanguageSelector />
+          {tapTapLoginAvailable && (
+            <ActionButton onClick={loginWithTapTap}>TapTap 登录</ActionButton>
+          )}
+          {isTapTapChannel && !tapTapLoginAvailable && (
+            <p className="error">当前环境未检测到 TapTap 登录能力，可继续使用调试账号登录。</p>
+          )}
           <label>账号<input value={account} autoCapitalize="none" onChange={(e) => setAccount(e.target.value)} /></label>
           <label>密码<input type="password" value={password} onChange={(e) => setPassword(e.target.value)} /></label>
           {error && <p className="error">{localizeServerError(error, language)}</p>}
