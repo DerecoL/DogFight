@@ -187,6 +187,19 @@ describe('selection screen structure', () => {
     expect(lobbyBranch).not.toContain('<Shell feedbacks={uiFeedbacks} run={run ?? undefined}')
   })
 
+  it('keeps active run stats out of non-game account and mode entry pages', () => {
+    const branchNames = ['SHOP', 'ACHIEVEMENTS', 'SETTINGS', 'LADDER', 'DOGFIGHT', 'PEAK']
+
+    for (const branchName of branchNames) {
+      const branchStart = app.indexOf(`if (appScreen === '${branchName}'`)
+      const branchEnd = app.indexOf('\n  if (', branchStart + 1)
+      const branch = app.slice(branchStart, branchEnd === -1 ? undefined : branchEnd)
+
+      expect(branch, branchName).toContain('<Shell feedbacks={uiFeedbacks}')
+      expect(branch, branchName).not.toContain('run={run ?? undefined}')
+    }
+  })
+
   it('unlocks ladder mode with profile, leaderboard, and settlement formula hooks', () => {
     expect(app).toContain('function LadderHome')
     expect(app).toContain("api<LadderMeResponse>('/ladder/me')")

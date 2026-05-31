@@ -2179,7 +2179,7 @@ export default function App() {
 
   if (appScreen === 'SHOP') {
     return (
-      <Shell feedbacks={uiFeedbacks} cosmetics={equippedCosmetics} user={user} run={run ?? undefined} error={error} musicEnabled={musicEnabled} musicBlocked={musicBlocked} onToggleMusic={toggleMusic} onOpenLobby={() => setAppScreen('LOBBY')} onLogout={() => action(() => api('/auth/logout', { method: 'POST' }).then(() => ({ user: null })))}>
+      <Shell feedbacks={uiFeedbacks} cosmetics={equippedCosmetics} user={user} error={error} musicEnabled={musicEnabled} musicBlocked={musicBlocked} onToggleMusic={toggleMusic} onOpenLobby={() => setAppScreen('LOBBY')} onLogout={() => action(() => api('/auth/logout', { method: 'POST' }).then(() => ({ user: null })))}>
         <AccountShopScreen onCosmeticsChange={loadCosmetics} />
       </Shell>
     )
@@ -2187,7 +2187,7 @@ export default function App() {
 
   if (appScreen === 'ACHIEVEMENTS') {
     return (
-      <Shell feedbacks={uiFeedbacks} cosmetics={equippedCosmetics} user={user} run={run ?? undefined} error={error} musicEnabled={musicEnabled} musicBlocked={musicBlocked} onToggleMusic={toggleMusic} onOpenLobby={() => setAppScreen('LOBBY')} onLogout={() => action(() => api('/auth/logout', { method: 'POST' }).then(() => ({ user: null })))}>
+      <Shell feedbacks={uiFeedbacks} cosmetics={equippedCosmetics} user={user} error={error} musicEnabled={musicEnabled} musicBlocked={musicBlocked} onToggleMusic={toggleMusic} onOpenLobby={() => setAppScreen('LOBBY')} onLogout={() => action(() => api('/auth/logout', { method: 'POST' }).then(() => ({ user: null })))}>
         <AchievementsScreen />
       </Shell>
     )
@@ -2195,7 +2195,7 @@ export default function App() {
 
   if (appScreen === 'SETTINGS') {
     return (
-      <Shell feedbacks={uiFeedbacks} cosmetics={equippedCosmetics} user={user} run={run ?? undefined} error={error} musicEnabled={musicEnabled} musicBlocked={musicBlocked} onToggleMusic={toggleMusic} onOpenLobby={() => setAppScreen('LOBBY')} onLogout={() => action(() => api('/auth/logout', { method: 'POST' }).then(() => ({ user: null })))}>
+      <Shell feedbacks={uiFeedbacks} cosmetics={equippedCosmetics} user={user} error={error} musicEnabled={musicEnabled} musicBlocked={musicBlocked} onToggleMusic={toggleMusic} onOpenLobby={() => setAppScreen('LOBBY')} onLogout={() => action(() => api('/auth/logout', { method: 'POST' }).then(() => ({ user: null })))}>
         <AccountSettingsScreen onCosmeticsChange={loadCosmetics} />
       </Shell>
     )
@@ -2203,7 +2203,7 @@ export default function App() {
 
   if (appScreen === 'LADDER' && run?.mode !== 'LADDER') {
     return (
-      <Shell feedbacks={uiFeedbacks} cosmetics={equippedCosmetics} user={user} run={run ?? undefined} error={error} musicEnabled={musicEnabled} musicBlocked={musicBlocked} onToggleMusic={toggleMusic} onOpenLobby={() => setAppScreen('LOBBY')} onLogout={() => action(() => api('/auth/logout', { method: 'POST' }).then(() => ({ user: null })))}>
+      <Shell feedbacks={uiFeedbacks} cosmetics={equippedCosmetics} user={user} error={error} musicEnabled={musicEnabled} musicBlocked={musicBlocked} onToggleMusic={toggleMusic} onOpenLobby={() => setAppScreen('LOBBY')} onLogout={() => action(() => api('/auth/logout', { method: 'POST' }).then(() => ({ user: null })))}>
         <LadderHome onStart={(choice) => action(() => api('/runs', { method: 'POST', body: JSON.stringify({ ...choice, mode: 'LADDER' }) }))} />
         {tutorialGuide}
       </Shell>
@@ -2212,7 +2212,7 @@ export default function App() {
 
   if (appScreen === 'DOGFIGHT') {
     return (
-      <Shell feedbacks={uiFeedbacks} cosmetics={equippedCosmetics} user={user} run={run ?? undefined} error={error} musicEnabled={musicEnabled} musicBlocked={musicBlocked} onToggleMusic={toggleMusic} onOpenLobby={() => setAppScreen('LOBBY')} onLogout={() => action(() => api('/auth/logout', { method: 'POST' }).then(() => ({ user: null })))}>
+      <Shell feedbacks={uiFeedbacks} cosmetics={equippedCosmetics} user={user} error={error} musicEnabled={musicEnabled} musicBlocked={musicBlocked} onToggleMusic={toggleMusic} onOpenLobby={() => setAppScreen('LOBBY')} onLogout={() => action(() => api('/auth/logout', { method: 'POST' }).then(() => ({ user: null })))}>
         <DogfightLobby soundEnabled={musicEnabled} />
         {tutorialGuide}
       </Shell>
@@ -2221,7 +2221,7 @@ export default function App() {
 
   if (appScreen === 'PEAK') {
     return (
-      <Shell feedbacks={uiFeedbacks} cosmetics={equippedCosmetics} user={user} run={run ?? undefined} error={error} musicEnabled={musicEnabled} musicBlocked={musicBlocked} onToggleMusic={toggleMusic} onOpenLobby={() => setAppScreen('LOBBY')} onLogout={() => action(() => api('/auth/logout', { method: 'POST' }).then(() => ({ user: null })))}>
+      <Shell feedbacks={uiFeedbacks} cosmetics={equippedCosmetics} user={user} error={error} musicEnabled={musicEnabled} musicBlocked={musicBlocked} onToggleMusic={toggleMusic} onOpenLobby={() => setAppScreen('LOBBY')} onLogout={() => action(() => api('/auth/logout', { method: 'POST' }).then(() => ({ user: null })))}>
         <ApexArena />
         {tutorialGuide}
       </Shell>
