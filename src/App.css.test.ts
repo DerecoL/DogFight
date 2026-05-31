@@ -73,10 +73,10 @@ describe('exploration map route board', () => {
     expect(cssRule('.exploration-map-overlay')).toContain('padding: 8px')
     expect(cssRule('.exploration-map-shell')).toContain('width: min(1680px, calc(100vw - 16px))')
     expect(cssRule('.exploration-map-shell')).toContain('height: calc(100vh - 16px)')
-    expect(cssRule('.exploration-map-route-board')).toContain('grid-template-columns: minmax(0, 1fr) clamp(220px, 20vw, 300px)')
+    expect(cssRule('.exploration-map-route-board')).toContain('grid-template-columns: minmax(0, 1fr) clamp(260px, 22vw, 340px)')
     expect(cssRule('.map-route-path')).toContain('stroke-width: 1.25')
-    expect(cssRule('.map-route-path.available')).toContain('stroke-width: 2.2')
-    expect(cssRule('.map-route-path.completed')).toContain('stroke-width: 1.95')
+    expect(cssRule('.map-route-path.available')).toContain('stroke-width: 2.65')
+    expect(cssRule('.map-route-path.completed')).toContain('stroke-width: 2.25')
     expect(app).toContain('mapNodeDisplayLaneOffset')
     expect(app).toContain('lane + mapNodeDisplayLaneOffset(node)')
   })
@@ -84,6 +84,57 @@ describe('exploration map route board', () => {
   it('keeps the mobile exploration detail panel visible below the route canvas', () => {
     expect(css).toContain('grid-template-rows: minmax(900px, auto) minmax(230px, auto)')
     expect(css).toContain('min-height: 230px')
+  })
+
+  it('presents the map as a paper board with a title placard, layer markers, and preview rail', () => {
+    expect(app).toContain('mapLayerMarkers')
+    expect(app).toContain('map-title-placard')
+    expect(css).toContain('.map-layer-marker')
+    expect(cssRule('.exploration-map-shell')).toContain('var(--paper-fiber)')
+    expect(cssRule('.map-title-placard')).toContain('clip-path')
+    expect(cssRule('.map-route-canvas::after')).toContain('map-sketch')
+    expect(cssRule('.map-node-detail-panel')).toContain('border-left')
+  })
+
+  it('sizes sticker nodes for readable icons while keeping locked nodes visible', () => {
+    expect(cssRule('.map-node.compact-route-node')).toContain('width: 76px')
+    expect(cssRule('.map-node.compact-route-node')).toContain('min-height: 82px')
+    expect(cssRule('.map-node-sticker')).toContain('width: 48px')
+    expect(cssRule('.map-node.compact-route-node.available .map-node-sticker, .map-node.compact-route-node.current .map-node-sticker')).toContain('width: 58px')
+    expect(cssRule('.map-node.locked')).toContain('opacity: .62')
+  })
+
+  it('separates route states into selectable, completed, inspected, and locked colors', () => {
+    expect(app).toContain('inspectedRouteNodeIds')
+    expect(cssRule('.map-route-path.available')).toContain('#e6a11a')
+    expect(cssRule('.map-route-path.completed')).toContain('#5e9f55')
+    expect(cssRule('.map-route-path.inspected')).toContain('#3f7fd5')
+    expect(cssRule('.map-route-path')).toContain('stroke-dasharray')
+  })
+
+  it('uses the side panel as the only node entry confirmation surface', () => {
+    expect(app).toContain('onInspect(node.id)')
+    expect(app).not.toContain('available ? onSelect(node.id) : onInspect(node.id)')
+    expect(app).toContain('className="map-enter-action"')
+    expect(app).toContain('onSelect={enterMapNode}')
+  })
+
+  it('shows monster possible rewards as inspectable equipment links', () => {
+    expect(app).toContain('MapRewardPreviewLinks')
+    expect(app).toContain('onInspectReward')
+    expect(app).toContain('map-reward-preview-link')
+    expect(app).toContain('previewMapRewardAsOffer')
+    expect(css).toContain('.map-reward-preview-link')
+  })
+
+  it('adds a drawable planning layer with view, brush, eraser, and clear tools', () => {
+    expect(app).toContain("type MapDrawingTool = 'inspect' | 'brush' | 'eraser'")
+    expect(app).toContain('map-drawing-toolbar')
+    expect(app).toContain('map-route-draft-svg')
+    expect(app).toContain('handleDraftPointerDown')
+    expect(app).toContain('eraseDraftStrokesNearPoint')
+    expect(app).toContain('setDraftStrokes([])')
+    expect(cssRule('.map-route-draft-surface')).toContain('touch-action: none')
   })
 })
 

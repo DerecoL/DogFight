@@ -18,9 +18,11 @@ import {
   ArrowRight,
   Backpack,
   BadgeDollarSign,
+  Brush,
   Coins,
   Crown,
   Dice5,
+  Eraser,
   Eye,
   EyeOff,
   Flag,
@@ -40,6 +42,7 @@ import {
   ShoppingBag,
   Sparkles,
   Swords,
+  Trash2,
   Trophy,
   VolumeX,
 } from 'lucide-react'
@@ -185,6 +188,9 @@ type ExplorationMapState = {
   nodes: ExplorationMapNode[]
   pendingReward?: ExplorationPendingReward | null
 }
+type MapDrawingTool = 'inspect' | 'brush' | 'eraser'
+type MapDraftPoint = { x: number; y: number }
+type MapDraftStroke = { id: string; points: MapDraftPoint[] }
 type BattleActor = 'player' | 'opponent' | 'system'
 type BattleTarget = 'player' | 'opponent' | 'both' | 'none'
 type BattleSnapshot = { name: string; dogType: DogType; luckyNumber?: number | null; wins: number; losses: number; round: number; items: Item[]; relics?: Relic[] }
@@ -4356,6 +4362,13 @@ function ExplorationMapView({
 }) {
   const map = run.mapState
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
+  const [drawingTool, setDrawingTool] = useState<MapDrawingTool>('inspect')
+  const [draftStrokes, setDraftStrokes] = useState<MapDraftStroke[]>([])
+  const [activeDraftStroke, setActiveDraftStroke] = useState<MapDraftStroke | null>(null)
+  const [previewRewardOffer, setPreviewRewardOffer] = useState<ShopOffer | null>(null)
+  const [mapRewardTipAnchor, setMapRewardTipAnchor] = useState<TipAnchor | null>(null)
+  const activeDraftStrokeRef = useRef<MapDraftStroke | null>(null)
+  const activeDraftPointerRef = useRef<number | null>(null)
   if (!map) return null
   const completed = new Set(map.completedNodeIds)
   const available = new Set(map.availableNodeIds)
@@ -4370,14 +4383,79 @@ function ExplorationMapView({
     ? map.nodes.find((node) => node.id === selectedNodeId) ?? currentNode
     : currentNode ?? map.nodes.find((node) => available.has(node.id)) ?? map.nodes[0] ?? null
   const orientation: 'horizontal' | 'vertical' = typeof window !== 'undefined' && window.matchMedia('(max-width: 760px)').matches ? 'vertical' : 'horizontal'
+  const mapLayerMarkers = Array.from({ length: mapLayerCount }, (_, index) => index)
+  const inspectedRouteNodeIds = new Set<string>()
+  if (highlightedNode) {
+    inspectedRouteNodeIds.add(highlightedNode.id)
+    highlightedNode.nextNodeIds.forEach((id) => inspectedRouteNodeIds.add(id))
+    map.nodes.filter((node) => node.nextNodeIds.includes(highlightedNode.id)).forEach((node) => inspectedRouteNodeIds.add(node.id))
+  }
+  const setActiveDraft = (stroke: MapDraftStroke | null) => {
+    activeDraftStrokeRef.current = stroke
+    setActiveDraftStroke(stroke)
+  }
+  const clearMapRewardTip = () => {
+    setPreviewRewardOffer(null)
+    setMapRewardTipAnchor(null)
+  }
+  const enterMapNode = (nodeId: string) => {
+    setDraftStrokes([])
+    setActiveDraft(null)
+    clearMapRewardTip()
+    onSelectNode(nodeId)
+  }
+  const inspectMapReward = (reward: { defId: string; quality: ItemQuality }, element: HTMLElement) => {
+    setPreviewRewardOffer(previewMapRewardAsOffer(reward))
+    setMapRewardTipAnchor(getFloatingTipPosition(element))
+  }
+  const handleDraftPointerDown = (event: ReactPointerEvent<SVGSVGElement>) => {
+    if (drawingTool === 'inspect') return
+    event.preventDefault()
+    event.stopPropagation()
+    event.currentTarget.setPointerCapture(event.pointerId)
+    const point = mapDraftPointFromPointer(event)
+    activeDraftPointerRef.current = event.pointerId
+    if (drawingTool === 'eraser') {
+      setDraftStrokes((strokes) => eraseDraftStrokesNearPoint(strokes, point))
+      return
+    }
+    setActiveDraft({ id: `draft-${Date.now()}-${event.pointerId}`, points: [point] })
+  }
+  const handleDraftPointerMove = (event: ReactPointerEvent<SVGSVGElement>) => {
+    if (drawingTool === 'inspect' || activeDraftPointerRef.current !== event.pointerId) return
+    event.preventDefault()
+    event.stopPropagation()
+    const point = mapDraftPointFromPointer(event)
+    if (drawingTool === 'eraser') {
+      setDraftStrokes((strokes) => eraseDraftStrokesNearPoint(strokes, point))
+      return
+    }
+    const current = activeDraftStrokeRef.current
+    if (!current) return
+    const previous = current.points.at(-1)
+    if (previous && Math.hypot(previous.x - point.x, previous.y - point.y) < 0.45) return
+    setActiveDraft({ ...current, points: [...current.points, point] })
+  }
+  const finishDraftStroke = (event: ReactPointerEvent<SVGSVGElement>) => {
+    if (activeDraftPointerRef.current !== event.pointerId) return
+    event.preventDefault()
+    event.stopPropagation()
+    const current = activeDraftStrokeRef.current
+    if (current && current.points.length > 1) setDraftStrokes((strokes) => [...strokes, current])
+    setActiveDraft(null)
+    activeDraftPointerRef.current = null
+  }
   return (
     <section className="exploration-map-screen">
       <div className="exploration-map-overlay">
         <div className="exploration-map-shell">
           <div className="exploration-map-topbar">
-            <div>
+            <div className="map-title-placard">
+              <PawPrint size={28} />
+              <div>
               <h2>探索地图</h2>
               <p>第 {map.mapIndex + 1} 张地图 · 第 {Math.min(mapLayerCount, currentLayer + 1)} / {mapLayerCount} 层</p>
+              </div>
             </div>
             <div className="map-run-stats">
               <ResourcePill icon={<Trophy size={16} />} label="胜场" value={`${run.wins}/12`} tone="gold" />
@@ -4388,6 +4466,11 @@ function ExplorationMapView({
 
           <div className="exploration-map-route-board">
             <div className="map-route-canvas" data-orientation={orientation}>
+              <div className="map-layer-marker-row" aria-hidden="true">
+                {mapLayerMarkers.map((layer) => (
+                  <span key={layer} className="map-layer-marker" style={{ '--marker-x': mapLayerMarkerPosition(layer, mapLayerCount) } as React.CSSProperties}>{layer + 1}</span>
+                ))}
+              </div>
               <svg className="map-route-layer map-route-svg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
                 {map.nodes.flatMap((node) => node.nextNodeIds.map((nextId) => {
                   const next = map.nodes.find((entry) => entry.id === nextId)
@@ -4396,10 +4479,11 @@ function ExplorationMapView({
                   const end = mapNodePosition(next, orientation, mapLayerCount)
                   const active = completed.has(node.id) && available.has(next.id)
                   const done = completed.has(node.id) && completed.has(next.id)
+                  const inspected = inspectedRouteNodeIds.has(node.id) && inspectedRouteNodeIds.has(next.id)
                   return (
                     <path
                       key={`${node.id}:${next.id}`}
-                      className={`map-route-path ${active ? 'available' : ''} ${done ? 'completed' : ''}`}
+                      className={`map-route-path ${active ? 'available' : ''} ${done ? 'completed' : ''} ${inspected ? 'inspected' : ''}`}
                       d={routePathData(start, end, orientation)}
                     />
                   )
@@ -4415,9 +4499,29 @@ function ExplorationMapView({
                   selected={highlightedNode?.id === node.id}
                   orientation={orientation}
                   onInspect={setSelectedNodeId}
-                  onSelect={onSelectNode}
                 />
               ))}
+              <svg
+                className={`map-route-layer map-route-draft-svg map-route-draft-surface tool-${drawingTool}`}
+                viewBox="0 0 100 100"
+                preserveAspectRatio="none"
+                aria-label="手绘预期路线"
+                onPointerDown={handleDraftPointerDown}
+                onPointerMove={handleDraftPointerMove}
+                onPointerUp={finishDraftStroke}
+                onPointerCancel={finishDraftStroke}
+              >
+                {draftStrokes.map((stroke) => (
+                  <path key={stroke.id} className="map-route-draft-stroke" d={draftStrokePath(stroke.points)} />
+                ))}
+                {activeDraftStroke && <path className="map-route-draft-stroke active" d={draftStrokePath(activeDraftStroke.points)} />}
+              </svg>
+              <div className="map-drawing-toolbar" role="toolbar" aria-label="路线草稿工具">
+                <button type="button" className={drawingTool === 'inspect' ? 'active' : ''} title="查看节点" aria-label="查看节点" onClick={() => setDrawingTool('inspect')}><Eye size={18} /></button>
+                <button type="button" className={drawingTool === 'brush' ? 'active' : ''} title="画笔" aria-label="画笔" onClick={() => setDrawingTool('brush')}><Brush size={18} /></button>
+                <button type="button" className={drawingTool === 'eraser' ? 'active' : ''} title="橡皮" aria-label="橡皮" onClick={() => setDrawingTool('eraser')}><Eraser size={18} /></button>
+                <button type="button" title="清空草稿" aria-label="清空草稿" disabled={draftStrokes.length === 0 && !activeDraftStroke} onClick={() => { setDraftStrokes([]); setActiveDraft(null) }}><Trash2 size={18} /></button>
+              </div>
             </div>
 
             <aside className="map-node-detail-panel">
@@ -4453,7 +4557,8 @@ function ExplorationMapView({
                   available={available.has(highlightedNode.id)}
                   current={map.currentNodeId === highlightedNode.id}
                   completed={completed.has(highlightedNode.id)}
-                  onSelect={onSelectNode}
+                  onSelect={enterMapNode}
+                  onInspectReward={inspectMapReward}
                 />
               )}
             </aside>
@@ -4471,6 +4576,7 @@ function ExplorationMapView({
               <FloatingTip run={run} item={selectedItem} offer={null} anchor={tipAnchor} onClose={onCloseTip} onBuy={null} onSell={null} onUpgrade={onUpgrade} />
             </HanddrawnFrame>
           )}
+          <FloatingTip run={run} item={null} offer={previewRewardOffer} anchor={mapRewardTipAnchor} onClose={clearMapRewardTip} onBuy={null} onSell={null} onUpgrade={null} />
         </div>
       </div>
     </section>
@@ -4488,6 +4594,11 @@ function mapNodePosition(node: Pick<ExplorationMapNode, 'layer' | 'column' | 'x'
   return { x: progress * 100, y: Math.max(8, Math.min(92, staggeredLane * 100)) }
 }
 
+function mapLayerMarkerPosition(layer: number, layerCount: number) {
+  const layerDivisor = Math.max(1, layerCount - 1)
+  return `${(0.06 + layer * (0.88 / layerDivisor)) * 100}%`
+}
+
 function mapNodeDisplayLaneOffset(node: Pick<ExplorationMapNode, 'layer' | 'column'>) {
   const layerWave = node.layer % 2 === 0 ? -0.045 : 0.045
   const columnNudge = node.column % 2 === 0 ? -0.018 : 0.018
@@ -4503,7 +4614,32 @@ function routePathData(start: { x: number; y: number }, end: { x: number; y: num
   return `M ${start.x.toFixed(2)} ${start.y.toFixed(2)} C ${middleX.toFixed(2)} ${start.y.toFixed(2)}, ${middleX.toFixed(2)} ${end.y.toFixed(2)}, ${end.x.toFixed(2)} ${end.y.toFixed(2)}`
 }
 
-function MapNodeButton({ node, completed, available, current, selected, orientation, onInspect, onSelect }: { node: ExplorationMapNode; completed: boolean; available: boolean; current: boolean; selected: boolean; orientation: 'horizontal' | 'vertical'; onInspect: (nodeId: string) => void; onSelect: (nodeId: string) => void }) {
+function mapDraftPointFromPointer(event: ReactPointerEvent<SVGSVGElement>): MapDraftPoint {
+  const rect = event.currentTarget.getBoundingClientRect()
+  return {
+    x: Math.max(0, Math.min(100, ((event.clientX - rect.left) / Math.max(1, rect.width)) * 100)),
+    y: Math.max(0, Math.min(100, ((event.clientY - rect.top) / Math.max(1, rect.height)) * 100)),
+  }
+}
+
+function draftStrokePath(points: MapDraftPoint[]) {
+  if (points.length === 0) return ''
+  if (points.length === 1) return `M ${points[0].x.toFixed(2)} ${points[0].y.toFixed(2)}`
+  return points.map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x.toFixed(2)} ${point.y.toFixed(2)}`).join(' ')
+}
+
+function eraseDraftStrokesNearPoint(strokes: MapDraftStroke[], point: MapDraftPoint) {
+  const eraseRadius = 4.2
+  return strokes.filter((stroke) => !stroke.points.some((entry) => Math.hypot(entry.x - point.x, entry.y - point.y) <= eraseRadius))
+}
+
+function previewMapRewardAsOffer(reward: { defId: string; quality: ItemQuality }): ShopOffer | null {
+  const def = itemDefById(reward.defId)
+  if (!def) return null
+  return { offerId: `map-preview-${reward.defId}-${reward.quality}`, defId: reward.defId, quality: reward.quality, price: -1, discount: 1, def }
+}
+
+function MapNodeButton({ node, completed, available, current, selected, orientation, onInspect }: { node: ExplorationMapNode; completed: boolean; available: boolean; current: boolean; selected: boolean; orientation: 'horizontal' | 'vertical'; onInspect: (nodeId: string) => void }) {
   const position = mapNodePosition(node, orientation)
   const locked = !available && !completed && !current
   return (
@@ -4513,7 +4649,7 @@ function MapNodeButton({ node, completed, available, current, selected, orientat
       aria-disabled={!available}
       onMouseEnter={() => onInspect(node.id)}
       onFocus={() => onInspect(node.id)}
-      onClick={() => available ? onSelect(node.id) : onInspect(node.id)}
+      onClick={() => onInspect(node.id)}
       aria-label={mapNodeTitle(node)}
     >
       <MapNodeSticker kind={node.kind} />
@@ -4522,7 +4658,7 @@ function MapNodeButton({ node, completed, available, current, selected, orientat
   )
 }
 
-function MapNodeDetail({ node, available, current, completed, onSelect }: { node: ExplorationMapNode; available: boolean; current: boolean; completed: boolean; onSelect: (nodeId: string) => void }) {
+function MapNodeDetail({ node, available, current, completed, onSelect, onInspectReward }: { node: ExplorationMapNode; available: boolean; current: boolean; completed: boolean; onSelect: (nodeId: string) => void; onInspectReward: (reward: { defId: string; quality: ItemQuality }, element: HTMLElement) => void }) {
   return (
     <div className={`map-side-card map-node-detail ${available ? 'available' : ''} ${current ? 'current' : ''} ${completed ? 'completed' : ''}`}>
       <MapNodeSticker kind={node.kind} size="lg" />
@@ -4531,10 +4667,39 @@ function MapNodeDetail({ node, available, current, completed, onSelect }: { node
         <h3>{mapNodeTitle(node)}</h3>
         <p>{mapNodePreview(node)}</p>
       </div>
-      {available && <ActionButton onClick={() => onSelect(node.id)}>前往节点</ActionButton>}
+      {node.kind === 'MONSTER_BATTLE' && <MapRewardPreviewLinks node={node} onInspectReward={onInspectReward} />}
+      {available && <ActionButton className="map-enter-action" onClick={() => onSelect(node.id)}>前往</ActionButton>}
       {current && <strong className="map-node-state-copy">当前处理中</strong>}
       {completed && <strong className="map-node-state-copy">已完成</strong>}
       {!available && !current && !completed && <strong className="map-node-state-copy muted">路线未解锁</strong>}
+    </div>
+  )
+}
+
+function MapRewardPreviewLinks({ node, onInspectReward }: { node: ExplorationMapNode; onInspectReward: (reward: { defId: string; quality: ItemQuality }, element: HTMLElement) => void }) {
+  const rewards = node.monster?.possibleRewards.slice(0, 3) ?? []
+  if (rewards.length === 0) return <p className="map-node-state-copy muted">预期掉落：暂无明确装备</p>
+  return (
+    <div className="map-reward-preview-links" aria-label="预期掉落">
+      <span className="map-node-detail-kicker">预期掉落</span>
+      <div>
+        {rewards.map((reward) => {
+          const def = itemDefById(reward.defId)
+          return (
+            <button
+              key={`${reward.defId}-${reward.quality}`}
+              type="button"
+              className="map-reward-preview-link"
+              onClick={(event) => {
+                event.stopPropagation()
+                onInspectReward(reward, event.currentTarget)
+              }}
+            >
+              {def?.name ?? reward.defId}<small>{qualityLabel[normalizeQuality(reward.quality)]}</small>
+            </button>
+          )
+        })}
+      </div>
     </div>
   )
 }
@@ -5265,7 +5430,7 @@ function FloatingTip({ run, item, offer, anchor, descriptionOverride, relicsOver
   if (!def || !anchor) return null
   const isOffer = Boolean(offer)
   const quality = normalizeQuality(item?.quality ?? offer?.quality)
-  const canAfford = !offer || run.gold >= offer.price
+  const canAfford = !offer || offer.price < 0 || run.gold >= offer.price
   const sellValue = item ? sellValueForItem(item) : null
   const style = anchor ? { '--tip-x': `${anchor.x}px`, '--tip-y': `${anchor.y}px` } as React.CSSProperties : undefined
   const tipTriggerDice = triggerDiceLabel(item ? itemTriggerDisplay(item) : def, item ? (relicsOverride ?? run.relics) : [])
@@ -5309,7 +5474,7 @@ function FloatingTip({ run, item, offer, anchor, descriptionOverride, relicsOver
       )}
       <p className="tip-description"><RuleText text={descriptionText} /></p>
       {item?.enchant && <p className="tip-description enchant-tip"><Sparkles size={16} /> <RuleText text={enchantmentText(item.enchant)} /></p>}
-      {isOffer && (
+      {isOffer && offer && offer.price >= 0 && (
         <div className="tip-price">
           <Coins size={16} />
           <span>价格 {offer?.price}{offer && offer.discount < 1 ? ` · ${Math.round(offer.discount * 10)}折` : ''}</span>
