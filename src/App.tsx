@@ -1257,6 +1257,12 @@ function effectText(def: ItemDef, quality: ItemQuality = 'BRONZE') {
 }
 
 function growthDamageTextForBattleItem(item: Item, owner: 'player' | 'opponent', events: BattleEvent[], displayIndex: number) {
+  const damage = growthDamageValueForBattleItem(item, owner, events, displayIndex)
+  if (damage == null) return null
+  return `当前伤害 ${damage}；每次成功触发后，本局内后续伤害继续提升。`
+}
+
+function growthDamageValueForBattleItem(item: Item, owner: 'player' | 'opponent', events: BattleEvent[], displayIndex: number) {
   if (item.def.advancedEffect !== 'GROWTH_DAMAGE') return null
   const baseDamage = qualityAmountFrom(item.def.effect.amount, item.quality, item.def.effect.qualityBase)
   const growth = events.slice(0, displayIndex + 1).reduce((total, event) => {
@@ -1271,7 +1277,15 @@ function growthDamageTextForBattleItem(item: Item, owner: 'player' | 'opponent',
     }
     return total
   }, 0)
-  return `当前伤害 ${baseDamage + growth}；每次成功触发后，本局内后续伤害继续提升。`
+  return baseDamage + growth
+}
+
+function battleCardAdaptiveFontSize(text: string, base: number, min: number) {
+  const length = [...text].length
+  if (length <= 6) return base
+  if (length <= 10) return Math.max(min, base - 1)
+  if (length <= 14) return Math.max(min, base - 2)
+  return min
 }
 
 function boomCounterStateForBattleItem(item: Item, owner: 'player' | 'opponent', events: BattleEvent[], displayIndex: number, activeEvent?: BattleEvent) {
@@ -5601,11 +5615,11 @@ function BattleEquipmentRow({ owner, snapshot, events, displayIndex, activeEvent
         {Array.from({ length: slots }).map((_, x) => <i key={x} className="battle-slot" style={{ gridColumn: x + 1, gridRow: 1 }} />)}
         {items.map((item) => {
           const growthText = growthDamageTextForBattleItem(item, owner, events, displayIndex)
+          const growthNumber = growthDamageValueForBattleItem(item, owner, events, displayIndex)
           const boomCounterState = boomCounterStateForBattleItem(item, owner, events, displayIndex, activeEvent)
           const freezeStackState = freezeStackStateForBattleItem(item, owner, events, displayIndex, activeEvent)
           const reservoirState = reservoirStateForBattleItem(activeEvent, owner, item.id)
           const triggerDice = triggerDiceLabel(itemTriggerDisplay(item), snapshot.relics ?? [])
-          const extraTriggerDice = extraTriggerDiceLabel(itemTriggerDisplay(item), snapshot.relics ?? [])
           const triggerCountLabel = itemTriggerCountLabel(events, owner, item.id, displayIndex)
           const triggerCountPopping = activeItemId === item.id
           const localizedDef = localizeItemDef(item.def, language)
@@ -5613,7 +5627,9 @@ function BattleEquipmentRow({ owner, snapshot, events, displayIndex, activeEvent
           const itemEffect = language === 'en-US' ? localizedDef.description : (growthText ?? effectText(item.def, normalizeQuality(item.quality)))
           const slotLabel = language === 'en-US' ? `${item.def.size} slots` : `占${item.def.size}格`
           const diceLabel = triggerDice ?? (language === 'en-US' ? 'No dice' : '无点数')
+          const enchantText = item.enchant ? enchantmentText(item.enchant) : null
           const fullEnchantText = item.enchant ? ` · ${enchantmentText(item.enchant)}` : ""
+          const infoTextForScale = `${diceLabel}${enchantText ?? ''}${growthNumber ?? ''}`
           return (
           <ItemFrame
             as="button"
@@ -5625,8 +5641,10 @@ function BattleEquipmentRow({ owner, snapshot, events, displayIndex, activeEvent
             style={{
               gridColumn: `${item.x + 1} / span ${item.def.width}`,
               gridRow: 1,
-            }}
-            title={`${qualityText} ${localizedDef.name} · ${itemEffect}${fullEnchantText}`}
+              '--battle-name-size': `${battleCardAdaptiveFontSize(localizedDef.name, 13, 9)}px`,
+              '--battle-info-size': `${battleCardAdaptiveFontSize(infoTextForScale, 11, 8)}px`,
+            } as React.CSSProperties}
+            title={`${qualityText} ${localizedDef.name} · ${slotLabel} · ${language === 'en-US' ? 'Dice' : '点数'} ${diceLabel} · ${itemEffect}${fullEnchantText}`}
             onClick={(event) => onInspect(item, event.currentTarget)}
           >
             {reservoirState && (
@@ -5636,19 +5654,14 @@ function BattleEquipmentRow({ owner, snapshot, events, displayIndex, activeEvent
                 aria-hidden="true"
               />
             )}
-            {item.enchant && <span className="battle-enchant-overlay" title={enchantmentText(item.enchant)}><Sparkles size={11} />{enchantmentText(item.enchant)}</span>}
-            <span className="quality-chip">{qualityText}</span>
             <span className="battle-item-icon-frame">
               <img className="item-icon" src={itemIcon(item.def)} alt="" />
             </span>
-            <span className="battle-item-copy">
-              <span className="battle-item-name">{localizedDef.name}</span>
-              <span className="battle-item-meta">
-                <small><Dice5 size={12} /> {diceLabel}</small>
-                <small>{slotLabel}</small>
-                {extraTriggerDice && <small className="extra-trigger-dice"><Sparkles size={12} /> 额外 {extraTriggerDice}</small>}
-              </span>
-              <small className="battle-card-effect item-effect">{itemEffect}</small>
+            <span className="battle-item-name" title={localizedDef.name}>{localizedDef.name}</span>
+            <span className="battle-item-info">
+              <span className="battle-item-dice" title={`${language === 'en-US' ? 'Dice' : '点数'} ${diceLabel}`}><Dice5 size={12} />{diceLabel}</span>
+              {enchantText && <span className="battle-enchant-overlay" title={enchantText}><Sparkles size={11} />{enchantText}</span>}
+              {growthNumber != null && <span className="battle-item-growth-number" title={growthText ?? String(growthNumber)}>{growthNumber}</span>}
             </span>
             {boomCounterState && (
               <span className="boom-counter-meter" aria-label={`爆鸣计数 ${boomCounterState.count}/${boomCounterState.max}`}>
