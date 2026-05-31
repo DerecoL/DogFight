@@ -4478,12 +4478,19 @@ function ExplorationMapView({
 
 function mapNodePosition(node: Pick<ExplorationMapNode, 'layer' | 'column' | 'x'>, orientation: 'horizontal' | 'vertical' = 'horizontal', layerCount = 10) {
   const lane = typeof node.x === 'number' ? node.x : ([0.18, 0.5, 0.82][node.column] ?? 0.5)
+  const staggeredLane = lane + mapNodeDisplayLaneOffset(node)
   const layerDivisor = Math.max(1, layerCount - 1)
   const progress = 0.06 + node.layer * (0.88 / layerDivisor)
   if (orientation === 'vertical') {
-    return { x: Math.max(8, Math.min(92, lane * 100)), y: progress * 100 }
+    return { x: Math.max(8, Math.min(92, staggeredLane * 100)), y: progress * 100 }
   }
-  return { x: progress * 100, y: Math.max(10, Math.min(90, lane * 100)) }
+  return { x: progress * 100, y: Math.max(8, Math.min(92, staggeredLane * 100)) }
+}
+
+function mapNodeDisplayLaneOffset(node: Pick<ExplorationMapNode, 'layer' | 'column'>) {
+  const layerWave = node.layer % 2 === 0 ? -0.045 : 0.045
+  const columnNudge = node.column % 2 === 0 ? -0.018 : 0.018
+  return layerWave + columnNudge
 }
 
 function routePathData(start: { x: number; y: number }, end: { x: number; y: number }, orientation: 'horizontal' | 'vertical') {
