@@ -42,9 +42,25 @@ describe('exploration map generation', () => {
     expect(completePaths.length).toBeGreaterThan(0)
     for (const path of completePaths) {
       const playerBattles = path.filter((node) => node.kind === 'PLAYER_BATTLE').length
-      expect(playerBattles).toBeGreaterThanOrEqual(4)
+      expect(playerBattles).toBeGreaterThanOrEqual(3)
       expect(playerBattles).toBeLessThanOrEqual(5)
     }
+  })
+
+  it('makes four player battles the common route, with some three-battle maps and rare five-battle maps', () => {
+    const counts = new Map<number, number>()
+
+    for (let index = 0; index < 200; index += 1) {
+      const map = createExplorationMapState(`run-battle-density-${index}`, 0, index % 7, index % 3)
+      const path = enumerateMapPaths(map)[0]
+      const playerBattles = path.filter((node) => node.kind === 'PLAYER_BATTLE').length
+      counts.set(playerBattles, (counts.get(playerBattles) ?? 0) + 1)
+    }
+
+    expect([...counts.keys()].sort()).toEqual([3, 4, 5])
+    expect(counts.get(4)).toBeGreaterThan(counts.get(3) ?? 0)
+    expect(counts.get(3)).toBeGreaterThan(counts.get(5) ?? 0)
+    expect(counts.get(5)).toBeLessThanOrEqual(20)
   })
 
   it('allows only entrance nodes first, then only nodes linked from the completed node', () => {

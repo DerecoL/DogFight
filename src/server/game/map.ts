@@ -104,7 +104,8 @@ function playerBattleLayerSet(seed: string) {
     candidates[index] = candidates[swapIndex]
     candidates[swapIndex] = value
   }
-  const count = rng() < 0.5 ? 4 : 5
+  const roll = rng()
+  const count = roll < 0.25 ? 3 : roll < 0.95 ? 4 : 5
   return new Set(candidates.slice(0, count))
 }
 

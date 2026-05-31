@@ -299,6 +299,10 @@ export function makePotionChoices(seed: string) {
   return createPotionChoices(seed)
 }
 
+export function playerBattleGoldIncome(nextRound: number) {
+  return 6 + Math.max(0, Math.floor(nextRound))
+}
+
 function shouldCreateEnchantChoices(run: Pick<Run, 'losses' | 'enchantThirdLossGranted'>, nextRound: number, seed: string) {
   if (run.losses >= 3 && !run.enchantThirdLossGranted) return { trigger: true, thirdLossGranted: true }
   if (nextRound >= 4 && createRng(`${seed}-enchant-roll`)() < 0.1) return { trigger: true, thirdLossGranted: false }
