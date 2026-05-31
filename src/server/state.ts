@@ -14,6 +14,7 @@ import {
 import { createEnchantChoices } from './game/enchant'
 import { buildOfflineFighter } from './game/offline-builder'
 import { findSlot } from './game/grid'
+import { explorationMapPublicState, normalizeExplorationMapState } from './game/map'
 import { createPotionChoices, normalizeTriggerDiceWithExtras } from './game/potion'
 import { nextQuality, normalizeQuality } from './game/quality'
 import { createRng } from './game/rng'
@@ -102,6 +103,7 @@ export function publicLadderSettlement(settlement: LadderSettlement | null | und
 }
 
 export function publicRun(run: Run & { items: ItemInstance[]; ladderSettlement?: LadderSettlement | null }) {
+  const mapState = normalizeExplorationMapState(parseOptionalJson((run as Run & { mapState?: string | null }).mapState, null))
   return {
     id: run.id,
     mode: (run.mode === 'LADDER' ? 'LADDER' : 'CASUAL') as RunMode,
@@ -134,6 +136,7 @@ export function publicRun(run: Run & { items: ItemInstance[]; ladderSettlement?:
     matchedGhost: run.matchedGhost ? parseJson(run.matchedGhost, null) : null,
     lastBattle: run.lastBattle ? parseJson(run.lastBattle, null) : null,
     ladderSettlement: publicLadderSettlement(run.ladderSettlement),
+    mapState: mapState ? explorationMapPublicState(mapState) : null,
     items: toGameItems(run.items).map((item) => ({ ...item, def: itemDefForQuality(item.defId, item.quality) })),
   }
 }

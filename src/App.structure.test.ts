@@ -429,7 +429,7 @@ describe('selection screen structure', () => {
   })
 
   it('wires the free upgrade shop into choices and item selection', () => {
-    expect(app).toContain("type Phase = 'SHOP' | 'CHOICE' | 'CLASS_REWARD' | 'ENCHANT_CHOICE' | 'RELIC_CHOICE' | 'UPGRADE_CHOICE' | 'POTION_CHOICE' | 'PREP' | 'MATCH' | 'BATTLE' | 'COMPLETE'")
+    expect(app).toContain("type Phase = 'MAP' | 'SHOP' | 'CHOICE' | 'CLASS_REWARD' | 'ENCHANT_CHOICE' | 'RELIC_CHOICE' | 'UPGRADE_CHOICE' | 'POTION_CHOICE' | 'PREP' | 'MATCH' | 'BATTLE' | 'COMPLETE'")
     expect(app).toContain("type ShopType = 'GENERAL' | 'LARGE' | 'MEDIUM' | 'SMALL' | 'SMALL_DICE' | 'BIG_DICE' | 'RELIC' | 'UPGRADE' | 'UPGRADE_SILVER' | 'UPGRADE_GOLD' | 'UPGRADE_DIAMOND' | 'POTION'")
     expect(app).toContain("UPGRADE_SILVER: '白银商店'")
     expect(app).toContain("UPGRADE_GOLD: '黄金商店'")
@@ -719,6 +719,28 @@ describe('selection screen structure', () => {
       expect(app).toContain(`'${id}': '/assets/sticker-icons/${id}.webp'`)
       expect(existsSync(webp)).toBe(true)
       expect(statSync(webp).size).toBeGreaterThan(3_500)
+      expect(statSync(webp).size).toBeLessThanOrEqual(15_000)
+    }
+  })
+
+  it('uses existing lightweight WebP sticker art for exploration map nodes instead of SVG icons', () => {
+    const mapIconKeys = ['PLAYER_BATTLE', 'MONSTER_BATTLE', 'SHOP_FIXED', 'SHOP_UNKNOWN', 'SHOP_EQUIPMENT', 'REST', 'EVENT']
+
+    expect(app).toContain('const mapNodeIcons: Record<ExplorationMapNodeKind, string> = {')
+    expect(app).toContain('function ExplorationMapView')
+    expect(app).toContain('function MapNodeSticker')
+    expect(css).toContain('.exploration-map-screen')
+    expect(css).toContain('.map-node-sticker')
+    expect(css).toContain('.map-node-icon')
+    expect(css).toContain('.map-route-line')
+    expect(app).not.toContain('<Swords className="map-node-icon"')
+    expect(app).not.toContain('<ShoppingBag className="map-node-icon"')
+
+    for (const key of mapIconKeys) {
+      const pathMatch = app.match(new RegExp(`${key}:\\s*['"]([^'"]+\\.webp)['"]`))
+      expect(pathMatch?.[1]).toContain('/assets/sticker-icons/')
+      const webp = new URL(`../public${pathMatch?.[1]}`, import.meta.url)
+      expect(existsSync(webp)).toBe(true)
       expect(statSync(webp).size).toBeLessThanOrEqual(15_000)
     }
   })

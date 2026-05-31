@@ -31,6 +31,62 @@ afterAll(async () => {
 })
 
 describeWithDatabase('run API', () => {
+  async function createAuthenticatedRun(dogType = 'SHIBA') {
+    const agent = request.agent(app.server)
+    await app.ready()
+    await agent.post('/api/auth/register').send({ account: `map-${Date.now()}-${Math.random()}`, password: 'dogdice' }).expect(200)
+    const created = await agent.post('/api/runs').send({ dogType }).expect(200)
+    return { agent, run: created.body.run }
+  }
+
+  it('starts new casual runs on the exploration map', async () => {
+    const { run } = await createAuthenticatedRun()
+    expect(run.phase).toBe('MAP')
+    expect(run.mapState.nodes).toHaveLength(36)
+    expect(run.mapState.availableNodeIds).toHaveLength(3)
+  })
+
+  it('routes equipment shop map nodes into equipment-only shop choices', async () => {
+    const { agent, run } = await createAuthenticatedRun()
+    const map = run.mapState
+    const equipmentNode = map.nodes.find((node: { kind: string; layer: number }) => node.kind === 'SHOP_EQUIPMENT' && node.layer > 0)
+    expect(equipmentNode).toBeTruthy()
+    const previous = map.nodes.find((node: { nextNodeIds: string[] }) => node.nextNodeIds.includes(equipmentNode.id))
+    expect(previous).toBeTruthy()
+    await prisma.run.update({ where: { id: run.id }, data: { mapState: JSON.stringify({ ...map, completedNodeIds: [previous.id], currentNodeId: null }) } })
+
+    const selected = await agent.post(`/api/runs/${run.id}/map/select`).send({ nodeId: equipmentNode.id }).expect(200)
+    expect(selected.body.run.phase).toBe('CHOICE')
+    expect(selected.body.run.choices).toHaveLength(3)
+    expect(selected.body.run.choices.every((choice: string) => ['GENERAL', 'LARGE', 'MEDIUM', 'SMALL', 'SMALL_DICE', 'BIG_DICE'].includes(choice))).toBe(true)
+  })
+
+  it('rest map nodes restore one consumed tolerance', async () => {
+    const { agent, run } = await createAuthenticatedRun()
+    const map = run.mapState
+    const restNode = map.nodes.find((node: { kind: string; layer: number }) => node.kind === 'REST' && node.layer > 0)
+    expect(restNode).toBeTruthy()
+    const previous = map.nodes.find((node: { nextNodeIds: string[] }) => node.nextNodeIds.includes(restNode.id))
+    await prisma.run.update({ where: { id: run.id }, data: { losses: 2, mapState: JSON.stringify({ ...map, completedNodeIds: [previous.id], currentNodeId: null }) } })
+
+    const selected = await agent.post(`/api/runs/${run.id}/map/select`).send({ nodeId: restNode.id }).expect(200)
+    expect(selected.body.run.phase).toBe('MAP')
+    expect(selected.body.run.losses).toBe(1)
+  })
+
+  it('monster map battles do not change wins or losses after finish', async () => {
+    const { agent, run } = await createAuthenticatedRun()
+    const map = run.mapState
+    const monsterNode = map.nodes.find((node: { kind: string; layer: number }) => node.kind === 'MONSTER_BATTLE' && node.layer === 0)
+    const matched = await agent.post(`/api/runs/${run.id}/map/select`).send({ nodeId: monsterNode.id }).expect(200)
+    expect(matched.body.run.phase).toBe('MATCH')
+    await agent.post(`/api/runs/${run.id}/battle/start`).send({}).expect(200)
+    const finished = await agent.post(`/api/runs/${run.id}/battle/finish`).send({}).expect(200)
+    expect(finished.body.run.wins).toBe(run.wins)
+    expect(finished.body.run.losses).toBe(run.losses)
+    expect(finished.body.run.phase).toBe('MAP')
+  })
+
   it('registers and logs in with an account instead of requiring an email address', async () => {
     const registering = request.agent(app.server)
     const loggingIn = request.agent(app.server)
