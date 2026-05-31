@@ -75,6 +75,14 @@ fi
 cd "$TEMP_DEPLOY_PATH"
 echo "Validating Docker Compose configuration..."
 docker compose --env-file .env.production config >/dev/null
+if [ ! -f .dockerignore ]; then
+  echo "Remote Docker build context is missing .dockerignore"
+  exit 1
+fi
+if ! grep -qx 'backups' .dockerignore; then
+  echo "Remote Docker build context does not exclude backups"
+  exit 1
+fi
 
 if [ -f "$DEPLOY_PATH/deploy/backup-postgres.sh" ] && [ -f "$DEPLOY_PATH/.env.production" ]; then
   cd "$DEPLOY_PATH"
@@ -107,8 +115,8 @@ cd "$DEPLOY_PATH"
 echo "Building Docker images..."
 docker compose build --no-cache api caddy
 echo "Starting Docker services..."
-docker compose up -d --build --remove-orphans
-docker compose up -d --build --force-recreate --no-deps caddy
+docker compose up -d --no-build --remove-orphans
+docker compose up -d --no-build --force-recreate --no-deps caddy
 docker compose ps
 
 echo "Checking API health inside Docker..."

@@ -54,7 +54,7 @@ jobs:
           REMOTE_SCRIPT="/tmp/dogfight-remote-deploy-${{ github.sha }}.sh"
           tar -czf "$PACKAGE_PATH" \
             deploy prisma public scripts src \
-            Caddyfile Dockerfile compose.yml index.html package-lock.json package.json \
+            .dockerignore Caddyfile Dockerfile compose.yml index.html package-lock.json package.json \
             tsconfig.app.json tsconfig.json tsconfig.node.json tsconfig.server.json vite.config.ts
           ls -lh "$PACKAGE_PATH"
           echo "Uploading source package to Tencent Cloud..."
