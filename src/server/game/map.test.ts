@@ -103,6 +103,21 @@ describe('exploration map generation', () => {
     const completed = applyMapNodeCompletion({ ...map, currentNodeId: entranceIds[0] })
     expect(explorationMapPublicState(completed).availableNodeIds).toEqual(currentMapNode(map, entranceIds[0])?.nextNodeIds)
   })
+
+  it('keeps event details hidden until an event node has been opened', () => {
+    const map = createExplorationMapState('run-hidden-event-seed', 0, 0, 0)
+    const eventNode = map.nodes.find((node) => node.kind === 'EVENT')
+    expect(eventNode?.event).toBeTruthy()
+
+    const unexplored = explorationMapPublicState(map)
+    expect(unexplored.nodes.filter((node) => node.kind === 'EVENT').every((node) => node.event === undefined)).toBe(true)
+
+    const opened = explorationMapPublicState({ ...map, currentNodeId: eventNode!.id })
+    expect(opened.nodes.find((node) => node.id === eventNode!.id)?.event).toEqual(eventNode!.event)
+
+    const completed = explorationMapPublicState({ ...map, completedNodeIds: [eventNode!.id] })
+    expect(completed.nodes.find((node) => node.id === eventNode!.id)?.event).toEqual(eventNode!.event)
+  })
 })
 
 function enumerateMapPaths(map: ReturnType<typeof createExplorationMapState>) {

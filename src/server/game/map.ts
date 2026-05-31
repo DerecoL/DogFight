@@ -272,8 +272,15 @@ export function availableMapNodeIds(map: ExplorationMapState) {
 }
 
 export function explorationMapPublicState(map: ExplorationMapState) {
+  const revealedEventNodeIds = new Set([map.currentNodeId, ...map.completedNodeIds].filter((id): id is string => typeof id === 'string'))
+  const nodes: ExplorationMapNode[] = map.nodes.map((node): ExplorationMapNode => {
+    if (node.kind !== 'EVENT' || revealedEventNodeIds.has(node.id)) return node
+    const { event: _event, ...hiddenNode } = node
+    return hiddenNode
+  })
   return {
     ...map,
+    nodes,
     availableNodeIds: availableMapNodeIds(map),
   }
 }
