@@ -124,6 +124,7 @@ const BOOM_COUNTER_TRIGGER_THRESHOLD = 50
 const FREEZE_STACK_TRIGGER_THRESHOLD = 10
 const HANDDRAWN_FONT_STACK = '"Comic Sans MS", "Microsoft YaHei", "KaiTi", "Kaiti SC", "DFKai-SB", cursive, sans-serif'
 const isTapTapChannel = import.meta.env.VITE_CHANNEL === 'taptap'
+const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || '/api').replace(/\/$/, '')
 
 type ItemDef = {
   id: string
@@ -1037,7 +1038,7 @@ const statusTipDetails: Record<string, { polarity: '正面效果' | '负面效�
 
 async function api<T>(url: string, options: RequestInit = {}): Promise<T> {
   const headers = options.body ? { 'Content-Type': 'application/json', ...(options.headers || {}) } : options.headers
-  const res = await fetch(`/api${url}`, { credentials: 'include', headers, ...options })
+  const res = await fetch(`${apiBaseUrl}${url}`, { credentials: 'include', headers, ...options })
   const data = await res.json().catch(() => ({}))
   if (!res.ok) throw new Error(data.error || data.message || '请求失败')
   return data

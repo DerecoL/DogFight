@@ -898,6 +898,8 @@ describe('selection screen structure', () => {
 
   it('wires TapTap channel login without removing web auth controls', () => {
     expect(app).toContain("import.meta.env.VITE_CHANNEL === 'taptap'")
+    expect(app).toContain('import.meta.env.VITE_API_BASE_URL')
+    expect(app).toContain('const apiBaseUrl =')
     expect(app).toContain('globalWithTap.tap')
     expect(app).toContain('tap.login')
     expect(app).toContain("api('/auth/taptap'")

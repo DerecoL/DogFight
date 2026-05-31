@@ -47,7 +47,7 @@ export function resolveServerConfig(env = process.env): ServerConfig {
 export function cookieOptionsForEnv(nodeEnv: string) {
   return {
     httpOnly: true,
-    sameSite: 'lax' as const,
+    sameSite: nodeEnv === 'production' ? 'none' as const : 'lax' as const,
     secure: nodeEnv === 'production',
     path: '/',
   }

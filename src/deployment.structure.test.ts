@@ -34,6 +34,7 @@ describe('production deployment assets', () => {
     expect(example).toContain('TAPTAP_MINIAPP_ID=')
     expect(example).toContain('TAPTAP_MINIAPP_SECRET=')
     expect(example).toContain('TAPTAP_MINIAPP_REGION=cn')
+    expect(example).toContain('VITE_API_BASE_URL=https://www.torcharena.online/api')
     expect(example).toContain('DOMAIN=')
     expect(example).toContain('BACKUP_DIR=/opt/dogfight/backups')
     expect(example).toContain('LOCAL_BACKUP_RETENTION_HOURS=72')
@@ -60,6 +61,7 @@ describe('production deployment assets', () => {
 
   it('adds GitHub Actions deployment and server backup scripts', () => {
     const workflow = read('.github/workflows/deploy.yml')
+    const viteConfig = read('vite.config.ts')
     const remoteDeploy = read('deploy/remote-deploy.sh')
     const backup = read('deploy/backup-postgres.sh')
     const cron = read('deploy/install-backup-cron.sh')
@@ -104,6 +106,7 @@ describe('production deployment assets', () => {
     expect(remoteDeploy).toContain('BACKUP_REASON=predeploy timeout 10m sh deploy/backup-postgres.sh')
     expect(remoteDeploy).toContain('Building Docker images')
     expect(workflow).toContain('bash -s')
+    expect(viteConfig).toContain("mode === 'taptap' ? './' : '/'")
     expect(remoteDeploy).toContain('docker compose build --no-cache api caddy')
     expect(remoteDeploy).toContain('docker compose up -d --build')
     expect(remoteDeploy).toContain('docker compose up -d --build --force-recreate --no-deps caddy')

@@ -44,10 +44,10 @@ describe('server config', () => {
     })).toBe(true)
   })
 
-  it('uses secure http-only cookies in production', () => {
+  it('uses cross-site secure http-only cookies in production for TapTap H5', () => {
     expect(cookieOptionsForEnv('production')).toMatchObject({
       httpOnly: true,
-      sameSite: 'lax',
+      sameSite: 'none',
       secure: true,
       path: '/',
     })
