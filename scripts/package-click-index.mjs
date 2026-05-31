@@ -468,7 +468,7 @@ async function defaultMockApiScript(buildId = new Date().toISOString().replace(/
     run.gold += 5 + run.round * 2;
     run.matchedGhost = null;
     run.lastBattle = battle;
-    run.status = run.wins >= 12 || run.losses >= 5 ? 'COMPLETE' : 'ACTIVE';
+    run.status = run.wins >= 12 || run.losses >= 3 ? 'COMPLETE' : 'ACTIVE';
     run.phase = run.status === 'COMPLETE' ? 'COMPLETE' : run.round <= 2 ? 'SHOP' : 'CHOICE';
     run.refreshCost = 1;
     run.shopType = 'GENERAL';

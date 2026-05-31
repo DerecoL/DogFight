@@ -14,13 +14,14 @@ import { simulateBattle } from './game/battle'
 import type { BattleEvent, BattleResult, DogType, EnchantmentChoice, FighterSnapshot, GameItem, PotionChoice, ShopType } from './game/types'
 import { applyRelicChoice, initialItems, makeChoices, makePotionChoices, makeRelicChoices, makeShop, nextPhaseData as buildNextPhaseData, parseJson, phaseDataAfterEnchant, playerBattleGoldIncome, postBattleLargeItemReward, postBattleSellBonusItemGrowths, publicRun, relicsFromRun, seedGhost, snapshotFromRun, toGameItems } from './state'
 import { getActiveSeason } from './seasons'
+import { RUN_LOSS_LIMIT } from '../shared/game-rules'
 
 const DOGFIGHT_TARGET_PLAYERS = 8
 const DOGFIGHT_LOBBY_MS = 15_000
 const DOGFIGHT_DOG_SELECT_MS = 15_000
 const DOGFIGHT_SHOP_MS = 30_000
 const DOGFIGHT_TRAINING_ROUNDS = 3
-const DOGFIGHT_LOSS_LIMIT = 5
+const DOGFIGHT_LOSS_LIMIT = RUN_LOSS_LIMIT
 const DOGFIGHT_WAITING_ROOM_TTL_MS = 10 * 60_000
 const DOGFIGHT_ACTIVE_ROOM_TTL_MS = 30 * 60_000
 const DOGFIGHT_FORCE_COMPLETE_MAX_STEPS = 80

@@ -149,7 +149,7 @@ describe('buildStandaloneIndex', () => {
         ...state.run,
         id: created.run.id,
         wins: 0,
-        losses: 5,
+        losses: 3,
         round: 1,
         phase: 'COMPLETE',
         status: 'COMPLETE',

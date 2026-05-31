@@ -13,7 +13,7 @@ import { exchangeTapTapCode } from './taptap-auth'
 import { buildApexSeedEntries, dailyApexBoardKey, resolveApexChallenge, type ApexBoardType, type ApexChallengeReport, type ApexOpponent } from './game/apex'
 import { itemDef, itemDefForQuality, relicDef, relicDefForQuality } from './game/data'
 import { canPlace, findSlot, type PlacementOptions } from './game/grid'
-import { applyMapNodeCompletion, availableMapNodeIds, createExplorationMapState, explorationMapFinished, mapNodeSelection, mapShopChoices, normalizeExplorationMapState, randomEquipmentReward, randomMonsterReward, type ExplorationMapNode, type ExplorationMapState } from './game/map'
+import { applyMapNodeCompletion, availableMapNodeIds, createExplorationMapState, explorationMapFinished, mapMonsterBattleRound, mapNodeSelection, mapShopChoices, normalizeExplorationMapState, randomEquipmentReward, randomMonsterReward, type ExplorationMapNode, type ExplorationMapState } from './game/map'
 import { buildOfflineFighter } from './game/offline-builder'
 import { applyPotionToBaseDice } from './game/potion'
 import { canUpgradePair, nextQuality, normalizeQuality, upgradeEnchant } from './game/quality'
@@ -25,6 +25,7 @@ import type { BattleResult, DogType, EnchantmentChoice, FighterSnapshot, GameIte
 import { applyRelicChoice, createFinishedBattleRecord, initialItems, makeChoices, makePotionChoices, makeRelicChoices, makeShop, nextPhaseData, parseJson, playerBattleGoldIncome, postBattleLargeItemReward, postBattleSellBonusItemGrowths, publicLadderSettlement, publicRun, publicRunHistory, relicsFromRun, removeRelicByInstanceId, seedGhost, snapshotFromRun, toGameItems, upgradeChoiceSkipPhase } from './state'
 import { accountSummary, claimAchievement, claimDaily, equipUserCosmetic, getAchievements, getCosmetics, getDailyTasks, getShop, purchaseShopItem, recordAccountEvent, refreshDaily, unequipUserCosmetic } from './account-services'
 import { getActiveSeason, publicSeason, publicSeasonSummary } from './seasons'
+import { RUN_LOSS_LIMIT } from '../shared/game-rules'
 
 type PrismaTransaction = Prisma.TransactionClient
 type ApexSourceRun = {
@@ -819,7 +820,7 @@ export function buildApp() {
     if (selection.action === 'MONSTER_BATTLE') {
       const monster = buildOfflineFighter({
         dogType: node.monster?.dogType,
-        round: Math.max(1, node.layer + 1),
+        round: node.monster?.round ?? mapMonsterBattleRound(map.mapIndex, node.layer),
         wins: run.wins,
         losses: run.losses,
         seed: node.monster?.seed ?? `${run.id}-${node.id}-monster`,
@@ -879,7 +880,7 @@ export function buildApp() {
     if (type === 'RISKY_COMMISSION') {
       data.gold = { increment: 12 }
       data.losses = { increment: 1 }
-      if (run.losses + 1 >= 5) {
+      if (run.losses + 1 >= RUN_LOSS_LIMIT) {
         data.status = 'COMPLETE'
         data.phase = 'COMPLETE'
       }
@@ -1469,7 +1470,7 @@ export function buildApp() {
     const wins = run.wins + (playerWon ? 1 : 0)
     const losses = run.losses + (playerWon ? 0 : 1)
     const battleRecord = createFinishedBattleRecord(result, wins, losses)
-    const status = wins >= 12 || losses >= 5 ? 'COMPLETE' : 'ACTIVE'
+    const status = wins >= 12 || losses >= RUN_LOSS_LIMIT ? 'COMPLETE' : 'ACTIVE'
     const nextRound = run.round + 1
     const roundIncome = playerBattleGoldIncome(nextRound)
     const currentItems = toGameItems(run.items)

@@ -77,6 +77,7 @@ import {
   type BattleReviewSideStats,
 } from './battle-review'
 import { TERM_DEFS } from './shared/rule-terms'
+import { RUN_LOSS_LIMIT } from './shared/game-rules'
 import { LANGUAGE_STORAGE_KEY, useLanguage, type Language } from './i18n'
 import {
   localizeDog,
@@ -166,7 +167,7 @@ type PotionChoice = { id: string; category: PotionCategory; dice: number[]; desc
 type Item = { id: string; defId: string; quality: ItemQuality; area: Area; x: number; y: number; def: ItemDef; enchant?: Enchantment | null; triggerDiceOverride?: number[] | null; sellBonus?: number }
 type ExplorationMapNodeKind = 'PLAYER_BATTLE' | 'MONSTER_BATTLE' | 'SHOP_FIXED' | 'SHOP_UNKNOWN' | 'SHOP_EQUIPMENT' | 'REST' | 'EVENT'
 type ExplorationEventType = 'GOLD_CACHE' | 'RESTORE_TOLERANCE' | 'FREE_EQUIPMENT' | 'FREE_UPGRADE' | 'RELIC_GIFT' | 'RISKY_COMMISSION'
-type ExplorationMapMonster = { name: string; dogType: DogType; seed?: string; possibleRewards: Array<{ defId: string; quality: ItemQuality }> }
+type ExplorationMapMonster = { name: string; dogType: DogType; seed?: string; round?: number; possibleRewards: Array<{ defId: string; quality: ItemQuality }> }
 type ExplorationMapNode = {
   id: string
   layer: number
@@ -1366,7 +1367,7 @@ function dogfightPhaseLabel(phase: DogfightRoomPhase) {
 }
 
 function dogfightLives(member: DogfightMember) {
-  return member.eliminated ? 0 : Math.max(0, 5 - member.losses)
+  return member.eliminated ? 0 : Math.max(0, RUN_LOSS_LIMIT - member.losses)
 }
 
 function sortedDogfightMembers(members: DogfightMember[]) {
@@ -4224,7 +4225,7 @@ function TopBar({ run, user, profile, musicEnabled, musicBlocked, onToggleMusic,
         <div className="stats">
           <DogTraitSummary run={run} />
           <ResourcePill icon={<Trophy size={16} />} label="胜场" value={`${run.wins}/12`} tone="win" />
-          <ResourcePill icon={<Shield size={16} />} label="容错" value={`${5 - run.losses}`} tone={5 - run.losses <= 1 ? 'danger' : 'safe'} />
+          <ResourcePill icon={<Shield size={16} />} label="容错" value={`${RUN_LOSS_LIMIT - run.losses}`} tone={RUN_LOSS_LIMIT - run.losses <= 1 ? 'danger' : 'safe'} />
           <ResourcePill icon={<Coins size={16} />} label="金币" value={run.gold} tone="gold" />
           <ResourcePill icon={<Dice5 size={16} />} label="回合" value={run.round} tone="round" />
         </div>
@@ -4459,7 +4460,7 @@ function ExplorationMapView({
             </div>
             <div className="map-run-stats">
               <ResourcePill icon={<Trophy size={16} />} label="胜场" value={`${run.wins}/12`} tone="gold" />
-              <ResourcePill icon={<Heart size={16} />} label="容错" value={`${Math.max(0, 5 - run.losses)}/5`} tone="pink" />
+              <ResourcePill icon={<Heart size={16} />} label="容错" value={`${Math.max(0, RUN_LOSS_LIMIT - run.losses)}/${RUN_LOSS_LIMIT}`} tone="pink" />
               <ResourcePill icon={<Coins size={16} />} label="金币" value={run.gold} tone="gold" />
             </div>
           </div>

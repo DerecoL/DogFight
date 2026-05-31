@@ -83,7 +83,7 @@ describe('dogfight public room display state', () => {
       eliminated: true,
       eliminatedRound: 2,
       placement: 2,
-      run: makeRun({ id: 'run-b', userId: 'user-b', wins: 1, losses: 5, round: 3, gold: 15, status: 'DOGFIGHT_ELIMINATED', phase: 'COMPLETE' }),
+      run: makeRun({ id: 'run-b', userId: 'user-b', wins: 1, losses: 3, round: 3, gold: 15, status: 'DOGFIGHT_ELIMINATED', phase: 'COMPLETE' }),
     })
     const room = {
       id: 'room',
@@ -126,7 +126,7 @@ describe('dogfight public room display state', () => {
     })
     expect(visibleB).toMatchObject({
       wins: 1,
-      losses: 4,
+      losses: 2,
       round: 2,
       gold: 10,
       eliminated: false,
@@ -135,7 +135,7 @@ describe('dogfight public room display state', () => {
     })
     expect(publicRoom.currentRun).toMatchObject({
       wins: 1,
-      losses: 4,
+      losses: 2,
       round: 2,
       gold: 10,
       status: 'DOGFIGHT_ACTIVE',

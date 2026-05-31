@@ -25,6 +25,7 @@ export type ExplorationMapMonster = {
   name: string
   dogType: DogType
   seed: string
+  round: number
   possibleRewards: Array<{ defId: string; quality: ItemQuality }>
 }
 
@@ -71,7 +72,7 @@ export function createExplorationMapState(runId: string, mapIndex: number, wins:
     for (let column = 0; column < nodeCount; column += 1) {
       const id = mapNodeId(mapIndex, layer, column)
       const x = layerNodeX(column, nodeCount, createRng(`${seed}-x-${layer}-${column}`))
-      const kind = playerBattleLayers.has(layer) ? 'PLAYER_BATTLE' : layerNodeKind(layer, column, nodeCount, seed)
+      const kind = playerBattleLayers.has(layer) ? 'PLAYER_BATTLE' : layerNodeKind(mapIndex, layer, column, nodeCount, seed)
       nodes.push(createMapNode({ id, layer, column, x, kind, seed, mapIndex, wins, losses }))
     }
   }
@@ -85,7 +86,22 @@ export function createExplorationMapState(runId: string, mapIndex: number, wins:
   }
 }
 
-function layerNodeKinds(layer: number): ExplorationMapNodeKind[] {
+function layerNodeKinds(mapIndex: number, layer: number): ExplorationMapNodeKind[] {
+  if (mapIndex === 0) {
+    const firstMapPatterns: ExplorationMapNodeKind[][] = [
+      ['MONSTER_BATTLE', 'SHOP_FIXED', 'EVENT'],
+      ['MONSTER_BATTLE', 'MONSTER_BATTLE', 'EVENT'],
+      ['EVENT', 'MONSTER_BATTLE', 'MONSTER_BATTLE'],
+      ['MONSTER_BATTLE', 'EVENT', 'MONSTER_BATTLE'],
+      ['MONSTER_BATTLE', 'SHOP_EQUIPMENT', 'EVENT'],
+      ['SHOP_FIXED', 'MONSTER_BATTLE', 'EVENT'],
+      ['SHOP_UNKNOWN', 'MONSTER_BATTLE', 'EVENT'],
+      ['SHOP_FIXED', 'MONSTER_BATTLE', 'EVENT'],
+      ['SHOP_EQUIPMENT', 'MONSTER_BATTLE', 'EVENT'],
+      ['SHOP_FIXED', 'MONSTER_BATTLE', 'EVENT'],
+    ]
+    return firstMapPatterns[layer] ?? firstMapPatterns.at(-1)!
+  }
   const patterns: ExplorationMapNodeKind[][] = [
     ['MONSTER_BATTLE', 'SHOP_FIXED', 'EVENT'],
     ['MONSTER_BATTLE', 'SHOP_EQUIPMENT', 'REST'],
@@ -118,9 +134,9 @@ function layerNodeX(column: number, count: number, rng: () => number) {
   return Math.max(0.08, Math.min(0.92, base + jitter))
 }
 
-function layerNodeKind(layer: number, column: number, count: number, seed: string): ExplorationMapNodeKind {
+function layerNodeKind(mapIndex: number, layer: number, column: number, count: number, seed: string): ExplorationMapNodeKind {
   const rng = createRng(`${seed}-kind-${layer}-${column}-${count}`)
-  const pattern = layerNodeKinds(layer)
+  const pattern = layerNodeKinds(mapIndex, layer)
   const base = pattern[column % pattern.length]
   if (base === 'PLAYER_BATTLE') return rng() < 0.55 ? 'MONSTER_BATTLE' : 'EVENT'
   return base
@@ -184,7 +200,7 @@ function createMapNode(input: { id: string; layer: number; column: number; x: nu
     node.shopType = pick(createRng(`${rngSeed}-shop`), [...FIXED_SHOP_TYPES])
   }
   if (input.kind === 'MONSTER_BATTLE') {
-    node.monster = createMonsterPreview(input.layer, input.wins, input.losses, rngSeed)
+    node.monster = createMonsterPreview(input.mapIndex, input.layer, input.wins, input.losses, rngSeed)
   }
   if (input.kind === 'EVENT') {
     node.event = eventPreview(pick(createRng(`${rngSeed}-event`), [...EVENT_TYPES]))
@@ -192,11 +208,17 @@ function createMapNode(input: { id: string; layer: number; column: number; x: nu
   return node
 }
 
-function createMonsterPreview(layer: number, wins: number, losses: number, seed: string): ExplorationMapMonster {
+export function mapMonsterBattleRound(mapIndex: number, layer: number) {
+  if (mapIndex === 0) return Math.max(1, Math.min(3, Math.floor(layer / 2) + 1))
+  return Math.max(1, layer + 1)
+}
+
+function createMonsterPreview(mapIndex: number, layer: number, wins: number, losses: number, seed: string): ExplorationMapMonster {
   const dogType = pick(createRng(`${seed}-dog`), [...DOG_TYPES])
+  const round = mapMonsterBattleRound(mapIndex, layer)
   const fighter = buildOfflineFighter({
     dogType,
-    round: Math.max(1, layer + 1),
+    round,
     wins,
     losses,
     seed,
@@ -209,6 +231,7 @@ function createMonsterPreview(layer: number, wins: number, losses: number, seed:
     name: offlineFighterName(seed),
     dogType,
     seed,
+    round,
     possibleRewards,
   }
 }

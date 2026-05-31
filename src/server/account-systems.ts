@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
 import type { DogType } from './game/types'
+import { RUN_LOSS_LIMIT } from '../shared/game-rules'
 
 export type CosmeticType = 'TITLE' | 'AVATAR' | 'BACKGROUND' | 'DOG_SKIN' | 'BATTLE_EFFECT'
 export type CosmeticRarity = 'COMMON' | 'RARE' | 'EPIC' | 'LEGENDARY'
@@ -66,7 +67,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   { id: 'first-ladder', title: '踏上天梯', description: '完成 1 次天梯结算。', category: '基础成长', target: 1, reward: 140, eventKinds: ['LADDER_SETTLED'], progress: eventCount('LADDER_SETTLED') },
   { id: 'first-dogfight', title: '狗斗入场', description: '完成 1 轮多人狗斗。', category: '基础成长', target: 1, reward: 120, eventKinds: ['DOGFIGHT_ROUND_FINISHED'], progress: eventCount('DOGFIGHT_ROUND_FINISHED') },
   { id: 'first-shop-buy', title: '会花钱的狗', description: '在局内商店购买 1 件商品。', category: '基础成长', target: 1, reward: 80, eventKinds: ['SHOP_PURCHASED'], progress: eventCount('SHOP_PURCHASED') },
-  { id: 'finish-run', title: '有始有终', description: '完成 1 局游戏。', category: '基础成长', target: 1, reward: 160, eventKinds: ['BATTLE_FINISHED'], progress: (event) => event.kind === 'BATTLE_FINISHED' && (event.wins >= 12 || event.losses >= 5) ? 1 : 0 },
+  { id: 'finish-run', title: '有始有终', description: '完成 1 局游戏。', category: '基础成长', target: 1, reward: 160, eventKinds: ['BATTLE_FINISHED'], progress: (event) => event.kind === 'BATTLE_FINISHED' && (event.wins >= 12 || event.losses >= RUN_LOSS_LIMIT) ? 1 : 0 },
   ...(['SHIBA', 'SAMOYED', 'MUTT', 'BULLY', 'EMPEROR', 'FROG'] as const).flatMap((dogType) => {
     const dogNames: Record<DogType, string> = { SHIBA: '柴犬', SAMOYED: '萨摩耶', MUTT: '土狗', BULLY: '恶霸', EMPEROR: '狗皇帝', FROG: '祖灵' }
     const prefix = dogType.toLowerCase()

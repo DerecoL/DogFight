@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { applyMapNodeCompletion, createExplorationMapState, currentMapNode, explorationMapPublicState, mapNodeSelection, mapShopChoices } from './map'
+import { applyMapNodeCompletion, createExplorationMapState, currentMapNode, explorationMapPublicState, mapMonsterBattleRound, mapNodeSelection, mapShopChoices } from './map'
 
 describe('exploration map generation', () => {
   it('creates a deterministic randomized ten-layer map with forward-only fair routes', () => {
-    const first = createExplorationMapState('run-map-seed', 0, 0, 0)
-    const second = createExplorationMapState('run-map-seed', 0, 0, 0)
+    const first = createExplorationMapState('run-map-seed', 1, 0, 0)
+    const second = createExplorationMapState('run-map-seed', 1, 0, 0)
 
     expect(first).toEqual(second)
     expect(new Set(first.nodes.map((node) => node.layer))).toEqual(new Set(Array.from({ length: 10 }, (_, index) => index)))
@@ -63,6 +63,33 @@ describe('exploration map generation', () => {
     expect(counts.get(5)).toBeLessThanOrEqual(20)
   })
 
+  it('keeps the first map rest-free with only one early shop and softer monsters', () => {
+    for (let index = 0; index < 80; index += 1) {
+      const map = createExplorationMapState(`first-map-pacing-${index}`, 0, index % 4, index % 2)
+      const earlyNodes = map.nodes.filter((node) => node.layer <= 3)
+      const earlyShops = earlyNodes.filter((node) => node.kind.startsWith('SHOP'))
+      const laterShops = map.nodes.filter((node) => node.layer >= 4 && node.kind.startsWith('SHOP'))
+      const monsters = map.nodes.filter((node) => node.kind === 'MONSTER_BATTLE')
+
+      expect(map.nodes.some((node) => node.kind === 'REST')).toBe(false)
+      expect(earlyShops).toHaveLength(1)
+      expect(earlyShops[0]).toMatchObject({ layer: 0, kind: 'SHOP_FIXED' })
+      expect(laterShops.length).toBeGreaterThan(0)
+      expect(monsters.length).toBeGreaterThan(0)
+      expect(monsters.every((node) => node.monster?.round === mapMonsterBattleRound(map.mapIndex, node.layer))).toBe(true)
+      expect(monsters.every((node) => (node.monster?.round ?? 99) <= 3)).toBe(true)
+    }
+  })
+
+  it('keeps later maps eligible for rest points and normal monster scaling', () => {
+    const map = createExplorationMapState('later-map-pacing', 1, 4, 1)
+    const monster = map.nodes.find((node) => node.kind === 'MONSTER_BATTLE' && node.layer >= 4)
+
+    expect(map.nodes.some((node) => node.kind === 'REST')).toBe(true)
+    expect(monster?.monster?.round).toBe(mapMonsterBattleRound(map.mapIndex, monster?.layer ?? 0))
+    expect(monster?.monster?.round).toBe((monster?.layer ?? -1) + 1)
+  })
+
   it('allows only entrance nodes first, then only nodes linked from the completed node', () => {
     const map = createExplorationMapState('run-route-seed', 0, 0, 0)
     const entranceIds = map.nodes.filter((node) => node.layer === 0).map((node) => node.id)
@@ -95,7 +122,7 @@ function enumerateMapPaths(map: ReturnType<typeof createExplorationMapState>) {
 
 describe('exploration map node selection', () => {
   it('resolves the three shop node families without mixing equipment-only shops with special shops', () => {
-    const map = createExplorationMapState('run-shop-seed', 0, 0, 0)
+    const map = createExplorationMapState('run-shop-seed', 1, 0, 0)
     const fixed = map.nodes.find((node) => node.kind === 'SHOP_FIXED' && node.shopType)!
     const unknown = map.nodes.find((node) => node.kind === 'SHOP_UNKNOWN')!
     const equipment = map.nodes.find((node) => node.kind === 'SHOP_EQUIPMENT')!
@@ -111,7 +138,7 @@ describe('exploration map node selection', () => {
   })
 
   it('returns node-specific actions for battle, rest, event, and reward nodes', () => {
-    const map = createExplorationMapState('run-action-seed', 0, 0, 0)
+    const map = createExplorationMapState('run-action-seed', 1, 0, 0)
     const player = map.nodes.find((node) => node.kind === 'PLAYER_BATTLE')!
     const monster = map.nodes.find((node) => node.kind === 'MONSTER_BATTLE')!
     const rest = map.nodes.find((node) => node.kind === 'REST')!

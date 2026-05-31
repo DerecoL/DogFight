@@ -339,7 +339,7 @@ describeWithDatabase('run API', () => {
     expect(finished.body.run.gold).toBe(bought.body.run.gold + 7)
   })
 
-  it('keeps casual runs active until the fifth loss', async () => {
+  it('keeps casual runs active until the third loss', async () => {
     const agent = request.agent(app.server)
     await app.ready()
 
@@ -354,25 +354,25 @@ describeWithDatabase('run API', () => {
       playerMaxHp: 10,
       opponentMaxHp: 10,
       events: [],
-      playerSnapshot: { name: 'P', dogType: 'SHIBA', wins: 0, losses: 3, round: 4, items: [] },
+      playerSnapshot: { name: 'P', dogType: 'SHIBA', wins: 0, losses: 1, round: 4, items: [] },
       opponentSnapshot: { name: 'O', dogType: 'MUTT', wins: 0, losses: 0, round: 4, items: [] },
     }
 
     await prisma.run.update({
       where: { id: runId },
-      data: { losses: 3, round: 4, phase: 'BATTLE', lastBattle: JSON.stringify(losingBattle) },
+      data: { losses: 1, round: 4, phase: 'BATTLE', lastBattle: JSON.stringify(losingBattle) },
     })
 
-    const fourthLoss = await agent.post(`/api/runs/${runId}/battle/finish`).send({}).expect(200)
-    expect(fourthLoss.body.run).toMatchObject({ losses: 4, status: 'ACTIVE' })
+    const secondLoss = await agent.post(`/api/runs/${runId}/battle/finish`).send({}).expect(200)
+    expect(secondLoss.body.run).toMatchObject({ losses: 2, status: 'ACTIVE' })
 
     await prisma.run.update({
       where: { id: runId },
-      data: { phase: 'BATTLE', lastBattle: JSON.stringify({ ...losingBattle, playerSnapshot: { ...losingBattle.playerSnapshot, losses: 4, round: 5 } }) },
+      data: { phase: 'BATTLE', lastBattle: JSON.stringify({ ...losingBattle, playerSnapshot: { ...losingBattle.playerSnapshot, losses: 2, round: 5 } }) },
     })
 
-    const fifthLoss = await agent.post(`/api/runs/${runId}/battle/finish`).send({}).expect(200)
-    expect(fifthLoss.body.run).toMatchObject({ losses: 5, status: 'COMPLETE', phase: 'COMPLETE' })
+    const thirdLoss = await agent.post(`/api/runs/${runId}/battle/finish`).send({}).expect(200)
+    expect(thirdLoss.body.run).toMatchObject({ losses: 3, status: 'COMPLETE', phase: 'COMPLETE' })
   })
 
   it('settles a casual active run at the current record without adding a loss', async () => {
@@ -1314,7 +1314,7 @@ describeWithDatabase('run API', () => {
 
     await prisma.run.update({
       where: { id: runId },
-      data: { wins: 0, losses: 5, round: 1, phase: 'COMPLETE', status: 'COMPLETE' },
+      data: { wins: 0, losses: 3, round: 1, phase: 'COMPLETE', status: 'COMPLETE' },
     })
 
     const overview = await agent.get('/api/apex').expect(200)
@@ -1793,7 +1793,7 @@ describeWithDatabase('run API', () => {
     const battleRound = await agents[2].post(`/api/dogfight/rooms/${roomId}/ready`).send({}).expect(200)
     expect(battleRound.body.room).toMatchObject({ phase: 'BATTLE', currentRound: 0 })
     expect(battleRound.body.room.battles.filter((battle: { round: number; opponentKind: string }) => battle.round === 0 && battle.opponentKind === 'OFFLINE')).toHaveLength(8)
-    expect(battleRound.body.room.members.map((member: { losses: number }) => 5 - member.losses)).toEqual([...battleRound.body.room.members.map((member: { losses: number }) => 5 - member.losses)].sort((a, b) => b - a))
+    expect(battleRound.body.room.members.map((member: { losses: number }) => 3 - member.losses)).toEqual([...battleRound.body.room.members.map((member: { losses: number }) => 3 - member.losses)].sort((a, b) => b - a))
     expect(battleRound.body.room.members.find((member: { kind: string; currentBattleId: string | null }) => member.kind === 'BOT' && member.currentBattleId)).toBeTruthy()
 
     const ownBattleId = battleRound.body.room.currentRunMember.currentBattleId

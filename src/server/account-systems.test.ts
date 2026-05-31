@@ -33,6 +33,23 @@ describe('account shop and achievements domain', () => {
     expect(() => claimAchievementReward(claimed.wallet, claimed.progress, 'first-run')).toThrow('Achievement already claimed')
   })
 
+  it('counts a three-loss run as a completed run for achievements', () => {
+    const progressed = progressAchievements([], {
+      kind: 'BATTLE_FINISHED',
+      mode: 'CASUAL',
+      dogType: 'SHIBA',
+      winner: false,
+      wins: 0,
+      losses: 3,
+      round: 3,
+    }, '2026-05-30T00:00:00.000Z')
+
+    expect(progressed.find((entry) => entry.achievementId === 'finish-run')).toMatchObject({
+      progress: 1,
+      completedAt: '2026-05-30T00:00:00.000Z',
+    })
+  })
+
   it('draws three daily slots, refreshes only unclaimed tasks, and claims rewards', () => {
     const state = createInitialDailyTasks('user-a', '2026-05-30')
     expect(state.tasks.map((task) => task.slot).sort()).toEqual(['BATTLE', 'BUILD', 'PARTICIPATION'])

@@ -319,11 +319,11 @@ describe('selection screen structure', () => {
     expect(app).toContain('onClick={() => void unequip(group.type)}')
   })
 
-  it('shows five-loss tolerance for casual runs in the top banner', () => {
-    expect(app).toContain('value={`${5 - run.losses}`}')
-    expect(app).toContain("tone={5 - run.losses <= 1 ? 'danger' : 'safe'}")
-    expect(app).not.toContain('value={`${3 - run.losses}`}')
-    expect(app).not.toContain("tone={3 - run.losses <= 1 ? 'danger' : 'safe'}")
+  it('shows three-loss tolerance for casual runs in the top banner', () => {
+    expect(app).toContain('value={`${RUN_LOSS_LIMIT - run.losses}`}')
+    expect(app).toContain("tone={RUN_LOSS_LIMIT - run.losses <= 1 ? 'danger' : 'safe'}")
+    expect(app).not.toContain('value={`${5 - run.losses}`}')
+    expect(app).not.toContain("tone={5 - run.losses <= 1 ? 'danger' : 'safe'}")
   })
 
   it('applies dogfight run action results before background room refresh', () => {
