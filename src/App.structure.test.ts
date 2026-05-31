@@ -576,6 +576,9 @@ describe('selection screen structure', () => {
   it('renders battle health bars as a percentage of max health', () => {
     expect(app).toContain('playerMaxHp')
     expect(app).toContain('opponentMaxHp')
+    expect(app).toContain('const MID_ROUND_HP_GROWTH = 60')
+    expect(app).toContain('const LATE_ROUND_HP_GROWTH = 70')
+    expect(app).toContain('midRounds * MID_ROUND_HP_GROWTH')
     expect(app).toContain('const hpPercent = maxHp > 0 ? (hp / maxHp) * 100 : 0')
     expect(app).toContain('<BoneHealthBar')
     expect(app).toContain('poisonPreviewDamage={poisonStatus?.tickDamage ?? 0}')

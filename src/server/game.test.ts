@@ -944,7 +944,7 @@ describe('battle simulation', () => {
       amount: 15,
       target: 'player',
       sourceHpDelta: 15,
-      playerHp: 240,
+      playerHp: 250,
     })
     expect(purge?.text).toContain('清除 3 层增益')
     expect(purge?.text).toContain('恢复 15 点生命')
@@ -982,7 +982,7 @@ describe('battle simulation', () => {
       effectType: 'HEAL',
       amount: 15,
       sourceHpDelta: 15,
-      playerHp: 251,
+      playerHp: 261,
     })
     expect(purge?.text).toContain('清除 3 层增益')
     expect(purge?.text).toContain('恢复 15 点生命')
@@ -1675,18 +1675,21 @@ describe('battle simulation', () => {
     expect(resolveWinnerByHealthPercent({ hp: 0, maxHp: 100 }, { hp: 0, maxHp: 100 })).toBe('player')
   })
 
-  it('starts fighters with round-scaled max health and records it for playback', () => {
-    const player: FighterSnapshot = { name: 'P', dogType: 'SHIBA', wins: 0, losses: 0, round: 6, items: [] }
-    const opponent: FighterSnapshot = { name: 'O', dogType: 'SHIBA', wins: 0, losses: 0, round: 7, items: [] }
+  it('starts fighters with stepped late-round max health and records it for playback', () => {
+    const player: FighterSnapshot = { name: 'P', dogType: 'SHIBA', wins: 0, losses: 0, round: 8, items: [] }
+    const opponent: FighterSnapshot = { name: 'O', dogType: 'SHIBA', wins: 0, losses: 0, round: 9, items: [] }
     const result = simulateBattle(player, opponent, 'round-health-growth')
+    const boundary = simulateBattle({ ...player, round: 6 }, { ...opponent, round: 7 }, 'round-health-growth-boundary')
 
-    expect(result.playerMaxHp).toBe(220)
-    expect(result.opponentMaxHp).toBe(270)
+    expect(boundary.playerMaxHp).toBe(220)
+    expect(boundary.opponentMaxHp).toBe(280)
+    expect(result.playerMaxHp).toBe(340)
+    expect(result.opponentMaxHp).toBe(410)
     expect(result.events[0]).toMatchObject({
-      playerHp: 220,
-      playerMaxHp: 220,
-      opponentHp: 270,
-      opponentMaxHp: 270,
+      playerHp: 340,
+      playerMaxHp: 340,
+      opponentHp: 410,
+      opponentMaxHp: 410,
     })
   })
 

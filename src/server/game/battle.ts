@@ -63,8 +63,10 @@ const MAX_BATTLE_TIME = 120
 const TIME_EPSILON = 0.000001
 const BASE_MAX_HP = 100
 const EARLY_ROUND_HP_GROWTH = 20
-const LATE_ROUND_HP_GROWTH = 50
 const EARLY_HP_GROWTH_ROUNDS = 6
+const MID_ROUND_HP_GROWTH = 60
+const MID_HP_GROWTH_ROUNDS = 2
+const LATE_ROUND_HP_GROWTH = 70
 
 type HealthForDecision = {
   hp: number
@@ -146,8 +148,9 @@ type BattleSideState = {
 function maxHealthForRound(round: number) {
   const completedRounds = Math.max(0, Math.floor(round))
   const earlyRounds = Math.min(completedRounds, EARLY_HP_GROWTH_ROUNDS)
-  const lateRounds = Math.max(0, completedRounds - EARLY_HP_GROWTH_ROUNDS)
-  return BASE_MAX_HP + earlyRounds * EARLY_ROUND_HP_GROWTH + lateRounds * LATE_ROUND_HP_GROWTH
+  const midRounds = Math.min(Math.max(0, completedRounds - EARLY_HP_GROWTH_ROUNDS), MID_HP_GROWTH_ROUNDS)
+  const lateRounds = Math.max(0, completedRounds - EARLY_HP_GROWTH_ROUNDS - MID_HP_GROWTH_ROUNDS)
+  return BASE_MAX_HP + earlyRounds * EARLY_ROUND_HP_GROWTH + midRounds * MID_ROUND_HP_GROWTH + lateRounds * LATE_ROUND_HP_GROWTH
 }
 
 function createSideState(maxHp: number): BattleSideState {
