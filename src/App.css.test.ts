@@ -216,6 +216,18 @@ describe('exploration map route board', () => {
     expect(css).toContain('.map-monster-equipment-preview')
   })
 
+  it('keeps monster equipment preview modals on fixed tracks without content-driven resizing', () => {
+    expect(cssRule('.map-monster-equipment-sheet')).toContain('width: min(1120px, calc(100vw - 28px))')
+    expect(cssRule('.map-monster-equipment-sheet')).toContain('height: min(520px, calc(100vh - 28px))')
+    expect(cssRule('.map-monster-equipment-sheet')).toContain('grid-template-rows: auto minmax(0, 1fr)')
+    expect(cssRule('.map-monster-equipment-sheet')).toContain('overflow: hidden')
+    expect(cssRule('.map-monster-equipment-preview')).toContain('min-height: 0')
+    expect(cssRule('.map-monster-equipment-preview')).toContain('overflow: hidden')
+    expect(cssRule('.map-monster-equipment-preview .battle-slot-grid')).toContain('height: 158px')
+    expect(cssRule('.map-monster-equipment-preview .battle-slot-grid')).toContain('overflow-x: auto')
+    expect(cssRule('.map-monster-equipment-preview .battle-item')).toContain('min-height: 0')
+  })
+
   it('adds a drawable planning layer with view, brush, eraser, and clear tools', () => {
     expect(app).toContain("type MapDrawingTool = 'inspect' | 'brush' | 'eraser'")
     expect(app).toContain('map-drawing-toolbar')

@@ -8227,8 +8227,11 @@ progress {
 
 .map-monster-equipment-sheet {
   width: min(1120px, calc(100vw - 28px));
-  max-height: calc(100vh - 28px);
+  height: min(520px, calc(100vh - 28px));
+  min-width: 0;
+  min-height: 0;
   display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
   gap: 14px;
   padding: 18px;
   border: 2px solid rgba(91, 61, 39, .3);
@@ -8237,7 +8240,7 @@ progress {
     var(--paper-fiber),
     linear-gradient(180deg, rgba(255, 250, 240, .98), rgba(246, 229, 195, .96));
   box-shadow: 0 26px 70px rgba(38, 25, 16, .34);
-  overflow: auto;
+  overflow: hidden;
 }
 
 .map-monster-equipment-header {
@@ -8260,14 +8263,38 @@ progress {
 
 .map-monster-equipment-preview {
   --slot-h: 106px;
-}
-
-.map-monster-equipment-preview .battle-slot-grid {
-  padding: 10px 10px 30px;
+  min-height: 0;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: 26px 158px;
+  align-content: start;
   overflow: hidden;
 }
 
+.map-monster-equipment-preview .battle-row-title {
+  min-width: 0;
+  height: 26px;
+}
+
+.map-monster-equipment-preview .battle-row-title span,
+.map-monster-equipment-preview .battle-row-title small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.map-monster-equipment-preview .battle-slot-grid {
+  height: 158px;
+  min-height: 158px;
+  max-height: 158px;
+  padding: 10px 10px 30px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  align-content: start;
+}
+
 .map-monster-equipment-preview .battle-item {
+  min-height: 0;
   overflow: hidden;
 }
 
