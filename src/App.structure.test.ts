@@ -927,7 +927,7 @@ describe('selection screen structure', () => {
   it('wires feedback sounds into UI toast and battle playback paths', () => {
     expect(app).toContain("from './sound-feedback'")
     expect(app).toContain('soundCueForUiFeedback(kind)')
-    expect(app).toContain('soundCueForBattlePresentation(presentation.kind)')
+    expect(app).toContain('soundCueForBattlePresentation(presentationKind)')
     expect(app).toContain('playFeedbackSound')
     expect(app).toContain('soundEnabled={musicEnabled}')
     expect(app).toContain('function BattleView({ run, battle, cosmetics: equippedCosmetics, currentEvent, eventIndex, speed, score, soundEnabled, onSpeed, onContinue, onRestart }')

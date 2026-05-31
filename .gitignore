@@ -2,8 +2,10 @@
 logs
 *.log
 .codex-logs
+.codex-tmp/
 .superpowers
 .worktrees/
+artifacts/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
@@ -12,8 +14,10 @@ lerna-debug.log*
 
 node_modules
 dist
+dist-click/
 dist-ssr
 *.local
+picture/
 
 # Editor directories and files
 .vscode/*

@@ -24,7 +24,8 @@ const projectilePalettes: Record<PresentationKind, string[]> = {
   utility: ['#38bdf8', '#818cf8', '#ffffff'],
 }
 
-export function battleProjectileCues(kind: PresentationKind, _amount?: number | null): BattleProjectileCue[] {
+export function battleProjectileCues(kind: PresentationKind, amount?: number | null): BattleProjectileCue[] {
+  void amount
   if (kind === 'none' || kind === 'roll') return []
   return [{
     delay: 0,

@@ -34,6 +34,7 @@ rm -rf \
   "$TEMP_DEPLOY_PATH/.github" \
   "$TEMP_DEPLOY_PATH/.codex-logs" \
   "$TEMP_DEPLOY_PATH/.codex-tmp" \
+  "$TEMP_DEPLOY_PATH/artifacts" \
   "$TEMP_DEPLOY_PATH/dist" \
   "$TEMP_DEPLOY_PATH/dist-click" \
   "$TEMP_DEPLOY_PATH/node_modules" \

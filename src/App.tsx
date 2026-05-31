@@ -1540,7 +1540,10 @@ function RuleTermFloatingTip({ tip }: { tip: RuleTermTipState | null }) {
 
 export default function App() {
   if (isItemArtDebugRoute()) return <ItemArtDebugGallery />
+  return <GameApp />
+}
 
+function GameApp() {
   const { t, language } = useLanguage()
   const [account, setAccount] = useState(createDefaultAccount)
   const [password, setPassword] = useState('dogdice')
@@ -5403,11 +5406,12 @@ function BattleView({ run, battle, cosmetics: equippedCosmetics, currentEvent, e
   const isFinished = Boolean(playback && (!battle || eventIndex >= events.length - 1))
   const targetEquipment = event && playback ? targetEquipmentItemsForBattleEvent(event, playerSnapshot, opponentSnapshot) : { owner: null, itemIds: [] }
   const presentation = battlePresentationWithEquipmentTarget(event ? createBattlePresentation(event) : null, targetEquipment)
+  const presentationKind = presentation?.kind
 
   useEffect(() => {
-    if (!presentation) return
-    playFeedbackSound(soundCueForBattlePresentation(presentation.kind), { enabled: soundEnabled })
-  }, [displayIndex, presentation?.kind, soundEnabled])
+    if (!presentationKind) return
+    playFeedbackSound(soundCueForBattlePresentation(presentationKind), { enabled: soundEnabled })
+  }, [displayIndex, presentationKind, soundEnabled])
 
   useEffect(() => {
     setSettlementHidden(false)
@@ -5880,7 +5884,7 @@ function BattleFxStage({ event, eventIndex, presentation, speed, battleFxClass =
     instancesRef.current = nextInstances
     lastCueKeyRef.current = cueKey
     setActiveFxInstances(nextInstances)
-  }, [cueKey, speed])
+  }, [cueKey, event, presentation, speed])
 
   useEffect(() => {
     const stage = stageRef.current

@@ -1,7 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="raindrop funnel">
-  <rect width="128" height="128" rx="28" fill="#eefcff"/>
-  <path d="M31 30h66L78 67v32H50V67L31 30Z" fill="#b8f3ff" stroke="#246b7a" stroke-width="7" stroke-linejoin="round"/>
-  <path d="M48 48h32" stroke="#fff" stroke-width="7" stroke-linecap="round" opacity=".75"/>
-  <path d="M64 10c14 18 20 27 20 38a20 20 0 0 1-40 0c0-11 6-20 20-38Z" fill="#5cc6ff" stroke="#216181" stroke-width="6"/>
-  <path d="M50 99c-12 0-20 6-24 15m52-15c12 0 20 6 24 15" stroke="#36b88f" stroke-width="7" stroke-linecap="round"/>
-</svg>

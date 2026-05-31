@@ -131,6 +131,7 @@ export const ItemFrame = forwardRef<HTMLDivElement | HTMLButtonElement, ItemFram
 ) {
   if (props.as === 'button') {
     const { as, className, children, ...buttonProps } = props
+    void as
     return (
       <button ref={ref as ForwardedRef<HTMLButtonElement>} className={joinClasses('item-card', 'paper-item-card', 'handdrawn-item-frame', className)} {...buttonProps}>
         {children}
@@ -139,6 +140,7 @@ export const ItemFrame = forwardRef<HTMLDivElement | HTMLButtonElement, ItemFram
   }
 
   const { as, className, children, ...divProps } = props
+  void as
   return (
     <div ref={ref as ForwardedRef<HTMLDivElement>} className={joinClasses('item-card', 'paper-item-card', 'handdrawn-item-frame', className)} {...divProps}>
       {children}

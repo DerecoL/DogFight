@@ -91,6 +91,7 @@ describe('production deployment assets', () => {
     expect(remoteDeploy).toContain('"$TEMP_DEPLOY_PATH/node_modules"')
     expect(remoteDeploy).toContain('"$TEMP_DEPLOY_PATH/dist-click"')
     expect(remoteDeploy).toContain('"$TEMP_DEPLOY_PATH/.codex-tmp"')
+    expect(remoteDeploy).toContain('"$TEMP_DEPLOY_PATH/artifacts"')
     expect(remoteDeploy).toContain('"$TEMP_DEPLOY_PATH/backups"')
     expect(remoteDeploy).toContain('PRODUCTION_ENV override did not include DATABASE_URL')
     expect(remoteDeploy).toContain('ENV_OVERRIDE_PATH="$TEMP_DEPLOY_PATH/.env.production.override"')

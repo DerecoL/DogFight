@@ -1,8 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="full pond gate">
-  <rect width="128" height="128" rx="28" fill="#e9fbf5"/>
-  <path d="M21 84c15-10 31-10 47 0s31 10 47 0v26H21V84Z" fill="#49c7c5" stroke="#1f6d71" stroke-width="6" stroke-linejoin="round"/>
-  <path d="M38 25h52v59H38z" fill="#f0b85a" stroke="#724218" stroke-width="7" stroke-linejoin="round"/>
-  <path d="M51 25v59m26-59v59" stroke="#724218" stroke-width="6"/>
-  <path d="M30 52h68" stroke="#724218" stroke-width="8" stroke-linecap="round"/>
-  <path d="M45 94c9 7 18 7 27 0s18-7 27 0" fill="none" stroke="#e8fffb" stroke-width="6" stroke-linecap="round"/>
-</svg>

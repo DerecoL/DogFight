@@ -1,18 +1,9 @@
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { text, type uiText } from './dictionary'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { text } from './dictionary'
 import { applyLegacyDomLocalization } from './legacy-dom-localization'
+import { LanguageContext, type LanguageContextValue } from './language-context'
 import { readStoredLanguage, writeStoredLanguage } from './language'
 import type { Language } from './types'
-
-type TranslationKey = keyof typeof uiText
-
-type LanguageContextValue = {
-  language: Language
-  setLanguage: (language: Language) => void
-  t: (key: TranslationKey) => string
-}
-
-const LanguageContext = createContext<LanguageContextValue | null>(null)
 
 export function LanguageProvider({ children }: { children: ReactNode }) {
   const [language, setLanguageState] = useState<Language>(() => readStoredLanguage())
@@ -33,10 +24,4 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   }, [language])
 
   return <LanguageContext.Provider value={value}>{children}</LanguageContext.Provider>
-}
-
-export function useLanguage() {
-  const value = useContext(LanguageContext)
-  if (!value) throw new Error('useLanguage must be used within LanguageProvider')
-  return value
 }

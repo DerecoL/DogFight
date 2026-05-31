@@ -1,9 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="croak drum">
-  <rect width="128" height="128" rx="28" fill="#edfdf7"/>
-  <ellipse cx="64" cy="61" rx="37" ry="28" fill="#f7d58b" stroke="#6b3f1f" stroke-width="7"/>
-  <path d="M29 62v23c0 16 70 16 70 0V62" fill="#7ed957" stroke="#2d6a2f" stroke-width="7"/>
-  <ellipse cx="64" cy="62" rx="35" ry="18" fill="#ffe7ae" stroke="#6b3f1f" stroke-width="5"/>
-  <path d="M28 34c-11 8-11 22 0 30m72-30c11 8 11 22 0 30" fill="none" stroke="#35b9a7" stroke-width="6" stroke-linecap="round"/>
-  <path d="M41 22l23 20m23-20L64 42" stroke="#6b3f1f" stroke-width="6" stroke-linecap="round"/>
-  <circle cx="64" cy="42" r="7" fill="#f05d7b"/>
-</svg>
