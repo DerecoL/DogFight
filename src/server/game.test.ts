@@ -2778,4 +2778,36 @@ describe('battle simulation', () => {
     expect(result.events.some((event) => event.text.includes('暴雨季') && event.text.includes('充水速度'))).toBe(true)
     expect(result.events.some((event) => event.text.includes('满池闸门') && event.text.includes('水位最高'))).toBe(true)
   })
+
+  it('cuts same-tick frog fanout cycles before a growth item can trigger explosively', () => {
+    const allDice = [1, 2, 3, 4, 5, 6]
+    const player: FighterSnapshot = {
+      name: 'P',
+      dogType: 'FROG' as never,
+      wins: 0,
+      losses: 0,
+      round: 13,
+      items: [
+        { id: 'growth', defId: 'v4-growing-chew-sword', quality: 'DIAMOND', area: 'EQUIPMENT', x: 0, y: 0, triggerDiceOverride: allDice },
+        { id: 'left-light', defId: 'v3-night-patrol-light', quality: 'DIAMOND', area: 'EQUIPMENT', x: 2, y: 0, triggerDiceOverride: allDice },
+        { id: 'drum', defId: 'frog-croak-drum', quality: 'GOLD', area: 'EQUIPMENT', x: 4, y: 0, triggerDiceOverride: allDice },
+        { id: 'right-light', defId: 'v3-night-patrol-light', quality: 'GOLD', area: 'EQUIPMENT', x: 5, y: 0, triggerDiceOverride: allDice },
+        { id: 'counter', defId: 'v4-boom-counter', quality: 'GOLD', area: 'EQUIPMENT', x: 7, y: 0 },
+        { id: 'fang', defId: 'poisoned-dog-fang', quality: 'GOLD', area: 'EQUIPMENT', x: 9, y: 0 },
+      ],
+    }
+    const opponent: FighterSnapshot = { name: 'O', dogType: 'SHIBA', wins: 0, losses: 0, round: 13, items: [] }
+
+    const result = simulateBattle(player, opponent, 'frog-fanout-growth-loop')
+    const growthHitsAtOpeningTick = result.events.filter((event) =>
+      event.time === 0.5
+      && event.kind === 'ITEM'
+      && event.actor === 'player'
+      && event.itemId === 'growth'
+      && event.effectType === 'DAMAGE'
+    )
+
+    expect(growthHitsAtOpeningTick).toHaveLength(6)
+    expect(result.duration).toBeGreaterThan(0.5)
+  })
 })

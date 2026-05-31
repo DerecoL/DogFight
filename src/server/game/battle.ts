@@ -107,6 +107,7 @@ type TriggerQueueEntry = {
   multiIndex: number
   multiTotal: number
   chainEdgeIds: Set<string>
+  source: 'roll' | 'reservoir' | 'fanout'
 }
 
 type MultiCountTransform = (item: GameItem, multiTotal: number) => number
@@ -398,6 +399,7 @@ function queueItems(
   chainEdgeIds?: Set<string>,
   sourceItemId?: string,
   multiCountTransform?: MultiCountTransform,
+  source: TriggerQueueEntry['source'] = sourceItemId ? 'fanout' : 'roll',
 ) {
   const transformedMultiCount = (item: GameItem) => {
     const base = effectiveMultiCount(actor, item)
@@ -409,7 +411,7 @@ function queueItems(
     for (const item of items) {
       const multiTotal = transformedMultiCount(item)
       for (let multiIndex = 1; multiIndex <= multiTotal; multiIndex += 1) {
-        queue.push({ item, allowExtraRollFanout, allowLargeTriggerFanout, multiIndex, multiTotal, chainEdgeIds: new Set() })
+        queue.push({ item, allowExtraRollFanout, allowLargeTriggerFanout, multiIndex, multiTotal, chainEdgeIds: new Set(), source })
       }
     }
     return
@@ -424,7 +426,7 @@ function queueItems(
     newEdgeIds.add(edgeId)
     const multiTotal = transformedMultiCount(item)
     for (let multiIndex = 1; multiIndex <= multiTotal; multiIndex += 1) {
-      queue.push({ item, allowExtraRollFanout, allowLargeTriggerFanout, multiIndex, multiTotal, chainEdgeIds: rootChainEdgeIds })
+      queue.push({ item, allowExtraRollFanout, allowLargeTriggerFanout, multiIndex, multiTotal, chainEdgeIds: rootChainEdgeIds, source: 'fanout' })
     }
   }
   for (const edgeId of newEdgeIds) rootChainEdgeIds.add(edgeId)
@@ -780,7 +782,8 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
     allowLargeTriggerFanout = true,
     chainEdgeIds?: Set<string>,
     sourceItemId?: string,
-  ) => queueItems(queue, actor, items, allowExtraRollFanout, allowLargeTriggerFanout, chainEdgeIds, sourceItemId, antiMultiTransform(time, actorSide))
+    source: TriggerQueueEntry['source'] = sourceItemId ? 'fanout' : 'roll',
+  ) => queueItems(queue, actor, items, allowExtraRollFanout, allowLargeTriggerFanout, chainEdgeIds, sourceItemId, antiMultiTransform(time, actorSide), source)
 
   const executeItem = (
     actorSide: Side,
@@ -800,6 +803,7 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
     chainEdgeIds: Set<string>,
     multiIndex: number,
     multiTotal: number,
+    triggerSource: TriggerQueueEntry['source'],
   ): ItemTrigger[] => {
     const targetSide = opponentOf(actorSide)
     const targetFighter = targetSide === 'player' ? player : opponent
@@ -1398,19 +1402,21 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
       triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'UTILITY', amount: 0, target: actorSide, sourceHp: getHp(actorSide), targetHp: getHp(targetSide), sourceHpDelta: 0, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 【净化】所有负面状态` })
     }
 
+    const isReservoirTrigger = triggerSource === 'reservoir'
+
     if (!sacrificeReplacesSmallEffect && advanced === 'ADJACENT_DAMAGE_BONUS') {
       for (const adjacent of adjacentItems(actor, item)) actorState.adjacentDamageBonus[adjacent.id] = (actorState.adjacentDamageBonus[adjacent.id] ?? 0) + qualityAmount(4, quality)
     }
-    if (!sacrificeReplacesSmallEffect && advanced === 'FROG_CHARGE_ADJACENT') {
+    if (!sacrificeReplacesSmallEffect && isReservoirTrigger && advanced === 'FROG_CHARGE_ADJACENT') {
       const adjacent = adjacentItems(actor, item)
       for (const targetItem of adjacent) chargeReservoir(actorSide, targetItem, time, 0.5)
       triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'UTILITY', amount: adjacent.length, target: actorSide, sourceHp: getHp(actorSide), targetHp: getHp(targetSide), sourceHpDelta: 0, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 使【相邻】装备获得 50% 水位` })
     }
-    if (!sacrificeReplacesSmallEffect && advanced === 'FROG_RAINY_SEASON') {
+    if (!sacrificeReplacesSmallEffect && isReservoirTrigger && advanced === 'FROG_RAINY_SEASON') {
       actorState.frogRainyUntil = Math.max(actorState.frogRainyUntil, time + 4)
       triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'UTILITY', amount: 4, target: actorSide, sourceHp: getHp(actorSide), targetHp: getHp(targetSide), sourceHpDelta: 0, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 开启【暴雨季】，4 秒内充水速度 +50%` })
     }
-    if (!sacrificeReplacesSmallEffect && advanced === 'FROG_TRIGGER_HIGHEST_RESERVOIR') {
+    if (!sacrificeReplacesSmallEffect && isReservoirTrigger && advanced === 'FROG_TRIGGER_HIGHEST_RESERVOIR') {
       const candidates = Object.values(reservoirs[actorSide])
         .filter((entry) => entry.item.id !== item.id && itemDef(entry.item.defId).kind !== 'CLASS_EQUIPMENT')
         .sort((left, right) => ((time - right.lastResetAt) / right.duration) - ((time - left.lastResetAt) / left.duration))
@@ -1420,7 +1426,7 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
         triggers.push({ itemId: item.id, targetItemId: target.id, defId: item.defId, quality, effectType: 'UTILITY', amount: 1, target: actorSide, sourceHp: getHp(actorSide), targetHp: getHp(targetSide), sourceHpDelta: 0, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 立即触发水位最高的装备` })
       }
     }
-    if (!sacrificeReplacesSmallEffect && advanced === 'FROG_ROLL_ON_RESERVOIR' && !frogClassRoll) {
+    if (!sacrificeReplacesSmallEffect && isReservoirTrigger && advanced === 'FROG_ROLL_ON_RESERVOIR' && !frogClassRoll) {
       processed.frogRollRequests = (processed.frogRollRequests ?? 0) + 1
       triggers.push({ itemId: item.id, defId: item.defId, quality, effectType: 'ROLL', amount: 1, target: actorSide, sourceHp: getHp(actorSide), targetHp: getHp(targetSide), sourceHpDelta: 0, targetHpDelta: 0, roll, text: `${itemName(def, quality)} 鼓动水声，准备进行一次普通投骰` })
     }
@@ -1551,7 +1557,7 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
     while (queue.length > 0 && processed.count < TRIGGER_QUEUE_CAP && !hasDefeatedFighter()) {
       const entry = queue.shift()
       if (!entry) continue
-      const { item, allowExtraRollFanout, allowLargeTriggerFanout, chainEdgeIds, multiIndex, multiTotal } = entry
+      const { item, allowExtraRollFanout, allowLargeTriggerFanout, chainEdgeIds, multiIndex, multiTotal, source } = entry
       const context = matchingContext(fighter, item, roll, fighterState.forcedItemDice)
       processed.count += 1
       const itemTriggerCount = (fighterState.itemTriggerCounts[item.id] ?? 0) + 1
@@ -1559,7 +1565,7 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
       const queueLengthBefore = queue.length
       const extraRollRequestsBefore = processed.extraRollRequests
       const frogRollRequestsBefore = processed.frogRollRequests
-      const itemTriggers = executeItem(actorSide, fighter, item, time, roll, context.scale, context.note, queue, processed, extra, extraDepth, allowExtraRollFanout, allowLargeTriggerFanout, frogClassRoll, chainEdgeIds, multiIndex, multiTotal)
+      const itemTriggers = executeItem(actorSide, fighter, item, time, roll, context.scale, context.note, queue, processed, extra, extraDepth, allowExtraRollFanout, allowLargeTriggerFanout, frogClassRoll, chainEdgeIds, multiIndex, multiTotal, source)
       const hasSelfTriggerEvent = itemTriggers.some((trigger) => trigger.itemId === item.id)
       const def = itemDef(item.defId)
       const quality = normalizeQuality(item.quality)
@@ -1834,7 +1840,7 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
         for (const entry of Object.values(reservoirs[actor]).filter((candidate) => Math.abs(candidate.nextAt - time) <= TIME_EPSILON)) {
           resetReservoir(actor, entry.item, time)
           const queue: TriggerQueueEntry[] = []
-          queueBattleItems(queue, actor, fighter, [entry.item], time)
+          queueBattleItems(queue, actor, fighter, [entry.item], time, true, true, undefined, undefined, 'reservoir')
           const processed = processTriggerQueue(time, actor, fighter, 0, queue)
           for (let index = 0; index < processed.frogRollRequests && index < 3; index += 1) {
             resolveActor(time, actor, false, 0, true)
