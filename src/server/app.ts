@@ -22,7 +22,7 @@ import { simulateBattle } from './game/battle'
 import { calculateLadderResult, ladderTierForScore, ladderTierLabels, ladderTiers, type LadderTier } from './game/ladder'
 import { STARTING_GOLD, isTrainingMatchRound, selectCasualGhostSnapshot, selectLadderGhostSnapshot, targetLadderOpponentWinsRange, targetOpponentWins } from './game/matchmaking'
 import type { BattleResult, DogType, EnchantmentChoice, FighterSnapshot, GameItem, PotionChoice, RelicInstance, ShopOffer, ShopType } from './game/types'
-import { applyRelicChoice, createFinishedBattleRecord, initialItems, makeChoices, makePotionChoices, makeRelicChoices, makeShop, nextPhaseData, parseJson, postBattleLargeItemReward, postBattleSellBonusItemGrowths, publicLadderSettlement, publicRun, publicRunHistory, relicsFromRun, removeRelicByInstanceId, seedGhost, snapshotFromRun, toGameItems } from './state'
+import { applyRelicChoice, createFinishedBattleRecord, initialItems, makeChoices, makePotionChoices, makeRelicChoices, makeShop, nextPhaseData, parseJson, postBattleLargeItemReward, postBattleSellBonusItemGrowths, publicLadderSettlement, publicRun, publicRunHistory, relicsFromRun, removeRelicByInstanceId, seedGhost, snapshotFromRun, toGameItems, upgradeChoiceSkipPhase } from './state'
 import { accountSummary, claimAchievement, claimDaily, equipUserCosmetic, getAchievements, getCosmetics, getDailyTasks, getShop, purchaseShopItem, recordAccountEvent, refreshDaily, unequipUserCosmetic } from './account-services'
 import { getActiveSeason, publicSeason, publicSeasonSummary } from './seasons'
 
@@ -1187,6 +1187,27 @@ export function buildApp() {
         include: { items: true },
       }),
     ])
+    return { run: publicRun(updated) }
+  })
+
+  app.post('/api/runs/:runId/upgrade/skip', async (request, reply) => {
+    const userId = requireUser(request.userId)
+    const { runId } = z.object({ runId: z.string() }).parse(request.params)
+    const run = await prisma.run.findFirst({ where: { id: runId, userId }, include: { items: true } })
+    if (!run) return reply.code(404).send({ error: '跑局不存在' })
+    if (await isReadyDogfightRunLocked(run.id)) return reply.code(400).send({ error: '本回合已完成，等待其他玩家' })
+    if (run.phase !== 'UPGRADE_CHOICE') return reply.code(400).send({ error: '当前不在升级商店' })
+    const updated = await prisma.run.update({
+      where: { id: run.id },
+      data: {
+        ...(upgradeChoiceSkipPhase(run) === 'MAP' ? mapCompletionUpdateData(run) : { phase: 'PREP' }),
+        choices: '[]',
+        shopItems: '[]',
+        relicChoices: '[]',
+        potionChoices: '[]',
+      },
+      include: { items: true },
+    })
     return { run: publicRun(updated) }
   })
 

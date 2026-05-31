@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createFinishedBattleRecord, nextPhaseData, postBattleLargeItemReward, postBattleSellBonusItemGrowths, publicRelics, publicRun, publicRunHistory, toGameItems } from './state'
+import { createFinishedBattleRecord, nextPhaseData, postBattleLargeItemReward, postBattleSellBonusItemGrowths, publicRelics, publicRun, publicRunHistory, toGameItems, upgradeChoiceSkipPhase } from './state'
 
 describe('public run relic data', () => {
   it('returns quality-adjusted relic descriptions for upgraded relics', () => {
@@ -56,6 +56,26 @@ describe('public exploration map data', () => {
         nodes: [{ id: 'n-0-0', kind: 'PLAYER_BATTLE' }],
       },
     })
+  })
+})
+
+describe('upgrade choice skip flow', () => {
+  it('continues the map when an upgrade choice belongs to a current map node', () => {
+    const mapState = JSON.stringify({
+      version: 1,
+      mapIndex: 0,
+      currentNodeId: 'shop-node',
+      completedNodeIds: [],
+      nodes: [
+        { id: 'shop-node', layer: 0, column: 0, kind: 'SHOP_FIXED', shopType: 'UPGRADE_SILVER', nextNodeIds: [] },
+      ],
+    })
+
+    expect(upgradeChoiceSkipPhase({ mapState })).toBe('MAP')
+  })
+
+  it('returns to prep when an upgrade choice is not tied to the map', () => {
+    expect(upgradeChoiceSkipPhase({ mapState: '{}' })).toBe('PREP')
   })
 })
 

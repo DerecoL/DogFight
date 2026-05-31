@@ -1195,6 +1195,28 @@ describeWithDatabase('run API', () => {
     expect(rejected.body.error).toBe('当前升级商店不能升级该品质装备')
   })
 
+  it('skips an upgrade shop with no eligible items and completes the current map node', async () => {
+    const { agent, run } = await createAuthenticatedRun()
+    const map = run.mapState
+    const node = map.nodes.find((entry: { kind: string }) => entry.kind === 'SHOP_FIXED') ?? map.nodes[0]
+    await prisma.run.update({
+      where: { id: run.id },
+      data: {
+        phase: 'UPGRADE_CHOICE',
+        shopType: 'UPGRADE_SILVER',
+        mapState: JSON.stringify({ ...map, currentNodeId: node.id }),
+      },
+    })
+    await prisma.itemInstance.updateMany({ where: { runId: run.id }, data: { quality: 'SILVER' } })
+
+    const skipped = await agent.post(`/api/runs/${run.id}/upgrade/skip`).send({}).expect(200)
+
+    expect(skipped.body.run.phase).toBe('MAP')
+    expect(skipped.body.run.mapState.currentNodeId).toBeNull()
+    expect(skipped.body.run.mapState.completedNodeIds).toContain(node.id)
+    expect(skipped.body.run.items.every((item: { quality: string }) => item.quality === 'SILVER')).toBe(true)
+  })
+
   it('supports potion shop choice and applies a concrete potion to a non-class item', async () => {
     const agent = request.agent(app.server)
     await app.ready()

@@ -286,6 +286,11 @@ export function makeChoices<T extends QualityBearingItem>(seed: string, round = 
   return createChoices(createRng(seed), round, items)
 }
 
+export function upgradeChoiceSkipPhase(run: { mapState?: string | null }): 'MAP' | 'PREP' {
+  const mapState = normalizeExplorationMapState(parseOptionalJson(run.mapState, null))
+  return mapState?.currentNodeId ? 'MAP' : 'PREP'
+}
+
 export function makeRelicChoices(run: Pick<Run, 'relics'>, seed: string) {
   return createRelicChoices(relicsFromRun(run), createRng(seed))
 }

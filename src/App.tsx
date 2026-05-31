@@ -1913,6 +1913,16 @@ export default function App() {
     )
   }
 
+  const skipUpgradeChoice = () => {
+    if (!run) return
+    setTipAnchor(null)
+    setSelectedItemId(null)
+    void action(
+      () => api(`/runs/${run.id}/upgrade/skip`, { method: 'POST' }),
+      { success: 'upgrade-success', failure: 'upgrade-failed' },
+    )
+  }
+
   const applyPotionChoice = (itemId: string) => {
     if (!run || !selectedPotion) return
     setTipAnchor(null)
@@ -2324,7 +2334,7 @@ export default function App() {
 
       {!battle && run.phase === 'UPGRADE_CHOICE' && (
         <section className="reward-workbench upgrade-workbench">
-          <UpgradeChoiceSelect run={run} visualTheme={visualThemeForRound(run.round)} />
+          <UpgradeChoiceSelect run={run} visualTheme={visualThemeForRound(run.round)} onSkip={skipUpgradeChoice} />
           <InventoryBoard
             run={run}
             selectedItemId={selectedItemId}
@@ -3325,6 +3335,13 @@ function DogfightRoomView({ room, onRoomChange, onLeave, soundEnabled }: { room:
     void runAction(() => api<{ run: Run }>(`/runs/${run.id}/upgrade/select`, { method: 'POST', body: JSON.stringify({ itemId }) }))
   }
 
+  const skipUpgradeChoice = () => {
+    if (!run || currentMember?.ready) return
+    setTipAnchor(null)
+    setSelectedItemId(null)
+    void runAction(() => api<{ run: Run }>(`/runs/${run.id}/upgrade/skip`, { method: 'POST' }))
+  }
+
   const applyPotionChoice = (itemId: string) => {
     if (!run || !selectedPotion || currentMember?.ready) return
     setTipAnchor(null)
@@ -3510,6 +3527,7 @@ function DogfightRoomView({ room, onRoomChange, onLeave, soundEnabled }: { room:
                 onClassReward={(defId) => !currentMember?.ready && runAction(() => api<{ run: Run }>(`/runs/${run.id}/class-reward/select`, { method: 'POST', body: JSON.stringify({ defId }) }))}
                 onRelic={(relicId) => !currentMember?.ready && runAction(() => api<{ run: Run }>(`/runs/${run.id}/relic/select`, { method: 'POST', body: JSON.stringify({ relicId }) }))}
                 onUpgradeChoice={selectUpgradeChoice}
+                onSkipUpgradeChoice={skipUpgradeChoice}
                 selectedEnchantId={selectedEnchant?.id ?? ''}
                 onEnchantChoice={setSelectedEnchantId}
                 selectedPotionId={selectedPotion?.id ?? ''}
@@ -3541,7 +3559,7 @@ function DogfightRoomView({ room, onRoomChange, onLeave, soundEnabled }: { room:
   )
 }
 
-function DogfightRunWorkbench({ run, selectedItemId, selectedOfferId, selectedItem, selectedOffer, tipAnchor, onDrop, onInspectOffer, onInspectItem, onMoveItem, onReroll, onBuy, onSell, onSellRelic, onUpgrade, onChoice, onClassReward, onRelic, onUpgradeChoice, selectedEnchantId, onEnchantChoice, selectedPotionId, onPotionChoice, onCloseTip }: {
+function DogfightRunWorkbench({ run, selectedItemId, selectedOfferId, selectedItem, selectedOffer, tipAnchor, onDrop, onInspectOffer, onInspectItem, onMoveItem, onReroll, onBuy, onSell, onSellRelic, onUpgrade, onChoice, onClassReward, onRelic, onUpgradeChoice, onSkipUpgradeChoice, selectedEnchantId, onEnchantChoice, selectedPotionId, onPotionChoice, onCloseTip }: {
   run: Run
   selectedItemId: string | null
   selectedOfferId: string | null
@@ -3561,6 +3579,7 @@ function DogfightRunWorkbench({ run, selectedItemId, selectedOfferId, selectedIt
   onClassReward: (defId: string) => void
   onRelic: (relicId: string) => void
   onUpgradeChoice: (itemId: string) => void
+  onSkipUpgradeChoice: () => void
   selectedEnchantId: string
   onEnchantChoice: (id: string) => void
   selectedPotionId: string
@@ -3590,7 +3609,7 @@ function DogfightRunWorkbench({ run, selectedItemId, selectedOfferId, selectedIt
   if (run.phase === 'UPGRADE_CHOICE') {
     return (
       <section className="reward-workbench upgrade-workbench">
-        <UpgradeChoiceSelect run={run} visualTheme={visualThemeForRound(run.round)} />
+        <UpgradeChoiceSelect run={run} visualTheme={visualThemeForRound(run.round)} onSkip={onSkipUpgradeChoice} />
         <InventoryBoard run={run} selectedItemId={selectedItemId} onDrop={onDrop} onSellRelic={onSellRelic} onSelectItem={onInspectItem} onSlotClick={() => undefined} />
         <FloatingTip run={run} item={selectedItem} offer={null} anchor={tipAnchor} onClose={onCloseTip} onBuy={null} onSell={null} onUpgrade={selectedItem && canFreeUpgradeItem(selectedItem) ? () => onUpgradeChoice(selectedItem.id) : null} />
       </section>
@@ -4731,7 +4750,7 @@ function RelicChoiceSelect({ choices, visualTheme, onPick }: { choices: RelicCho
   )
 }
 
-function UpgradeChoiceSelect({ run, visualTheme }: { run: Run; visualTheme: VisualThemeId }) {
+function UpgradeChoiceSelect({ run, visualTheme, onSkip }: { run: Run; visualTheme: VisualThemeId; onSkip: () => void }) {
   const maxQuality = upgradeShopMaxQuality(run.shopType)
   const upgradeableCount = run.items.filter((item) => canFreeUpgradeItem(item, run.shopType)).length
   return (
@@ -4748,6 +4767,9 @@ function UpgradeChoiceSelect({ run, visualTheme }: { run: Run; visualTheme: Visu
           <span className="choice-copy">{qualityLabel[maxQuality]}及以上品质不能在本商店继续提升。</span>
         </HanddrawnChoiceCard>
       </div>
+      <ActionButton variant="secondary" className="choice-submit" onClick={onSkip}>
+        <ArrowRight size={18} /> 放弃升级
+      </ActionButton>
     </HanddrawnFrame>
   )
 }
