@@ -2381,11 +2381,11 @@ input {
   height: var(--slot-h);
   min-height: 142px;
   display: grid;
-  grid-template-rows: 20px 42px 18px 18px minmax(0, 1fr);
-  align-content: start;
+  grid-template-rows: 72px minmax(0, 1fr);
+  align-content: stretch;
   justify-items: center;
-  gap: 2px;
-  padding: 7px 5px 18px;
+  gap: 3px;
+  padding: 8px 5px 18px;
   overflow: visible;
   isolation: isolate;
   cursor: pointer;
@@ -2429,25 +2429,72 @@ input {
 .battle-enchant-overlay svg {
   flex: 0 0 auto;
 }
-.battle-item .item-icon {
-  grid-row: 2;
+.battle-item-icon-frame {
+  grid-row: 1;
+  position: relative;
   align-self: center;
-  width: 42px;
-  height: 42px;
+  justify-self: center;
+  display: grid;
+  place-items: center;
+  width: 62px;
+  height: 62px;
+  min-width: 62px;
+  min-height: 62px;
+  overflow: hidden;
+  border: 2px solid rgba(61, 45, 37, .36);
+  border-radius: 8px;
+  background:
+    radial-gradient(circle at 35% 24%, rgba(255, 255, 255, .82), transparent 25%),
+    linear-gradient(135deg, var(--item-tone-soft, #eaf2ff), color-mix(in srgb, var(--item-tone-main, #60a5fa) 26%, #fff7e8));
+  box-shadow:
+    0 0 18px var(--item-art-glow, rgba(96, 165, 250, .26)),
+    inset 0 2px 0 rgba(255, 255, 255, .74);
+}
+.battle-item-icon-frame::before {
+  content: "";
+  position: absolute;
+  width: 38px;
+  height: 38px;
+  border-radius: 999px;
+  background: var(--item-tone-main, #60a5fa);
+  opacity: .22;
+  filter: blur(8px);
+}
+.battle-item .item-icon {
+  position: relative;
+  z-index: 1;
+  width: 46px;
+  height: 46px;
+  object-fit: contain;
+  filter: drop-shadow(0 8px 10px rgba(112, 72, 30, .22));
+}
+.battle-item-copy {
+  grid-row: 2;
+  align-self: end;
+  display: grid;
+  grid-template-rows: 18px 18px minmax(0, 1fr);
+  gap: 1px;
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  padding: 3px 4px 4px;
+  overflow: hidden;
+  border-radius: 6px;
+  background: rgba(255, 250, 241, .72);
 }
 .battle-item-name {
-  grid-row: 3;
+  grid-row: 1;
   width: 100%;
   min-width: 0;
   color: #253047;
-  font-size: calc(13px * var(--battle-name-scale, 1));
-  line-height: 1.05;
+  font-size: 13px;
+  line-height: 18px;
   white-space: nowrap;
   overflow: hidden;
-  text-overflow: clip;
+  text-overflow: ellipsis;
 }
 .battle-item-meta {
-  grid-row: 4;
+  grid-row: 2;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -2463,13 +2510,13 @@ input {
 .battle-item small { font-size: 11px; }
 .battle-item .battle-item-meta small {
   min-width: 0;
-  max-width: 100%;
+  max-width: 50%;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
 }
 .battle-item .battle-card-effect {
-  grid-row: 5;
+  grid-row: 3;
   align-self: stretch;
   display: -webkit-box;
   min-height: 0;

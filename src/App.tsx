@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react'
+﻿import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react'
 import { createPortal } from 'react-dom'
 import {
   DndContext,
@@ -5607,7 +5607,8 @@ function BattleEquipmentRow({ owner, snapshot, events, displayIndex, activeEvent
           const localizedDef = localizeItemDef(item.def, language)
           const qualityText = language === 'en-US' ? localizeQuality(normalizeQuality(item.quality), language) : qualityLabel[normalizeQuality(item.quality)]
           const itemEffect = language === 'en-US' ? localizedDef.description : (growthText ?? effectText(item.def, normalizeQuality(item.quality)))
-          const battleNameScale = Math.max(0.72, Math.min(1, 8 / Math.max(8, Array.from(localizedDef.name).length)))
+          const slotLabel = language === 'en-US' ? `${item.def.size} slots` : `占${item.def.size}格`
+          const diceLabel = triggerDice ?? (language === 'en-US' ? 'No dice' : '无点数')
           const fullEnchantText = item.enchant ? ` · ${enchantmentText(item.enchant)}` : ""
           return (
           <ItemFrame
@@ -5632,16 +5633,19 @@ function BattleEquipmentRow({ owner, snapshot, events, displayIndex, activeEvent
               />
             )}
             {item.enchant && <span className="battle-enchant-overlay" title={enchantmentText(item.enchant)}><Sparkles size={11} />{enchantmentText(item.enchant)}</span>}
-            <img className="item-icon" src={itemIcon(item.def)} alt="" />
             <span className="quality-chip">{qualityText}</span>
-            <span className="battle-item-name" style={{ '--battle-name-scale': battleNameScale } as CSSProperties}>{localizedDef.name}</span>
-            {(triggerDice || extraTriggerDice) && (
+            <span className="battle-item-icon-frame">
+              <img className="item-icon" src={itemIcon(item.def)} alt="" />
+            </span>
+            <span className="battle-item-copy">
+              <span className="battle-item-name">{localizedDef.name}</span>
               <span className="battle-item-meta">
-                {triggerDice && <small><Dice5 size={12} /> {triggerDice}</small>}
+                <small><Dice5 size={12} /> {diceLabel}</small>
+                <small>{slotLabel}</small>
                 {extraTriggerDice && <small className="extra-trigger-dice"><Sparkles size={12} /> 额外 {extraTriggerDice}</small>}
               </span>
-            )}
-            <small className="battle-card-effect item-effect">{itemEffect}</small>
+              <small className="battle-card-effect item-effect">{itemEffect}</small>
+            </span>
             {boomCounterState && (
               <span className="boom-counter-meter" aria-label={`爆鸣计数 ${boomCounterState.count}/${boomCounterState.max}`}>
                 <i style={{ width: `${boomCounterState.progress}%` }} />
