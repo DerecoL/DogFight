@@ -167,6 +167,7 @@ type ExplorationMapNode = {
   id: string
   layer: number
   column: number
+  x?: number
   kind: ExplorationMapNodeKind
   nextNodeIds: string[]
   shopType?: ShopType
@@ -4317,6 +4318,7 @@ function ExplorationMapView({
   onUpgrade: (() => void) | null
 }) {
   const map = run.mapState
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
   if (!map) return null
   const completed = new Set(map.completedNodeIds)
   const available = new Set(map.availableNodeIds)
@@ -4326,118 +4328,163 @@ function ExplorationMapView({
   const currentLayer = completed.size > 0
     ? Math.max(...map.completedNodeIds.map((nodeId) => map.nodes.find((node) => node.id === nodeId)?.layer ?? 0)) + 1
     : 0
+  const highlightedNode = selectedNodeId
+    ? map.nodes.find((node) => node.id === selectedNodeId) ?? currentNode
+    : currentNode ?? map.nodes.find((node) => available.has(node.id)) ?? map.nodes[0] ?? null
+  const orientation: 'horizontal' | 'vertical' = typeof window !== 'undefined' && window.matchMedia('(max-width: 760px)').matches ? 'vertical' : 'horizontal'
   return (
     <section className="exploration-map-screen">
-      <div className="exploration-map-header">
-        <div>
-          <h2>探索地图</h2>
-          <p>第 {map.mapIndex + 1} 张地图 · 第 {Math.min(12, currentLayer + 1)} / 12 层</p>
-        </div>
-        <div className="map-run-stats">
-          <ResourcePill icon={<Trophy size={16} />} label="胜场" value={`${run.wins}/12`} tone="gold" />
-          <ResourcePill icon={<Heart size={16} />} label="容错" value={`${Math.max(0, 5 - run.losses)}/5`} tone="pink" />
-          <ResourcePill icon={<Coins size={16} />} label="金币" value={run.gold} tone="gold" />
-        </div>
-      </div>
-
-      {currentEvent && (
-        <HanddrawnFrame as="section" variant="panel" ornament="corner" className="map-event-panel paper-card">
-          <MapNodeSticker kind="EVENT" size="lg" />
-          <div>
-            <h3>{currentEvent.title}</h3>
-            <p>{currentEvent.description}</p>
-          </div>
-          <ActionButton onClick={onResolveEvent}>处理事件</ActionButton>
-        </HanddrawnFrame>
-      )}
-
-      {map.pendingReward && (
-        <HanddrawnFrame as="section" variant="panel" ornament="wood" className="map-reward-panel paper-card">
-          <div className="map-reward-copy">
-            {pendingRewardDef ? <ItemArt def={pendingRewardDef} className="map-reward-art" /> : <MapNodeSticker kind="MONSTER_BATTLE" size="md" />}
+      <div className="exploration-map-overlay">
+        <div className="exploration-map-shell">
+          <div className="exploration-map-topbar">
             <div>
-              <h3>待领取掉落</h3>
-              <p>{pendingRewardDef?.name ?? map.pendingReward.defId} · {qualityLabel[normalizeQuality(map.pendingReward.quality)]}</p>
+              <h2>探索地图</h2>
+              <p>第 {map.mapIndex + 1} 张地图 · 第 {Math.min(12, currentLayer + 1)} / 12 层</p>
+            </div>
+            <div className="map-run-stats">
+              <ResourcePill icon={<Trophy size={16} />} label="胜场" value={`${run.wins}/12`} tone="gold" />
+              <ResourcePill icon={<Heart size={16} />} label="容错" value={`${Math.max(0, 5 - run.losses)}/5`} tone="pink" />
+              <ResourcePill icon={<Coins size={16} />} label="金币" value={run.gold} tone="gold" />
             </div>
           </div>
-          <div className="map-reward-actions">
-            <SellDropZone />
-            <ActionButton onClick={onClaimReward}>领取</ActionButton>
-            <ActionButton variant="secondary" onClick={onSkipReward}>放弃</ActionButton>
-          </div>
-          <InventoryBoard
-            run={run}
-            selectedItemId={selectedItemId}
-            onDrop={onDrop}
-            onSellRelic={onSellRelic}
-            onSelectItem={onSelectItem}
-            onSlotClick={onSlotClick}
-          />
-          <FloatingTip run={run} item={selectedItem} offer={null} anchor={tipAnchor} onClose={onCloseTip} onBuy={null} onSell={null} onUpgrade={onUpgrade} />
-        </HanddrawnFrame>
-      )}
 
-      <div className="exploration-map-board">
-        <div className="map-route-layer" aria-hidden="true">
-          {map.nodes.flatMap((node) => node.nextNodeIds.map((nextId) => {
-            const next = map.nodes.find((entry) => entry.id === nextId)
-            if (!next) return null
-            const start = mapNodePosition(node)
-            const end = mapNodePosition(next)
-            const dx = end.x - start.x
-            const dy = end.y - start.y
-            const length = Math.sqrt(dx * dx + dy * dy)
-            const angle = Math.atan2(dy, dx) * 180 / Math.PI
-            const active = completed.has(node.id) && available.has(next.id)
-            const done = completed.has(node.id) && completed.has(next.id)
-            return (
-              <span
-                key={`${node.id}:${next.id}`}
-                className={`map-route-line ${active ? 'available' : ''} ${done ? 'completed' : ''}`}
-                style={{ '--x1': start.x, '--y1': start.y, '--line-length': length, '--line-angle': `${angle}deg` } as React.CSSProperties}
+          <div className="exploration-map-route-board">
+            <div className="map-route-canvas" data-orientation={orientation}>
+              <div className="map-route-layer" aria-hidden="true">
+                {map.nodes.flatMap((node) => node.nextNodeIds.map((nextId) => {
+                  const next = map.nodes.find((entry) => entry.id === nextId)
+                  if (!next) return null
+                  const start = mapNodePosition(node, orientation)
+                  const end = mapNodePosition(next, orientation)
+                  const dx = end.x - start.x
+                  const dy = end.y - start.y
+                  const length = Math.sqrt(dx * dx + dy * dy)
+                  const angle = Math.atan2(dy, dx) * 180 / Math.PI
+                  const active = completed.has(node.id) && available.has(next.id)
+                  const done = completed.has(node.id) && completed.has(next.id)
+                  return (
+                    <span
+                      key={`${node.id}:${next.id}`}
+                      className={`map-route-line ${active ? 'available' : ''} ${done ? 'completed' : ''}`}
+                      style={{ '--x1': start.x, '--y1': start.y, '--line-length': length, '--line-angle': `${angle}deg` } as React.CSSProperties}
+                    />
+                  )
+                }))}
+              </div>
+              {map.nodes.map((node) => (
+                <MapNodeButton
+                  key={node.id}
+                  node={node}
+                  completed={completed.has(node.id)}
+                  available={available.has(node.id)}
+                  current={map.currentNodeId === node.id}
+                  selected={highlightedNode?.id === node.id}
+                  orientation={orientation}
+                  onInspect={setSelectedNodeId}
+                  onSelect={onSelectNode}
+                />
+              ))}
+            </div>
+
+            <aside className="map-node-detail-panel">
+              {currentEvent && (
+                <div className="map-side-card map-current-event">
+                  <MapNodeSticker kind="EVENT" size="md" />
+                  <div>
+                    <h3>{currentEvent.title}</h3>
+                    <p>{currentEvent.description}</p>
+                  </div>
+                  <ActionButton onClick={onResolveEvent}>处理事件</ActionButton>
+                </div>
+              )}
+              {map.pendingReward && (
+                <div className="map-side-card map-current-reward">
+                  <div className="map-reward-copy">
+                    {pendingRewardDef ? <ItemArt def={pendingRewardDef} className="map-reward-art" /> : <MapNodeSticker kind="MONSTER_BATTLE" size="md" />}
+                    <div>
+                      <h3>待领取掉落</h3>
+                      <p>{pendingRewardDef?.name ?? map.pendingReward.defId} · {qualityLabel[normalizeQuality(map.pendingReward.quality)]}</p>
+                    </div>
+                  </div>
+                  <div className="map-reward-actions">
+                    <SellDropZone />
+                    <ActionButton onClick={onClaimReward}>领取</ActionButton>
+                    <ActionButton variant="secondary" onClick={onSkipReward}>放弃</ActionButton>
+                  </div>
+                </div>
+              )}
+              {highlightedNode && (
+                <MapNodeDetail
+                  node={highlightedNode}
+                  available={available.has(highlightedNode.id)}
+                  current={map.currentNodeId === highlightedNode.id}
+                  completed={completed.has(highlightedNode.id)}
+                  onSelect={onSelectNode}
+                />
+              )}
+            </aside>
+          </div>
+          {map.pendingReward && (
+            <HanddrawnFrame as="section" variant="panel" ornament="wood" className="map-reward-inventory paper-card">
+              <InventoryBoard
+                run={run}
+                selectedItemId={selectedItemId}
+                onDrop={onDrop}
+                onSellRelic={onSellRelic}
+                onSelectItem={onSelectItem}
+                onSlotClick={onSlotClick}
               />
-            )
-          }))}
+              <FloatingTip run={run} item={selectedItem} offer={null} anchor={tipAnchor} onClose={onCloseTip} onBuy={null} onSell={null} onUpgrade={onUpgrade} />
+            </HanddrawnFrame>
+          )}
         </div>
-        {map.nodes.map((node) => (
-          <MapNodeButton
-            key={node.id}
-            node={node}
-            completed={completed.has(node.id)}
-            available={available.has(node.id)}
-            current={map.currentNodeId === node.id}
-            onSelect={onSelectNode}
-          />
-        ))}
       </div>
     </section>
   )
 }
 
-function mapNodePosition(node: Pick<ExplorationMapNode, 'layer' | 'column'>) {
-  const baseX = [18, 50, 82][node.column] ?? 50
-  const stagger = node.layer % 2 === 0 ? -2 : 2
-  return {
-    x: Math.max(10, Math.min(90, baseX + stagger)),
-    y: 4 + node.layer * 8.35,
+function mapNodePosition(node: Pick<ExplorationMapNode, 'layer' | 'column' | 'x'>, orientation: 'horizontal' | 'vertical' = 'horizontal') {
+  const lane = typeof node.x === 'number' ? node.x : ([0.18, 0.5, 0.82][node.column] ?? 0.5)
+  const progress = 0.05 + node.layer * (0.9 / 11)
+  if (orientation === 'vertical') {
+    return { x: Math.max(8, Math.min(92, lane * 100)), y: progress * 100 }
   }
+  return { x: progress * 100, y: Math.max(10, Math.min(90, lane * 100)) }
 }
 
-function MapNodeButton({ node, completed, available, current, onSelect }: { node: ExplorationMapNode; completed: boolean; available: boolean; current: boolean; onSelect: (nodeId: string) => void }) {
-  const position = mapNodePosition(node)
+function MapNodeButton({ node, completed, available, current, selected, orientation, onInspect, onSelect }: { node: ExplorationMapNode; completed: boolean; available: boolean; current: boolean; selected: boolean; orientation: 'horizontal' | 'vertical'; onInspect: (nodeId: string) => void; onSelect: (nodeId: string) => void }) {
+  const position = mapNodePosition(node, orientation)
   const locked = !available && !completed && !current
   return (
     <button
-      className={`map-node ${node.kind.toLowerCase().replaceAll('_', '-')} ${available ? 'available' : ''} ${completed ? 'completed' : ''} ${current ? 'current' : ''} ${locked ? 'locked' : ''}`}
+      className={`map-node compact-route-node ${node.kind.toLowerCase().replaceAll('_', '-')} ${available ? 'available' : ''} ${completed ? 'completed' : ''} ${current ? 'current' : ''} ${selected ? 'selected' : ''} ${locked ? 'locked' : ''}`}
       style={{ '--node-x': position.x, '--node-y': position.y } as React.CSSProperties}
-      disabled={!available}
-      onClick={() => onSelect(node.id)}
+      aria-disabled={!available}
+      onMouseEnter={() => onInspect(node.id)}
+      onFocus={() => onInspect(node.id)}
+      onClick={() => available ? onSelect(node.id) : onInspect(node.id)}
       aria-label={mapNodeTitle(node)}
     >
       <MapNodeSticker kind={node.kind} />
       <span className="map-node-title">{mapNodeTitle(node)}</span>
-      <span className="map-node-preview">{mapNodePreview(node)}</span>
     </button>
+  )
+}
+
+function MapNodeDetail({ node, available, current, completed, onSelect }: { node: ExplorationMapNode; available: boolean; current: boolean; completed: boolean; onSelect: (nodeId: string) => void }) {
+  return (
+    <div className={`map-side-card map-node-detail ${available ? 'available' : ''} ${current ? 'current' : ''} ${completed ? 'completed' : ''}`}>
+      <MapNodeSticker kind={node.kind} size="lg" />
+      <div>
+        <span className="map-node-detail-kicker">第 {node.layer + 1} 层</span>
+        <h3>{mapNodeTitle(node)}</h3>
+        <p>{mapNodePreview(node)}</p>
+      </div>
+      {available && <ActionButton onClick={() => onSelect(node.id)}>前往节点</ActionButton>}
+      {current && <strong className="map-node-state-copy">当前处理中</strong>}
+      {completed && <strong className="map-node-state-copy">已完成</strong>}
+      {!available && !current && !completed && <strong className="map-node-state-copy muted">路线未解锁</strong>}
+    </div>
   )
 }
 

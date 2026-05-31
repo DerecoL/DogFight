@@ -43,8 +43,10 @@ describeWithDatabase('run API', () => {
   it('starts new casual runs on the exploration map', async () => {
     const { run } = await createAuthenticatedRun()
     expect(run.phase).toBe('MAP')
-    expect(run.mapState.nodes).toHaveLength(36)
-    expect(run.mapState.availableNodeIds).toHaveLength(3)
+    expect(run.mapState.nodes.length).toBeGreaterThanOrEqual(24)
+    expect(run.mapState.nodes.length).toBeLessThanOrEqual(48)
+    expect(run.mapState.availableNodeIds.length).toBeGreaterThanOrEqual(2)
+    expect(run.mapState.availableNodeIds.length).toBeLessThanOrEqual(3)
   })
 
   it('routes equipment shop map nodes into equipment-only shop choices', async () => {

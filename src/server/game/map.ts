@@ -32,6 +32,7 @@ export type ExplorationMapNode = {
   id: string
   layer: number
   column: number
+  x?: number
   kind: ExplorationMapNodeKind
   nextNodeIds: string[]
   shopType?: ShopType
@@ -55,7 +56,6 @@ export type ExplorationMapState = {
 }
 
 const MAP_LAYER_COUNT = 12
-const MAP_COLUMNS = 3
 export const EQUIPMENT_SHOP_TYPES = ['GENERAL', 'LARGE', 'MEDIUM', 'SMALL', 'SMALL_DICE', 'BIG_DICE'] as const satisfies readonly ShopType[]
 const FIXED_SHOP_TYPES = ['GENERAL', 'LARGE', 'MEDIUM', 'SMALL', 'SMALL_DICE', 'BIG_DICE', 'RELIC', 'UPGRADE_SILVER', 'UPGRADE_GOLD', 'POTION'] as const satisfies readonly ShopType[]
 const DOG_TYPES = ['SHIBA', 'SAMOYED', 'MUTT', 'BULLY', 'EMPEROR', 'FROG'] as const satisfies readonly DogType[]
@@ -64,15 +64,15 @@ const EVENT_TYPES = ['GOLD_CACHE', 'RESTORE_TOLERANCE', 'FREE_EQUIPMENT', 'FREE_
 export function createExplorationMapState(runId: string, mapIndex: number, wins: number, losses: number): ExplorationMapState {
   const seed = `${runId}-map-${mapIndex}-${wins}-${losses}`
   const nodes: ExplorationMapNode[] = []
-  const playerBattleLayers = new Set([1, 3, 5, 7, 9, 11])
+  const playerBattleLayers = playerBattleLayerSet(seed)
   for (let layer = 0; layer < MAP_LAYER_COUNT; layer += 1) {
-    const rng = createRng(`${seed}-layer-${layer}`)
-    const playerColumn = playerBattleLayers.has(layer) ? Math.floor(rng() * MAP_COLUMNS) : -1
-    const layerKinds = layerNodeKinds(layer)
-    for (let column = 0; column < MAP_COLUMNS; column += 1) {
+    const layerRng = createRng(`${seed}-layer-${layer}`)
+    const nodeCount = layer === 0 ? 3 : 2 + Math.floor(layerRng() * 3)
+    for (let column = 0; column < nodeCount; column += 1) {
       const id = mapNodeId(mapIndex, layer, column)
-      const kind = column === playerColumn ? 'PLAYER_BATTLE' : layerKinds[column]
-      nodes.push(createMapNode({ id, layer, column, kind, seed, mapIndex, wins, losses }))
+      const x = layerNodeX(column, nodeCount, createRng(`${seed}-x-${layer}-${column}`))
+      const kind = playerBattleLayers.has(layer) ? 'PLAYER_BATTLE' : layerNodeKind(layer, column, nodeCount, seed)
+      nodes.push(createMapNode({ id, layer, column, x, kind, seed, mapIndex, wins, losses }))
     }
   }
 
@@ -81,14 +81,7 @@ export function createExplorationMapState(runId: string, mapIndex: number, wins:
     mapIndex,
     currentNodeId: null,
     completedNodeIds: [],
-    nodes: nodes.map((node) => ({
-      ...node,
-      nextNodeIds: node.layer >= MAP_LAYER_COUNT - 1
-        ? []
-        : [node.column - 1, node.column, node.column + 1]
-          .filter((column) => column >= 0 && column < MAP_COLUMNS)
-          .map((column) => mapNodeId(mapIndex, node.layer + 1, column)),
-    })),
+    nodes: connectMapLayers(nodes, mapIndex),
   }
 }
 
@@ -102,11 +95,86 @@ function layerNodeKinds(layer: number): ExplorationMapNodeKind[] {
   return patterns[layer % patterns.length]
 }
 
-function createMapNode(input: { id: string; layer: number; column: number; kind: ExplorationMapNodeKind; seed: string; mapIndex: number; wins: number; losses: number }): ExplorationMapNode {
+function playerBattleLayerSet(seed: string) {
+  const rng = createRng(`${seed}-player-battle-layers`)
+  const candidates = [4, 5, 6, 8, 10, 11]
+  for (let index = candidates.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(rng() * (index + 1))
+    const value = candidates[index]
+    candidates[index] = candidates[swapIndex]
+    candidates[swapIndex] = value
+  }
+  const count = rng() < 0.5 ? 5 : 6
+  return new Set(candidates.slice(0, count))
+}
+
+function layerNodeX(column: number, count: number, rng: () => number) {
+  if (count <= 1) return 0.5
+  const margin = 0.12
+  const span = 1 - margin * 2
+  const base = margin + (span * column) / (count - 1)
+  const jitter = (rng() - 0.5) * 0.08
+  return Math.max(0.08, Math.min(0.92, base + jitter))
+}
+
+function layerNodeKind(layer: number, column: number, count: number, seed: string): ExplorationMapNodeKind {
+  const rng = createRng(`${seed}-kind-${layer}-${column}-${count}`)
+  const pattern = layerNodeKinds(layer)
+  const base = pattern[column % pattern.length]
+  if (base === 'PLAYER_BATTLE') return rng() < 0.55 ? 'MONSTER_BATTLE' : 'EVENT'
+  return base
+}
+
+function connectMapLayers(nodes: ExplorationMapNode[], mapIndex: number) {
+  const byLayer = Array.from({ length: MAP_LAYER_COUNT }, (_, layer) =>
+    nodes.filter((node) => node.layer === layer).sort((a, b) => (a.x ?? 0.5) - (b.x ?? 0.5)),
+  )
+  const nextIdsByNodeId = new Map<string, string[]>()
+
+  for (let layer = 0; layer < MAP_LAYER_COUNT - 1; layer += 1) {
+    const currentLayer = byLayer[layer]
+    const nextLayer = byLayer[layer + 1]
+    const incoming = new Map(nextLayer.map((node) => [node.id, 0]))
+
+    for (const node of currentLayer) {
+      const nearest = nearestNextNodes(node, nextLayer).slice(0, 1)
+      nextIdsByNodeId.set(node.id, nearest.map((next) => next.id))
+      for (const next of nearest) incoming.set(next.id, (incoming.get(next.id) ?? 0) + 1)
+    }
+
+    for (const next of nextLayer) {
+      if ((incoming.get(next.id) ?? 0) > 0) continue
+      const source = nearestNextSources(next, currentLayer)
+        .find((node) => (nextIdsByNodeId.get(node.id)?.length ?? 0) < 2)
+      if (!source) continue
+      const nextIds = nextIdsByNodeId.get(source.id) ?? []
+      if (!nextIds.includes(next.id)) nextIdsByNodeId.set(source.id, [...nextIds, next.id])
+      incoming.set(next.id, (incoming.get(next.id) ?? 0) + 1)
+    }
+  }
+
+  return nodes.map((node) => ({
+    ...node,
+    nextNodeIds: node.layer >= MAP_LAYER_COUNT - 1
+      ? []
+      : (nextIdsByNodeId.get(node.id) ?? [mapNodeId(mapIndex, node.layer + 1, 0)]),
+  }))
+}
+
+function nearestNextNodes(node: ExplorationMapNode, nextLayer: ExplorationMapNode[]) {
+  return [...nextLayer].sort((a, b) => Math.abs((a.x ?? 0.5) - (node.x ?? 0.5)) - Math.abs((b.x ?? 0.5) - (node.x ?? 0.5)))
+}
+
+function nearestNextSources(next: ExplorationMapNode, currentLayer: ExplorationMapNode[]) {
+  return [...currentLayer].sort((a, b) => Math.abs((a.x ?? 0.5) - (next.x ?? 0.5)) - Math.abs((b.x ?? 0.5) - (next.x ?? 0.5)))
+}
+
+function createMapNode(input: { id: string; layer: number; column: number; x: number; kind: ExplorationMapNodeKind; seed: string; mapIndex: number; wins: number; losses: number }): ExplorationMapNode {
   const node: ExplorationMapNode = {
     id: input.id,
     layer: input.layer,
     column: input.column,
+    x: input.x,
     kind: input.kind,
     nextNodeIds: [],
   }

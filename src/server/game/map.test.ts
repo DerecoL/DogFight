@@ -2,14 +2,23 @@ import { describe, expect, it } from 'vitest'
 import { applyMapNodeCompletion, createExplorationMapState, currentMapNode, explorationMapPublicState, mapNodeSelection, mapShopChoices } from './map'
 
 describe('exploration map generation', () => {
-  it('creates a deterministic twelve-layer map with reachable adjacent routes and visible node previews', () => {
+  it('creates a deterministic randomized twelve-layer map with forward-only fair routes', () => {
     const first = createExplorationMapState('run-map-seed', 0, 0, 0)
     const second = createExplorationMapState('run-map-seed', 0, 0, 0)
 
     expect(first).toEqual(second)
-    expect(first.nodes).toHaveLength(36)
     expect(new Set(first.nodes.map((node) => node.layer))).toEqual(new Set(Array.from({ length: 12 }, (_, index) => index)))
-    expect(first.nodes.filter((node) => node.kind === 'PLAYER_BATTLE')).toHaveLength(6)
+    for (let layer = 0; layer < 12; layer += 1) {
+      const layerNodes = first.nodes.filter((node) => node.layer === layer)
+      expect(layerNodes.length).toBeGreaterThanOrEqual(2)
+      expect(layerNodes.length).toBeLessThanOrEqual(4)
+      for (const node of layerNodes) {
+        expect(typeof node.x).toBe('number')
+        expect(node.x).toBeGreaterThanOrEqual(0)
+        expect(node.x).toBeLessThanOrEqual(1)
+      }
+    }
+
     expect(first.nodes.some((node) => node.kind === 'MONSTER_BATTLE' && node.monster?.possibleRewards.length)).toBe(true)
     expect(first.nodes.some((node) => node.kind === 'SHOP_FIXED' && node.shopType)).toBe(true)
     expect(first.nodes.some((node) => node.kind === 'SHOP_UNKNOWN')).toBe(true)
@@ -19,23 +28,54 @@ describe('exploration map generation', () => {
 
     for (const node of first.nodes.filter((entry) => entry.layer < 11)) {
       expect(node.nextNodeIds.length).toBeGreaterThan(0)
+      expect(node.nextNodeIds.length).toBeLessThanOrEqual(2)
       for (const nextId of node.nextNodeIds) {
         const next = first.nodes.find((entry) => entry.id === nextId)
         expect(next?.layer).toBe(node.layer + 1)
-        expect(Math.abs((next?.column ?? 0) - node.column)).toBeLessThanOrEqual(1)
       }
+    }
+    for (const node of first.nodes.filter((entry) => entry.layer === 11)) {
+      expect(node.nextNodeIds).toEqual([])
+    }
+
+    const completePaths = enumerateMapPaths(first)
+    expect(completePaths.length).toBeGreaterThan(0)
+    for (const path of completePaths) {
+      const playerBattles = path.filter((node) => node.kind === 'PLAYER_BATTLE').length
+      expect(playerBattles).toBeGreaterThanOrEqual(5)
+      expect(playerBattles).toBeLessThanOrEqual(6)
     }
   })
 
-  it('allows only first-layer nodes first, then nodes linked from completed nodes', () => {
+  it('allows only entrance nodes first, then only nodes linked from the completed node', () => {
     const map = createExplorationMapState('run-route-seed', 0, 0, 0)
-    const firstLayerIds = map.nodes.filter((node) => node.layer === 0).map((node) => node.id)
-    expect(explorationMapPublicState(map).availableNodeIds).toEqual(firstLayerIds)
+    const entranceIds = map.nodes.filter((node) => node.layer === 0).map((node) => node.id)
+    expect(explorationMapPublicState(map).availableNodeIds).toEqual(entranceIds)
 
-    const completed = applyMapNodeCompletion({ ...map, currentNodeId: firstLayerIds[0] })
-    expect(explorationMapPublicState(completed).availableNodeIds).toEqual(currentMapNode(map, firstLayerIds[0])?.nextNodeIds)
+    const completed = applyMapNodeCompletion({ ...map, currentNodeId: entranceIds[0] })
+    expect(explorationMapPublicState(completed).availableNodeIds).toEqual(currentMapNode(map, entranceIds[0])?.nextNodeIds)
   })
 })
+
+function enumerateMapPaths(map: ReturnType<typeof createExplorationMapState>) {
+  const byId = new Map(map.nodes.map((node) => [node.id, node]))
+  const starts = map.nodes.filter((node) => node.layer === 0)
+  const paths: typeof starts[] = []
+  const visit = (path: typeof starts) => {
+    const tail = path[path.length - 1]
+    if (!tail) return
+    if (tail.layer === 11) {
+      paths.push(path)
+      return
+    }
+    for (const nextId of tail.nextNodeIds) {
+      const next = byId.get(nextId)
+      if (next) visit([...path, next])
+    }
+  }
+  for (const start of starts) visit([start])
+  return paths
+}
 
 describe('exploration map node selection', () => {
   it('resolves the three shop node families without mixing equipment-only shops with special shops', () => {

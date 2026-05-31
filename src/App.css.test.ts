@@ -45,6 +45,23 @@ function cssVariableValue(name: string) {
   return match?.[1] ?? ''
 }
 
+describe('exploration map route board', () => {
+  it('renders exploration map as a full-screen route board with compact nodes and separate details', () => {
+    expect(css).toContain('.exploration-map-overlay')
+    expect(css).toContain('.exploration-map-shell')
+    expect(css).toContain('.map-route-canvas')
+    expect(css).toContain('.map-node-detail-panel')
+    expect(css).toContain('.map-node.compact-route-node')
+    expect(css).toContain('@media (max-width: 760px)')
+  })
+
+  it('uses map node coordinates instead of only fixed three-column positions', () => {
+    expect(app).toContain('node.x')
+    expect(app).toContain('orientation')
+    expect(app).toContain('map-node-detail-panel')
+  })
+})
+
 describe('equipment layout scale', () => {
   it('defines reusable handdrawn UI tokens and ornamental frame variants', () => {
     expect(uiCss).toContain('--handdrawn-frame-border')
