@@ -46,44 +46,38 @@ jobs:
         timeout-minutes: 60
         env:
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
-          DEPLOY_REPO_TOKEN: ${{ secrets.DEPLOY_REPO_TOKEN }}
           PRODUCTION_ENV: ${{ secrets.PRODUCTION_ENV }}
         run: |
           PRODUCTION_ENV_B64="$(printf '%s\n' "$PRODUCTION_ENV" | base64 -w0)"
+          PACKAGE_PATH="/tmp/dogfight-source-${{ github.sha }}.tgz"
+          REMOTE_PACKAGE="/tmp/dogfight-source-${{ github.sha }}.tgz"
+          REMOTE_SCRIPT="/tmp/dogfight-remote-deploy-${{ github.sha }}.sh"
+          tar -czf "$PACKAGE_PATH" \
+            deploy prisma public scripts src \
+            Caddyfile Dockerfile compose.yml index.html package-lock.json package.json \
+            tsconfig.app.json tsconfig.json tsconfig.node.json tsconfig.server.json vite.config.ts
+          scp -i ~/.ssh/dogfight_deploy_key \
+            -o BatchMode=yes \
+            -o ConnectTimeout=20 \
+            "$PACKAGE_PATH" \
+            "${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:$REMOTE_PACKAGE"
+          scp -i ~/.ssh/dogfight_deploy_key \
+            -o BatchMode=yes \
+            -o ConnectTimeout=20 \
+            deploy/remote-deploy.sh \
+            "${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:$REMOTE_SCRIPT"
           ssh -i ~/.ssh/dogfight_deploy_key \
             -o BatchMode=yes \
             -o ConnectTimeout=20 \
             -o ServerAliveInterval=15 \
             -o ServerAliveCountMax=4 \
             "${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}" \
-            "DEPLOY_PATH='$DEPLOY_PATH' GITHUB_SHA='${{ github.sha }}' GITHUB_REPOSITORY='${{ github.repository }}' DEPLOY_REPO_TOKEN='$DEPLOY_REPO_TOKEN' PRODUCTION_ENV_B64='$PRODUCTION_ENV_B64' EXPECTED_JS='$EXPECTED_JS' EXPECTED_CSS='$EXPECTED_CSS' bash -s" <<'REMOTE_BOOTSTRAP'
+            "DEPLOY_PATH='$DEPLOY_PATH' GITHUB_SHA='${{ github.sha }}' REMOTE_PACKAGE='$REMOTE_PACKAGE' REMOTE_SCRIPT='$REMOTE_SCRIPT' PRODUCTION_ENV_B64='$PRODUCTION_ENV_B64' EXPECTED_JS='$EXPECTED_JS' EXPECTED_CSS='$EXPECTED_CSS' bash -s" <<'REMOTE_BOOTSTRAP'
           set -euo pipefail
           : "${GITHUB_SHA:?GITHUB_SHA is required}"
-          : "${GITHUB_REPOSITORY:?GITHUB_REPOSITORY is required}"
-
-          BOOTSTRAP_PATH="/tmp/dogfight-bootstrap-${GITHUB_SHA}"
-          rm -rf "$BOOTSTRAP_PATH"
-          trap 'rm -rf "$BOOTSTRAP_PATH"' EXIT
-
-          REPO_URL="https://github.com/${GITHUB_REPOSITORY}.git"
-          if [ -n "${DEPLOY_REPO_TOKEN:-}" ]; then
-            REPO_URL="https://x-access-token:${DEPLOY_REPO_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
-          fi
-
-          git init "$BOOTSTRAP_PATH"
-          cd "$BOOTSTRAP_PATH"
-          git remote add origin "$REPO_URL"
-          git sparse-checkout init --cone
-          git sparse-checkout set deploy prisma public scripts src Caddyfile Dockerfile compose.yml index.html package-lock.json package.json tsconfig.app.json tsconfig.json tsconfig.node.json tsconfig.server.json vite.config.ts
-          fetch_attempt=1
-          until git fetch --filter=blob:none --depth 1 origin "$GITHUB_SHA"; do
-            if [ "$fetch_attempt" -ge 5 ]; then
-              exit 1
-            fi
-            echo "git fetch attempt $fetch_attempt failed; retrying"
-            fetch_attempt=$((fetch_attempt + 1))
-            sleep 10
-          done
-          git checkout --detach "$GITHUB_SHA"
-          SOURCE_PATH="$BOOTSTRAP_PATH" bash deploy/remote-deploy.sh
+          : "${REMOTE_PACKAGE:?REMOTE_PACKAGE is required}"
+          : "${REMOTE_SCRIPT:?REMOTE_SCRIPT is required}"
+          trap 'rm -f "$REMOTE_PACKAGE" "$REMOTE_SCRIPT"' EXIT
+          bash -c 'tar -tzf "$REMOTE_PACKAGE" >/dev/null'
+          bash "$REMOTE_SCRIPT"
           REMOTE_BOOTSTRAP
