@@ -35,7 +35,25 @@ rm -rf \
   "$TEMP_DEPLOY_PATH/picture"
 
 if [ -n "${PRODUCTION_ENV_B64:-}" ]; then
-  printf '%s' "$PRODUCTION_ENV_B64" | base64 -d > "$TEMP_DEPLOY_PATH/.env.production"
+  ENV_OVERRIDE_PATH="$TEMP_DEPLOY_PATH/.env.production.override"
+  printf '%s' "$PRODUCTION_ENV_B64" | base64 -d > "$ENV_OVERRIDE_PATH"
+  if grep -q '^DATABASE_URL=' "$ENV_OVERRIDE_PATH" || [ ! -f "$DEPLOY_PATH/.env.production" ]; then
+    cp "$ENV_OVERRIDE_PATH" "$TEMP_DEPLOY_PATH/.env.production"
+  else
+    echo "PRODUCTION_ENV override did not include DATABASE_URL; merging with existing server .env.production"
+    cp "$DEPLOY_PATH/.env.production" "$TEMP_DEPLOY_PATH/.env.production"
+    while IFS= read -r line || [ -n "$line" ]; do
+      case "$line" in
+        ''|\#*) continue ;;
+        *=*)
+          key="${line%%=*}"
+          awk -v key="$key" 'BEGIN { prefix = key "=" } index($0, prefix) != 1 { print }' "$TEMP_DEPLOY_PATH/.env.production" > "$TEMP_DEPLOY_PATH/.env.production.next"
+          mv "$TEMP_DEPLOY_PATH/.env.production.next" "$TEMP_DEPLOY_PATH/.env.production"
+          printf '%s\n' "$line" >> "$TEMP_DEPLOY_PATH/.env.production"
+          ;;
+      esac
+    done < "$ENV_OVERRIDE_PATH"
+  fi
 else
   cp "$REMOTE_ENV_FILE" "$TEMP_DEPLOY_PATH/.env.production"
 fi
