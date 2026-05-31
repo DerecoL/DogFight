@@ -286,9 +286,8 @@ export function DynamicDice({ roll, actor = 'system', rolling = false, label, cl
       {...props}
     >
       <div className="dynamic-dice-cube" aria-hidden="true">
+        <img className="dynamic-dice-base" src="/assets/ui/battle-dice-base.webp" alt="" loading="eager" decoding="async" />
         <span className="dynamic-dice-face front"><DicePips roll={roll} /></span>
-        <span className="dynamic-dice-face top"><DicePips roll={roll ? ((roll % 6) + 1) : undefined} /></span>
-        <span className="dynamic-dice-face side"><DicePips roll={roll ? (((roll + 2) % 6) + 1) : undefined} /></span>
       </div>
       <b className="dynamic-dice-value">{roll ?? '-'}</b>
     </div>
