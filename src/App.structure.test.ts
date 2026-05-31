@@ -524,20 +524,25 @@ describe('selection screen structure', () => {
 
   it('shows player run history in the mode lobby as the multi-game battle record', () => {
     expect(app).toContain('type PlayerRunHistory')
+    expect(app).toContain('type SeasonInfo')
+    expect(app).toContain('type SeasonPlayerSummary')
+    expect(app).toContain('type ArchivedApexSnapshot')
     expect(app).toContain('const [ladderProfile, setLadderProfile]')
     expect(app).toContain('const [runHistory, setRunHistory]')
     expect(app).toContain('const [historyOverlayOpen, setHistoryOverlayOpen]')
     expect(app).toContain('type HistoryModeTab')
-    expect(app).toContain("api<{ history: PlayerRunHistory }>('/runs/history')")
+    expect(app).toContain("api<PlayerRunHistoryResponse>('/runs/history')")
     expect(app).toContain('function PlayerRunHistoryPanel')
+    expect(app).toContain('function SeasonHistoryList')
     expect(app).toContain('function PlayerHistoryOverlay')
-    expect(app).toContain('<PlayerRunHistoryPanel history={runHistory} ladderProfile={ladderProfile} onOpen={() => setHistoryOverlayOpen(true)} onEnterShop={() => setAppScreen(\'SHOP\')} onEnterAchievements={() => setAppScreen(\'ACHIEVEMENTS\')} onEnterSettings={() => setAppScreen(\'SETTINGS\')} />')
+    expect(app).toContain('<PlayerRunHistoryPanel history={runHistory} ladderProfile={ladderProfile} season={currentSeason} seasonSummaries={seasonSummaries} onOpen={() => setHistoryOverlayOpen(true)} onEnterShop={() => setAppScreen(\'SHOP\')} onEnterAchievements={() => setAppScreen(\'ACHIEVEMENTS\')} onEnterSettings={() => setAppScreen(\'SETTINGS\')} />')
     expect(app).toContain('<ModeLobby run={run}')
     expect(app).toContain('<PlayerHistoryOverlay history={runHistory} onClose={() => setHistoryOverlayOpen(false)} />')
     expect(app).toContain('个人战绩')
     expect(app).toContain('天梯段位')
     expect(app).toContain('犬爪奖杯')
     expect(app).toContain('history-ladder-slot')
+    expect(app).toContain('season-history-list')
     expect(app).toContain('最近对局')
     expect(app).toContain('全部')
     expect(app).toContain('休闲模式')
@@ -548,6 +553,7 @@ describe('selection screen structure', () => {
     expect(app).toContain('查看装备')
     expect(css).toContain('.player-history-panel')
     expect(css).toContain('.history-ladder-slot')
+    expect(css).toContain('.season-history-list')
     expect(css).toContain('.dog-rank-trophy')
     expect(css).toContain('.player-history-overlay')
     expect(css).toContain('.history-mode-tabs')
@@ -557,6 +563,14 @@ describe('selection screen structure', () => {
   it('limits the mode lobby history strip to the latest five runs', () => {
     expect(app).toContain('const lobbyRecentRuns = history.recentRuns.slice(0, 5)')
     expect(app).toContain('lobbyRecentRuns.length > 0 ? lobbyRecentRuns.map((entry) => (')
+  })
+
+  it('shows current season names on ladder and apex screens', () => {
+    expect(app).toContain('season?.name')
+    expect(app).toContain('const season = overview?.season')
+    expect(app).toContain('const activeSeasonName = overview?.season.name')
+    expect(app).toContain('当前赛季')
+    expect(app).toContain('巅峰赛季')
   })
 
   it('renders battle health bars as a percentage of max health', () => {

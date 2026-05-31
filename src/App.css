@@ -3724,6 +3724,45 @@ input {
   font-size: 12px;
 }
 
+.season-history-list {
+  display: grid;
+  gap: 10px;
+  min-width: 260px;
+}
+
+.season-history-heading,
+.season-history-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.season-history-heading span,
+.season-history-card strong {
+  font-weight: 900;
+}
+
+.season-history-heading small,
+.season-history-card p,
+.season-history-empty {
+  margin: 0;
+  color: rgba(61, 45, 37, .74);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.season-history-card {
+  padding: 10px 12px;
+  border: 2px solid rgba(61, 45, 37, .2);
+  border-radius: 8px;
+  background: rgba(255, 249, 230, .68);
+}
+
+.season-snapshot-action {
+  flex: 0 0 auto;
+}
+
 .dog-rank-trophy {
   position: relative;
   width: 44px;

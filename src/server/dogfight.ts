@@ -13,6 +13,7 @@ import { canUseUpgradeShop, isUpgradeShopType } from './game/shop'
 import { simulateBattle } from './game/battle'
 import type { BattleEvent, BattleResult, DogType, EnchantmentChoice, FighterSnapshot, GameItem, PotionChoice, ShopType } from './game/types'
 import { applyRelicChoice, initialItems, makeChoices, makePotionChoices, makeRelicChoices, makeShop, nextPhaseData as buildNextPhaseData, parseJson, phaseDataAfterEnchant, postBattleLargeItemReward, postBattleSellBonusItemGrowths, publicRun, relicsFromRun, seedGhost, snapshotFromRun, toGameItems } from './state'
+import { getActiveSeason } from './seasons'
 
 const DOGFIGHT_TARGET_PLAYERS = 8
 const DOGFIGHT_LOBBY_MS = 15_000
@@ -88,9 +89,11 @@ function participantSeed(roomId: string, participant: Pick<DogfightParticipant, 
 
 async function createDogfightRun(tx: Tx, userId: string, choice: z.infer<typeof dogChoiceSchema>, seed: string) {
   const shopItems = makeShop('GENERAL', `${seed}-shop`, 0)
+  const season = await getActiveSeason(tx)
   return tx.run.create({
     data: {
       userId,
+      seasonId: season.id,
       dogType: choice.dogType,
       luckyNumber: choice.dogType === 'EMPEROR' ? choice.luckyNumber : null,
       gold: STARTING_GOLD,

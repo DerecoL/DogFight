@@ -300,9 +300,10 @@ type LadderProfile = {
   totalLosses: number
   updatedAt: string
 }
-type LadderMeResponse = { profile: LadderProfile; recentSettlements: LadderSettlement[] }
+type SeasonInfo = { id: string; name: string; status: string; startedAt: string; endedAt: string | null }
+type LadderMeResponse = { season: SeasonInfo; profile: LadderProfile; recentSettlements: LadderSettlement[] }
 type LadderLeaderboardEntry = { rank: number; title: string; name: string; profile: LadderProfile }
-type LadderLeaderboardResponse = { leaderboard: LadderLeaderboardEntry[]; playerRank: number | null; playerProfile: LadderProfile }
+type LadderLeaderboardResponse = { season: SeasonInfo; leaderboard: LadderLeaderboardEntry[]; playerRank: number | null; playerProfile: LadderProfile }
 type PlayerRunHistoryEntry = Pick<Run, 'id' | 'dogType' | 'luckyNumber' | 'wins' | 'losses' | 'round' | 'status' | 'phase'> & {
   mode: HistoryRunMode
   items: Item[]
@@ -320,6 +321,30 @@ type PlayerRunHistory = {
   bestRun: PlayerRunHistoryEntry | null
   recentRuns: PlayerRunHistoryEntry[]
 }
+type ArchivedApexSnapshot = Pick<ApexEntry, 'id' | 'name' | 'dogType' | 'luckyNumber' | 'wins' | 'losses' | 'round' | 'rank' | 'challengeWins' | 'items' | 'relics' | 'createdAt'>
+type SeasonPlayerSummary = {
+  id: string
+  seasonId: string
+  seasonName: string
+  ladderTier: LadderTier | null
+  ladderTierLabel: string | null
+  ladderScore: number | null
+  ladderHighestTier: LadderTier | null
+  ladderHighestTierLabel: string | null
+  ladderGamesPlayed: number
+  ladderTotalWins: number
+  ladderTotalLosses: number
+  dogKingRank: number | null
+  apexRank: number | null
+  apexDogType: DogType | null
+  apexWins: number | null
+  apexLosses: number | null
+  apexRound: number | null
+  apexChallengeWins: number | null
+  apexSnapshot: ArchivedApexSnapshot | null
+  createdAt: string
+}
+type PlayerRunHistoryResponse = { history: PlayerRunHistory; seasonSummaries: SeasonPlayerSummary[] }
 type AuthUser = { id: string; account: string; nickname: string | null }
 type AccountWallet = { balance: number; dailyEarned: number; dailyKey: string }
 type CosmeticType = 'TITLE' | 'AVATAR' | 'BACKGROUND' | 'DOG_SKIN' | 'BATTLE_EFFECT'
@@ -384,8 +409,8 @@ type ApexBoardId = 'overall' | 'daily'
 type ApexLeaderboards = Record<ApexBoardId, ApexEntry[]>
 type ApexReports = Record<ApexBoardId, ApexChallengeReport>
 type ApexEntries = Record<ApexBoardId, ApexEntry>
-type ApexOverview = { leaderboards: ApexLeaderboards; candidates: Run[]; dailyBoardKey: string; dailyResetHour: number }
-type ApexSubmitResponse = { entries: ApexEntries; reports: ApexReports; leaderboards: ApexLeaderboards; dailyBoardKey: string; dailyResetHour: number }
+type ApexOverview = { season: SeasonInfo; leaderboards: ApexLeaderboards; candidates: Run[]; dailyBoardKey: string; dailyResetHour: number }
+type ApexSubmitResponse = { season: SeasonInfo; entries: ApexEntries; reports: ApexReports; leaderboards: ApexLeaderboards; dailyBoardKey: string; dailyResetHour: number }
 type DogfightRoomStatus = 'WAITING' | 'ACTIVE' | 'COMPLETE'
 type DogfightRoomPhase = 'LOBBY' | 'DOG_SELECT' | 'SHOP' | 'BATTLE' | 'COMPLETE'
 type DogfightMember = {
@@ -1462,6 +1487,8 @@ export default function App() {
   const [musicBlocked, setMusicBlocked] = useState(false)
   const [appHasAudioFocus, setAppHasAudioFocus] = useState(() => !document.hidden && document.hasFocus())
   const [runHistory, setRunHistory] = useState<PlayerRunHistory>(emptyRunHistory)
+  const [seasonSummaries, setSeasonSummaries] = useState<SeasonPlayerSummary[]>([])
+  const [currentSeason, setCurrentSeason] = useState<SeasonInfo | null>(null)
   const [ladderProfile, setLadderProfile] = useState<LadderProfile | null>(null)
   const [equippedCosmetics, setEquippedCosmetics] = useState<CosmeticsResponse | null>(null)
   const [historyOverlayOpen, setHistoryOverlayOpen] = useState(false)
@@ -1475,12 +1502,14 @@ export default function App() {
   const { scheduleTipAnchor, cancelTipAnchor } = useDeferredTipAnchor(setTipAnchor)
 
   const loadRunHistory = useCallback(async () => {
-    const data = await api<{ history: PlayerRunHistory }>('/runs/history')
+    const data = await api<PlayerRunHistoryResponse>('/runs/history')
     setRunHistory(data.history)
+    setSeasonSummaries(data.seasonSummaries)
   }, [])
 
   const loadLadderProfile = useCallback(async () => {
     const data = await api<LadderMeResponse>('/ladder/me')
+    setCurrentSeason(data.season)
     setLadderProfile(data.profile)
   }, [])
 
@@ -2006,7 +2035,7 @@ export default function App() {
   if (appScreen === 'LOBBY') {
     return (
       <Shell feedbacks={uiFeedbacks} cosmetics={equippedCosmetics} user={user} error={error} musicEnabled={musicEnabled} musicBlocked={musicBlocked} onToggleMusic={toggleMusic} onLogout={() => action(() => api('/auth/logout', { method: 'POST' }).then(() => ({ user: null })))}>
-        <PlayerRunHistoryPanel history={runHistory} ladderProfile={ladderProfile} onOpen={() => setHistoryOverlayOpen(true)} onEnterShop={() => setAppScreen('SHOP')} onEnterAchievements={() => setAppScreen('ACHIEVEMENTS')} onEnterSettings={() => setAppScreen('SETTINGS')} />
+        <PlayerRunHistoryPanel history={runHistory} ladderProfile={ladderProfile} season={currentSeason} seasonSummaries={seasonSummaries} onOpen={() => setHistoryOverlayOpen(true)} onEnterShop={() => setAppScreen('SHOP')} onEnterAchievements={() => setAppScreen('ACHIEVEMENTS')} onEnterSettings={() => setAppScreen('SETTINGS')} />
         <ModeLobby run={run} runHistory={runHistory} onOpen={() => setHistoryOverlayOpen(true)} onEnterCasual={handleEnterCasual} onReplayTutorial={startCasualTutorial} onEnterLadder={() => setAppScreen('LADDER')} onEnterDogfight={() => setAppScreen('DOGFIGHT')} onEnterPeak={() => setAppScreen('PEAK')} />
         {historyOverlayOpen && <PlayerHistoryOverlay history={runHistory} onClose={() => setHistoryOverlayOpen(false)} />}
         {tutorialGuide}
@@ -2616,7 +2645,7 @@ function ModeLobby({ run, runHistory, onOpen, onEnterCasual, onReplayTutorial, o
   )
 }
 
-function PlayerRunHistoryPanel({ history, ladderProfile, onOpen, onEnterShop, onEnterAchievements, onEnterSettings }: { history: PlayerRunHistory; ladderProfile: LadderProfile | null; onOpen: () => void; onEnterShop: () => void; onEnterAchievements: () => void; onEnterSettings: () => void }) {
+function PlayerRunHistoryPanel({ history, ladderProfile, season, seasonSummaries, onOpen, onEnterShop, onEnterAchievements, onEnterSettings }: { history: PlayerRunHistory; ladderProfile: LadderProfile | null; season: SeasonInfo | null; seasonSummaries: SeasonPlayerSummary[]; onOpen: () => void; onEnterShop: () => void; onEnterAchievements: () => void; onEnterSettings: () => void }) {
   const bestRun = history.bestRun
   const winRate = history.totalWins + history.totalLosses > 0
     ? Math.round((history.totalWins / (history.totalWins + history.totalLosses)) * 100)
@@ -2641,7 +2670,7 @@ function PlayerRunHistoryPanel({ history, ladderProfile, onOpen, onEnterShop, on
           <div>
             <small>天梯段位</small>
             <strong>{rankLabel}</strong>
-            <p>{rankScore} 分</p>
+            <p>{season?.name ?? '当前赛季'} · {rankScore} 分</p>
           </div>
         </div>
         <div className="history-best">
@@ -2674,7 +2703,37 @@ function PlayerRunHistoryPanel({ history, ladderProfile, onOpen, onEnterShop, on
           </div>
         )}
       </div>
+      <SeasonHistoryList summaries={seasonSummaries} />
     </section>
+  )
+}
+
+function SeasonHistoryList({ summaries }: { summaries: SeasonPlayerSummary[] }) {
+  const [selectedSnapshot, setSelectedSnapshot] = useState<ArchivedApexSnapshot | null>(null)
+  return (
+    <div className="season-history-list" aria-label="赛季历史">
+      <div className="season-history-heading">
+        <span>赛季历史</span>
+        <small>{summaries.length > 0 ? `${summaries.length} 个已结束赛季` : '赛季结束后会保存在这里'}</small>
+      </div>
+      {summaries.length > 0 ? summaries.slice(0, 3).map((summary) => (
+        <article className="season-history-card" key={summary.id}>
+          <div>
+            <strong>{summary.seasonName}</strong>
+            <p>天梯 {summary.ladderTierLabel ?? '未参赛'}{summary.ladderScore != null ? ` · ${summary.ladderScore} 分` : ''}{summary.dogKingRank ? ` · 犬王第 ${summary.dogKingRank} 名` : ''}</p>
+            <p>{summary.apexRank ? `巅峰第 ${summary.apexRank} 名 · ${summary.apexWins}胜${summary.apexLosses}败` : '巅峰未入榜'}</p>
+          </div>
+          {summary.apexSnapshot && (
+            <ActionButton variant="secondary" className="season-snapshot-action" onClick={() => setSelectedSnapshot(summary.apexSnapshot)}>
+              <Eye size={18} /> 巅峰配置快照
+            </ActionButton>
+          )}
+        </article>
+      )) : (
+        <p className="season-history-empty">暂无赛季历史</p>
+      )}
+      {selectedSnapshot && <ApexConfigOverlay entry={apexEntryFromArchive(selectedSnapshot)} onClose={() => setSelectedSnapshot(null)} />}
+    </div>
   )
 }
 
@@ -3470,6 +3529,7 @@ function ApexArena() {
       setReports(result.reports)
       setSubmittedEntries(result.entries)
       setOverview((current) => ({
+        season: result.season,
         leaderboards: result.leaderboards,
         dailyBoardKey: result.dailyBoardKey,
         dailyResetHour: result.dailyResetHour,
@@ -3486,12 +3546,13 @@ function ApexArena() {
   const leaderboard = leaderboards[activeApexBoard]
   const candidates = overview?.candidates ?? []
   const activeBoardLabel = activeApexBoard === 'overall' ? '总榜' : '当日榜'
+  const activeSeasonName = overview?.season.name ?? '读取中'
 
   return (
     <section className="apex-screen">
       <div className="screen-heading centered">
         <h2>巅峰竞技场</h2>
-        <p>保存战斗结束后的死数据，自动从榜尾向上挑战，失败后固定在当前名次。</p>
+        <p>巅峰赛季：{activeSeasonName} · 保存战斗结束后的死数据，自动从榜尾向上挑战，失败后固定在当前名次。</p>
       </div>
       <div className="apex-toolbar">
         <ActionButton variant="secondary" onClick={() => void loadApex()} disabled={loading}>
@@ -3589,6 +3650,17 @@ function ApexConfigOverlay({ entry, onClose }: { entry: ApexEntry; onClose: () =
     </div>,
     document.body,
   )
+}
+
+function apexEntryFromArchive(snapshot: ArchivedApexSnapshot): ApexEntry {
+  return {
+    ...snapshot,
+    sourceRunId: null,
+    boardType: 'OVERALL',
+    boardKey: 'archived-season',
+    isSeed: false,
+    isMine: true,
+  }
 }
 
 function ApexSnapshotDetails({ entry }: { entry: ApexEntry }) {
@@ -3691,6 +3763,7 @@ function LadderHome({ onStart }: { onStart: (choice: { dogType: DogType; luckyNu
   }, [])
 
   const profile = overview?.profile
+  const season = overview?.season
   const progress = profile
     ? profile.tier === 'MASTER' || profile.tier === 'DOG_KING'
       ? Math.min(100, Math.round((profile.score / 500) * 100))
@@ -3704,7 +3777,7 @@ function LadderHome({ onStart }: { onStart: (choice: { dogType: DogType; luckyNu
     <section className="ladder-screen">
       <div className="screen-heading centered">
         <h2>天梯模式</h2>
-        <p>12 胜或 5 败结算积分，低段位更宽松，高段位按犬王积分榜竞争。</p>
+        <p>当前赛季：{season?.name ?? '读取中'} · 12 胜或 5 败结算积分，低段位更宽松，高段位按犬王积分榜竞争。</p>
       </div>
       <div className="ladder-layout">
         <section className="ladder-panel paper-card">

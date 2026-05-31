@@ -16,11 +16,12 @@ import { applyPotionToBaseDice } from './game/potion'
 import { canUpgradePair, nextQuality, normalizeQuality, upgradeEnchant } from './game/quality'
 import { canUseUpgradeShop, isUpgradeShopType, itemSellValue } from './game/shop'
 import { simulateBattle } from './game/battle'
-import { calculateLadderResult, ladderTierForScore, ladderTierLabels, ladderTiers, LADDER_SEASON_ID, type LadderTier } from './game/ladder'
+import { calculateLadderResult, ladderTierForScore, ladderTierLabels, ladderTiers, type LadderTier } from './game/ladder'
 import { STARTING_GOLD, isTrainingMatchRound, selectCasualGhostSnapshot, selectLadderGhostSnapshot, targetLadderOpponentWinsRange, targetOpponentWins } from './game/matchmaking'
 import type { BattleResult, DogType, EnchantmentChoice, FighterSnapshot, GameItem, PotionChoice, RelicInstance, ShopOffer, ShopType } from './game/types'
 import { applyRelicChoice, createFinishedBattleRecord, initialItems, makeChoices, makeNewRunShop, makePotionChoices, makeRelicChoices, makeShop, nextPhaseData, parseJson, phaseDataAfterEnchant, postBattleLargeItemReward, postBattleSellBonusItemGrowths, publicLadderSettlement, publicRun, publicRunHistory, relicsFromRun, removeRelicByInstanceId, seedGhost, snapshotFromRun, toGameItems } from './state'
 import { accountSummary, claimAchievement, claimDaily, equipUserCosmetic, getAchievements, getCosmetics, getDailyTasks, getShop, purchaseShopItem, recordAccountEvent, refreshDaily, unequipUserCosmetic } from './account-services'
+import { getActiveSeason, publicSeason, publicSeasonSummary } from './seasons'
 
 type PrismaTransaction = Prisma.TransactionClient
 type ApexSourceRun = {
@@ -138,6 +139,7 @@ export function buildApp() {
   }
 
   const publicLadderProfile = (profile: {
+    seasonId: string
     tier: string
     score: number
     highestTier: string
@@ -149,7 +151,7 @@ export function buildApp() {
     const tier = normalizeLadderTier(profile.tier, profile.score)
     const highestTier = sanitizeLadderTier(profile.highestTier)
     return {
-      seasonId: LADDER_SEASON_ID,
+      seasonId: profile.seasonId,
       tier,
       tierLabel: ladderTierLabels[tier],
       score: profile.score,
@@ -162,17 +164,17 @@ export function buildApp() {
     }
   }
 
-  const ensureLadderProfile = async (userId: string) => prisma.ladderProfile.upsert({
-    where: { userId_seasonId: { userId, seasonId: LADDER_SEASON_ID } },
+  const ensureLadderProfile = async (userId: string, seasonId: string) => prisma.ladderProfile.upsert({
+    where: { userId_seasonId: { userId, seasonId } },
     update: {},
-    create: { userId, seasonId: LADDER_SEASON_ID },
+    create: { userId, seasonId },
   })
 
-  const createLadderSettlement = async (tx: PrismaTransaction, userId: string, runId: string, wins: number, losses: number) => {
+  const createLadderSettlement = async (tx: PrismaTransaction, userId: string, runId: string, wins: number, losses: number, seasonId: string) => {
     const profile = await tx.ladderProfile.upsert({
-      where: { userId_seasonId: { userId, seasonId: LADDER_SEASON_ID } },
+      where: { userId_seasonId: { userId, seasonId } },
       update: {},
-      create: { userId, seasonId: LADDER_SEASON_ID },
+      create: { userId, seasonId },
     })
     const calculation = calculateLadderResult({
       tier: normalizeLadderTier(profile.tier, profile.score),
@@ -200,7 +202,7 @@ export function buildApp() {
         userId,
         profileId: profile.id,
         runId,
-        seasonId: LADDER_SEASON_ID,
+        seasonId,
         beforeTier: calculation.before.tier,
         beforeScore: calculation.before.score,
         afterTier: calculation.after.tier,
@@ -218,7 +220,7 @@ export function buildApp() {
     })
   }
 
-  const settleLadderRun = async (userId: string, runId: string, wins: number, losses: number) => prisma.$transaction(async (tx) => createLadderSettlement(tx, userId, runId, wins, losses))
+  const settleLadderRun = async (userId: string, runId: string, wins: number, losses: number, seasonId: string) => prisma.$transaction(async (tx) => createLadderSettlement(tx, userId, runId, wins, losses, seasonId))
 
   const placementOptionsForRun = (run: { relics: string }): PlacementOptions => {
     const hasExtraEquipment = relicsFromRun(run).some((relic) => relicDef(relic.relicId).effect === 'EXTRA_EQUIPMENT_REDUCED_EFFECT')
@@ -254,12 +256,13 @@ export function buildApp() {
     return moves
   }
 
-  const ensureApexSeeds = async (boardType: ApexBoardType, boardKey: string) => {
-    const count = await prisma.apexEntry.count({ where: { boardType, boardKey } })
+  const ensureApexSeeds = async (seasonId: string, boardType: ApexBoardType, boardKey: string) => {
+    const count = await prisma.apexEntry.count({ where: { seasonId, boardType, boardKey } })
     if (count > 0) return
 
     await prisma.apexEntry.createMany({
       data: buildApexSeedEntries().map((entry) => ({
+        seasonId,
         boardType,
         boardKey,
         name: entry.fighter.name,
@@ -277,15 +280,16 @@ export function buildApp() {
     })
   }
 
-  const apexLeaderboard = async (boardType: ApexBoardType, boardKey: string) => {
-    await ensureApexSeeds(boardType, boardKey)
-    return prisma.apexEntry.findMany({ where: { boardType, boardKey }, orderBy: { rank: 'asc' } })
+  const apexLeaderboard = async (seasonId: string, boardType: ApexBoardType, boardKey: string) => {
+    await ensureApexSeeds(seasonId, boardType, boardKey)
+    return prisma.apexEntry.findMany({ where: { seasonId, boardType, boardKey }, orderBy: { rank: 'asc' } })
   }
 
-  const apexBoardSeed = (boardType: ApexBoardType, boardKey: string, runId: string) => `${runId}-apex-${boardType.toLowerCase()}-${boardKey}`
+  const apexBoardSeed = (seasonId: string, boardType: ApexBoardType, boardKey: string, runId: string) => `${seasonId}-${runId}-apex-${boardType.toLowerCase()}-${boardKey}`
 
   const incrementApexDefenderStreaks = async (
     tx: PrismaTransaction,
+    seasonId: string,
     boardType: ApexBoardType,
     boardKey: string,
     report: ApexChallengeReport,
@@ -296,13 +300,14 @@ export function buildApp() {
     if (defenderIds.length === 0) return
 
     await tx.apexEntry.updateMany({
-      where: { id: { in: defenderIds }, boardType, boardKey },
+      where: { id: { in: defenderIds }, seasonId, boardType, boardKey },
       data: { challengeWins: { increment: 1 } },
     })
   }
 
   const insertApexEntry = async (
     tx: PrismaTransaction,
+    seasonId: string,
     boardType: ApexBoardType,
     boardKey: string,
     userId: string,
@@ -311,11 +316,12 @@ export function buildApp() {
     report: ApexChallengeReport,
   ) => {
     const rankOffset = 1_000_000
-    await tx.$executeRaw`UPDATE "ApexEntry" SET "rank" = "rank" + ${rankOffset} WHERE "boardType" = ${boardType} AND "boardKey" = ${boardKey} AND "rank" >= ${report.placementRank}`
+    await tx.$executeRaw`UPDATE "ApexEntry" SET "rank" = "rank" + ${rankOffset} WHERE "seasonId" = ${seasonId} AND "boardType" = ${boardType} AND "boardKey" = ${boardKey} AND "rank" >= ${report.placementRank}`
     const created = await tx.apexEntry.create({
       data: {
         userId,
         sourceRunId: run.id,
+        seasonId,
         boardType,
         boardKey,
         name: challengerName,
@@ -331,7 +337,7 @@ export function buildApp() {
         isSeed: false,
       },
     })
-    await tx.$executeRaw`UPDATE "ApexEntry" SET "rank" = "rank" - ${rankOffset - 1} WHERE "boardType" = ${boardType} AND "boardKey" = ${boardKey} AND "rank" >= ${report.placementRank + rankOffset}`
+    await tx.$executeRaw`UPDATE "ApexEntry" SET "rank" = "rank" - ${rankOffset - 1} WHERE "seasonId" = ${seasonId} AND "boardType" = ${boardType} AND "boardKey" = ${boardKey} AND "rank" >= ${report.placementRank + rankOffset}`
     return created
   }
 
@@ -434,13 +440,15 @@ export function buildApp() {
 
   app.get('/api/ladder/me', async (request) => {
     const userId = requireUser(request.userId)
-    const profile = await ensureLadderProfile(userId)
+    const season = await getActiveSeason()
+    const profile = await ensureLadderProfile(userId, season.id)
     const recentSettlements = await prisma.ladderSettlement.findMany({
-      where: { userId, seasonId: LADDER_SEASON_ID },
+      where: { userId, seasonId: season.id },
       orderBy: { createdAt: 'desc' },
       take: 5,
     })
     return {
+      season: publicSeason(season),
       profile: publicLadderProfile(profile),
       recentSettlements: recentSettlements.map(publicLadderSettlement),
     }
@@ -448,17 +456,18 @@ export function buildApp() {
 
   app.get('/api/ladder/leaderboard', async (request) => {
     const userId = requireUser(request.userId)
+    const season = await getActiveSeason()
     const topDogKings = await prisma.ladderProfile.findMany({
-      where: { seasonId: LADDER_SEASON_ID, tier: 'DOG_KING' },
+      where: { seasonId: season.id, tier: 'DOG_KING' },
       orderBy: [{ score: 'desc' }, { updatedAt: 'asc' }],
       take: 50,
       include: { user: true },
     })
-    const playerProfile = await ensureLadderProfile(userId)
+    const playerProfile = await ensureLadderProfile(userId, season.id)
     const betterPlayers = playerProfile.tier === 'DOG_KING'
       ? await prisma.ladderProfile.count({
         where: {
-          seasonId: LADDER_SEASON_ID,
+          seasonId: season.id,
           tier: 'DOG_KING',
           OR: [
             { score: { gt: playerProfile.score } },
@@ -469,6 +478,7 @@ export function buildApp() {
       : null
 
     return {
+      season: publicSeason(season),
       leaderboard: topDogKings.map((entry, index) => ({
         rank: index + 1,
         title: `犬王第 ${index + 1} 名`,
@@ -482,7 +492,8 @@ export function buildApp() {
 
   app.get('/api/runs/history', async (request) => {
     const userId = requireUser(request.userId)
-    const runs = await prisma.run.findMany({
+    const [runs, seasonSummaries] = await Promise.all([
+      prisma.run.findMany({
       where: { userId },
       orderBy: { updatedAt: 'desc' },
       select: {
@@ -500,8 +511,13 @@ export function buildApp() {
         updatedAt: true,
         items: true,
       },
-    })
-    return { history: publicRunHistory(runs) }
+      }),
+      prisma.seasonPlayerSummary.findMany({
+        where: { userId },
+        orderBy: { createdAt: 'desc' },
+      }),
+    ])
+    return { history: publicRunHistory(runs), seasonSummaries: seasonSummaries.map(publicSeasonSummary) }
   })
 
   app.post('/api/runs', async (request, reply) => {
@@ -514,15 +530,17 @@ export function buildApp() {
     if (!parsed.success) return reply.code(400).send({ error: '无效狗狗选择' })
     const body = parsed.data
     const mode = body.mode ?? 'CASUAL'
+    const season = await getActiveSeason()
     if (body.dogType === 'EMPEROR' && body.luckyNumber == null) {
       return reply.code(400).send({ error: '狗皇帝需要选择 1-6 的幸运数字' })
     }
-    if (mode === 'LADDER') await ensureLadderProfile(userId)
+    if (mode === 'LADDER') await ensureLadderProfile(userId, season.id)
     await prisma.run.updateMany({ where: { userId, status: 'ACTIVE' }, data: { status: 'ABANDONED' } })
     const shopItems = makeNewRunShop(userId)
     const run = await prisma.run.create({
       data: {
         userId,
+        seasonId: season.id,
         mode,
         dogType: body.dogType,
         luckyNumber: body.dogType === 'EMPEROR' ? body.luckyNumber : null,
@@ -538,13 +556,14 @@ export function buildApp() {
 
   app.get('/api/apex', async (request) => {
     const userId = requireUser(request.userId)
+    const season = await getActiveSeason()
     const dailyBoardKey = dailyApexBoardKey()
     const [overallLeaderboard, dailyLeaderboard] = await Promise.all([
-      apexLeaderboard('OVERALL', 'default'),
-      apexLeaderboard('DAILY', dailyBoardKey),
+      apexLeaderboard(season.id, 'OVERALL', 'default'),
+      apexLeaderboard(season.id, 'DAILY', dailyBoardKey),
     ])
     const submitted = await prisma.apexEntry.findMany({
-      where: { userId, boardType: 'OVERALL', sourceRunId: { not: null } },
+      where: { userId, seasonId: season.id, boardType: 'OVERALL', sourceRunId: { not: null } },
       select: { sourceRunId: true },
     })
     const submittedRunIds = submitted
@@ -553,6 +572,7 @@ export function buildApp() {
     const candidates = await prisma.run.findMany({
       where: {
         userId,
+        seasonId: season.id,
         status: 'COMPLETE',
         id: { notIn: submittedRunIds },
       },
@@ -561,6 +581,7 @@ export function buildApp() {
     })
 
     return {
+      season: publicSeason(season),
       dailyBoardKey,
       dailyResetHour: 5,
       leaderboards: {
@@ -573,19 +594,20 @@ export function buildApp() {
 
   app.post('/api/apex/submit', async (request, reply) => {
     const userId = requireUser(request.userId)
+    const season = await getActiveSeason()
     const { runId } = z.object({ runId: z.string() }).parse(request.body)
     const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } })
-    const run = await prisma.run.findFirst({ where: { id: runId, userId }, include: { items: true } })
+    const run = await prisma.run.findFirst({ where: { id: runId, userId, seasonId: season.id }, include: { items: true } })
     if (!run) return reply.code(404).send({ error: 'Run not found' })
     if (run.status !== 'COMPLETE') return reply.code(400).send({ error: 'Only completed dogs can enter apex arena' })
 
-    const existing = await prisma.apexEntry.findFirst({ where: { sourceRunId: run.id, boardType: 'OVERALL' } })
+    const existing = await prisma.apexEntry.findFirst({ where: { sourceRunId: run.id, seasonId: season.id, boardType: 'OVERALL' } })
     if (existing) return reply.code(409).send({ error: 'This dog has already entered apex arena' })
 
     const dailyBoardKey = dailyApexBoardKey()
     const [overallLeaderboard, dailyLeaderboard] = await Promise.all([
-      apexLeaderboard('OVERALL', 'default'),
-      apexLeaderboard('DAILY', dailyBoardKey),
+      apexLeaderboard(season.id, 'OVERALL', 'default'),
+      apexLeaderboard(season.id, 'DAILY', dailyBoardKey),
     ])
     const challengerName = `${user.nickname ?? user.account}#${user.id.slice(0, 6)}`
     const challenger = snapshotFromRun(run, challengerName)
@@ -599,22 +621,23 @@ export function buildApp() {
       rank: entry.rank,
       fighter: apexEntryToFighter(entry),
     }))
-    const overallReport = resolveApexChallenge(challenger, overallOpponents, apexBoardSeed('OVERALL', 'default', run.id))
-    const dailyReport = resolveApexChallenge(challenger, dailyOpponents, apexBoardSeed('DAILY', dailyBoardKey, run.id))
+    const overallReport = resolveApexChallenge(challenger, overallOpponents, apexBoardSeed(season.id, 'OVERALL', 'default', run.id))
+    const dailyReport = resolveApexChallenge(challenger, dailyOpponents, apexBoardSeed(season.id, 'DAILY', dailyBoardKey, run.id))
 
     const entries = await prisma.$transaction(async (tx) => {
-      await incrementApexDefenderStreaks(tx, 'OVERALL', 'default', overallReport)
-      await incrementApexDefenderStreaks(tx, 'DAILY', dailyBoardKey, dailyReport)
-      const overall = await insertApexEntry(tx, 'OVERALL', 'default', userId, run, challengerName, overallReport)
-      const daily = await insertApexEntry(tx, 'DAILY', dailyBoardKey, userId, run, challengerName, dailyReport)
+      await incrementApexDefenderStreaks(tx, season.id, 'OVERALL', 'default', overallReport)
+      await incrementApexDefenderStreaks(tx, season.id, 'DAILY', dailyBoardKey, dailyReport)
+      const overall = await insertApexEntry(tx, season.id, 'OVERALL', 'default', userId, run, challengerName, overallReport)
+      const daily = await insertApexEntry(tx, season.id, 'DAILY', dailyBoardKey, userId, run, challengerName, dailyReport)
       return { overall, daily }
     })
     const [updatedOverallLeaderboard, updatedDailyLeaderboard] = await Promise.all([
-      prisma.apexEntry.findMany({ where: { boardType: 'OVERALL', boardKey: 'default' }, orderBy: { rank: 'asc' } }),
-      prisma.apexEntry.findMany({ where: { boardType: 'DAILY', boardKey: dailyBoardKey }, orderBy: { rank: 'asc' } }),
+      prisma.apexEntry.findMany({ where: { seasonId: season.id, boardType: 'OVERALL', boardKey: 'default' }, orderBy: { rank: 'asc' } }),
+      prisma.apexEntry.findMany({ where: { seasonId: season.id, boardType: 'DAILY', boardKey: dailyBoardKey }, orderBy: { rank: 'asc' } }),
     ])
 
     return {
+      season: publicSeason(season),
       entries: {
         overall: publicApexEntry(entries.overall, userId),
         daily: publicApexEntry(entries.daily, userId),
@@ -1002,6 +1025,7 @@ export function buildApp() {
       data: {
         runId: run.id,
         userId,
+        seasonId: run.seasonId,
         mode: run.mode,
         name: playerName,
         dogType: run.dogType,
@@ -1016,7 +1040,7 @@ export function buildApp() {
       },
     })
     const runMode = run.mode === 'LADDER' ? 'LADDER' : 'CASUAL'
-    const ladderProfile = runMode === 'LADDER' ? await ensureLadderProfile(userId) : null
+    const ladderProfile = runMode === 'LADDER' ? await ensureLadderProfile(userId, run.seasonId) : null
     const ladderRange = ladderProfile
       ? targetLadderOpponentWinsRange({
         tier: normalizeLadderTier(ladderProfile.tier, ladderProfile.score),
@@ -1030,6 +1054,7 @@ export function buildApp() {
       : await prisma.ghostSnapshot.findMany({
         where: {
           mode: runMode,
+          seasonId: run.seasonId,
           round: run.round,
           NOT: [{ runId: run.id }, { userId }],
           wins: ladderRange ? { gte: ladderRange.min, lte: ladderRange.max } : { gte: opponentWins, lte: run.wins },
@@ -1132,7 +1157,7 @@ export function buildApp() {
       relicCount: relicsFromRun(run).length,
     })
     if (status === 'COMPLETE' && run.mode === 'LADDER') {
-      await settleLadderRun(userId, run.id, wins, losses)
+      await settleLadderRun(userId, run.id, wins, losses, run.seasonId)
       await recordAccountEvent(userId, { kind: 'LADDER_SETTLED', wins, losses })
       const settledRun = await prisma.run.findUniqueOrThrow({ where: { id: run.id }, include: { items: true, ladderSettlement: true } })
       await recordAccountEvent(userId, { kind: 'BATTLE_FINISHED', mode: run.mode, dogType: run.dogType, winner: playerWon, wins, losses, round: nextRound, itemCount: currentItems.length, relicCount: relicsFromRun(run).length })
@@ -1162,7 +1187,7 @@ export function buildApp() {
       if (transition.count === 0) return { type: 'invalid' as const }
 
       if (run.mode === 'LADDER') {
-        await createLadderSettlement(tx, userId, run.id, run.wins, run.losses)
+        await createLadderSettlement(tx, userId, run.id, run.wins, run.losses, run.seasonId)
       }
 
       return { type: 'settled' as const, run: await tx.run.findUniqueOrThrow({ where: { id: run.id }, include: { items: true, ladderSettlement: true } }) }

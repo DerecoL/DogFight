@@ -4,6 +4,7 @@ import { buildApp } from './app'
 import { shouldRunDestructiveDatabaseTests } from './config'
 import { prisma } from './db'
 import { nextQuality } from './game/quality'
+import { endActiveSeason } from './seasons'
 
 const describeWithDatabase = shouldRunDestructiveDatabaseTests() ? describe : describe.skip
 const app = buildApp()
@@ -12,6 +13,7 @@ beforeEach(async () => {
   await prisma.dogfightBattle.deleteMany()
   await prisma.dogfightParticipant.deleteMany()
   await prisma.dogfightRoom.deleteMany()
+  await prisma.seasonPlayerSummary.deleteMany()
   await prisma.ladderSettlement.deleteMany()
   await prisma.ladderProfile.deleteMany()
   await prisma.apexEntry.deleteMany()
@@ -20,6 +22,7 @@ beforeEach(async () => {
   await prisma.itemInstance.deleteMany()
   await prisma.run.deleteMany()
   await prisma.user.deleteMany()
+  await prisma.season.deleteMany()
 })
 
 afterAll(async () => {
@@ -562,7 +565,9 @@ describeWithDatabase('run API', () => {
     })
 
     const ladder = await agent.get('/api/ladder/me').expect(200)
+    expect(ladder.body.season).toMatchObject({ id: 'season-1', name: '赛季 1', status: 'ACTIVE' })
     expect(ladder.body.profile).toMatchObject({
+      seasonId: 'season-1',
       tier: 'BRONZE',
       score: 73,
       gamesPlayed: 1,
@@ -1232,6 +1237,7 @@ describeWithDatabase('run API', () => {
     })
 
     const overview = await agent.get('/api/apex').expect(200)
+    expect(overview.body.season).toMatchObject({ id: 'season-1', name: '赛季 1', status: 'ACTIVE' })
     expect(overview.body.dailyBoardKey).toMatch(/^\d{4}-\d{2}-\d{2}$/)
     expect(overview.body.dailyResetHour).toBe(5)
     expect(overview.body.leaderboards.overall).toHaveLength(50)
@@ -1245,6 +1251,7 @@ describeWithDatabase('run API', () => {
     expect(overview.body.candidates.map((run: { id: string }) => run.id)).toContain(runId)
 
     const submitted = await agent.post('/api/apex/submit').send({ runId }).expect(200)
+    expect(submitted.body.season).toMatchObject({ id: 'season-1' })
     expect(submitted.body.entries.overall).toMatchObject({ sourceRunId: runId, isSeed: false, boardType: 'OVERALL', boardKey: 'default', name: expect.stringContaining('Apex Player'), challengeWins: 1 })
     expect(submitted.body.entries.daily).toMatchObject({ sourceRunId: runId, isSeed: false, boardType: 'DAILY', boardKey: overview.body.dailyBoardKey, name: expect.stringContaining('Apex Player'), challengeWins: 1 })
     expect(submitted.body.entries.overall.items.length).toBeGreaterThan(0)
@@ -1293,6 +1300,69 @@ describeWithDatabase('run API', () => {
 
     const afterSubmit = await agent.get('/api/apex').expect(200)
     expect(afterSubmit.body.candidates.map((run: { id: string }) => run.id)).not.toContain(ladderRunId)
+  })
+
+  it('archives season ladder and apex results before opening a reset season', async () => {
+    const agent = request.agent(app.server)
+    await app.ready()
+
+    const registered = await agent.post('/api/auth/register').send({ account: `season-${Date.now()}`, password: 'dogdice' }).expect(200)
+    await agent.post('/api/profile/nickname').send({ nickname: '赛季玩家' }).expect(200)
+    await agent.get('/api/ladder/me').expect(200)
+    await prisma.ladderProfile.update({
+      where: { userId_seasonId: { userId: registered.body.user.id, seasonId: 'season-1' } },
+      data: { tier: 'DOG_KING', score: 540, highestTier: 'DOG_KING', gamesPlayed: 3, totalWins: 30, totalLosses: 4 },
+    })
+
+    const created = await agent.post('/api/runs').send({ dogType: 'SHIBA' }).expect(200)
+    const runId = created.body.run.id
+    await prisma.run.update({
+      where: { id: runId },
+      data: { wins: 12, losses: 0, round: 12, phase: 'COMPLETE', status: 'COMPLETE' },
+    })
+    await agent.post('/api/apex/submit').send({ runId }).expect(200)
+
+    const ended = await endActiveSeason()
+    expect(ended).toMatchObject({
+      endedSeason: { id: 'season-1', status: 'ENDED' },
+      newSeason: { id: 'season-2', name: '赛季 2', status: 'ACTIVE' },
+      archivedPlayers: 1,
+    })
+
+    const history = await agent.get('/api/runs/history').expect(200)
+    expect(history.body.seasonSummaries[0]).toMatchObject({
+      seasonId: 'season-1',
+      seasonName: '赛季 1',
+      ladderTier: 'DOG_KING',
+      ladderScore: 540,
+      dogKingRank: 1,
+      apexRank: expect.any(Number),
+      apexDogType: 'SHIBA',
+      apexWins: 12,
+      apexSnapshot: { dogType: 'SHIBA', wins: 12, losses: 0 },
+    })
+
+    const nextLadder = await agent.get('/api/ladder/me').expect(200)
+    expect(nextLadder.body).toMatchObject({
+      season: { id: 'season-2', status: 'ACTIVE' },
+      profile: { seasonId: 'season-2', tier: 'BRONZE', score: 0, gamesPlayed: 0 },
+    })
+
+    const nextApex = await agent.get('/api/apex').expect(200)
+    expect(nextApex.body.season).toMatchObject({ id: 'season-2' })
+    expect(nextApex.body.candidates.map((run: { id: string }) => run.id)).not.toContain(runId)
+  })
+
+  it('refuses to end a season while ladder runs are active unless forced', async () => {
+    const agent = request.agent(app.server)
+    await app.ready()
+
+    await agent.post('/api/auth/register').send({ account: `season-active-${Date.now()}`, password: 'dogdice' }).expect(200)
+    await agent.post('/api/runs').send({ dogType: 'SHIBA', mode: 'LADDER' }).expect(200)
+
+    await expect(endActiveSeason()).rejects.toThrow('进行中的天梯跑局')
+    const forced = await endActiveSeason({ forceAbandonActiveLadder: true })
+    expect(forced).toMatchObject({ abandonedActiveLadderRuns: 1, newSeason: { id: 'season-2' } })
   })
 
   it('creates dogfight rooms as empty seats without abandoning the casual run', async () => {

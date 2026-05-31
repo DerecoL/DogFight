@@ -19,6 +19,7 @@ model User {
   nickname     String?
   createdAt    DateTime @default(now())
   runs         Run[]
+  seasonSummaries SeasonPlayerSummary[]
   ladderProfiles LadderProfile[]
   ladderSettlements LadderSettlement[]
   wallet       AccountWallet?
@@ -29,9 +30,53 @@ model User {
   cosmeticEquips CosmeticEquip[]
 }
 
+model Season {
+  id        String   @id
+  name      String
+  status    String   @default("ACTIVE")
+  startedAt DateTime @default(now())
+  endedAt   DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  summaries SeasonPlayerSummary[]
+
+  @@index([status])
+}
+
+model SeasonPlayerSummary {
+  id                 String   @id @default(cuid())
+  userId             String
+  seasonId           String
+  seasonName         String
+  ladderTier         String?
+  ladderScore        Int?
+  ladderHighestTier  String?
+  ladderGamesPlayed  Int      @default(0)
+  ladderTotalWins    Int      @default(0)
+  ladderTotalLosses  Int      @default(0)
+  dogKingRank        Int?
+  apexRank           Int?
+  apexDogType        String?
+  apexWins           Int?
+  apexLosses         Int?
+  apexRound          Int?
+  apexChallengeWins  Int?
+  apexSnapshot       String?
+  createdAt          DateTime @default(now())
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  season Season @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, seasonId])
+  @@index([seasonId, apexRank])
+  @@index([userId, createdAt])
+}
+
 model Run {
   id          String   @id @default(cuid())
   userId      String
+  seasonId    String   @default("season-1")
   mode        String   @default("CASUAL")
   dogType     String
   wins        Int      @default(0)
@@ -81,6 +126,7 @@ model GhostSnapshot {
   id        String   @id @default(cuid())
   runId     String?
   userId    String?
+  seasonId  String   @default("season-1")
   mode      String   @default("CASUAL")
   name      String
   dogType   String
@@ -151,6 +197,7 @@ model ApexEntry {
   id            String   @id @default(cuid())
   userId        String?
   sourceRunId   String?
+  seasonId      String   @default("season-1")
   boardType     String   @default("OVERALL")
   boardKey      String   @default("default")
   name          String
@@ -166,10 +213,10 @@ model ApexEntry {
   isSeed        Boolean  @default(false)
   createdAt     DateTime @default(now())
 
-  @@unique([sourceRunId, boardType])
-  @@unique([boardType, boardKey, rank])
+  @@unique([seasonId, sourceRunId, boardType])
+  @@unique([seasonId, boardType, boardKey, rank])
   @@index([userId])
-  @@index([boardType, boardKey, rank])
+  @@index([seasonId, boardType, boardKey, rank])
 }
 
 model BattleLog {
