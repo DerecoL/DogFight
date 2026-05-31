@@ -26,6 +26,7 @@ import {
   Flag,
   Gamepad2,
   Grid3X3,
+  Heart,
   House,
   Lock,
   LogOut,
@@ -105,7 +106,7 @@ import './App.css'
 import './ui/handdrawn.css'
 
 type DogType = 'SHIBA' | 'SAMOYED' | 'MUTT' | 'BULLY' | 'EMPEROR' | 'FROG'
-type Phase = 'SHOP' | 'CHOICE' | 'CLASS_REWARD' | 'ENCHANT_CHOICE' | 'RELIC_CHOICE' | 'UPGRADE_CHOICE' | 'POTION_CHOICE' | 'PREP' | 'MATCH' | 'BATTLE' | 'COMPLETE'
+type Phase = 'MAP' | 'SHOP' | 'CHOICE' | 'CLASS_REWARD' | 'ENCHANT_CHOICE' | 'RELIC_CHOICE' | 'UPGRADE_CHOICE' | 'POTION_CHOICE' | 'PREP' | 'MATCH' | 'BATTLE' | 'COMPLETE'
 type Area = 'EQUIPMENT' | 'BAG'
 type ShopType = 'GENERAL' | 'LARGE' | 'MEDIUM' | 'SMALL' | 'SMALL_DICE' | 'BIG_DICE' | 'RELIC' | 'UPGRADE' | 'UPGRADE_SILVER' | 'UPGRADE_GOLD' | 'UPGRADE_DIAMOND' | 'POTION'
 type ItemQuality = 'BRONZE' | 'SILVER' | 'GOLD' | 'DIAMOND'
@@ -158,6 +159,29 @@ type EnchantmentChoice = { id: string; description: string; enchant: Enchantment
 type PotionCategory = 'ADD_ONE' | 'ADD_TWO' | 'EXTRA_ONE' | 'REPLACE_RANGE' | 'REPLACE_ALL'
 type PotionChoice = { id: string; category: PotionCategory; dice: number[]; description: string }
 type Item = { id: string; defId: string; quality: ItemQuality; area: Area; x: number; y: number; def: ItemDef; enchant?: Enchantment | null; triggerDiceOverride?: number[] | null; sellBonus?: number }
+type ExplorationMapNodeKind = 'PLAYER_BATTLE' | 'MONSTER_BATTLE' | 'SHOP_FIXED' | 'SHOP_UNKNOWN' | 'SHOP_EQUIPMENT' | 'REST' | 'EVENT'
+type ExplorationEventType = 'GOLD_CACHE' | 'RESTORE_TOLERANCE' | 'FREE_EQUIPMENT' | 'FREE_UPGRADE' | 'RELIC_GIFT' | 'RISKY_COMMISSION'
+type ExplorationMapMonster = { name: string; dogType: DogType; seed?: string; possibleRewards: Array<{ defId: string; quality: ItemQuality }> }
+type ExplorationMapNode = {
+  id: string
+  layer: number
+  column: number
+  kind: ExplorationMapNodeKind
+  nextNodeIds: string[]
+  shopType?: ShopType
+  monster?: ExplorationMapMonster
+  event?: { type: ExplorationEventType; title: string; description: string }
+}
+type ExplorationPendingReward = { nodeId: string; defId: string; quality: ItemQuality }
+type ExplorationMapState = {
+  version: 1
+  mapIndex: number
+  currentNodeId: string | null
+  completedNodeIds: string[]
+  availableNodeIds: string[]
+  nodes: ExplorationMapNode[]
+  pendingReward?: ExplorationPendingReward | null
+}
 type BattleActor = 'player' | 'opponent' | 'system'
 type BattleTarget = 'player' | 'opponent' | 'both' | 'none'
 type BattleSnapshot = { name: string; dogType: DogType; luckyNumber?: number | null; wins: number; losses: number; round: number; items: Item[]; relics?: Relic[] }
@@ -269,6 +293,7 @@ type Run = {
   matchedGhost: null | { name: string; dogType: DogType; luckyNumber?: number | null; wins: number; losses: number; round: number }
   lastBattle: Battle | null
   ladderSettlement: LadderSettlement | null
+  mapState?: ExplorationMapState | null
   items: Item[]
 }
 type LadderSettlement = {
@@ -833,6 +858,15 @@ const itemIcons: Record<string, string> = {
   'frog-rainy-season': '/assets/sticker-icons/frog-rainy-season.webp',
   'frog-full-pond-gate': '/assets/sticker-icons/frog-full-pond-gate.webp',
 }
+const mapNodeIcons: Record<ExplorationMapNodeKind, string> = {
+  PLAYER_BATTLE: '/assets/sticker-icons/small-bite.webp',
+  MONSTER_BATTLE: '/assets/sticker-icons/poisoned-dog-fang.webp',
+  SHOP_FIXED: '/assets/sticker-icons/dog-gold-ingot.webp',
+  SHOP_UNKNOWN: '/assets/sticker-icons/lucky-paw.webp',
+  SHOP_EQUIPMENT: '/assets/sticker-icons/giant-bone.webp',
+  REST: '/assets/sticker-icons/milk-bone.webp',
+  EVENT: '/assets/sticker-icons/carrot.webp',
+}
 const relicIcons: Record<string, string> = {
   'midas-left': '/assets/sticker-icons/midas-left.webp',
   'midas-right': '/assets/sticker-icons/midas-right.webp',
@@ -1009,6 +1043,10 @@ function versionedIconSrc(src: string) {
 
 function itemIcon(def: ItemDef) {
   return versionedIconSrc(itemIcons[def.id] ?? '/assets/sticker-icons/starter-1.webp')
+}
+
+function itemDefById(defId: string) {
+  return ALL_ITEM_DEFS.find((def) => def.id === defId) ?? null
 }
 
 function ItemArtIcon({ def, className }: { def: ItemDef; className: string }) {
@@ -1867,6 +1905,46 @@ export default function App() {
     }
   }
 
+  const selectMapNode = (nodeId: string) => {
+    if (!run) return
+    void action(
+      () => api(`/runs/${run.id}/map/select`, { method: 'POST', body: JSON.stringify({ nodeId }) }),
+      { success: 'place-success', failure: 'action-failed' },
+    )
+  }
+
+  const resolveMapEvent = () => {
+    if (!run) return
+    void action(
+      () => api(`/runs/${run.id}/map/event`, { method: 'POST' }),
+      { success: 'reward-picked', failure: 'action-failed' },
+    )
+  }
+
+  const completeMapNode = () => {
+    if (!run) return
+    void action(
+      () => api(`/runs/${run.id}/map/complete-node`, { method: 'POST' }),
+      { success: 'place-success', failure: 'action-failed' },
+    )
+  }
+
+  const claimMapReward = () => {
+    if (!run) return
+    void action(
+      () => api(`/runs/${run.id}/map/monster-reward/claim`, { method: 'POST' }),
+      { success: 'reward-picked', failure: 'place-failed' },
+    )
+  }
+
+  const skipMapReward = () => {
+    if (!run) return
+    void action(
+      () => api(`/runs/${run.id}/map/monster-reward/skip`, { method: 'POST' }),
+      { success: 'place-success', failure: 'action-failed' },
+    )
+  }
+
   const settleRun = async () => {
     if (!run) return
     const confirmed = window.confirm('将按当前胜负结算，不会额外增加失败。确定放弃本局吗？')
@@ -1974,7 +2052,7 @@ export default function App() {
       }
       return
     }
-    if (overId === 'SELL_ZONE' && run?.phase === 'SHOP') {
+    if (overId === 'SELL_ZONE' && (run?.phase === 'SHOP' || run?.phase === 'MAP')) {
       setSelectedItemId(null)
       setTipAnchor(null)
       void action(
@@ -2104,6 +2182,30 @@ export default function App() {
   }
   return (
     <Shell feedbacks={uiFeedbacks} cosmetics={equippedCosmetics} user={user} run={run} error={error} musicEnabled={musicEnabled} musicBlocked={musicBlocked} onToggleMusic={toggleMusic} onOpenLobby={() => setAppScreen('LOBBY')} onLogout={() => action(() => api('/auth/logout', { method: 'POST' }).then(() => ({ user: null })))}>
+      {!battle && run.phase === 'MAP' && run.mapState && (
+        <DndContext sensors={sensors} measuring={dndMeasuring} collisionDetection={dragCollisionDetection} onDragStart={onDragStart} onDragEnd={onDragEnd} onDragCancel={onDragCancel}>
+          <ExplorationMapView
+            run={run}
+            selectedItemId={selectedItemId}
+            selectedItem={selectedItem}
+            tipAnchor={tipAnchor}
+            onSelectNode={selectMapNode}
+            onResolveEvent={resolveMapEvent}
+            onClaimReward={claimMapReward}
+            onSkipReward={skipMapReward}
+            onDrop={handleItemDrop}
+            onSellRelic={sellRelic}
+            onSelectItem={onInspectItem}
+            onSlotClick={(area, x, y) => selectedItemId && moveItem(selectedItemId, area, x, y)}
+            onCloseTip={closeShopTip}
+            onUpgrade={selectedItem && canUpgradeItem(selectedItem, run.items) ? () => upgradeItem(selectedItem.id) : null}
+          />
+          <DragOverlay dropAnimation={null} zIndex={1000}>
+            <DraggingItemOverlay />
+          </DragOverlay>
+        </DndContext>
+      )}
+
       {!battle && run.phase === 'CHOICE' && (
         <ShopChoiceSelect choices={run.choices} onPick={(shopType) => action(() => api(`/runs/${run.id}/choice/select`, { method: 'POST', body: JSON.stringify({ shopType }) }))} />
       )}
@@ -2202,7 +2304,8 @@ export default function App() {
               onInspectOffer={onInspectOffer}
               pendingAction={pendingShopAction}
               onReroll={() => void rerollShop()}
-              onMatch={() => action(() => api(`/runs/${run.id}/battle/match`, { method: 'POST' }), { success: 'battle-start' })}
+              matchLabel={run.mapState?.currentNodeId ? '返回地图' : '匹配'}
+              onMatch={() => run.mapState?.currentNodeId ? completeMapNode() : action(() => api(`/runs/${run.id}/battle/match`, { method: 'POST' }), { success: 'battle-start' })}
             />
             <InventoryBoard
               run={run}
@@ -4116,6 +4219,204 @@ function ActionButton({ children, className, variant = 'primary', wide = false, 
   )
 }
 
+const mapNodeLabels: Record<ExplorationMapNodeKind, string> = {
+  PLAYER_BATTLE: '玩家对战',
+  MONSTER_BATTLE: '怪物战斗',
+  SHOP_FIXED: '固定商店',
+  SHOP_UNKNOWN: '? 商店',
+  SHOP_EQUIPMENT: '装备商店',
+  REST: '休息点',
+  EVENT: '事件',
+}
+
+function ExplorationMapView({
+  run,
+  selectedItemId,
+  selectedItem,
+  tipAnchor,
+  onSelectNode,
+  onResolveEvent,
+  onClaimReward,
+  onSkipReward,
+  onDrop,
+  onSellRelic,
+  onSelectItem,
+  onSlotClick,
+  onCloseTip,
+  onUpgrade,
+}: {
+  run: Run
+  selectedItemId: string | null
+  selectedItem: Item | null
+  tipAnchor: TipAnchor | null
+  onSelectNode: (nodeId: string) => void
+  onResolveEvent: () => void
+  onClaimReward: () => void
+  onSkipReward: () => void
+  onDrop: ItemDropHandler
+  onSellRelic: (relicId: string) => void
+  onSelectItem: (itemId: string, element: HTMLElement) => void
+  onSlotClick: (area: Area, x: number, y: number) => void
+  onCloseTip: () => void
+  onUpgrade: (() => void) | null
+}) {
+  const map = run.mapState
+  if (!map) return null
+  const completed = new Set(map.completedNodeIds)
+  const available = new Set(map.availableNodeIds)
+  const currentNode = map.currentNodeId ? map.nodes.find((node) => node.id === map.currentNodeId) ?? null : null
+  const currentEvent = currentNode?.kind === 'EVENT' ? currentNode.event : null
+  const pendingRewardDef = map.pendingReward ? itemDefById(map.pendingReward.defId) : null
+  const currentLayer = completed.size > 0
+    ? Math.max(...map.completedNodeIds.map((nodeId) => map.nodes.find((node) => node.id === nodeId)?.layer ?? 0)) + 1
+    : 0
+  return (
+    <section className="exploration-map-screen">
+      <div className="exploration-map-header">
+        <div>
+          <h2>探索地图</h2>
+          <p>第 {map.mapIndex + 1} 张地图 · 第 {Math.min(12, currentLayer + 1)} / 12 层</p>
+        </div>
+        <div className="map-run-stats">
+          <ResourcePill icon={<Trophy size={16} />} label="胜场" value={`${run.wins}/12`} tone="gold" />
+          <ResourcePill icon={<Heart size={16} />} label="容错" value={`${Math.max(0, 5 - run.losses)}/5`} tone="pink" />
+          <ResourcePill icon={<Coins size={16} />} label="金币" value={run.gold} tone="gold" />
+        </div>
+      </div>
+
+      {currentEvent && (
+        <HanddrawnFrame as="section" variant="panel" ornament="corner" className="map-event-panel paper-card">
+          <MapNodeSticker kind="EVENT" size="lg" />
+          <div>
+            <h3>{currentEvent.title}</h3>
+            <p>{currentEvent.description}</p>
+          </div>
+          <ActionButton onClick={onResolveEvent}>处理事件</ActionButton>
+        </HanddrawnFrame>
+      )}
+
+      {map.pendingReward && (
+        <HanddrawnFrame as="section" variant="panel" ornament="wood" className="map-reward-panel paper-card">
+          <div className="map-reward-copy">
+            {pendingRewardDef ? <ItemArt def={pendingRewardDef} className="map-reward-art" /> : <MapNodeSticker kind="MONSTER_BATTLE" size="md" />}
+            <div>
+              <h3>待领取掉落</h3>
+              <p>{pendingRewardDef?.name ?? map.pendingReward.defId} · {qualityLabel[normalizeQuality(map.pendingReward.quality)]}</p>
+            </div>
+          </div>
+          <div className="map-reward-actions">
+            <SellDropZone />
+            <ActionButton onClick={onClaimReward}>领取</ActionButton>
+            <ActionButton variant="secondary" onClick={onSkipReward}>放弃</ActionButton>
+          </div>
+          <InventoryBoard
+            run={run}
+            selectedItemId={selectedItemId}
+            onDrop={onDrop}
+            onSellRelic={onSellRelic}
+            onSelectItem={onSelectItem}
+            onSlotClick={onSlotClick}
+          />
+          <FloatingTip run={run} item={selectedItem} offer={null} anchor={tipAnchor} onClose={onCloseTip} onBuy={null} onSell={null} onUpgrade={onUpgrade} />
+        </HanddrawnFrame>
+      )}
+
+      <div className="exploration-map-board">
+        <div className="map-route-layer" aria-hidden="true">
+          {map.nodes.flatMap((node) => node.nextNodeIds.map((nextId) => {
+            const next = map.nodes.find((entry) => entry.id === nextId)
+            if (!next) return null
+            const start = mapNodePosition(node)
+            const end = mapNodePosition(next)
+            const dx = end.x - start.x
+            const dy = end.y - start.y
+            const length = Math.sqrt(dx * dx + dy * dy)
+            const angle = Math.atan2(dy, dx) * 180 / Math.PI
+            const active = completed.has(node.id) && available.has(next.id)
+            const done = completed.has(node.id) && completed.has(next.id)
+            return (
+              <span
+                key={`${node.id}:${next.id}`}
+                className={`map-route-line ${active ? 'available' : ''} ${done ? 'completed' : ''}`}
+                style={{ '--x1': start.x, '--y1': start.y, '--line-length': length, '--line-angle': `${angle}deg` } as React.CSSProperties}
+              />
+            )
+          }))}
+        </div>
+        {map.nodes.map((node) => (
+          <MapNodeButton
+            key={node.id}
+            node={node}
+            completed={completed.has(node.id)}
+            available={available.has(node.id)}
+            current={map.currentNodeId === node.id}
+            onSelect={onSelectNode}
+          />
+        ))}
+      </div>
+    </section>
+  )
+}
+
+function mapNodePosition(node: Pick<ExplorationMapNode, 'layer' | 'column'>) {
+  const baseX = [18, 50, 82][node.column] ?? 50
+  const stagger = node.layer % 2 === 0 ? -2 : 2
+  return {
+    x: Math.max(10, Math.min(90, baseX + stagger)),
+    y: 4 + node.layer * 8.35,
+  }
+}
+
+function MapNodeButton({ node, completed, available, current, onSelect }: { node: ExplorationMapNode; completed: boolean; available: boolean; current: boolean; onSelect: (nodeId: string) => void }) {
+  const position = mapNodePosition(node)
+  const locked = !available && !completed && !current
+  return (
+    <button
+      className={`map-node ${node.kind.toLowerCase().replaceAll('_', '-')} ${available ? 'available' : ''} ${completed ? 'completed' : ''} ${current ? 'current' : ''} ${locked ? 'locked' : ''}`}
+      style={{ '--node-x': position.x, '--node-y': position.y } as React.CSSProperties}
+      disabled={!available}
+      onClick={() => onSelect(node.id)}
+      aria-label={mapNodeTitle(node)}
+    >
+      <MapNodeSticker kind={node.kind} />
+      <span className="map-node-title">{mapNodeTitle(node)}</span>
+      <span className="map-node-preview">{mapNodePreview(node)}</span>
+    </button>
+  )
+}
+
+function MapNodeSticker({ kind, size = 'md' }: { kind: ExplorationMapNodeKind; size?: 'sm' | 'md' | 'lg' }) {
+  return (
+    <span className={`map-node-sticker ${size}`}>
+      <img className="map-node-icon" src={versionedIconSrc(mapNodeIcons[kind])} alt="" loading="lazy" decoding="async" />
+    </span>
+  )
+}
+
+function mapNodeTitle(node: ExplorationMapNode) {
+  if (node.kind === 'SHOP_FIXED' && node.shopType) return shopNames[node.shopType]
+  if (node.kind === 'MONSTER_BATTLE') return node.monster?.name ?? mapNodeLabels[node.kind]
+  if (node.kind === 'EVENT') return node.event?.title ?? mapNodeLabels[node.kind]
+  return mapNodeLabels[node.kind]
+}
+
+function mapNodePreview(node: ExplorationMapNode) {
+  if (node.kind === 'SHOP_FIXED' && node.shopType) return '直接进入'
+  if (node.kind === 'SHOP_UNKNOWN') return '随机三选一'
+  if (node.kind === 'SHOP_EQUIPMENT') return '装备三选一'
+  if (node.kind === 'REST') return '恢复容错'
+  if (node.kind === 'PLAYER_BATTLE') return '计胜负'
+  if (node.kind === 'EVENT') return node.event?.description ?? '随机收益'
+  if (node.kind === 'MONSTER_BATTLE') {
+    const rewards = node.monster?.possibleRewards
+      .map((reward) => itemDefById(reward.defId)?.name ?? reward.defId)
+      .slice(0, 3)
+      .join(' / ')
+    return rewards ? `掉落 ${rewards}` : '不扣容错'
+  }
+  return ''
+}
+
 function ShopChoiceSelect({ choices, onPick }: { choices: ShopType[]; onPick: (shopType: ShopType) => void }) {
   const [selectedChoice, setSelectedChoice] = useState<ShopType | null>(choices[0] ?? null)
   const slots = Array.from({ length: SHOP_CHOICE_SLOT_COUNT }, (_, index) => choices[index] ?? null)
@@ -4363,7 +4664,7 @@ function PotionChoiceSelect({ choices, selectedId, visualTheme, onSelect }: { ch
   )
 }
 
-function ShopShelf({ run, selectedOfferId, pendingAction = null, onInspectOffer, onReroll, onMatch }: { run: Run; selectedOfferId: string | null; pendingAction?: PendingShopAction; onInspectOffer: (offerId: string, element: HTMLElement) => void; onReroll: () => void; onMatch: () => void }) {
+function ShopShelf({ run, selectedOfferId, pendingAction = null, matchLabel = '匹配', onInspectOffer, onReroll, onMatch }: { run: Run; selectedOfferId: string | null; pendingAction?: PendingShopAction; matchLabel?: string; onInspectOffer: (offerId: string, element: HTMLElement) => void; onReroll: () => void; onMatch: () => void }) {
   const { language } = useLanguage()
   const visualTheme = visualThemeForRound(run.round)
   const busy = pendingAction !== null
@@ -4388,7 +4689,7 @@ function ShopShelf({ run, selectedOfferId, pendingAction = null, onInspectOffer,
         ))}
       </div>
       <ActionButton className="match-button" data-tutorial-anchor="match-button" onClick={onMatch} disabled={busy}>
-        <Swords size={18} /> 匹配
+        <Swords size={18} /> {matchLabel}
       </ActionButton>
     </HanddrawnFrame>
   )

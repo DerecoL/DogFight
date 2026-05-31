@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createFinishedBattleRecord, nextPhaseData, postBattleLargeItemReward, postBattleSellBonusItemGrowths, publicRelics, publicRunHistory, toGameItems } from './state'
+import { createFinishedBattleRecord, nextPhaseData, postBattleLargeItemReward, postBattleSellBonusItemGrowths, publicRelics, publicRun, publicRunHistory, toGameItems } from './state'
 
 describe('public run relic data', () => {
   it('returns quality-adjusted relic descriptions for upgraded relics', () => {
@@ -8,6 +8,54 @@ describe('public run relic data', () => {
     })
 
     expect(relics[0].def.description).toContain('75%')
+  })
+})
+
+describe('public exploration map data', () => {
+  it('exposes map state for new map-phase runs', () => {
+    const run = {
+      id: 'run-map',
+      mode: 'CASUAL',
+      dogType: 'SHIBA',
+      luckyNumber: null,
+      wins: 0,
+      losses: 0,
+      round: 0,
+      gold: 10,
+      phase: 'MAP',
+      status: 'ACTIVE',
+      shopType: 'GENERAL',
+      shopItems: '[]',
+      choices: '[]',
+      enchantChoices: '[]',
+      potionChoices: '[]',
+      classRewardChoices: '[]',
+      relicChoices: '[]',
+      relics: '[]',
+      refreshCost: 1,
+      matchedGhost: null,
+      lastBattle: null,
+      ladderSettlement: null,
+      mapState: JSON.stringify({
+        version: 1,
+        mapIndex: 0,
+        currentNodeId: null,
+        completedNodeIds: [],
+        nodes: [
+          { id: 'n-0-0', layer: 0, column: 0, kind: 'PLAYER_BATTLE', nextNodeIds: [] },
+        ],
+      }),
+      items: [],
+    } as never
+
+    expect(publicRun(run)).toMatchObject({
+      phase: 'MAP',
+      mapState: {
+        mapIndex: 0,
+        availableNodeIds: ['n-0-0'],
+        nodes: [{ id: 'n-0-0', kind: 'PLAYER_BATTLE' }],
+      },
+    })
   })
 })
 

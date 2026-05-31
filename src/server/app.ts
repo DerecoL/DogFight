@@ -12,6 +12,8 @@ import { publicErrorMessage } from './errors'
 import { buildApexSeedEntries, dailyApexBoardKey, resolveApexChallenge, type ApexBoardType, type ApexChallengeReport, type ApexOpponent } from './game/apex'
 import { itemDef, itemDefForQuality, relicDef, relicDefForQuality } from './game/data'
 import { canPlace, findSlot, type PlacementOptions } from './game/grid'
+import { applyMapNodeCompletion, availableMapNodeIds, createExplorationMapState, explorationMapFinished, mapNodeSelection, mapShopChoices, normalizeExplorationMapState, randomEquipmentReward, randomMonsterReward, type ExplorationMapNode, type ExplorationMapState } from './game/map'
+import { buildOfflineFighter } from './game/offline-builder'
 import { applyPotionToBaseDice } from './game/potion'
 import { canUpgradePair, nextQuality, normalizeQuality, upgradeEnchant } from './game/quality'
 import { canUseUpgradeShop, isUpgradeShopType, itemSellValue } from './game/shop'
@@ -19,7 +21,7 @@ import { simulateBattle } from './game/battle'
 import { calculateLadderResult, ladderTierForScore, ladderTierLabels, ladderTiers, type LadderTier } from './game/ladder'
 import { STARTING_GOLD, isTrainingMatchRound, selectCasualGhostSnapshot, selectLadderGhostSnapshot, targetLadderOpponentWinsRange, targetOpponentWins } from './game/matchmaking'
 import type { BattleResult, DogType, EnchantmentChoice, FighterSnapshot, GameItem, PotionChoice, RelicInstance, ShopOffer, ShopType } from './game/types'
-import { applyRelicChoice, createFinishedBattleRecord, initialItems, makeChoices, makeNewRunShop, makePotionChoices, makeRelicChoices, makeShop, nextPhaseData, parseJson, phaseDataAfterEnchant, postBattleLargeItemReward, postBattleSellBonusItemGrowths, publicLadderSettlement, publicRun, publicRunHistory, relicsFromRun, removeRelicByInstanceId, seedGhost, snapshotFromRun, toGameItems } from './state'
+import { applyRelicChoice, createFinishedBattleRecord, initialItems, makeChoices, makePotionChoices, makeRelicChoices, makeShop, nextPhaseData, parseJson, postBattleLargeItemReward, postBattleSellBonusItemGrowths, publicLadderSettlement, publicRun, publicRunHistory, relicsFromRun, removeRelicByInstanceId, seedGhost, snapshotFromRun, toGameItems } from './state'
 import { accountSummary, claimAchievement, claimDaily, equipUserCosmetic, getAchievements, getCosmetics, getDailyTasks, getShop, purchaseShopItem, recordAccountEvent, refreshDaily, unequipUserCosmetic } from './account-services'
 import { getActiveSeason, publicSeason, publicSeasonSummary } from './seasons'
 
@@ -254,6 +256,67 @@ export function buildApp() {
       staged.push({ ...item, area: 'BAG', x: slot.x, y: slot.y })
     }
     return moves
+  }
+
+  const parseRunMapState = (run: { mapState?: string | null }): ExplorationMapState | null => normalizeExplorationMapState(parseJson(run.mapState ?? '{}', null))
+
+  const completeMapNodeState = (run: { id: string; wins: number; losses: number; mapState?: string | null }) => {
+    const map = parseRunMapState(run)
+    if (!map?.currentNodeId) return null
+    const completed = applyMapNodeCompletion(map)
+    return explorationMapFinished(completed)
+      ? createExplorationMapState(run.id, completed.mapIndex + 1, run.wins, run.losses)
+      : completed
+  }
+
+  const mapCompletionUpdateData = (run: { id: string; wins: number; losses: number; mapState?: string | null }) => {
+    const nextMap = completeMapNodeState(run)
+    return nextMap ? { phase: 'MAP', mapState: JSON.stringify(nextMap), matchedGhost: null } : { phase: 'MAP', matchedGhost: null }
+  }
+
+  const postPlayerBattlePhaseData = (run: { id: string; dogType: string; wins: number; losses: number; enchantThirdLossGranted: boolean; mapState?: string | null }, nextRound: number, currentItems: GameItem[]) => {
+    const map = parseRunMapState(run)
+    if (!map?.currentNodeId) {
+      return nextPhaseData({ id: run.id, dogType: run.dogType as DogType, losses: run.losses, enchantThirdLossGranted: run.enchantThirdLossGranted, items: currentItems }, nextRound, `${run.id}-finish-${nextRound}-${run.wins}-${run.losses}`)
+    }
+    const rewardPhase = nextPhaseData({ id: run.id, dogType: run.dogType as DogType, losses: run.losses, enchantThirdLossGranted: run.enchantThirdLossGranted, items: currentItems }, nextRound, `${run.id}-finish-${nextRound}-${run.wins}-${run.losses}`)
+    if (rewardPhase.phase === 'CLASS_REWARD' || rewardPhase.phase === 'ENCHANT_CHOICE') return rewardPhase
+    return { ...mapCompletionUpdateData(run), choices: '[]', shopItems: '[]', classRewardChoices: '[]', enchantChoices: '[]' }
+  }
+
+  const createItemRewardData = (run: { relics: string; items: ItemInstance[] }, reward: { defId: string; quality?: string | null }) => {
+    const items = toGameItems(run.items)
+    const quality = normalizeQuality(reward.quality)
+    const slot = findSlot(items, reward.defId, 'BAG', placementOptionsForRun(run))
+    const upgradeTarget = !slot ? items.find((entry) =>
+      entry.defId === reward.defId
+      && normalizeQuality(entry.quality) === quality
+      && nextQuality(entry.quality) !== null
+    ) : null
+    const upgradedQuality = upgradeTarget ? nextQuality(upgradeTarget.quality) : null
+    if (upgradeTarget && upgradedQuality) {
+      return { kind: 'upgrade' as const, itemId: upgradeTarget.id, quality: upgradedQuality }
+    }
+    if (!slot) return { kind: 'blocked' as const }
+    return { kind: 'create' as const, item: { defId: reward.defId, quality, area: 'BAG' as const, x: slot.x, y: slot.y } }
+  }
+
+  const mapNodeShopPhaseData = (run: { id: string; round: number; items: ItemInstance[]; relics: string }, node: ExplorationMapNode) => {
+    const choices = mapShopChoices(node, `${run.id}-${node.id}-${Date.now()}`, run.round)
+    const shopType = choices[0] ?? 'GENERAL'
+    if (node.kind === 'SHOP_UNKNOWN' || node.kind === 'SHOP_EQUIPMENT') {
+      return { phase: 'CHOICE', choices: JSON.stringify(choices), shopItems: '[]', relicChoices: '[]', potionChoices: '[]' }
+    }
+    if (shopType === 'RELIC') {
+      return { phase: 'RELIC_CHOICE', shopType: 'RELIC', choices: '[]', shopItems: '[]', relicChoices: JSON.stringify(makeRelicChoices(run, `${run.id}-${node.id}-relic`)), potionChoices: '[]' }
+    }
+    if (isUpgradeShopType(shopType)) {
+      return { phase: 'UPGRADE_CHOICE', shopType, choices: '[]', shopItems: '[]', relicChoices: '[]', potionChoices: '[]' }
+    }
+    if (shopType === 'POTION') {
+      return { phase: 'POTION_CHOICE', shopType: 'POTION', choices: '[]', shopItems: '[]', relicChoices: '[]', potionChoices: JSON.stringify(makePotionChoices(`${run.id}-${node.id}-potion`)) }
+    }
+    return { phase: 'SHOP', shopType, refreshCost: 1, choices: '[]', shopItems: JSON.stringify(makeShop(shopType, `${run.id}-${node.id}-${shopType}`, run.round)), relicChoices: '[]', potionChoices: '[]' }
   }
 
   const ensureApexSeeds = async (seasonId: string, boardType: ApexBoardType, boardKey: string) => {
@@ -536,7 +599,7 @@ export function buildApp() {
     }
     if (mode === 'LADDER') await ensureLadderProfile(userId, season.id)
     await prisma.run.updateMany({ where: { userId, status: 'ACTIVE' }, data: { status: 'ABANDONED' } })
-    const shopItems = makeNewRunShop(userId)
+    const mapState = createExplorationMapState(`${userId}-${Date.now()}`, 0, 0, 0)
     const run = await prisma.run.create({
       data: {
         userId,
@@ -545,7 +608,9 @@ export function buildApp() {
         dogType: body.dogType,
         luckyNumber: body.dogType === 'EMPEROR' ? body.luckyNumber : null,
         gold: STARTING_GOLD,
-        shopItems: JSON.stringify(shopItems),
+        phase: 'MAP',
+        shopItems: '[]',
+        mapState: JSON.stringify(mapState),
         items: { create: initialItems().map(({ defId, area, x, y }) => ({ defId, area, x, y })) },
       },
       include: { items: true },
@@ -662,6 +727,194 @@ export function buildApp() {
     return { run: publicRun(run) }
   })
 
+  app.post('/api/runs/:runId/map/select', async (request, reply) => {
+    const userId = requireUser(request.userId)
+    const { runId } = z.object({ runId: z.string() }).parse(request.params)
+    const { nodeId } = z.object({ nodeId: z.string() }).parse(request.body)
+    const run = await prisma.run.findFirstOrThrow({ where: { id: runId, userId }, include: { items: true, ladderSettlement: true } })
+    if (run.status !== 'ACTIVE' || run.phase !== 'MAP') return reply.code(400).send({ error: '当前不在探索地图' })
+    const map = parseRunMapState(run)
+    if (!map) return reply.code(400).send({ error: '探索地图不存在' })
+    if (!availableMapNodeIds(map).includes(nodeId)) return reply.code(400).send({ error: '该节点当前不可到达' })
+    const node = map.nodes.find((entry) => entry.id === nodeId)
+    if (!node) return reply.code(404).send({ error: '地图节点不存在' })
+    const selectedMap = { ...map, currentNodeId: node.id }
+    const selection = mapNodeSelection(node)
+
+    if (selection.action === 'REST') {
+      const restedRun = await prisma.run.update({
+        where: { id: run.id },
+        data: {
+          losses: run.losses > 0 ? run.losses - 1 : run.losses,
+          gold: run.losses > 0 ? run.gold : run.gold + 4,
+          ...mapCompletionUpdateData({ ...run, mapState: JSON.stringify(selectedMap) }),
+        },
+        include: { items: true, ladderSettlement: true },
+      })
+      return { run: publicRun(restedRun) }
+    }
+
+    if (selection.action === 'EVENT') {
+      const updated = await prisma.run.update({
+        where: { id: run.id },
+        data: { phase: 'MAP', mapState: JSON.stringify(selectedMap) },
+        include: { items: true, ladderSettlement: true },
+      })
+      return { run: publicRun(updated) }
+    }
+
+    if (selection.action === 'SHOP') {
+      const updated = await prisma.run.update({
+        where: { id: run.id },
+        data: { mapState: JSON.stringify(selectedMap), ...mapNodeShopPhaseData(run, node) },
+        include: { items: true, ladderSettlement: true },
+      })
+      return { run: publicRun(updated) }
+    }
+
+    if (selection.action === 'MONSTER_BATTLE') {
+      const monster = buildOfflineFighter({
+        dogType: node.monster?.dogType,
+        round: Math.max(1, node.layer + 1),
+        wins: run.wins,
+        losses: run.losses,
+        seed: node.monster?.seed ?? `${run.id}-${node.id}-monster`,
+      })
+      const updated = await prisma.run.update({
+        where: { id: run.id },
+        data: { phase: 'MATCH', mapState: JSON.stringify(selectedMap), matchedGhost: JSON.stringify({ ...monster, name: node.monster?.name ?? monster.name, ghostId: null }) },
+        include: { items: true, ladderSettlement: true },
+      })
+      return { run: publicRun(updated) }
+    }
+
+    const updated = await prisma.run.update({
+      where: { id: run.id },
+      data: { phase: 'PREP', mapState: JSON.stringify(selectedMap), matchedGhost: null },
+      include: { items: true, ladderSettlement: true },
+    })
+    return { run: publicRun(updated) }
+  })
+
+  app.post('/api/runs/:runId/map/event', async (request, reply) => {
+    const userId = requireUser(request.userId)
+    const { runId } = z.object({ runId: z.string() }).parse(request.params)
+    const run = await prisma.run.findFirstOrThrow({ where: { id: runId, userId }, include: { items: true, ladderSettlement: true } })
+    const map = parseRunMapState(run)
+    const node = map?.nodes.find((entry) => entry.id === map.currentNodeId)
+    if (run.phase !== 'MAP' || !map || node?.kind !== 'EVENT' || !node.event) return reply.code(400).send({ error: '当前没有可处理的事件' })
+    const type = node.event.type
+
+    if (type === 'RELIC_GIFT') {
+      const relicChoices = makeRelicChoices(run, `${run.id}-${node.id}-event-relic`)
+      const updated = await prisma.run.update({
+        where: { id: run.id },
+        data: { phase: 'RELIC_CHOICE', shopType: 'RELIC', relicChoices: JSON.stringify(relicChoices), choices: '[]', shopItems: '[]' },
+        include: { items: true, ladderSettlement: true },
+      })
+      return { run: publicRun(updated) }
+    }
+
+    if (type === 'FREE_UPGRADE') {
+      const item = toGameItems(run.items).find((entry) => nextQuality(entry.quality))
+      if (item) await prisma.itemInstance.update({ where: { id: item.id }, data: { quality: nextQuality(item.quality)! } })
+      const updated = await prisma.run.update({
+        where: { id: run.id },
+        data: mapCompletionUpdateData(run),
+        include: { items: true, ladderSettlement: true },
+      })
+      return { run: publicRun(updated) }
+    }
+
+    const data: Prisma.RunUpdateInput = mapCompletionUpdateData(run)
+    if (type === 'GOLD_CACHE') data.gold = { increment: 6 }
+    if (type === 'RESTORE_TOLERANCE') {
+      if (run.losses > 0) data.losses = { decrement: 1 }
+      else data.gold = { increment: 4 }
+    }
+    if (type === 'RISKY_COMMISSION') {
+      data.gold = { increment: 12 }
+      data.losses = { increment: 1 }
+      if (run.losses + 1 >= 5) {
+        data.status = 'COMPLETE'
+        data.phase = 'COMPLETE'
+      }
+    }
+    if (type === 'FREE_EQUIPMENT') {
+      const itemReward = randomEquipmentReward(`${run.id}-${node.id}-event-equipment`)
+      const reward = createItemRewardData(run, itemReward)
+      if (reward.kind === 'create') data.items = { create: reward.item }
+      if (reward.kind === 'upgrade') {
+        await prisma.itemInstance.update({ where: { id: reward.itemId }, data: { quality: reward.quality } })
+      }
+      if (reward.kind === 'blocked') {
+        const nextMap = applyMapNodeCompletion(map)
+        data.mapState = JSON.stringify({ ...nextMap, pendingReward: { nodeId: node.id, ...itemReward } })
+      }
+    }
+    const updated = await prisma.run.update({ where: { id: run.id }, data, include: { items: true, ladderSettlement: true } })
+    if (updated.status === 'COMPLETE' && run.mode === 'LADDER') {
+      await settleLadderRun(userId, run.id, updated.wins, updated.losses, run.seasonId)
+      await recordAccountEvent(userId, { kind: 'LADDER_SETTLED', wins: updated.wins, losses: updated.losses })
+      const settledRun = await prisma.run.findUniqueOrThrow({ where: { id: run.id }, include: { items: true, ladderSettlement: true } })
+      return { run: publicRun(settledRun) }
+    }
+    return { run: publicRun(updated) }
+  })
+
+  app.post('/api/runs/:runId/map/complete-node', async (request, reply) => {
+    const userId = requireUser(request.userId)
+    const { runId } = z.object({ runId: z.string() }).parse(request.params)
+    const run = await prisma.run.findFirstOrThrow({ where: { id: runId, userId }, include: { items: true, ladderSettlement: true } })
+    const map = parseRunMapState(run)
+    if (!map?.currentNodeId) return reply.code(400).send({ error: '当前没有待完成的地图节点' })
+    const node = map.nodes.find((entry) => entry.id === map.currentNodeId)
+    if (node?.kind === 'PLAYER_BATTLE' || node?.kind === 'MONSTER_BATTLE' || node?.kind === 'EVENT') return reply.code(400).send({ error: '当前节点需要先完成对应内容' })
+    if (run.phase !== 'SHOP') return reply.code(400).send({ error: '当前节点还不能完成' })
+    if (run.status !== 'ACTIVE') return reply.code(400).send({ error: '当前节点还不能完成' })
+    const updated = await prisma.run.update({
+      where: { id: run.id },
+      data: mapCompletionUpdateData(run),
+      include: { items: true, ladderSettlement: true },
+    })
+    return { run: publicRun(updated) }
+  })
+
+  app.post('/api/runs/:runId/map/monster-reward/claim', async (request, reply) => {
+    const userId = requireUser(request.userId)
+    const { runId } = z.object({ runId: z.string() }).parse(request.params)
+    const run = await prisma.run.findFirstOrThrow({ where: { id: runId, userId }, include: { items: true, ladderSettlement: true } })
+    const map = parseRunMapState(run)
+    if (!map?.pendingReward) return reply.code(400).send({ error: '当前没有待领取掉落' })
+    const reward = createItemRewardData(run, map.pendingReward)
+    if (reward.kind === 'blocked') return reply.code(400).send({ error: '背包空间不足，请先整理' })
+    if (reward.kind === 'upgrade') await prisma.itemInstance.update({ where: { id: reward.itemId }, data: { quality: reward.quality } })
+    const updated = await prisma.run.update({
+      where: { id: run.id },
+      data: {
+        phase: 'MAP',
+        mapState: JSON.stringify({ ...map, pendingReward: null }),
+        ...(reward.kind === 'create' ? { items: { create: reward.item } } : {}),
+      },
+      include: { items: true, ladderSettlement: true },
+    })
+    return { run: publicRun(updated) }
+  })
+
+  app.post('/api/runs/:runId/map/monster-reward/skip', async (request, reply) => {
+    const userId = requireUser(request.userId)
+    const { runId } = z.object({ runId: z.string() }).parse(request.params)
+    const run = await prisma.run.findFirstOrThrow({ where: { id: runId, userId }, include: { items: true, ladderSettlement: true } })
+    const map = parseRunMapState(run)
+    if (!map?.pendingReward) return reply.code(400).send({ error: '当前没有待领取掉落' })
+    const updated = await prisma.run.update({
+      where: { id: run.id },
+      data: { phase: 'MAP', mapState: JSON.stringify({ ...map, pendingReward: null }) },
+      include: { items: true, ladderSettlement: true },
+    })
+    return { run: publicRun(updated) }
+  })
+
   app.post('/api/runs/:runId/shop/reroll', async (request, reply) => {
     const userId = requireUser(request.userId)
     const { runId } = z.object({ runId: z.string() }).parse(request.params)
@@ -747,7 +1000,7 @@ export function buildApp() {
     const body = z.object({ itemId: z.string(), area: z.enum(['EQUIPMENT', 'BAG']), x: z.number().int(), y: z.number().int() }).parse(request.body)
     const run = await prisma.run.findFirstOrThrow({ where: { id: runId, userId }, include: { items: true } })
     if (await isReadyDogfightRunLocked(run.id)) return reply.code(400).send({ error: '本回合已完成，等待其他玩家' })
-    if (!['SHOP', 'MATCH', 'CLASS_REWARD', 'ENCHANT_CHOICE', 'PREP'].includes(run.phase)) return reply.code(400).send({ error: '当前不能调整装备' })
+    if (!['MAP', 'SHOP', 'MATCH', 'CLASS_REWARD', 'ENCHANT_CHOICE', 'PREP'].includes(run.phase)) return reply.code(400).send({ error: '当前不能调整装备' })
     const item = run.items.find((entry) => entry.id === body.itemId)
     if (!item) return reply.code(404).send({ error: '道具不存在' })
     const gameItems = toGameItems(run.items)
@@ -795,7 +1048,7 @@ export function buildApp() {
     const run = await prisma.run.findFirst({ where: { id: runId, userId }, include: { items: true } })
     if (!run) return reply.code(404).send({ error: '跑局不存在' })
     if (await isReadyDogfightRunLocked(run.id)) return reply.code(400).send({ error: '本回合已完成，等待其他玩家' })
-    if (!['SHOP', 'MATCH', 'CLASS_REWARD', 'ENCHANT_CHOICE', 'PREP'].includes(run.phase)) return reply.code(400).send({ error: '当前不能升级道具' })
+    if (!['MAP', 'SHOP', 'MATCH', 'CLASS_REWARD', 'ENCHANT_CHOICE', 'PREP'].includes(run.phase)) return reply.code(400).send({ error: '当前不能升级道具' })
 
     const gameItems = toGameItems(run.items)
     const source = gameItems.find((entry) => entry.id === body.itemId)
@@ -886,7 +1139,7 @@ export function buildApp() {
       prisma.itemInstance.update({ where: { id: item.id }, data: { quality: upgradedQuality } }),
       prisma.run.update({
         where: { id: run.id },
-        data: { phase: 'PREP', choices: '[]', shopItems: '[]', relicChoices: '[]' },
+        data: { ...(parseRunMapState(run)?.currentNodeId ? mapCompletionUpdateData(run) : { phase: 'PREP' }), choices: '[]', shopItems: '[]', relicChoices: '[]' },
         include: { items: true },
       }),
     ])
@@ -917,7 +1170,7 @@ export function buildApp() {
       prisma.itemInstance.update({ where: { id: item.id }, data: { triggerDiceOverride: JSON.stringify(triggerDiceOverride) } }),
       prisma.run.update({
         where: { id: run.id },
-        data: { phase: 'PREP', choices: '[]', shopItems: '[]', relicChoices: '[]', potionChoices: '[]' },
+        data: { ...(parseRunMapState(run)?.currentNodeId ? mapCompletionUpdateData(run) : { phase: 'PREP' }), choices: '[]', shopItems: '[]', relicChoices: '[]', potionChoices: '[]' },
         include: { items: true },
       }),
     ])
@@ -936,12 +1189,14 @@ export function buildApp() {
     const slot = findSlot(toGameItems(run.items), body.defId, 'BAG')
     if (!slot) return reply.code(400).send({ error: '背包空间不足，请先整理' })
     const pendingEnchantChoices = parseJson<EnchantmentChoice[]>(run.enchantChoices, [])
+    const map = parseRunMapState(run)
     const updated = await prisma.run.update({
       where: { id: run.id },
       data: {
-        phase: pendingEnchantChoices.length > 0 ? 'ENCHANT_CHOICE' : 'CHOICE',
+        phase: pendingEnchantChoices.length > 0 ? 'ENCHANT_CHOICE' : map?.currentNodeId ? 'MAP' : 'CHOICE',
+        ...(pendingEnchantChoices.length === 0 && map?.currentNodeId ? mapCompletionUpdateData(run) : {}),
         classRewardChoices: '[]',
-        choices: pendingEnchantChoices.length > 0 ? '[]' : JSON.stringify(makeChoices(`${run.id}-choices-${run.round}`, run.round, [
+        choices: pendingEnchantChoices.length > 0 || map?.currentNodeId ? '[]' : JSON.stringify(makeChoices(`${run.id}-choices-${run.round}`, run.round, [
           ...toGameItems(run.items),
           { id: 'class-reward-preview', defId: body.defId, quality: normalizeQuality(def.defaultQuality), area: 'BAG', x: slot.x, y: slot.y },
         ])),
@@ -970,7 +1225,13 @@ export function buildApp() {
       prisma.itemInstance.update({ where: { id: item.id }, data: { enchant: JSON.stringify(choice.enchant) } }),
       prisma.run.update({
         where: { id: run.id },
-        data: phaseDataAfterEnchant(run),
+        data: parseRunMapState(run)?.currentNodeId ? { ...mapCompletionUpdateData(run), choices: '[]', shopItems: '[]', enchantChoices: '[]' } : {
+          phase: run.round <= 2 ? 'SHOP' : 'CHOICE',
+          ...(run.round <= 2
+            ? { shopType: 'GENERAL', shopItems: JSON.stringify(makeShop('GENERAL', `${run.id}-post-enchant-${run.round}`, run.round)), choices: '[]' }
+            : { choices: JSON.stringify(makeChoices(`${run.id}-post-enchant-${run.round}`, run.round, run.items)), shopItems: '[]' }),
+          enchantChoices: '[]',
+        },
         include: { items: true, ladderSettlement: true },
       }),
     ])
@@ -989,7 +1250,7 @@ export function buildApp() {
     relicDef(body.relicId)
     const updated = await prisma.run.update({
       where: { id: run.id },
-      data: { phase: 'PREP', relicChoices: '[]', relics: JSON.stringify(applyRelicChoice(relicsFromRun(run), body.relicId)) },
+      data: { ...(parseRunMapState(run)?.currentNodeId ? mapCompletionUpdateData(run) : { phase: 'PREP' }), relicChoices: '[]', relics: JSON.stringify(applyRelicChoice(relicsFromRun(run), body.relicId)) },
       include: { items: true },
     })
     return { run: publicRun(updated) }
@@ -1001,7 +1262,7 @@ export function buildApp() {
     const body = z.object({ relicId: z.string() }).parse(request.body)
     const run = await prisma.run.findFirstOrThrow({ where: { id: runId, userId }, include: { items: true } })
     if (await isReadyDogfightRunLocked(run.id)) return reply.code(400).send({ error: 'Round is already ready and locked' })
-    if (!['SHOP', 'MATCH', 'CLASS_REWARD', 'ENCHANT_CHOICE', 'PREP'].includes(run.phase)) return reply.code(400).send({ error: 'Cannot sell relics in the current phase' })
+    if (!['MAP', 'SHOP', 'MATCH', 'CLASS_REWARD', 'ENCHANT_CHOICE', 'PREP'].includes(run.phase)) return reply.code(400).send({ error: 'Cannot sell relics in the current phase' })
     const remainingRelics = removeRelicByInstanceId(relicsFromRun(run), body.relicId)
     if (!remainingRelics) return reply.code(404).send({ error: 'Relic not found' })
     const updated = await prisma.run.update({
@@ -1109,6 +1370,37 @@ export function buildApp() {
     const result = parseJson<BattleResult | null>(run.lastBattle || '', null)
     if (!result) return reply.code(400).send({ error: '没有可结算的战斗结果' })
     const playerWon = result.winner === 'player'
+    const map = parseRunMapState(run)
+    const mapNode = map?.currentNodeId ? map.nodes.find((node) => node.id === map.currentNodeId) ?? null : null
+    if (mapNode?.kind === 'MONSTER_BATTLE') {
+      const battleRecord = createFinishedBattleRecord(result, run.wins, run.losses)
+      const completion = mapCompletionUpdateData(run)
+      let itemMutation: Prisma.RunUpdateInput['items'] | undefined
+      let nextMap = completion.mapState ? parseRunMapState({ mapState: completion.mapState }) : null
+      if (playerWon) {
+        const reward = randomMonsterReward(mapNode.monster, `${run.id}-${mapNode.id}-reward-${run.round}`)
+        const rewardData = createItemRewardData(run, reward)
+        if (rewardData.kind === 'create') {
+          itemMutation = { create: rewardData.item }
+        } else if (rewardData.kind === 'upgrade') {
+          itemMutation = { update: { where: { id: rewardData.itemId }, data: { quality: rewardData.quality } } }
+        } else if (nextMap) {
+          nextMap = { ...nextMap, pendingReward: { nodeId: mapNode.id, defId: reward.defId, quality: normalizeQuality(reward.quality) } }
+        }
+      }
+      const updated = await prisma.run.update({
+        where: { id: run.id },
+        data: {
+          ...completion,
+          ...(nextMap ? { mapState: JSON.stringify(nextMap) } : {}),
+          lastBattle: JSON.stringify(battleRecord),
+          matchedGhost: null,
+          ...(itemMutation ? { items: itemMutation } : {}),
+        },
+        include: { items: true, ladderSettlement: true },
+      })
+      return { run: publicRun(updated) }
+    }
     const wins = run.wins + (playerWon ? 1 : 0)
     const losses = run.losses + (playerWon ? 0 : 1)
     const battleRecord = createFinishedBattleRecord(result, wins, losses)
@@ -1122,7 +1414,7 @@ export function buildApp() {
       : null
     const phaseData = status === 'COMPLETE'
       ? { phase: 'COMPLETE', enchantChoices: '[]' }
-      : nextPhaseData({ id: run.id, dogType: run.dogType, losses, enchantThirdLossGranted: run.enchantThirdLossGranted, items: currentItems }, nextRound, `${run.id}-finish-${nextRound}-${wins}-${losses}`)
+      : postPlayerBattlePhaseData({ ...run, wins, losses }, nextRound, currentItems)
     const updateData = {
       wins,
       losses,
@@ -1160,11 +1452,8 @@ export function buildApp() {
       await settleLadderRun(userId, run.id, wins, losses, run.seasonId)
       await recordAccountEvent(userId, { kind: 'LADDER_SETTLED', wins, losses })
       const settledRun = await prisma.run.findUniqueOrThrow({ where: { id: run.id }, include: { items: true, ladderSettlement: true } })
-      await recordAccountEvent(userId, { kind: 'BATTLE_FINISHED', mode: run.mode, dogType: run.dogType, winner: playerWon, wins, losses, round: nextRound, itemCount: currentItems.length, relicCount: relicsFromRun(run).length })
-      await recordAccountEvent(userId, { kind: 'LADDER_SETTLED', wins, losses })
       return { run: publicRun(settledRun) }
     }
-    await recordAccountEvent(userId, { kind: 'BATTLE_FINISHED', mode: run.mode, dogType: run.dogType, winner: playerWon, wins, losses, round: nextRound, itemCount: currentItems.length, relicCount: relicsFromRun(run).length })
     return { run: publicRun(updated) }
   })
 
