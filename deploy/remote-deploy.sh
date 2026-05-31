@@ -28,11 +28,16 @@ else
 fi
 rm -rf \
   "$TEMP_DEPLOY_PATH/.git" \
+  "$TEMP_DEPLOY_PATH/.github" \
+  "$TEMP_DEPLOY_PATH/.codex-logs" \
+  "$TEMP_DEPLOY_PATH/.codex-tmp" \
   "$TEMP_DEPLOY_PATH/dist" \
   "$TEMP_DEPLOY_PATH/dist-click" \
+  "$TEMP_DEPLOY_PATH/node_modules" \
   "$TEMP_DEPLOY_PATH/.superpowers" \
   "$TEMP_DEPLOY_PATH/docs/superpowers" \
-  "$TEMP_DEPLOY_PATH/picture"
+  "$TEMP_DEPLOY_PATH/picture" \
+  "$TEMP_DEPLOY_PATH/backups"
 
 if [ -n "${PRODUCTION_ENV_B64:-}" ]; then
   ENV_OVERRIDE_PATH="$TEMP_DEPLOY_PATH/.env.production.override"
