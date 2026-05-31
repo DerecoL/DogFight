@@ -8191,6 +8191,26 @@ progress {
   font-weight: 950;
 }
 
+.monster-equipment-name-button {
+  display: inline-flex;
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  color: #375f96;
+  background: transparent;
+  font: inherit;
+  font-weight: 950;
+  text-align: left;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  cursor: pointer;
+}
+
+.monster-equipment-name-button:hover,
+.monster-equipment-name-button:focus-visible {
+  color: #1f4d86;
+}
+
 .map-enter-action {
   width: 100%;
   justify-content: center;
@@ -8247,6 +8267,75 @@ progress {
 .map-reward-inventory {
   min-height: 0;
   overflow: auto;
+}
+
+.map-monster-equipment-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 85;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(35, 27, 21, .48);
+}
+
+.map-monster-equipment-sheet {
+  width: min(1120px, calc(100vw - 28px));
+  max-height: calc(100vh - 28px);
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border: 2px solid rgba(91, 61, 39, .3);
+  border-radius: 18px;
+  background:
+    var(--paper-fiber),
+    linear-gradient(180deg, rgba(255, 250, 240, .98), rgba(246, 229, 195, .96));
+  box-shadow: 0 26px 70px rgba(38, 25, 16, .34);
+  overflow: auto;
+}
+
+.map-monster-equipment-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.map-monster-equipment-header span,
+.map-monster-equipment-header p {
+  color: var(--muted);
+  font-weight: 900;
+}
+
+.map-monster-equipment-header h3 {
+  margin: 3px 0;
+  font-size: 1.55rem;
+}
+
+.map-monster-equipment-preview {
+  --slot-h: 106px;
+}
+
+.map-monster-equipment-preview .battle-slot-grid {
+  padding: 10px 10px 30px;
+  overflow: hidden;
+}
+
+.map-monster-equipment-preview .battle-item {
+  overflow: hidden;
+}
+
+.map-monster-equipment-preview .item-art-window {
+  min-height: 38px;
+}
+
+.map-monster-equipment-preview .item-card-icon-art {
+  width: 44px;
+  height: 44px;
+}
+
+.map-monster-equipment-preview .item-effect {
+  display: none;
 }
 
 @media (max-width: 760px) {

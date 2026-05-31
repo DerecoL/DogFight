@@ -187,6 +187,16 @@ describe('exploration map route board', () => {
     expect(rewardLinks).not.toContain('<small>{qualityLabel')
   })
 
+  it('opens monster equipment previews from the monster name', () => {
+    expect(app).toContain('monster-equipment-name-button')
+    expect(app).toContain('selectedMonsterEquipmentNode')
+    expect(app).toContain('MonsterEquipmentPreviewModal')
+    expect(app).toContain('map-monster-equipment-preview')
+    expect(css).toContain('.monster-equipment-name-button')
+    expect(css).toContain('.map-monster-equipment-modal')
+    expect(css).toContain('.map-monster-equipment-preview')
+  })
+
   it('adds a drawable planning layer with view, brush, eraser, and clear tools', () => {
     expect(app).toContain("type MapDrawingTool = 'inspect' | 'brush' | 'eraser'")
     expect(app).toContain('map-drawing-toolbar')

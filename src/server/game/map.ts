@@ -2,7 +2,7 @@ import { itemDef, shopPool } from './data'
 import { buildOfflineFighter, offlineFighterName } from './offline-builder'
 import { createRng, pick } from './rng'
 import { createChoices } from './shop'
-import type { DogType, ItemQuality, ShopType } from './types'
+import type { DogType, GameItem, ItemQuality, ShopType } from './types'
 
 export type ExplorationMapNodeKind =
   | 'PLAYER_BATTLE'
@@ -26,6 +26,7 @@ export type ExplorationMapMonster = {
   dogType: DogType
   seed: string
   round: number
+  equipment: GameItem[]
   possibleRewards: Array<{ defId: string; quality: ItemQuality }>
 }
 
@@ -232,6 +233,7 @@ function createMonsterPreview(mapIndex: number, layer: number, wins: number, los
     dogType,
     seed,
     round,
+    equipment: fighter.items,
     possibleRewards,
   }
 }

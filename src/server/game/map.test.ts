@@ -20,6 +20,11 @@ describe('exploration map generation', () => {
     }
 
     expect(first.nodes.some((node) => node.kind === 'MONSTER_BATTLE' && node.monster?.possibleRewards.length)).toBe(true)
+    expect(first.nodes.some((node) => node.kind === 'MONSTER_BATTLE' && node.monster?.equipment.length)).toBe(true)
+    for (const monster of first.nodes.filter((node) => node.kind === 'MONSTER_BATTLE').map((node) => node.monster).filter((monster) => monster !== undefined)) {
+      expect(monster.equipment.every((item) => item.area === 'EQUIPMENT')).toBe(true)
+      expect(monster.equipment.every((item) => item.x >= 0 && item.x < 12)).toBe(true)
+    }
     expect(first.nodes.some((node) => node.kind === 'SHOP_FIXED' && node.shopType)).toBe(true)
     expect(first.nodes.some((node) => node.kind === 'SHOP_UNKNOWN')).toBe(true)
     expect(first.nodes.some((node) => node.kind === 'SHOP_EQUIPMENT')).toBe(true)

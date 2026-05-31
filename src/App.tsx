@@ -165,9 +165,10 @@ type EnchantmentChoice = { id: string; description: string; enchant: Enchantment
 type PotionCategory = 'ADD_ONE' | 'ADD_TWO' | 'EXTRA_ONE' | 'REPLACE_RANGE' | 'REPLACE_ALL'
 type PotionChoice = { id: string; category: PotionCategory; dice: number[]; description: string }
 type Item = { id: string; defId: string; quality: ItemQuality; area: Area; x: number; y: number; def: ItemDef; enchant?: Enchantment | null; triggerDiceOverride?: number[] | null; sellBonus?: number }
+type MapMonsterEquipmentItem = Omit<Item, 'def'>
 type ExplorationMapNodeKind = 'PLAYER_BATTLE' | 'MONSTER_BATTLE' | 'SHOP_FIXED' | 'SHOP_UNKNOWN' | 'SHOP_EQUIPMENT' | 'REST' | 'EVENT'
 type ExplorationEventType = 'GOLD_CACHE' | 'RESTORE_TOLERANCE' | 'FREE_EQUIPMENT' | 'FREE_UPGRADE' | 'RELIC_GIFT' | 'RISKY_COMMISSION'
-type ExplorationMapMonster = { name: string; dogType: DogType; seed?: string; round?: number; possibleRewards: Array<{ defId: string; quality: ItemQuality }> }
+type ExplorationMapMonster = { name: string; dogType: DogType; seed?: string; round?: number; equipment?: MapMonsterEquipmentItem[]; possibleRewards: Array<{ defId: string; quality: ItemQuality }> }
 type ExplorationMapNode = {
   id: string
   layer: number
@@ -4375,6 +4376,7 @@ function ExplorationMapView({
   const [activeDraftStroke, setActiveDraftStroke] = useState<MapDraftStroke | null>(null)
   const [previewRewardOffer, setPreviewRewardOffer] = useState<ShopOffer | null>(null)
   const [mapRewardTipAnchor, setMapRewardTipAnchor] = useState<TipAnchor | null>(null)
+  const [selectedMonsterEquipmentNodeId, setSelectedMonsterEquipmentNodeId] = useState<string | null>(null)
   const activeDraftStrokeRef = useRef<MapDraftStroke | null>(null)
   const activeDraftPointerRef = useRef<number | null>(null)
   if (!map) return null
@@ -4392,6 +4394,9 @@ function ExplorationMapView({
     : currentNode ?? map.nodes.find((node) => available.has(node.id)) ?? map.nodes[0] ?? null
   const previewMapNode = previewNodeId && previewNodeId !== selectedMapNode?.id
     ? map.nodes.find((node) => node.id === previewNodeId) ?? null
+    : null
+  const selectedMonsterEquipmentNode = selectedMonsterEquipmentNodeId
+    ? map.nodes.find((node) => node.id === selectedMonsterEquipmentNodeId && node.kind === 'MONSTER_BATTLE') ?? null
     : null
   const routeFocusNode = previewMapNode ?? selectedMapNode
   const orientation: 'horizontal' | 'vertical' = typeof window !== 'undefined' && window.matchMedia('(max-width: 760px)').matches ? 'vertical' : 'horizontal'
@@ -4414,6 +4419,7 @@ function ExplorationMapView({
     setDraftStrokes([])
     setActiveDraft(null)
     setPreviewNodeId(null)
+    setSelectedMonsterEquipmentNodeId(null)
     clearMapRewardTip()
     onSelectNode(nodeId)
   }
@@ -4581,6 +4587,7 @@ function ExplorationMapView({
                   tone="selected"
                   onSelect={enterMapNode}
                   onInspectReward={inspectMapReward}
+                  onInspectMonsterEquipment={setSelectedMonsterEquipmentNodeId}
                 />
               )}
               {previewMapNode && (
@@ -4593,6 +4600,7 @@ function ExplorationMapView({
                   allowEntry={false}
                   onSelect={enterMapNode}
                   onInspectReward={inspectMapReward}
+                  onInspectMonsterEquipment={setSelectedMonsterEquipmentNodeId}
                 />
               )}
             </aside>
@@ -4611,6 +4619,7 @@ function ExplorationMapView({
             </HanddrawnFrame>
           )}
           <FloatingTip run={run} item={null} offer={previewRewardOffer} anchor={mapRewardTipAnchor} onClose={clearMapRewardTip} onBuy={null} onSell={null} onUpgrade={null} />
+          {selectedMonsterEquipmentNode && <MonsterEquipmentPreviewModal node={selectedMonsterEquipmentNode} onClose={() => setSelectedMonsterEquipmentNodeId(null)} />}
         </div>
       </div>
     </section>
@@ -4692,14 +4701,20 @@ function MapNodeButton({ node, completed, available, current, selected, previewe
   )
 }
 
-function MapNodeDetail({ node, available, current, completed, tone = 'selected', allowEntry = true, onSelect, onInspectReward }: { node: ExplorationMapNode; available: boolean; current: boolean; completed: boolean; tone?: 'selected' | 'preview'; allowEntry?: boolean; onSelect: (nodeId: string) => void; onInspectReward: (reward: { defId: string; quality: ItemQuality }, element: HTMLElement) => void }) {
+function MapNodeDetail({ node, available, current, completed, tone = 'selected', allowEntry = true, onSelect, onInspectReward, onInspectMonsterEquipment }: { node: ExplorationMapNode; available: boolean; current: boolean; completed: boolean; tone?: 'selected' | 'preview'; allowEntry?: boolean; onSelect: (nodeId: string) => void; onInspectReward: (reward: { defId: string; quality: ItemQuality }, element: HTMLElement) => void; onInspectMonsterEquipment: (nodeId: string) => void }) {
   return (
     <div className={`map-side-card map-node-detail ${tone === 'preview' ? 'map-node-detail-preview' : 'map-node-detail-selected'} ${tone} ${available ? 'available' : ''} ${current ? 'current' : ''} ${completed ? 'completed' : ''}`}>
       <MapNodeSticker kind={node.kind} size="lg" />
       <div>
         {tone === 'preview' && <span className="map-node-detail-mode">滑过预览</span>}
         <span className="map-node-detail-kicker">第 {node.layer + 1} 层</span>
-        <h3>{mapNodeTitle(node)}</h3>
+        <h3>
+          {node.kind === 'MONSTER_BATTLE' ? (
+            <button type="button" className="monster-equipment-name-button" onClick={() => onInspectMonsterEquipment(node.id)}>
+              {mapNodeTitle(node)}
+            </button>
+          ) : mapNodeTitle(node)}
+        </h3>
         <p>{mapNodePreview(node)}</p>
       </div>
       {node.kind === 'MONSTER_BATTLE' && <MapRewardPreviewLinks node={node} onInspectReward={onInspectReward} />}
@@ -4710,6 +4725,106 @@ function MapNodeDetail({ node, available, current, completed, tone = 'selected',
       {!available && !current && !completed && <strong className="map-node-state-copy muted">路线未解锁</strong>}
     </div>
   )
+}
+
+function monsterEquipmentItems(node: ExplorationMapNode): Item[] {
+  const equipment: Item[] = []
+  for (const item of node.monster?.equipment ?? []) {
+    if (item.area !== 'EQUIPMENT') continue
+    const def = itemDefById(item.defId)
+    if (!def) continue
+    equipment.push({ ...item, def })
+  }
+  return equipment.sort((a, b) => a.x - b.x || a.y - b.y)
+}
+
+function MonsterEquipmentPreviewModal({ node, onClose }: { node: ExplorationMapNode; onClose: () => void }) {
+  const [inspectedItem, setInspectedItem] = useState<Item | null>(null)
+  const [tipAnchor, setTipAnchor] = useState<TipAnchor | null>(null)
+  const { scheduleTipAnchor, cancelTipAnchor } = useDeferredTipAnchor(setTipAnchor)
+  const equipment = monsterEquipmentItems(node)
+  const previewRun = monsterEquipmentPreviewRun(node, equipment)
+  const inspectItem = (item: Item, element: HTMLElement) => {
+    setInspectedItem(item)
+    setTipAnchor(null)
+    scheduleTipAnchor(element)
+  }
+  const closeTip = () => {
+    cancelTipAnchor()
+    setInspectedItem(null)
+    setTipAnchor(null)
+  }
+  if (typeof document === 'undefined') return null
+
+  return createPortal(
+    <div className="map-monster-equipment-modal" role="dialog" aria-modal="true" aria-label="野怪装备栏预览" onClick={onClose}>
+      <section className="map-monster-equipment-sheet" onClick={(event) => event.stopPropagation()}>
+        <header className="map-monster-equipment-header">
+          <div>
+            <span>野怪配置 · 第 {node.monster?.round ?? node.layer + 1} 回合</span>
+            <h3>{mapNodeTitle(node)}</h3>
+            <p>{node.monster ? dogNames[node.monster.dogType] : '怪物战斗'} · 点击装备查看详情</p>
+          </div>
+          <IconButton title="关闭野怪装备预览" onClick={onClose}>
+            <span aria-hidden="true">×</span>
+          </IconButton>
+        </header>
+        <div className="battle-equipment-row opponent map-monster-equipment-preview">
+          <div className="battle-row-title">
+            <span>野怪装备栏</span>
+            <small>{equipment.length > 0 ? `${equipment.length} 件装备` : '暂无装备'}</small>
+          </div>
+          <div className="battle-slot-grid" style={{ gridTemplateColumns: `repeat(${BASE_EQUIPMENT_SLOT_COUNT}, minmax(0, 1fr))` }}>
+            {Array.from({ length: BASE_EQUIPMENT_SLOT_COUNT }).map((_, x) => <i key={x} className="battle-slot" style={{ gridColumn: x + 1, gridRow: 1 }} />)}
+            {equipment.map((item) => (
+              <ItemFrame
+                as="button"
+                type="button"
+                key={item.id}
+                className={`battle-item item-card paper-item-card ${itemTone(item.def)} ${qualityClass(item.quality)}`}
+                style={{ gridColumn: `${item.x + 1} / span ${item.def.width}`, gridRow: 1 }}
+                title={`${qualityLabel[normalizeQuality(item.quality)]} ${item.def.name} · ${effectText(item.def, normalizeQuality(item.quality))}`}
+                onClick={(event) => inspectItem(item, event.currentTarget)}
+              >
+                <ItemCardContent item={item} relics={[]} />
+              </ItemFrame>
+            ))}
+          </div>
+        </div>
+        <FloatingTip run={previewRun} item={inspectedItem} offer={null} anchor={tipAnchor} onClose={closeTip} onBuy={null} onSell={null} onUpgrade={null} />
+      </section>
+    </div>,
+    document.body,
+  )
+}
+
+function monsterEquipmentPreviewRun(node: ExplorationMapNode, equipment: Item[]): Run {
+  return {
+    id: `monster-preview-${node.id}`,
+    mode: 'CASUAL',
+    dogType: node.monster?.dogType ?? 'MUTT',
+    luckyNumber: null,
+    wins: 0,
+    losses: 0,
+    round: node.monster?.round ?? node.layer + 1,
+    gold: 0,
+    phase: 'MAP',
+    status: 'ACTIVE',
+    shopType: 'GENERAL',
+    shopItems: [],
+    choices: [],
+    classRewardChoices: [],
+    enchantChoices: [],
+    potionChoices: [],
+    relicChoices: [],
+    relics: [],
+    refreshCost: 1,
+    matchedGhost: null,
+    lastBattle: null,
+    ladderSettlement: null,
+    mapState: null,
+    items: equipment,
+  }
 }
 
 function MapRewardPreviewLinks({ node, onInspectReward }: { node: ExplorationMapNode; onInspectReward: (reward: { defId: string; quality: ItemQuality }, element: HTMLElement) => void }) {
