@@ -122,7 +122,7 @@ describe('dogfight public room display state', () => {
     expect(visibleA).toMatchObject({
       wins: 2,
       round: 2,
-      gold: 15,
+      gold: 16,
     })
     expect(visibleB).toMatchObject({
       wins: 1,

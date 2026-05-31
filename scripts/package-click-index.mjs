@@ -465,7 +465,7 @@ async function defaultMockApiScript(buildId = new Date().toISOString().replace(/
     run.wins += playerWon ? 1 : 0;
     run.losses += playerWon ? 0 : 1;
     run.round += 1;
-    run.gold += 5 + run.round * 2;
+    run.gold += 5 + run.round;
     run.matchedGhost = null;
     run.lastBattle = battle;
     run.status = run.wins >= 12 || run.losses >= 3 ? 'COMPLETE' : 'ACTIVE';
@@ -1653,7 +1653,7 @@ async function currentMockApiScript(buildId) {
     run.wins += playerWon ? 1 : 0;
     run.losses += playerWon ? 0 : 1;
     run.round += 1;
-    run.gold += 5 + run.round * 2;
+    run.gold += 5 + run.round;
     applyPostBattleSellBonuses(run.items);
     run.matchedGhost = null;
     run.lastBattle = battle;

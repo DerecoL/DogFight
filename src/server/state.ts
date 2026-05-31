@@ -300,7 +300,7 @@ export function makePotionChoices(seed: string) {
 }
 
 export function playerBattleGoldIncome(nextRound: number) {
-  return 6 + Math.max(0, Math.floor(nextRound))
+  return 5 + Math.max(0, Math.floor(nextRound))
 }
 
 function shouldCreateEnchantChoices(run: Pick<Run, 'losses' | 'enchantThirdLossGranted'>, nextRound: number, seed: string) {

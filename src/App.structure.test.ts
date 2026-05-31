@@ -739,7 +739,7 @@ describe('selection screen structure', () => {
     }
   })
 
-  it('uses existing lightweight WebP sticker art for exploration map nodes instead of SVG icons', () => {
+  it('uses lightweight generated WebP sticker art for exploration map nodes instead of SVG icons', () => {
     const mapIconKeys = ['PLAYER_BATTLE', 'MONSTER_BATTLE', 'SHOP_FIXED', 'SHOP_UNKNOWN', 'SHOP_EQUIPMENT', 'REST', 'EVENT']
 
     expect(app).toContain('const mapNodeIcons: Record<ExplorationMapNodeKind, string> = {')
@@ -754,7 +754,7 @@ describe('selection screen structure', () => {
 
     for (const key of mapIconKeys) {
       const pathMatch = app.match(new RegExp(`${key}:\\s*['"]([^'"]+\\.webp)['"]`))
-      expect(pathMatch?.[1]).toContain('/assets/sticker-icons/')
+      expect(pathMatch?.[1]).toContain('/assets/map-icons/')
       const webp = new URL(`../public${pathMatch?.[1]}`, import.meta.url)
       expect(existsSync(webp)).toBe(true)
       expect(statSync(webp).size).toBeLessThanOrEqual(15_000)

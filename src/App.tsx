@@ -877,13 +877,13 @@ const itemIcons: Record<string, string> = {
   'frog-full-pond-gate': '/assets/sticker-icons/frog-full-pond-gate.webp',
 }
 const mapNodeIcons: Record<ExplorationMapNodeKind, string> = {
-  PLAYER_BATTLE: '/assets/sticker-icons/small-bite.webp',
-  MONSTER_BATTLE: '/assets/sticker-icons/poisoned-dog-fang.webp',
-  SHOP_FIXED: '/assets/sticker-icons/dog-gold-ingot.webp',
-  SHOP_UNKNOWN: '/assets/sticker-icons/lucky-paw.webp',
-  SHOP_EQUIPMENT: '/assets/sticker-icons/giant-bone.webp',
-  REST: '/assets/sticker-icons/milk-bone.webp',
-  EVENT: '/assets/sticker-icons/carrot.webp',
+  PLAYER_BATTLE: '/assets/map-icons/player-battle.webp',
+  MONSTER_BATTLE: '/assets/map-icons/monster-battle.webp',
+  SHOP_FIXED: '/assets/map-icons/shop-fixed.webp',
+  SHOP_UNKNOWN: '/assets/map-icons/shop-unknown.webp',
+  SHOP_EQUIPMENT: '/assets/map-icons/shop-equipment.webp',
+  REST: '/assets/map-icons/rest.webp',
+  EVENT: '/assets/map-icons/event.webp',
 }
 const relicIcons: Record<string, string> = {
   'midas-left': '/assets/sticker-icons/midas-left.webp',
@@ -1712,6 +1712,9 @@ function GameApp() {
 
   const selectedItem = run?.items.find((item) => item.id === selectedItemId) || null
   const selectedOffer = run?.shopItems.find((offer) => offer.offerId === selectedOfferId) || null
+  const activeMapNode = run?.mapState?.currentNodeId
+    ? run.mapState.nodes.find((node) => node.id === run.mapState?.currentNodeId) ?? null
+    : null
   const selectedEnchant = run?.phase === 'ENCHANT_CHOICE'
     ? run.enchantChoices.find((choice) => choice.id === selectedEnchantId) ?? run.enchantChoices[0] ?? null
     : null
@@ -2396,7 +2399,7 @@ function GameApp() {
               onInspectOffer={onInspectOffer}
               pendingAction={pendingShopAction}
               onReroll={() => void rerollShop()}
-              matchLabel={run.mapState?.currentNodeId ? '返回地图' : '匹配'}
+              matchLabel={activeMapNode?.kind === 'PLAYER_BATTLE' ? '进入战斗' : run.mapState?.currentNodeId ? '返回地图' : '匹配'}
               onMatch={() => run.mapState?.currentNodeId ? completeMapNode() : action(() => api(`/runs/${run.id}/battle/match`, { method: 'POST' }), { success: 'battle-start' })}
             />
             <InventoryBoard
@@ -4363,6 +4366,7 @@ function ExplorationMapView({
 }) {
   const map = run.mapState
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
+  const [previewNodeId, setPreviewNodeId] = useState<string | null>(null)
   const [drawingTool, setDrawingTool] = useState<MapDrawingTool>('inspect')
   const [draftStrokes, setDraftStrokes] = useState<MapDraftStroke[]>([])
   const [activeDraftStroke, setActiveDraftStroke] = useState<MapDraftStroke | null>(null)
@@ -4380,16 +4384,20 @@ function ExplorationMapView({
     ? Math.max(...map.completedNodeIds.map((nodeId) => map.nodes.find((node) => node.id === nodeId)?.layer ?? 0)) + 1
     : 0
   const mapLayerCount = Math.max(1, ...map.nodes.map((node) => node.layer + 1))
-  const highlightedNode = selectedNodeId
+  const selectedMapNode = selectedNodeId
     ? map.nodes.find((node) => node.id === selectedNodeId) ?? currentNode
     : currentNode ?? map.nodes.find((node) => available.has(node.id)) ?? map.nodes[0] ?? null
+  const previewMapNode = previewNodeId && previewNodeId !== selectedMapNode?.id
+    ? map.nodes.find((node) => node.id === previewNodeId) ?? null
+    : null
+  const routeFocusNode = previewMapNode ?? selectedMapNode
   const orientation: 'horizontal' | 'vertical' = typeof window !== 'undefined' && window.matchMedia('(max-width: 760px)').matches ? 'vertical' : 'horizontal'
   const mapLayerMarkers = Array.from({ length: mapLayerCount }, (_, index) => index)
   const inspectedRouteNodeIds = new Set<string>()
-  if (highlightedNode) {
-    inspectedRouteNodeIds.add(highlightedNode.id)
-    highlightedNode.nextNodeIds.forEach((id) => inspectedRouteNodeIds.add(id))
-    map.nodes.filter((node) => node.nextNodeIds.includes(highlightedNode.id)).forEach((node) => inspectedRouteNodeIds.add(node.id))
+  if (routeFocusNode) {
+    inspectedRouteNodeIds.add(routeFocusNode.id)
+    routeFocusNode.nextNodeIds.forEach((id) => inspectedRouteNodeIds.add(id))
+    map.nodes.filter((node) => node.nextNodeIds.includes(routeFocusNode.id)).forEach((node) => inspectedRouteNodeIds.add(node.id))
   }
   const setActiveDraft = (stroke: MapDraftStroke | null) => {
     activeDraftStrokeRef.current = stroke
@@ -4402,6 +4410,7 @@ function ExplorationMapView({
   const enterMapNode = (nodeId: string) => {
     setDraftStrokes([])
     setActiveDraft(null)
+    setPreviewNodeId(null)
     clearMapRewardTip()
     onSelectNode(nodeId)
   }
@@ -4497,9 +4506,11 @@ function ExplorationMapView({
                   completed={completed.has(node.id)}
                   available={available.has(node.id)}
                   current={map.currentNodeId === node.id}
-                  selected={highlightedNode?.id === node.id}
+                  selected={selectedMapNode?.id === node.id}
+                  previewed={previewMapNode?.id === node.id}
                   orientation={orientation}
-                  onInspect={setSelectedNodeId}
+                  onPreview={setPreviewNodeId}
+                  onSelect={setSelectedNodeId}
                 />
               ))}
               <svg
@@ -4522,6 +4533,12 @@ function ExplorationMapView({
                 <button type="button" className={drawingTool === 'brush' ? 'active' : ''} title="画笔" aria-label="画笔" onClick={() => setDrawingTool('brush')}><Brush size={18} /></button>
                 <button type="button" className={drawingTool === 'eraser' ? 'active' : ''} title="橡皮" aria-label="橡皮" onClick={() => setDrawingTool('eraser')}><Eraser size={18} /></button>
                 <button type="button" title="清空草稿" aria-label="清空草稿" disabled={draftStrokes.length === 0 && !activeDraftStroke} onClick={() => { setDraftStrokes([]); setActiveDraft(null) }}><Trash2 size={18} /></button>
+              </div>
+              <div className="map-route-legend" aria-label="路线颜色图示">
+                <span><i className="map-route-legend-swatch available" />可选择</span>
+                <span><i className="map-route-legend-swatch inspected" />当前查看</span>
+                <span><i className="map-route-legend-swatch completed" />已完成</span>
+                <span><i className="map-route-legend-swatch locked" />未解锁</span>
               </div>
             </div>
 
@@ -4552,12 +4569,25 @@ function ExplorationMapView({
                   </div>
                 </div>
               )}
-              {highlightedNode && (
+              {selectedMapNode && (
                 <MapNodeDetail
-                  node={highlightedNode}
-                  available={available.has(highlightedNode.id)}
-                  current={map.currentNodeId === highlightedNode.id}
-                  completed={completed.has(highlightedNode.id)}
+                  node={selectedMapNode}
+                  available={available.has(selectedMapNode.id)}
+                  current={map.currentNodeId === selectedMapNode.id}
+                  completed={completed.has(selectedMapNode.id)}
+                  tone="selected"
+                  onSelect={enterMapNode}
+                  onInspectReward={inspectMapReward}
+                />
+              )}
+              {previewMapNode && (
+                <MapNodeDetail
+                  node={previewMapNode}
+                  available={available.has(previewMapNode.id)}
+                  current={map.currentNodeId === previewMapNode.id}
+                  completed={completed.has(previewMapNode.id)}
+                  tone="preview"
+                  allowEntry={false}
                   onSelect={enterMapNode}
                   onInspectReward={inspectMapReward}
                 />
@@ -4640,17 +4670,17 @@ function previewMapRewardAsOffer(reward: { defId: string; quality: ItemQuality }
   return { offerId: `map-preview-${reward.defId}-${reward.quality}`, defId: reward.defId, quality: reward.quality, price: -1, discount: 1, def }
 }
 
-function MapNodeButton({ node, completed, available, current, selected, orientation, onInspect }: { node: ExplorationMapNode; completed: boolean; available: boolean; current: boolean; selected: boolean; orientation: 'horizontal' | 'vertical'; onInspect: (nodeId: string) => void }) {
+function MapNodeButton({ node, completed, available, current, selected, previewed, orientation, onPreview, onSelect }: { node: ExplorationMapNode; completed: boolean; available: boolean; current: boolean; selected: boolean; previewed: boolean; orientation: 'horizontal' | 'vertical'; onPreview: (nodeId: string) => void; onSelect: (nodeId: string) => void }) {
   const position = mapNodePosition(node, orientation)
   const locked = !available && !completed && !current
   return (
     <button
-      className={`map-node compact-route-node ${node.kind.toLowerCase().replaceAll('_', '-')} ${available ? 'available' : ''} ${completed ? 'completed' : ''} ${current ? 'current' : ''} ${selected ? 'selected' : ''} ${locked ? 'locked' : ''}`}
+      className={`map-node compact-route-node ${node.kind.toLowerCase().replaceAll('_', '-')} ${available ? 'available' : ''} ${completed ? 'completed' : ''} ${current ? 'current' : ''} ${selected ? 'selected' : ''} ${previewed ? 'previewed' : ''} ${locked ? 'locked' : ''}`}
       style={{ '--node-x': position.x, '--node-y': position.y } as React.CSSProperties}
       aria-disabled={!available}
-      onMouseEnter={() => onInspect(node.id)}
-      onFocus={() => onInspect(node.id)}
-      onClick={() => onInspect(node.id)}
+      onPointerEnter={() => onPreview(node.id)}
+      onFocus={() => onPreview(node.id)}
+      onClick={() => onSelect(node.id)}
       aria-label={mapNodeTitle(node)}
     >
       <MapNodeSticker kind={node.kind} />
@@ -4659,17 +4689,19 @@ function MapNodeButton({ node, completed, available, current, selected, orientat
   )
 }
 
-function MapNodeDetail({ node, available, current, completed, onSelect, onInspectReward }: { node: ExplorationMapNode; available: boolean; current: boolean; completed: boolean; onSelect: (nodeId: string) => void; onInspectReward: (reward: { defId: string; quality: ItemQuality }, element: HTMLElement) => void }) {
+function MapNodeDetail({ node, available, current, completed, tone = 'selected', allowEntry = true, onSelect, onInspectReward }: { node: ExplorationMapNode; available: boolean; current: boolean; completed: boolean; tone?: 'selected' | 'preview'; allowEntry?: boolean; onSelect: (nodeId: string) => void; onInspectReward: (reward: { defId: string; quality: ItemQuality }, element: HTMLElement) => void }) {
   return (
-    <div className={`map-side-card map-node-detail ${available ? 'available' : ''} ${current ? 'current' : ''} ${completed ? 'completed' : ''}`}>
+    <div className={`map-side-card map-node-detail ${tone === 'preview' ? 'map-node-detail-preview' : 'map-node-detail-selected'} ${tone} ${available ? 'available' : ''} ${current ? 'current' : ''} ${completed ? 'completed' : ''}`}>
       <MapNodeSticker kind={node.kind} size="lg" />
       <div>
+        {tone === 'preview' && <span className="map-node-detail-mode">滑过预览</span>}
         <span className="map-node-detail-kicker">第 {node.layer + 1} 层</span>
         <h3>{mapNodeTitle(node)}</h3>
         <p>{mapNodePreview(node)}</p>
       </div>
       {node.kind === 'MONSTER_BATTLE' && <MapRewardPreviewLinks node={node} onInspectReward={onInspectReward} />}
-      {available && <ActionButton className="map-enter-action" onClick={() => onSelect(node.id)}>前往</ActionButton>}
+      {available && allowEntry && <ActionButton className="map-enter-action" onClick={() => onSelect(node.id)}>前往</ActionButton>}
+      {available && !allowEntry && <strong className="map-node-state-copy muted">点击节点后可在上方确认</strong>}
       {current && <strong className="map-node-state-copy">当前处理中</strong>}
       {completed && <strong className="map-node-state-copy">已完成</strong>}
       {!available && !current && !completed && <strong className="map-node-state-copy muted">路线未解锁</strong>}

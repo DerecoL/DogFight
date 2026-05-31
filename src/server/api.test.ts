@@ -87,7 +87,35 @@ describeWithDatabase('run API', () => {
     const finished = await agent.post(`/api/runs/${run.id}/battle/finish`).send({}).expect(200)
     expect(finished.body.run.wins).toBe(run.wins)
     expect(finished.body.run.losses).toBe(run.losses)
+    expect(finished.body.run.gold).toBe(run.gold)
     expect(finished.body.run.phase).toBe('MAP')
+  })
+
+  it('requires a three-choice equipment shop before a player battle map node can match', async () => {
+    const { agent, run } = await createAuthenticatedRun()
+    const map = run.mapState
+    const playerNode = map.nodes.find((node: { kind: string; layer: number }) => node.kind === 'PLAYER_BATTLE')
+    expect(playerNode).toBeTruthy()
+    const previous = map.nodes.find((node: { nextNodeIds: string[] }) => node.nextNodeIds.includes(playerNode.id))
+    expect(previous).toBeTruthy()
+    await prisma.run.update({
+      where: { id: run.id },
+      data: { mapState: JSON.stringify({ ...map, completedNodeIds: [previous.id], currentNodeId: null }) },
+    })
+
+    const selected = await agent.post(`/api/runs/${run.id}/map/select`).send({ nodeId: playerNode.id }).expect(200)
+    expect(selected.body.run.phase).toBe('CHOICE')
+    expect(selected.body.run.choices).toHaveLength(3)
+    expect(selected.body.run.choices.every((choice: string) => ['GENERAL', 'LARGE', 'MEDIUM', 'SMALL', 'SMALL_DICE', 'BIG_DICE'].includes(choice))).toBe(true)
+    expect(selected.body.run.mapState.currentNodeId).toBe(playerNode.id)
+
+    const shop = await agent.post(`/api/runs/${run.id}/choice/select`).send({ shopType: selected.body.run.choices[0] }).expect(200)
+    expect(shop.body.run.phase).toBe('SHOP')
+    expect(shop.body.run.mapState.currentNodeId).toBe(playerNode.id)
+
+    const prepped = await agent.post(`/api/runs/${run.id}/map/complete-node`).send({}).expect(200)
+    expect(prepped.body.run.phase).toBe('PREP')
+    expect(prepped.body.run.mapState.currentNodeId).toBe(playerNode.id)
   })
 
   it('registers and logs in with an account instead of requiring an email address', async () => {

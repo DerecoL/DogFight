@@ -289,6 +289,7 @@ export function applyMapNodeCompletion(map: ExplorationMapState, nodeId = map.cu
 export function mapShopChoices(node: ExplorationMapNode, seed: string, round: number): ShopType[] {
   if (node.kind === 'SHOP_FIXED') return [node.shopType ?? 'GENERAL']
   if (node.kind === 'SHOP_EQUIPMENT') return uniqueChoices(createRng(seed), [...EQUIPMENT_SHOP_TYPES], 3)
+  if (node.kind === 'PLAYER_BATTLE') return uniqueChoices(createRng(seed), [...EQUIPMENT_SHOP_TYPES], 3)
   if (node.kind === 'SHOP_UNKNOWN') return createChoices(createRng(seed), round)
   return []
 }

@@ -81,10 +81,10 @@ describe('upgrade choice skip flow', () => {
 
 describe('post-battle equipment rewards', () => {
   it('uses the tighter player battle income curve after exploration map rewards were added', () => {
-    expect(playerBattleGoldIncome(1)).toBe(7)
-    expect(playerBattleGoldIncome(6)).toBe(12)
-    expect(playerBattleGoldIncome(12)).toBe(18)
-    expect(Array.from({ length: 12 }, (_, index) => playerBattleGoldIncome(index + 1)).reduce((sum, income) => sum + income, 0)).toBe(150)
+    expect(playerBattleGoldIncome(1)).toBe(6)
+    expect(playerBattleGoldIncome(6)).toBe(11)
+    expect(playerBattleGoldIncome(12)).toBe(17)
+    expect(Array.from({ length: 12 }, (_, index) => playerBattleGoldIncome(index + 1)).reduce((sum, income) => sum + income, 0)).toBe(138)
   })
 
   it('creates a bagged large item when bully vault is equipped', () => {

@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, statSync } from 'node:fs'
+﻿import { existsSync, readFileSync, statSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
 const css = readFileSync(new URL('./App.css', import.meta.url), 'utf8')
@@ -9,6 +9,40 @@ const uiCss = existsSync(new URL('./ui/handdrawn.css', import.meta.url))
   : ''
 const dogBrawlTownBackgroundUrl = new URL('../public/assets/backgrounds/dog-brawl-town.jpg', import.meta.url)
 const battleDiceBaseUrl = new URL('../public/assets/ui/battle-dice-base.webp', import.meta.url)
+const mapParchmentUrl = new URL('../public/assets/map/exploration-parchment-scroll.webp', import.meta.url)
+const mapIconUrls = [
+  new URL('../public/assets/map-icons/player-battle.webp', import.meta.url),
+  new URL('../public/assets/map-icons/monster-battle.webp', import.meta.url),
+  new URL('../public/assets/map-icons/shop-fixed.webp', import.meta.url),
+  new URL('../public/assets/map-icons/shop-unknown.webp', import.meta.url),
+  new URL('../public/assets/map-icons/shop-equipment.webp', import.meta.url),
+  new URL('../public/assets/map-icons/rest.webp', import.meta.url),
+  new URL('../public/assets/map-icons/event.webp', import.meta.url),
+]
+
+function webpSize(url: URL) {
+  const buffer = readFileSync(url)
+  expect(buffer.toString('ascii', 0, 4)).toBe('RIFF')
+  expect(buffer.toString('ascii', 8, 12)).toBe('WEBP')
+  let offset = 12
+  while (offset + 8 <= buffer.length) {
+    const chunk = buffer.toString('ascii', offset, offset + 4)
+    const length = buffer.readUInt32LE(offset + 4)
+    const data = offset + 8
+    if (chunk === 'VP8X') {
+      return { width: 1 + buffer.readUIntLE(data + 4, 3), height: 1 + buffer.readUIntLE(data + 7, 3) }
+    }
+    if (chunk === 'VP8 ') {
+      return { width: buffer.readUInt16LE(data + 6) & 0x3fff, height: buffer.readUInt16LE(data + 8) & 0x3fff }
+    }
+    if (chunk === 'VP8L') {
+      const bits = buffer.readUInt32LE(data + 1)
+      return { width: (bits & 0x3fff) + 1, height: ((bits >> 14) & 0x3fff) + 1 }
+    }
+    offset += 8 + length + (length % 2)
+  }
+  throw new Error(`Unsupported WebP chunks in ${url.pathname}`)
+}
 
 function cssVariablePx(name: string) {
   const match = css.match(new RegExp(`${name}:\\s*(\\d+)px`))
@@ -74,9 +108,9 @@ describe('exploration map route board', () => {
     expect(cssRule('.exploration-map-shell')).toContain('width: min(1680px, calc(100vw - 16px))')
     expect(cssRule('.exploration-map-shell')).toContain('height: calc(100vh - 16px)')
     expect(cssRule('.exploration-map-route-board')).toContain('grid-template-columns: minmax(0, 1fr) clamp(260px, 22vw, 340px)')
-    expect(cssRule('.map-route-path')).toContain('stroke-width: 1.25')
-    expect(cssRule('.map-route-path.available')).toContain('stroke-width: 2.65')
-    expect(cssRule('.map-route-path.completed')).toContain('stroke-width: 2.25')
+    expect(cssRule('.map-route-path')).toContain('stroke-width: 2.5')
+    expect(cssRule('.map-route-path.available')).toContain('stroke-width: 5.3')
+    expect(cssRule('.map-route-path.completed')).toContain('stroke-width: 4.5')
     expect(app).toContain('mapNodeDisplayLaneOffset')
     expect(app).toContain('lane + mapNodeDisplayLaneOffset(node)')
   })
@@ -86,13 +120,15 @@ describe('exploration map route board', () => {
     expect(css).toContain('min-height: 230px')
   })
 
-  it('presents the map as a paper board with a title placard, layer markers, and preview rail', () => {
+  it('presents the map as a generated parchment scroll instead of CSS-drawn paper decoration', () => {
     expect(app).toContain('mapLayerMarkers')
-    expect(app).toContain('map-title-placard')
+    expect(app).toContain('map-route-legend')
+    expect(css).toContain('/assets/map/exploration-parchment-scroll.webp')
     expect(css).toContain('.map-layer-marker')
     expect(cssRule('.exploration-map-shell')).toContain('var(--paper-fiber)')
-    expect(cssRule('.map-title-placard')).toContain('clip-path')
-    expect(cssRule('.map-route-canvas::after')).toContain('map-sketch')
+    expect(css).not.toContain('--map-sketch')
+    expect(cssRule('.map-title-placard')).not.toContain('clip-path')
+    expect(css).not.toContain('.map-route-canvas::after')
     expect(cssRule('.map-node-detail-panel')).toContain('border-left')
   })
 
@@ -106,17 +142,32 @@ describe('exploration map route board', () => {
 
   it('separates route states into selectable, completed, inspected, and locked colors', () => {
     expect(app).toContain('inspectedRouteNodeIds')
+    expect(cssRule('.map-route-path')).toContain('stroke-width: 2.5')
     expect(cssRule('.map-route-path.available')).toContain('#e6a11a')
+    expect(cssRule('.map-route-path.available')).toContain('stroke-width: 5.3')
     expect(cssRule('.map-route-path.completed')).toContain('#5e9f55')
+    expect(cssRule('.map-route-path.completed')).toContain('stroke-width: 4.5')
     expect(cssRule('.map-route-path.inspected')).toContain('#3f7fd5')
+    expect(cssRule('.map-route-path.inspected')).toContain('stroke-width: 4.8')
     expect(cssRule('.map-route-path')).toContain('stroke-dasharray')
   })
 
   it('uses the side panel as the only node entry confirmation surface', () => {
-    expect(app).toContain('onInspect(node.id)')
+    expect(app).toContain('onSelect(node.id)')
     expect(app).not.toContain('available ? onSelect(node.id) : onInspect(node.id)')
     expect(app).toContain('className="map-enter-action"')
     expect(app).toContain('onSelect={enterMapNode}')
+  })
+
+  it('keeps the chosen map node pinned while hover shows a secondary preview card', () => {
+    expect(app).toContain('previewNodeId')
+    expect(app).toContain('selectedMapNode')
+    expect(app).toContain('previewMapNode')
+    expect(app).toContain('onPreview={setPreviewNodeId}')
+    expect(app).toContain('onSelect={setSelectedNodeId}')
+    expect(app).not.toContain('onInspect={setSelectedNodeId}')
+    expect(app).toContain('map-node-detail-preview')
+    expect(css).toContain('.map-node-detail.preview')
   })
 
   it('shows monster possible rewards as inspectable equipment links', () => {
@@ -135,6 +186,40 @@ describe('exploration map route board', () => {
     expect(app).toContain('eraseDraftStrokesNearPoint')
     expect(app).toContain('setDraftStrokes([])')
     expect(cssRule('.map-route-draft-surface')).toContain('touch-action: none')
+    expect(cssRule('.map-route-draft-stroke')).toContain('stroke-width: 2.6')
+  })
+
+  it('renders a bottom route legend explaining every route color', () => {
+    expect(app).toContain('map-route-legend')
+    expect(app).toContain('可选择')
+    expect(app).toContain('当前查看')
+    expect(app).toContain('已完成')
+    expect(app).toContain('未解锁')
+    expect(css).toContain('.map-route-legend-swatch.available')
+    expect(css).toContain('.map-route-legend-swatch.inspected')
+    expect(css).toContain('.map-route-legend-swatch.completed')
+    expect(css).toContain('.map-route-legend-swatch.locked')
+  })
+
+  it('uses generated map-specific WebP assets for the parchment and all map node icons', () => {
+    expect(existsSync(mapParchmentUrl)).toBe(true)
+    expect(statSync(mapParchmentUrl).size).toBeLessThanOrEqual(122880)
+    const parchment = webpSize(mapParchmentUrl)
+    expect(parchment.width).toBeGreaterThanOrEqual(1200)
+    expect(parchment.height).toBeGreaterThanOrEqual(700)
+    for (const url of mapIconUrls) {
+      expect(existsSync(url)).toBe(true)
+      expect(statSync(url).size).toBeLessThanOrEqual(15360)
+      expect(webpSize(url)).toEqual({ width: 128, height: 128 })
+    }
+    expect(app).toContain('/assets/map-icons/player-battle.webp')
+    expect(app).toContain('/assets/map-icons/monster-battle.webp')
+    expect(app).toContain('/assets/map-icons/shop-fixed.webp')
+    expect(app).toContain('/assets/map-icons/shop-unknown.webp')
+    expect(app).toContain('/assets/map-icons/shop-equipment.webp')
+    expect(app).toContain('/assets/map-icons/rest.webp')
+    expect(app).toContain('/assets/map-icons/event.webp')
+    expect(app).not.toContain("PLAYER_BATTLE: '/assets/sticker-icons/small-bite.webp'")
   })
 })
 
@@ -488,7 +573,7 @@ describe('equipment layout scale', () => {
     expect(primitives).toContain('className="dynamic-dice-face front"')
     expect(primitives).toContain('className="dynamic-dice-value"')
     expect(primitives).not.toContain('<span>{label}</span>')
-    expect(app).not.toContain("instance.presentation.kind === 'roll' ? '掷'")
+    expect(app).not.toContain("instance.presentation.kind === 'roll' ? '鎺?")
     expect(app).toContain('roll={roll}')
     expect(app).not.toContain("activeFxInstances.filter((instance) => instance.presentation.kind === 'roll').map((instance)")
     expect(app).not.toContain('className={`battle-feedback-burst ${instance.presentation.kind}`}')
@@ -1097,7 +1182,7 @@ describe('equipment layout scale', () => {
   it('keeps battle equipment icon frames and text rows fixed', () => {
     expect(app).toContain('className="battle-item-icon-frame"')
     expect(app).toContain('className="battle-item-info"')
-    expect(app).toContain("`占${item.def.size}格`")
+    expect(app).toContain('`占${item.def.size}格`')
     expect(app).not.toContain("'--battle-name-scale'")
 
     expect(cssRule('.battle-item')).toContain('grid-template-rows: 64px 21px 22px')
@@ -1150,3 +1235,4 @@ describe('equipment layout scale', () => {
     expect(cssRule('.battle-slot-grid::before, .paper-inventory .slot-grid::before')).toContain('var(--wood-grain)')
   })
 })
+

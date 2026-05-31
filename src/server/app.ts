@@ -833,6 +833,15 @@ export function buildApp() {
       return { run: publicRun(updated) }
     }
 
+    if (selection.action === 'PLAYER_BATTLE') {
+      const updated = await prisma.run.update({
+        where: { id: run.id },
+        data: { mapState: JSON.stringify(selectedMap), ...mapNodeShopPhaseData(run, node) },
+        include: { items: true, ladderSettlement: true },
+      })
+      return { run: publicRun(updated) }
+    }
+
     const updated = await prisma.run.update({
       where: { id: run.id },
       data: { phase: 'PREP', mapState: JSON.stringify(selectedMap), matchedGhost: null },
@@ -914,9 +923,17 @@ export function buildApp() {
     const map = parseRunMapState(run)
     if (!map?.currentNodeId) return reply.code(400).send({ error: '当前没有待完成的地图节点' })
     const node = map.nodes.find((entry) => entry.id === map.currentNodeId)
-    if (node?.kind === 'PLAYER_BATTLE' || node?.kind === 'MONSTER_BATTLE' || node?.kind === 'EVENT') return reply.code(400).send({ error: '当前节点需要先完成对应内容' })
+    if (node?.kind === 'MONSTER_BATTLE' || node?.kind === 'EVENT') return reply.code(400).send({ error: '当前节点需要先完成对应内容' })
     if (run.phase !== 'SHOP') return reply.code(400).send({ error: '当前节点还不能完成' })
     if (run.status !== 'ACTIVE') return reply.code(400).send({ error: '当前节点还不能完成' })
+    if (node?.kind === 'PLAYER_BATTLE') {
+      const updated = await prisma.run.update({
+        where: { id: run.id },
+        data: { phase: 'PREP', matchedGhost: null, choices: '[]', shopItems: '[]' },
+        include: { items: true, ladderSettlement: true },
+      })
+      return { run: publicRun(updated) }
+    }
     const updated = await prisma.run.update({
       where: { id: run.id },
       data: mapCompletionUpdateData(run),

@@ -137,6 +137,19 @@ describe('exploration map node selection', () => {
     expect(equipmentChoices).not.toContain('POTION')
   })
 
+  it('offers an equipment-only three-choice shop before player battle nodes', () => {
+    const map = createExplorationMapState('run-player-shop-seed', 0, 0, 0)
+    const playerBattle = map.nodes.find((node) => node.kind === 'PLAYER_BATTLE')!
+
+    const choices = mapShopChoices(playerBattle, 'player-battle-pre-shop', 3)
+
+    expect(choices).toHaveLength(3)
+    expect(choices.every((choice) => ['GENERAL', 'LARGE', 'MEDIUM', 'SMALL', 'SMALL_DICE', 'BIG_DICE'].includes(choice))).toBe(true)
+    expect(choices).not.toContain('RELIC')
+    expect(choices).not.toContain('UPGRADE_SILVER')
+    expect(choices).not.toContain('POTION')
+  })
+
   it('returns node-specific actions for battle, rest, event, and reward nodes', () => {
     const map = createExplorationMapState('run-action-seed', 1, 0, 0)
     const player = map.nodes.find((node) => node.kind === 'PLAYER_BATTLE')!
