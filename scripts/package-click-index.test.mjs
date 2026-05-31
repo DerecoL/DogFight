@@ -170,6 +170,69 @@ describe('buildStandaloneIndex', () => {
     }
   })
 
+  test('standalone apex boards hide entries beyond board and player display limits', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'dogfight-standalone-apex-limits-'))
+    try {
+      const distDir = await createMinimalDist(root)
+      const outputFile = path.join(root, 'click-index.html')
+      const launcherFile = path.join(root, 'DogFight-standalone.cmd')
+      await buildStandaloneIndex({ distDir, outputFile, launcherFile })
+
+      const html = await readFile(outputFile, 'utf8')
+      const { window, localStorage, storageKey } = evaluateMockScript(extractMockScript(html))
+      await window.fetch('/api/auth/register', { method: 'POST', body: JSON.stringify({ email: 'limits@dog.test', password: 'dogdice' }) })
+      const state = JSON.parse(localStorage.getItem(storageKey))
+      state.apexEntries = [
+        ...Array.from({ length: 205 }, (_, index) => ({
+          id: `overall-${index + 1}`,
+          sourceRunId: `overall-run-${index + 1}`,
+          boardType: 'OVERALL',
+          boardKey: 'default',
+          name: `Overall ${index + 1}`,
+          dogType: 'SHIBA',
+          luckyNumber: null,
+          wins: 12,
+          losses: 0,
+          round: 12,
+          rank: index + 1,
+          challengeWins: 1,
+          isSeed: false,
+          createdAt: new Date().toISOString(),
+          items: [],
+          relics: [],
+        })),
+        ...Array.from({ length: 105 }, (_, index) => ({
+          id: `daily-${index + 1}`,
+          sourceRunId: `daily-run-${index + 1}`,
+          boardType: 'DAILY',
+          boardKey: '2026-05-31',
+          name: `Daily ${index + 1}`,
+          dogType: 'MUTT',
+          luckyNumber: null,
+          wins: 12,
+          losses: 0,
+          round: 12,
+          rank: index + 1,
+          challengeWins: 1,
+          isSeed: false,
+          createdAt: new Date().toISOString(),
+          items: [],
+          relics: [],
+        })),
+      ]
+      localStorage.setItem(storageKey, JSON.stringify(state))
+
+      const overview = await readJson(await window.fetch('/api/apex'))
+
+      expect(overview.leaderboards.overall).toHaveLength(200)
+      expect(overview.leaderboards.overall.at(-1)).toMatchObject({ rank: 200 })
+      expect(overview.leaderboards.daily).toHaveLength(100)
+      expect(overview.leaderboards.daily.at(-1)).toMatchObject({ rank: 100 })
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   test('standalone mock buys a matching shop item as an immediate upgrade when the bag is full', async () => {
     const root = await mkdtemp(path.join(tmpdir(), 'dogfight-standalone-buy-upgrade-'))
     try {

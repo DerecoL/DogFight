@@ -1381,6 +1381,87 @@ describeWithDatabase('run API', () => {
     await agent.post('/api/apex/submit').send({ runId }).expect(409)
   })
 
+  it('only displays the ranked apex window for overall and daily boards', async () => {
+    const agent = request.agent(app.server)
+    await app.ready()
+
+    await agent.post('/api/auth/register').send({ account: `apex-cap-${Date.now()}`, password: 'dogdice' }).expect(200)
+    const dailyBoardKey = '2026-05-31'
+    await prisma.apexEntry.createMany({
+      data: [
+        ...Array.from({ length: 205 }, (_, index) => ({
+          seasonId: 'season-1',
+          boardType: 'OVERALL',
+          boardKey: 'default',
+          name: `Overall ${index + 1}`,
+          dogType: 'SHIBA',
+          round: 12,
+          wins: 12,
+          losses: 0,
+          items: '[]',
+          relics: '[]',
+          rank: index + 1,
+          isSeed: false,
+        })),
+        ...Array.from({ length: 105 }, (_, index) => ({
+          seasonId: 'season-1',
+          boardType: 'DAILY',
+          boardKey: dailyBoardKey,
+          name: `Daily ${index + 1}`,
+          dogType: 'MUTT',
+          round: 12,
+          wins: 12,
+          losses: 0,
+          items: '[]',
+          relics: '[]',
+          rank: index + 1,
+          isSeed: false,
+        })),
+      ],
+    })
+
+    const overview = await agent.get('/api/apex').expect(200)
+
+    expect(overview.body.leaderboards.overall).toHaveLength(200)
+    expect(overview.body.leaderboards.overall.at(-1)).toMatchObject({ rank: 200 })
+    expect(overview.body.leaderboards.daily).toHaveLength(100)
+    expect(overview.body.leaderboards.daily.at(-1)).toMatchObject({ rank: 100 })
+  })
+
+  it('keeps at most five dogs from one player visible on each apex board', async () => {
+    const agent = request.agent(app.server)
+    await app.ready()
+
+    await agent.post('/api/auth/register').send({ account: `apex-five-${Date.now()}`, password: 'dogdice' }).expect(200)
+    const submittedRunIds: string[] = []
+    for (let index = 0; index < 6; index += 1) {
+      const created = await agent.post('/api/runs').send({ dogType: 'SHIBA' }).expect(200)
+      const runId = created.body.run.id
+      submittedRunIds.push(runId)
+      await prisma.run.update({
+        where: { id: runId },
+        data: { wins: 12, losses: 0, round: 12, phase: 'COMPLETE', status: 'COMPLETE' },
+      })
+      await agent.post('/api/apex/submit').send({ runId }).expect(200)
+    }
+
+    const overview = await agent.get('/api/apex').expect(200)
+    const visibleOverallRuns = overview.body.leaderboards.overall
+      .filter((entry: { isMine: boolean }) => entry.isMine)
+      .map((entry: { sourceRunId: string }) => entry.sourceRunId)
+    const visibleDailyRuns = overview.body.leaderboards.daily
+      .filter((entry: { isMine: boolean }) => entry.isMine)
+      .map((entry: { sourceRunId: string }) => entry.sourceRunId)
+
+    expect(visibleOverallRuns).toHaveLength(5)
+    expect(visibleDailyRuns).toHaveLength(5)
+    expect(visibleOverallRuns).not.toContain(submittedRunIds[0])
+    expect(visibleDailyRuns).not.toContain(submittedRunIds[0])
+
+    const afterSubmit = await agent.get('/api/apex').expect(200)
+    expect(afterSubmit.body.candidates.map((run: { id: string }) => run.id)).not.toContain(submittedRunIds[0])
+  })
+
   it('lists completed ladder runs as apex candidates and removes them after submission', async () => {
     const agent = request.agent(app.server)
     await app.ready()

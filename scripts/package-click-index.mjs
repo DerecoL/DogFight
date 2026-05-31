@@ -944,6 +944,13 @@ async function currentMockApiScript(buildId) {
     return shifted.getUTCFullYear() + '-' + String(shifted.getUTCMonth() + 1).padStart(2, '0') + '-' + String(shifted.getUTCDate()).padStart(2, '0');
   }
 
+  const apexBoardDisplayLimits = { OVERALL: 200, DAILY: 100 };
+  const apexUserVisibleEntryLimit = 5;
+
+  function apexBoardDisplayLimit(boardType) {
+    return apexBoardDisplayLimits[boardType] || 200;
+  }
+
   function ensureApexEntries(state) {
     if (!Array.isArray(state.apexEntries)) state.apexEntries = [];
     return state.apexEntries;
@@ -987,6 +994,7 @@ async function currentMockApiScript(buildId) {
   function publicApexEntry(entry) {
     return {
       ...entry,
+      rank: entry.rank <= apexBoardDisplayLimit(entry.boardType) ? entry.rank : null,
       items: (entry.items || []).map(publicItem),
       relics: publicRelics(entry.relics || []),
     };
@@ -999,7 +1007,7 @@ async function currentMockApiScript(buildId) {
   function apexBoard(state, boardType, boardKey) {
     ensureApexBoard(state, boardType, boardKey);
     return ensureApexEntries(state)
-      .filter((entry) => entry.boardType === boardType && entry.boardKey === boardKey)
+      .filter((entry) => entry.boardType === boardType && entry.boardKey === boardKey && entry.rank <= apexBoardDisplayLimit(boardType))
       .sort((a, b) => a.rank - b.rank);
   }
 
@@ -1025,10 +1033,39 @@ async function currentMockApiScript(buildId) {
     return { placementRank: ordered.length > 0 ? ordered[ordered.length - 1].rank + 1 : 1, battles };
   }
 
+  function publicApexReport(boardType, report) {
+    return {
+      ...report,
+      placementRank: report.placementRank <= apexBoardDisplayLimit(boardType) ? report.placementRank : null,
+    };
+  }
+
+  function demoteApexEntryToUnranked(entries, boardType, boardKey, entry) {
+    const boardEntries = entries
+      .filter((candidate) => candidate.boardType === boardType && candidate.boardKey === boardKey)
+      .sort((a, b) => a.rank - b.rank);
+    const lastRank = boardEntries.at(-1)?.rank || apexBoardDisplayLimit(boardType);
+    const finalRank = Math.max(apexBoardDisplayLimit(boardType) + 1, lastRank);
+    for (const candidate of boardEntries) {
+      if (candidate.id !== entry.id && candidate.rank > entry.rank) candidate.rank -= 1;
+    }
+    entry.rank = finalRank;
+  }
+
+  function enforceApexUserVisibleLimit(state, boardType, boardKey, user) {
+    const entries = ensureApexEntries(state);
+    const visibleUserEntries = entries
+      .filter((entry) => entry.boardType === boardType && entry.boardKey === boardKey && entry.userId === user.id && entry.rank <= apexBoardDisplayLimit(boardType))
+      .sort((a, b) => a.rank - b.rank);
+    if (visibleUserEntries.length <= apexUserVisibleEntryLimit) return;
+    demoteApexEntryToUnranked(entries, boardType, boardKey, visibleUserEntries.at(-1));
+  }
+
   function submitApexBoard(state, boardType, boardKey, run, user) {
     const board = apexBoard(state, boardType, boardKey);
     const challenger = {
       id: id(state, 'apex'),
+      userId: user.id,
       sourceRunId: run.id,
       boardType,
       boardKey,
@@ -1050,12 +1087,20 @@ async function currentMockApiScript(buildId) {
       const defender = entries.find((entry) => entry.id === battle.opponentId && entry.boardType === boardType && entry.boardKey === boardKey);
       if (defender) defender.challengeWins = Math.max(1, Number(defender.challengeWins) || 1) + 1;
     }
-    for (const entry of entries) {
-      if (entry.boardType === boardType && entry.boardKey === boardKey && entry.rank >= report.placementRank) entry.rank += 1;
+    if (report.placementRank <= apexBoardDisplayLimit(boardType)) {
+      for (const entry of entries) {
+        if (entry.boardType === boardType && entry.boardKey === boardKey && entry.rank >= report.placementRank) entry.rank += 1;
+      }
+      challenger.rank = report.placementRank;
+    } else {
+      const lastRank = entries
+        .filter((entry) => entry.boardType === boardType && entry.boardKey === boardKey)
+        .reduce((rank, entry) => Math.max(rank, entry.rank), apexBoardDisplayLimit(boardType));
+      challenger.rank = lastRank + 1;
     }
-    challenger.rank = report.placementRank;
     challenger.challengeWins = 1;
     entries.push(challenger);
+    enforceApexUserVisibleLimit(state, boardType, boardKey, user);
     return { entry: challenger, report };
   }
 
@@ -1769,7 +1814,7 @@ async function currentMockApiScript(buildId) {
       saveState(state);
       return json({
         entries: { overall: publicApexEntry(overall.entry), daily: publicApexEntry(daily.entry) },
-        reports: { overall: overall.report, daily: daily.report },
+        reports: { overall: publicApexReport('OVERALL', overall.report), daily: publicApexReport('DAILY', daily.report) },
         dailyBoardKey,
         dailyResetHour: 5,
         leaderboards,

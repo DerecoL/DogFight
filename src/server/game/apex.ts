@@ -3,6 +3,11 @@ import { simulateBattle } from './battle'
 import type { BattleResult, DogType, FighterSnapshot } from './types'
 
 const APEX_SEED_COUNT = 50
+export const APEX_BOARD_DISPLAY_LIMITS: Record<ApexBoardType, number> = {
+  OVERALL: 200,
+  DAILY: 100,
+}
+export const APEX_USER_VISIBLE_ENTRY_LIMIT = 5
 const DOG_TYPES: DogType[] = ['SHIBA', 'SAMOYED', 'MUTT', 'BULLY', 'EMPEROR', 'FROG']
 const SHANGHAI_DAILY_RESET_OFFSET_MS = 3 * 60 * 60 * 1000
 
@@ -12,6 +17,10 @@ export type ApexSeedEntry = {
 }
 
 export type ApexBoardType = 'OVERALL' | 'DAILY'
+
+export function apexBoardDisplayLimit(boardType: ApexBoardType): number {
+  return APEX_BOARD_DISPLAY_LIMITS[boardType]
+}
 
 export type ApexOpponent = {
   id: string

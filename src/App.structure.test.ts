@@ -350,6 +350,7 @@ describe('selection screen structure', () => {
     expect(app).toContain('可投入的完成狗')
     expect(app).toContain('先在休闲模式完成一局，再回来冲榜。')
     expect(app).toContain('leaderboards: result.leaderboards')
+    expect(app).toContain("rank == null ? '未上榜'")
     expect(app).toContain('总榜')
     expect(app).toContain('当日榜')
     expect(app).toContain('每日 05:00 更新')

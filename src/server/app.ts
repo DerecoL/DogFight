@@ -10,7 +10,7 @@ import { prisma } from './db'
 import { registerDogfightRoutes } from './dogfight'
 import { publicErrorMessage } from './errors'
 import { exchangeTapTapCode } from './taptap-auth'
-import { buildApexSeedEntries, dailyApexBoardKey, resolveApexChallenge, type ApexBoardType, type ApexChallengeReport, type ApexOpponent } from './game/apex'
+import { APEX_USER_VISIBLE_ENTRY_LIMIT, apexBoardDisplayLimit, buildApexSeedEntries, dailyApexBoardKey, resolveApexChallenge, type ApexBoardType, type ApexChallengeReport, type ApexOpponent } from './game/apex'
 import { itemDef, itemDefForQuality, relicDef, relicDefForQuality } from './game/data'
 import { canPlace, findSlot, type PlacementOptions } from './game/grid'
 import { applyMapNodeCompletion, availableMapNodeIds, createExplorationMapState, explorationMapFinished, mapMonsterBattleRound, mapNodeSelection, mapShopChoices, normalizeExplorationMapState, randomEquipmentReward, randomMonsterReward, type ExplorationMapNode, type ExplorationMapState } from './game/map'
@@ -117,6 +117,16 @@ export function buildApp() {
     relics: parseJson(entry.relics, []),
   })
 
+  const publicApexEntryRank = (entry: ApexEntry) => {
+    const boardType = entry.boardType as ApexBoardType
+    return entry.rank <= apexBoardDisplayLimit(boardType) ? entry.rank : null
+  }
+
+  const publicApexReport = (boardType: ApexBoardType, report: ApexChallengeReport) => ({
+    ...report,
+    placementRank: report.placementRank <= apexBoardDisplayLimit(boardType) ? report.placementRank : null,
+  })
+
   const publicApexEntry = (entry: ApexEntry, currentUserId?: string) => ({
     id: entry.id,
     sourceRunId: entry.sourceRunId,
@@ -128,7 +138,7 @@ export function buildApp() {
     wins: entry.wins,
     losses: entry.losses,
     round: entry.round,
-    rank: entry.rank,
+    rank: publicApexEntryRank(entry),
     challengeWins: entry.challengeWins,
     isSeed: entry.isSeed,
     isMine: Boolean(currentUserId && entry.userId === currentUserId),
@@ -347,7 +357,11 @@ export function buildApp() {
 
   const apexLeaderboard = async (seasonId: string, boardType: ApexBoardType, boardKey: string) => {
     await ensureApexSeeds(seasonId, boardType, boardKey)
-    return prisma.apexEntry.findMany({ where: { seasonId, boardType, boardKey }, orderBy: { rank: 'asc' } })
+    return prisma.apexEntry.findMany({
+      where: { seasonId, boardType, boardKey, rank: { lte: apexBoardDisplayLimit(boardType) } },
+      orderBy: { rank: 'asc' },
+      take: apexBoardDisplayLimit(boardType),
+    })
   }
 
   const apexBoardSeed = (seasonId: string, boardType: ApexBoardType, boardKey: string, runId: string) => `${seasonId}-${runId}-apex-${boardType.toLowerCase()}-${boardKey}`
@@ -380,6 +394,35 @@ export function buildApp() {
     challengerName: string,
     report: ApexChallengeReport,
   ) => {
+    const displayLimit = apexBoardDisplayLimit(boardType)
+    if (report.placementRank > displayLimit) {
+      const lastEntry = await tx.apexEntry.findFirst({
+        where: { seasonId, boardType, boardKey },
+        orderBy: { rank: 'desc' },
+        select: { rank: true },
+      })
+      return tx.apexEntry.create({
+        data: {
+          userId,
+          sourceRunId: run.id,
+          seasonId,
+          boardType,
+          boardKey,
+          name: challengerName,
+          dogType: run.dogType,
+          luckyNumber: run.luckyNumber,
+          round: run.round,
+          wins: run.wins,
+          losses: run.losses,
+          items: JSON.stringify(toGameItems(run.items)),
+          relics: JSON.stringify(relicsFromRun(run)),
+          rank: Math.max(displayLimit + 1, (lastEntry?.rank ?? displayLimit) + 1),
+          challengeWins: 1,
+          isSeed: false,
+        },
+      })
+    }
+
     const rankOffset = 1_000_000
     await tx.$executeRaw`UPDATE "ApexEntry" SET "rank" = "rank" + ${rankOffset} WHERE "seasonId" = ${seasonId} AND "boardType" = ${boardType} AND "boardKey" = ${boardKey} AND "rank" >= ${report.placementRank}`
     const created = await tx.apexEntry.create({
@@ -404,6 +447,36 @@ export function buildApp() {
     })
     await tx.$executeRaw`UPDATE "ApexEntry" SET "rank" = "rank" - ${rankOffset - 1} WHERE "seasonId" = ${seasonId} AND "boardType" = ${boardType} AND "boardKey" = ${boardKey} AND "rank" >= ${report.placementRank + rankOffset}`
     return created
+  }
+
+  const enforceApexUserVisibleLimit = async (
+    tx: PrismaTransaction,
+    seasonId: string,
+    boardType: ApexBoardType,
+    boardKey: string,
+    userId: string,
+  ) => {
+    const displayLimit = apexBoardDisplayLimit(boardType)
+    const visibleEntries = await tx.apexEntry.findMany({
+      where: { seasonId, boardType, boardKey, userId, rank: { lte: displayLimit } },
+      orderBy: { rank: 'asc' },
+      select: { id: true, rank: true },
+    })
+    if (visibleEntries.length <= APEX_USER_VISIBLE_ENTRY_LIMIT) return
+
+    const demoted = visibleEntries[visibleEntries.length - 1]
+    const lastEntry = await tx.apexEntry.findFirst({
+      where: { seasonId, boardType, boardKey },
+      orderBy: { rank: 'desc' },
+      select: { rank: true },
+    })
+    const finalRank = Math.max(displayLimit + 1, lastEntry?.rank ?? displayLimit)
+    const rankOffset = 1_000_000
+    const demotedTempRank = 2_000_000
+    await tx.$executeRaw`UPDATE "ApexEntry" SET "rank" = ${demotedTempRank} WHERE "id" = ${demoted.id}`
+    await tx.$executeRaw`UPDATE "ApexEntry" SET "rank" = "rank" + ${rankOffset} WHERE "seasonId" = ${seasonId} AND "boardType" = ${boardType} AND "boardKey" = ${boardKey} AND "rank" > ${demoted.rank} AND "rank" < ${rankOffset}`
+    await tx.$executeRaw`UPDATE "ApexEntry" SET "rank" = "rank" - ${rankOffset + 1} WHERE "seasonId" = ${seasonId} AND "boardType" = ${boardType} AND "boardKey" = ${boardKey} AND "rank" > ${demoted.rank + rankOffset} AND "rank" < ${demotedTempRank}`
+    await tx.$executeRaw`UPDATE "ApexEntry" SET "rank" = ${finalRank} WHERE "id" = ${demoted.id}`
   }
 
   registerDogfightRoutes(app, requireUser)
@@ -739,11 +812,16 @@ export function buildApp() {
       await incrementApexDefenderStreaks(tx, season.id, 'DAILY', dailyBoardKey, dailyReport)
       const overall = await insertApexEntry(tx, season.id, 'OVERALL', 'default', userId, run, challengerName, overallReport)
       const daily = await insertApexEntry(tx, season.id, 'DAILY', dailyBoardKey, userId, run, challengerName, dailyReport)
-      return { overall, daily }
+      await enforceApexUserVisibleLimit(tx, season.id, 'OVERALL', 'default', userId)
+      await enforceApexUserVisibleLimit(tx, season.id, 'DAILY', dailyBoardKey, userId)
+      return {
+        overall: await tx.apexEntry.findUniqueOrThrow({ where: { id: overall.id } }),
+        daily: await tx.apexEntry.findUniqueOrThrow({ where: { id: daily.id } }),
+      }
     })
     const [updatedOverallLeaderboard, updatedDailyLeaderboard] = await Promise.all([
-      prisma.apexEntry.findMany({ where: { seasonId: season.id, boardType: 'OVERALL', boardKey: 'default' }, orderBy: { rank: 'asc' } }),
-      prisma.apexEntry.findMany({ where: { seasonId: season.id, boardType: 'DAILY', boardKey: dailyBoardKey }, orderBy: { rank: 'asc' } }),
+      apexLeaderboard(season.id, 'OVERALL', 'default'),
+      apexLeaderboard(season.id, 'DAILY', dailyBoardKey),
     ])
 
     return {
@@ -753,8 +831,8 @@ export function buildApp() {
         daily: publicApexEntry(entries.daily, userId),
       },
       reports: {
-        overall: overallReport,
-        daily: dailyReport,
+        overall: publicApexReport('OVERALL', overallReport),
+        daily: publicApexReport('DAILY', dailyReport),
       },
       dailyBoardKey,
       dailyResetHour: 5,

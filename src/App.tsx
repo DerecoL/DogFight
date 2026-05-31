@@ -427,7 +427,7 @@ type ApexEntry = {
   wins: number
   losses: number
   round: number
-  rank: number
+  rank: number | null
   challengeWins: number
   isSeed: boolean
   isMine: boolean
@@ -445,7 +445,7 @@ type ApexBattleSummary = {
   opponentHp: number
 }
 type ApexChallengeReport = {
-  placementRank: number
+  placementRank: number | null
   battles: ApexBattleSummary[]
 }
 type ApexBoardId = 'overall' | 'daily'
@@ -454,6 +454,9 @@ type ApexReports = Record<ApexBoardId, ApexChallengeReport>
 type ApexEntries = Record<ApexBoardId, ApexEntry>
 type ApexOverview = { season: SeasonInfo; leaderboards: ApexLeaderboards; candidates: Run[]; dailyBoardKey: string; dailyResetHour: number }
 type ApexSubmitResponse = { season: SeasonInfo; entries: ApexEntries; reports: ApexReports; leaderboards: ApexLeaderboards; dailyBoardKey: string; dailyResetHour: number }
+function apexRankText(rank: number | null) {
+  return rank == null ? '未上榜' : `第 ${rank} 名`
+}
 type DogfightRoomStatus = 'WAITING' | 'ACTIVE' | 'COMPLETE'
 type DogfightRoomPhase = 'LOBBY' | 'DOG_SELECT' | 'SHOP' | 'BATTLE' | 'COMPLETE'
 type DogfightMember = {
@@ -3772,7 +3775,7 @@ function ApexArena() {
           <Trophy size={30} />
           <div>
             <h3>{submittedEntries.overall.name} 已投入巅峰榜</h3>
-            <p>总榜第 {reports.overall.placementRank} 名，当日榜第 {reports.daily.placementRank} 名。新记录防守连胜从 {submittedEntries.overall.challengeWins} 开始。</p>
+            <p>总榜{apexRankText(reports.overall.placementRank)}，当日榜{apexRankText(reports.daily.placementRank)}。新记录防守连胜从 {submittedEntries.overall.challengeWins} 开始。</p>
           </div>
         </div>
       )}
@@ -3814,7 +3817,7 @@ function ApexArena() {
             {leaderboard.map((entry) => (
               <div className="apex-rank-entry" key={entry.id}>
                 <article className={`apex-rank-row ${entry.isSeed ? 'seed' : ''} ${entry.isMine ? 'player-entry' : ''}`}>
-                  <b>#{entry.rank}</b>
+                  <b>{entry.rank == null ? '未上榜' : `#${entry.rank}`}</b>
                   <DogBadge dogType={entry.dogType} src={dogAssets[entry.dogType]} size="sm" className="dog-avatar small" />
                   <div>
                     <strong>{entry.name}</strong>
@@ -3844,7 +3847,7 @@ function ApexConfigOverlay({ entry, onClose }: { entry: ApexEntry; onClose: () =
       <section className="apex-config-sheet" onClick={(event) => event.stopPropagation()}>
         <header className="apex-config-header">
           <div>
-            <span>#{entry.rank} · {entry.isSeed ? '种子' : `防守连胜 ${entry.challengeWins}`}</span>
+            <span>{entry.rank == null ? '未上榜' : `#${entry.rank}`} · {entry.isSeed ? '种子' : `防守连胜 ${entry.challengeWins}`}</span>
             <h3>{entry.name}</h3>
             <p>{dogNames[entry.dogType]} · {entry.wins}胜{entry.losses}败 · 第 {entry.round} 回合</p>
           </div>
@@ -4728,7 +4731,7 @@ function MapRewardPreviewLinks({ node, onInspectReward }: { node: ExplorationMap
                 onInspectReward(reward, event.currentTarget)
               }}
             >
-              {def?.name ?? reward.defId}<small>{qualityLabel[normalizeQuality(reward.quality)]}</small>
+              {def?.name ?? reward.defId}
             </button>
           )
         })}
