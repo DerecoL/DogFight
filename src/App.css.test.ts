@@ -122,22 +122,32 @@ describe('exploration map route board', () => {
 
   it('presents the map as a generated parchment scroll instead of CSS-drawn paper decoration', () => {
     expect(app).toContain('mapLayerMarkers')
-    expect(app).toContain('map-route-legend')
     expect(css).toContain('/assets/map/exploration-parchment-scroll.webp')
     expect(css).toContain('.map-layer-marker')
     expect(cssRule('.exploration-map-shell')).toContain('var(--paper-fiber)')
+    expect(cssRule('.exploration-map-route-board')).toContain("url('/assets/map/exploration-parchment-scroll.webp')")
+    expect(cssRule('.map-route-canvas')).toContain('background: transparent')
     expect(css).not.toContain('--map-sketch')
     expect(cssRule('.map-title-placard')).not.toContain('clip-path')
     expect(css).not.toContain('.map-route-canvas::after')
     expect(cssRule('.map-node-detail-panel')).toContain('border-left')
   })
 
-  it('sizes sticker nodes for readable icons while keeping locked nodes visible', () => {
-    expect(cssRule('.map-node.compact-route-node')).toContain('width: 76px')
-    expect(cssRule('.map-node.compact-route-node')).toContain('min-height: 82px')
+  it('sizes map nodes as readable paper-board plaques while keeping locked nodes visible', () => {
+    expect(cssRule('.map-node.compact-route-node')).toContain('width: 82px')
+    expect(cssRule('.map-node.compact-route-node')).toContain('min-height: 78px')
+    expect(cssRule('.map-node.compact-route-node')).toContain('border-radius: 10px')
     expect(cssRule('.map-node-sticker')).toContain('width: 48px')
     expect(cssRule('.map-node.compact-route-node.available .map-node-sticker, .map-node.compact-route-node.current .map-node-sticker')).toContain('width: 58px')
     expect(cssRule('.map-node.locked')).toContain('opacity: .62')
+  })
+
+  it('reserves empty top and bottom route-board space so nodes do not collide with layer numbers or tools', () => {
+    expect(app).toContain('mapNodeLanePosition')
+    expect(app).toContain('0.16 + normalizedLane * 0.62')
+    expect(cssRule('.map-drawing-toolbar')).toContain('bottom: 24px')
+    expect(app).not.toContain('map-route-legend')
+    expect(css).not.toContain('.map-route-legend')
   })
 
   it('separates route states into selectable, completed, inspected, and locked colors', () => {
@@ -206,18 +216,6 @@ describe('exploration map route board', () => {
     expect(app).toContain('setDraftStrokes([])')
     expect(cssRule('.map-route-draft-surface')).toContain('touch-action: none')
     expect(cssRule('.map-route-draft-stroke')).toContain('stroke-width: 2.6')
-  })
-
-  it('renders a bottom route legend explaining every route color', () => {
-    expect(app).toContain('map-route-legend')
-    expect(app).toContain('可选择')
-    expect(app).toContain('当前查看')
-    expect(app).toContain('已完成')
-    expect(app).toContain('未解锁')
-    expect(css).toContain('.map-route-legend-swatch.available')
-    expect(css).toContain('.map-route-legend-swatch.inspected')
-    expect(css).toContain('.map-route-legend-swatch.completed')
-    expect(css).toContain('.map-route-legend-swatch.locked')
   })
 
   it('uses generated map-specific WebP assets for the parchment and all map node icons', () => {

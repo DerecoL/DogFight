@@ -4543,12 +4543,6 @@ function ExplorationMapView({
                 <button type="button" className={drawingTool === 'eraser' ? 'active' : ''} title="橡皮" aria-label="橡皮" onClick={() => setDrawingTool('eraser')}><Eraser size={18} /></button>
                 <button type="button" title="清空草稿" aria-label="清空草稿" disabled={draftStrokes.length === 0 && !activeDraftStroke} onClick={() => { setDraftStrokes([]); setActiveDraft(null) }}><Trash2 size={18} /></button>
               </div>
-              <div className="map-route-legend" aria-label="路线颜色图示">
-                <span><i className="map-route-legend-swatch available" />可选择</span>
-                <span><i className="map-route-legend-swatch inspected" />当前查看</span>
-                <span><i className="map-route-legend-swatch completed" />已完成</span>
-                <span><i className="map-route-legend-swatch locked" />未解锁</span>
-              </div>
             </div>
 
             <aside className="map-node-detail-panel">
@@ -4632,9 +4626,14 @@ function mapNodePosition(node: Pick<ExplorationMapNode, 'layer' | 'column' | 'x'
   const layerDivisor = Math.max(1, layerCount - 1)
   const progress = 0.06 + node.layer * (0.88 / layerDivisor)
   if (orientation === 'vertical') {
-    return { x: Math.max(8, Math.min(92, staggeredLane * 100)), y: progress * 100 }
+    return { x: mapNodeLanePosition(staggeredLane), y: progress * 100 }
   }
-  return { x: progress * 100, y: Math.max(8, Math.min(92, staggeredLane * 100)) }
+  return { x: progress * 100, y: mapNodeLanePosition(staggeredLane) }
+}
+
+function mapNodeLanePosition(lane: number) {
+  const normalizedLane = Math.max(0, Math.min(1, lane))
+  return (0.16 + normalizedLane * 0.62) * 100
 }
 
 function mapLayerMarkerPosition(layer: number, layerCount: number) {
