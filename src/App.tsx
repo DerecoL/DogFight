@@ -281,6 +281,19 @@ type Battle = {
   playerSnapshot?: BattleSnapshot
   opponentSnapshot?: BattleSnapshot
 }
+type RewardSummarySource = 'EVENT' | 'MONSTER_BATTLE'
+type RewardSummaryEntry = {
+  kind: 'item' | 'upgrade' | 'gold' | 'tolerance' | 'choice' | 'status'
+  label: string
+  detail: string
+  defId?: string
+  quality?: ItemQuality
+}
+type RewardSummary = {
+  source: RewardSummarySource
+  title: string
+  entries: RewardSummaryEntry[]
+}
 type Run = {
   id: string
   mode: RunMode
@@ -1597,6 +1610,7 @@ function GameApp() {
   const [ladderProfile, setLadderProfile] = useState<LadderProfile | null>(null)
   const [equippedCosmetics, setEquippedCosmetics] = useState<CosmeticsResponse | null>(null)
   const [historyOverlayOpen, setHistoryOverlayOpen] = useState(false)
+  const [rewardSummary, setRewardSummary] = useState<RewardSummary | null>(null)
   const [casualTutorialState, setCasualTutorialState] = useState<CasualTutorialState>(defaultCasualTutorialState)
   const [tutorialOfferInspected, setTutorialOfferInspected] = useState(false)
   const [tutorialBought, setTutorialBought] = useState(false)
@@ -1795,7 +1809,7 @@ function GameApp() {
   }
 
   const action = async (
-    fn: () => Promise<{ run: Run; battle?: Battle } | { user: AuthUser | null; activeRun?: Run | null; needsNickname?: boolean }>,
+    fn: () => Promise<{ run: Run; battle?: Battle; rewardSummary?: RewardSummary } | { user: AuthUser | null; activeRun?: Run | null; needsNickname?: boolean }>,
     feedback?: { success?: UiFeedbackKind; failure?: UiFeedbackKind; successLabel?: string; failureLabel?: string },
   ) => {
     setError('')
@@ -1829,6 +1843,7 @@ function GameApp() {
         void loadRunHistory().catch(() => undefined)
         void loadLadderProfile().catch(() => undefined)
       }
+      if ('rewardSummary' in data && data.rewardSummary) setRewardSummary(data.rewardSummary)
       if (feedback?.success) pushUiFeedback(feedback.success, feedback.successLabel)
     } catch (err) {
       const message = err instanceof Error ? err.message : '操作失败'
@@ -1987,8 +2002,9 @@ function GameApp() {
     if (!run) return
     setError('')
     try {
-      const data = await api<{ run: Run }>(`/runs/${run.id}/battle/finish`, { method: 'POST' })
+      const data = await api<{ run: Run; rewardSummary?: RewardSummary }>(`/runs/${run.id}/battle/finish`, { method: 'POST' })
       setRun(data.run)
+      if (data.rewardSummary) setRewardSummary(data.rewardSummary)
       setBattle(null)
       setEventIndex(0)
       completeCasualTutorial()
@@ -2489,6 +2505,7 @@ function GameApp() {
       {!battle && !showClassRewardCeremony && run.status === 'ACTIVE' && run.phase !== 'BATTLE' && (
         <ForfeitRunAction run={run} onForfeit={() => void settleRun()} />
       )}
+      {rewardSummary && <RewardSummaryModal summary={rewardSummary} onClose={() => setRewardSummary(null)} />}
       {tutorialGuide}
     </Shell>
   )
@@ -4216,6 +4233,52 @@ function FeedbackLayer({ feedbacks }: { feedbacks: UiFeedbackEvent[] }) {
       ))}
     </div>
   )
+}
+
+function RewardSummaryModal({ summary, onClose }: { summary: RewardSummary; onClose: () => void }) {
+  if (typeof document === 'undefined') return null
+  const entries = summary.entries.length > 0 ? summary.entries : [{ kind: 'status' as const, label: '没有获得奖励', detail: '本次没有新的奖励' }]
+  return createPortal(
+    <div className="map-reward-summary-modal" role="dialog" aria-modal="true" aria-labelledby="map-reward-summary-title" onClick={onClose}>
+      <section className="map-reward-summary-sheet paper-card" onClick={(event) => event.stopPropagation()}>
+        <header className="map-reward-summary-header">
+          <div className="map-reward-summary-emblem" aria-hidden="true">
+            {summary.source === 'MONSTER_BATTLE' ? <Swords size={28} /> : <Sparkles size={28} />}
+          </div>
+          <div>
+            <span>{summary.source === 'MONSTER_BATTLE' ? '野怪结算' : '事件完成'}</span>
+            <h3 id="map-reward-summary-title">{summary.title}</h3>
+          </div>
+        </header>
+        <div className="map-reward-summary-entries">
+          {entries.map((entry, index) => {
+            const def = entry.defId ? itemDefById(entry.defId) : null
+            return (
+              <article key={`${entry.kind}-${entry.defId ?? index}-${entry.detail}`} className={`map-reward-summary-entry ${entry.kind}`}>
+                <div className="map-reward-summary-icon" aria-hidden="true">
+                  {def ? <ItemArt def={def} className="map-reward-summary-art" /> : rewardSummaryEntryIcon(entry.kind)}
+                </div>
+                <div>
+                  <strong>{entry.label}</strong>
+                  <p>{entry.detail}</p>
+                </div>
+              </article>
+            )
+          })}
+        </div>
+        <ActionButton className="map-reward-summary-close" onClick={onClose}>知道了</ActionButton>
+      </section>
+    </div>,
+    document.body,
+  )
+}
+
+function rewardSummaryEntryIcon(kind: RewardSummaryEntry['kind']) {
+  if (kind === 'gold') return <Coins size={24} />
+  if (kind === 'tolerance') return <Shield size={24} />
+  if (kind === 'choice') return <Sparkles size={24} />
+  if (kind === 'upgrade') return <PackagePlus size={24} />
+  return <Trophy size={24} />
 }
 
 function TopBar({ run, user, profile, musicEnabled, musicBlocked, onToggleMusic, onOpenLobby, onLogout }: { run?: Run; user?: AuthUser | null; profile: ReturnType<typeof equippedCosmeticProfile>; musicEnabled: boolean; musicBlocked: boolean; onToggleMusic: () => void; onOpenLobby?: () => void; onLogout: () => void }) {

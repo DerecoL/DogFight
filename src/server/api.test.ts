@@ -89,6 +89,35 @@ describeWithDatabase('run API', () => {
     expect(finished.body.run.losses).toBe(run.losses)
     expect(finished.body.run.gold).toBe(run.gold)
     expect(finished.body.run.phase).toBe('MAP')
+    expect(finished.body.rewardSummary).toMatchObject({
+      source: 'MONSTER_BATTLE',
+      title: '野怪战斗奖励',
+    })
+    expect(finished.body.rewardSummary.entries.length).toBeGreaterThanOrEqual(1)
+  })
+
+  it('returns an event reward summary after resolving a map event', async () => {
+    const { agent, run } = await createAuthenticatedRun()
+    const map = run.mapState
+    const eventNode = map.nodes.find((node: { kind: string }) => node.kind === 'EVENT')
+    expect(eventNode).toBeTruthy()
+    await prisma.run.update({
+      where: { id: run.id },
+      data: {
+        mapState: JSON.stringify({
+          ...map,
+          currentNodeId: eventNode.id,
+        }),
+      },
+    })
+
+    const resolved = await agent.post(`/api/runs/${run.id}/map/event`).send({}).expect(200)
+
+    expect(resolved.body.rewardSummary).toMatchObject({
+      source: 'EVENT',
+      title: eventNode.event.title,
+    })
+    expect(resolved.body.rewardSummary.entries.length).toBeGreaterThanOrEqual(1)
   })
 
   it('requires a three-choice equipment shop before a player battle map node can match', async () => {

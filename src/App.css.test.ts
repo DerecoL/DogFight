@@ -216,6 +216,19 @@ describe('exploration map route board', () => {
     expect(css).toContain('.map-monster-equipment-preview')
   })
 
+  it('shows map event and monster rewards in a fixed reward summary modal above map layers', () => {
+    expect(app).toContain('type RewardSummary')
+    expect(app).toContain('rewardSummary?: RewardSummary')
+    expect(app).toContain('setRewardSummary')
+    expect(app).toContain('RewardSummaryModal')
+    expect(app).toContain('map-reward-summary-modal')
+    expect(app).toContain('createPortal(')
+    expect(cssRule('.map-reward-summary-modal')).toContain('position: fixed')
+    expect(cssRule('.map-reward-summary-modal')).toContain('z-index: var(--z-modal-overlay)')
+    expect(cssRule('.map-reward-summary-sheet')).toContain('grid-template-rows: auto minmax(0, 1fr) auto')
+    expect(cssRule('.map-reward-summary-entries')).toContain('overflow: auto')
+  })
+
   it('keeps monster equipment preview modals on fixed tracks without content-driven resizing', () => {
     expect(cssRule('.map-monster-equipment-sheet')).toContain('width: min(1120px, calc(100vw - 28px))')
     expect(cssRule('.map-monster-equipment-sheet')).toContain('height: min(520px, calc(100vh - 28px))')

@@ -16,12 +16,12 @@ import { canPlace, findSlot, type PlacementOptions } from './game/grid'
 import { applyMapNodeCompletion, availableMapNodeIds, createExplorationMapState, explorationMapFinished, mapMonsterBattleRound, mapNodeSelection, mapShopChoices, normalizeExplorationMapState, randomEquipmentReward, randomMonsterReward, type ExplorationMapNode, type ExplorationMapState } from './game/map'
 import { buildOfflineFighter } from './game/offline-builder'
 import { applyPotionToBaseDice } from './game/potion'
-import { canUpgradePair, nextQuality, normalizeQuality, upgradeEnchant } from './game/quality'
+import { canUpgradePair, nextQuality, normalizeQuality, QUALITY_LABELS, upgradeEnchant } from './game/quality'
 import { canUseUpgradeShop, isUpgradeShopType, itemSellValue } from './game/shop'
 import { simulateBattle } from './game/battle'
 import { calculateLadderResult, ladderTierForScore, ladderTierLabels, ladderTiers, type LadderTier } from './game/ladder'
 import { STARTING_GOLD, isTrainingMatchRound, selectCasualGhostSnapshot, selectLadderGhostSnapshot, targetLadderOpponentWinsRange, targetOpponentWins } from './game/matchmaking'
-import type { BattleResult, DogType, EnchantmentChoice, FighterSnapshot, GameItem, PotionChoice, RelicInstance, ShopOffer, ShopType } from './game/types'
+import type { BattleResult, DogType, EnchantmentChoice, FighterSnapshot, GameItem, ItemQuality, PotionChoice, RelicInstance, ShopOffer, ShopType } from './game/types'
 import { applyRelicChoice, createFinishedBattleRecord, initialItems, makeChoices, makePotionChoices, makeRelicChoices, makeShop, nextPhaseData, parseJson, playerBattleGoldIncome, postBattleLargeItemReward, postBattleSellBonusItemGrowths, publicLadderSettlement, publicRun, publicRunHistory, relicsFromRun, removeRelicByInstanceId, seedGhost, snapshotFromRun, toGameItems, upgradeChoiceSkipPhase } from './state'
 import { accountSummary, claimAchievement, claimDaily, equipUserCosmetic, getAchievements, getCosmetics, getDailyTasks, getShop, purchaseShopItem, recordAccountEvent, refreshDaily, unequipUserCosmetic } from './account-services'
 import { getActiveSeason, publicSeason, publicSeasonSummary } from './seasons'
@@ -37,6 +37,20 @@ type ApexSourceRun = {
   losses: number
   relics: string
   items: ItemInstance[]
+}
+
+type RewardSummarySource = 'EVENT' | 'MONSTER_BATTLE'
+type RewardSummaryEntry = {
+  kind: 'item' | 'upgrade' | 'gold' | 'tolerance' | 'choice' | 'status'
+  label: string
+  detail: string
+  defId?: string
+  quality?: ItemQuality
+}
+type RewardSummary = {
+  source: RewardSummarySource
+  title: string
+  entries: RewardSummaryEntry[]
 }
 
 declare module 'fastify' {
@@ -312,6 +326,46 @@ export function buildApp() {
     if (!slot) return { kind: 'blocked' as const }
     return { kind: 'create' as const, item: { defId: reward.defId, quality, area: 'BAG' as const, x: slot.x, y: slot.y } }
   }
+
+  const itemRewardSummaryEntry = (
+    reward: { defId: string; quality?: string | null },
+    result: ReturnType<typeof createItemRewardData>,
+  ): RewardSummaryEntry => {
+    const quality = normalizeQuality(reward.quality)
+    const def = itemDefForQuality(reward.defId, quality)
+    if (result.kind === 'upgrade') {
+      const upgradedDef = itemDefForQuality(reward.defId, result.quality)
+      return {
+        kind: 'upgrade',
+        label: '装备升级',
+        detail: `${upgradedDef.name} 升至 ${QUALITY_LABELS[result.quality]}`,
+        defId: reward.defId,
+        quality: result.quality,
+      }
+    }
+    if (result.kind === 'blocked') {
+      return {
+        kind: 'item',
+        label: '发现掉落',
+        detail: `${def.name} · ${QUALITY_LABELS[quality]} · 背包已满，整理后领取`,
+        defId: reward.defId,
+        quality,
+      }
+    }
+    return {
+      kind: 'item',
+      label: '获得装备',
+      detail: `${def.name} · ${QUALITY_LABELS[result.item.quality]}`,
+      defId: reward.defId,
+      quality: result.item.quality,
+    }
+  }
+
+  const emptyRewardSummaryEntry = (detail: string): RewardSummaryEntry => ({
+    kind: 'status',
+    label: '没有获得奖励',
+    detail,
+  })
 
   const mapNodeShopPhaseData = (run: { id: string; round: number; items: ItemInstance[]; relics: string }, node: ExplorationMapNode) => {
     const choices = mapShopChoices(node, `${run.id}-${node.id}-${Date.now()}`, run.round)
@@ -944,21 +998,45 @@ export function buildApp() {
         data: { phase: 'RELIC_CHOICE', shopType: 'RELIC', relicChoices: JSON.stringify(relicChoices), choices: '[]', shopItems: '[]' },
         include: { items: true, ladderSettlement: true },
       })
-      return { run: publicRun(updated) }
+      const firstRelic = relicChoices[0] ? relicDefForQuality(relicChoices[0], relicDef(relicChoices[0]).defaultQuality) : null
+      const rewardSummary: RewardSummary = {
+        source: 'EVENT',
+        title: node.event.title,
+        entries: [{
+          kind: 'choice',
+          label: '遗物选择',
+          detail: firstRelic ? `进入遗物选择，可从 ${relicChoices.length} 件遗物中挑选；包含 ${firstRelic.name}` : '进入遗物选择',
+        }],
+      }
+      return { run: publicRun(updated), rewardSummary }
     }
 
     if (type === 'FREE_UPGRADE') {
       const item = toGameItems(run.items).find((entry) => nextQuality(entry.quality))
       if (item) await prisma.itemInstance.update({ where: { id: item.id }, data: { quality: nextQuality(item.quality)! } })
+      const rewardSummary: RewardSummary = {
+        source: 'EVENT',
+        title: node.event.title,
+        entries: [item
+          ? {
+              kind: 'upgrade',
+              label: '免费升级',
+              detail: `${itemDefForQuality(item.defId, nextQuality(item.quality)!).name} 升至 ${QUALITY_LABELS[nextQuality(item.quality)!]}`,
+              defId: item.defId,
+              quality: nextQuality(item.quality)!,
+            }
+          : emptyRewardSummaryEntry('当前没有可升级装备')],
+      }
       const updated = await prisma.run.update({
         where: { id: run.id },
         data: mapCompletionUpdateData(run),
         include: { items: true, ladderSettlement: true },
       })
-      return { run: publicRun(updated) }
+      return { run: publicRun(updated), rewardSummary }
     }
 
     const data: Prisma.RunUpdateInput = mapCompletionUpdateData(run)
+    const rewardSummary: RewardSummary = { source: 'EVENT', title: node.event.title, entries: [] }
     if (type === 'GOLD_CACHE') data.gold = { increment: 6 }
     if (type === 'RESTORE_TOLERANCE') {
       if (run.losses > 0) data.losses = { decrement: 1 }
@@ -975,6 +1053,7 @@ export function buildApp() {
     if (type === 'FREE_EQUIPMENT') {
       const itemReward = randomEquipmentReward(`${run.id}-${node.id}-event-equipment`)
       const reward = createItemRewardData(run, itemReward)
+      rewardSummary.entries.push(itemRewardSummaryEntry(itemReward, reward))
       if (reward.kind === 'create') data.items = { create: reward.item }
       if (reward.kind === 'upgrade') {
         await prisma.itemInstance.update({ where: { id: reward.itemId }, data: { quality: reward.quality } })
@@ -984,14 +1063,26 @@ export function buildApp() {
         data.mapState = JSON.stringify({ ...nextMap, pendingReward: { nodeId: node.id, ...itemReward } })
       }
     }
+    if (type === 'GOLD_CACHE') rewardSummary.entries.push({ kind: 'gold', label: '获得金币', detail: '+6 金币' })
+    if (type === 'RESTORE_TOLERANCE') {
+      rewardSummary.entries.push(run.losses > 0
+        ? { kind: 'tolerance', label: '恢复容错', detail: '+1 容错' }
+        : { kind: 'gold', label: '容错已满', detail: '+4 金币' })
+    }
+    if (type === 'RISKY_COMMISSION') {
+      rewardSummary.entries.push({ kind: 'gold', label: '委托报酬', detail: '+12 金币' })
+      rewardSummary.entries.push({ kind: 'tolerance', label: '委托代价', detail: '-1 容错' })
+      if (run.losses + 1 >= RUN_LOSS_LIMIT) rewardSummary.entries.push({ kind: 'status', label: '本局结束', detail: '容错耗尽，进入结算' })
+    }
+    if (rewardSummary.entries.length === 0) rewardSummary.entries.push(emptyRewardSummaryEntry('事件已处理'))
     const updated = await prisma.run.update({ where: { id: run.id }, data, include: { items: true, ladderSettlement: true } })
     if (updated.status === 'COMPLETE' && run.mode === 'LADDER') {
       await settleLadderRun(userId, run.id, updated.wins, updated.losses, run.seasonId)
       await recordAccountEvent(userId, { kind: 'LADDER_SETTLED', wins: updated.wins, losses: updated.losses })
       const settledRun = await prisma.run.findUniqueOrThrow({ where: { id: run.id }, include: { items: true, ladderSettlement: true } })
-      return { run: publicRun(settledRun) }
+      return { run: publicRun(settledRun), rewardSummary }
     }
-    return { run: publicRun(updated) }
+    return { run: publicRun(updated), rewardSummary }
   })
 
   app.post('/api/runs/:runId/map/complete-node', async (request, reply) => {
@@ -1028,6 +1119,11 @@ export function buildApp() {
     if (!map?.pendingReward) return reply.code(400).send({ error: '当前没有待领取掉落' })
     const reward = createItemRewardData(run, map.pendingReward)
     if (reward.kind === 'blocked') return reply.code(400).send({ error: '背包空间不足，请先整理' })
+    const rewardSummary: RewardSummary = {
+      source: 'MONSTER_BATTLE',
+      title: '野怪掉落领取',
+      entries: [itemRewardSummaryEntry(map.pendingReward, reward)],
+    }
     if (reward.kind === 'upgrade') await prisma.itemInstance.update({ where: { id: reward.itemId }, data: { quality: reward.quality } })
     const updated = await prisma.run.update({
       where: { id: run.id },
@@ -1038,7 +1134,7 @@ export function buildApp() {
       },
       include: { items: true, ladderSettlement: true },
     })
-    return { run: publicRun(updated) }
+    return { run: publicRun(updated), rewardSummary }
   })
 
   app.post('/api/runs/:runId/map/monster-reward/skip', async (request, reply) => {
@@ -1538,9 +1634,15 @@ export function buildApp() {
       const completion = mapCompletionUpdateData(run)
       let itemMutation: Prisma.RunUpdateInput['items'] | undefined
       let nextMap = completion.mapState ? parseRunMapState({ mapState: completion.mapState }) : null
+      const rewardSummary: RewardSummary = {
+        source: 'MONSTER_BATTLE',
+        title: '野怪战斗奖励',
+        entries: [],
+      }
       if (playerWon) {
         const reward = randomMonsterReward(mapNode.monster, `${run.id}-${mapNode.id}-reward-${run.round}`)
         const rewardData = createItemRewardData(run, reward)
+        rewardSummary.entries.push(itemRewardSummaryEntry(reward, rewardData))
         if (rewardData.kind === 'create') {
           itemMutation = { create: rewardData.item }
         } else if (rewardData.kind === 'upgrade') {
@@ -1548,6 +1650,8 @@ export function buildApp() {
         } else if (nextMap) {
           nextMap = { ...nextMap, pendingReward: { nodeId: mapNode.id, defId: reward.defId, quality: normalizeQuality(reward.quality) } }
         }
+      } else {
+        rewardSummary.entries.push(emptyRewardSummaryEntry('本次野怪战斗未胜利'))
       }
       const updated = await prisma.run.update({
         where: { id: run.id },
@@ -1560,7 +1664,7 @@ export function buildApp() {
         },
         include: { items: true, ladderSettlement: true },
       })
-      return { run: publicRun(updated) }
+      return { run: publicRun(updated), rewardSummary }
     }
     const wins = run.wins + (playerWon ? 1 : 0)
     const losses = run.losses + (playerWon ? 0 : 1)
