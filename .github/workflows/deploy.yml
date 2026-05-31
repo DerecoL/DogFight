@@ -56,16 +56,24 @@ jobs:
             deploy prisma public scripts src \
             Caddyfile Dockerfile compose.yml index.html package-lock.json package.json \
             tsconfig.app.json tsconfig.json tsconfig.node.json tsconfig.server.json vite.config.ts
+          ls -lh "$PACKAGE_PATH"
+          echo "Uploading source package to Tencent Cloud..."
           scp -i ~/.ssh/dogfight_deploy_key \
             -o BatchMode=yes \
             -o ConnectTimeout=20 \
+            -o ServerAliveInterval=15 \
+            -o ServerAliveCountMax=4 \
             "$PACKAGE_PATH" \
             "${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:$REMOTE_PACKAGE"
+          echo "Uploading remote deploy script to Tencent Cloud..."
           scp -i ~/.ssh/dogfight_deploy_key \
             -o BatchMode=yes \
             -o ConnectTimeout=20 \
+            -o ServerAliveInterval=15 \
+            -o ServerAliveCountMax=4 \
             deploy/remote-deploy.sh \
             "${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:$REMOTE_SCRIPT"
+          echo "Starting remote deploy script on Tencent Cloud..."
           ssh -i ~/.ssh/dogfight_deploy_key \
             -o BatchMode=yes \
             -o ConnectTimeout=20 \

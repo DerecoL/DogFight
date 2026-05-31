@@ -22,10 +22,13 @@ mkdir -p "$DEPLOY_PATH"
 rm -rf "$TEMP_DEPLOY_PATH"
 mkdir -p "$TEMP_DEPLOY_PATH"
 if [ -n "${SOURCE_PATH:-}" ]; then
+  echo "Copying source from $SOURCE_PATH..."
   cp -a "$SOURCE_PATH"/. "$TEMP_DEPLOY_PATH"/
 else
+  echo "Extracting source package $REMOTE_PACKAGE..."
   tar -xzf "$REMOTE_PACKAGE" -C "$TEMP_DEPLOY_PATH"
 fi
+echo "Pruning files that should not enter the Docker build context..."
 rm -rf \
   "$TEMP_DEPLOY_PATH/.git" \
   "$TEMP_DEPLOY_PATH/.github" \
@@ -69,16 +72,23 @@ if ! grep -q '^DATABASE_URL=' "$TEMP_DEPLOY_PATH/.env.production"; then
 fi
 
 cd "$TEMP_DEPLOY_PATH"
+echo "Validating Docker Compose configuration..."
 docker compose --env-file .env.production config >/dev/null
 
 if [ -f "$DEPLOY_PATH/deploy/backup-postgres.sh" ] && [ -f "$DEPLOY_PATH/.env.production" ]; then
   cd "$DEPLOY_PATH"
   export BACKUP_DIR="$DEPLOY_PATH/backups"
-  BACKUP_REASON=predeploy sh deploy/backup-postgres.sh
+  echo "Creating predeploy PostgreSQL backup..."
+  if command -v timeout >/dev/null 2>&1; then
+    BACKUP_REASON=predeploy timeout 10m sh deploy/backup-postgres.sh
+  else
+    BACKUP_REASON=predeploy sh deploy/backup-postgres.sh
+  fi
 else
   echo "Skipping predeploy backup because the existing deployment is not initialized yet."
 fi
 
+echo "Replacing deployment directory..."
 find "$DEPLOY_PATH" -mindepth 1 -maxdepth 1 ! -name backups ! -name .env.production -exec rm -rf {} +
 cp -a "$TEMP_DEPLOY_PATH"/. "$DEPLOY_PATH"/
 rm -rf "$TEMP_DEPLOY_PATH"
@@ -93,11 +103,14 @@ if [ -n "${REMOTE_SCRIPT:-}" ]; then
 fi
 
 cd "$DEPLOY_PATH"
+echo "Building Docker images..."
 docker compose build --no-cache api caddy
+echo "Starting Docker services..."
 docker compose up -d --build --remove-orphans
 docker compose up -d --build --force-recreate --no-deps caddy
 docker compose ps
 
+echo "Checking API health inside Docker..."
 api_healthy=0
 for attempt in $(seq 1 30); do
   if docker compose exec -T api node --input-type=module -e "const response = await fetch('http://127.0.0.1:4000/api/health'); const body = await response.json().catch(() => null); if (!response.ok || !body || body.database !== 'ok') { console.error(JSON.stringify(body)); process.exit(1); } console.log(JSON.stringify(body));"; then
@@ -113,6 +126,7 @@ if [ "$api_healthy" -ne 1 ]; then
   exit 1
 fi
 
+echo "Verifying deployed frontend assets..."
 frontend_index="$(docker compose exec -T caddy cat /srv/index.html)"
 js_asset="$(printf '%s\n' "$frontend_index" | sed -n 's/.*src="\/\(assets\/index-[^"]*\.js\)".*/\1/p' | head -n 1)"
 css_asset="$(printf '%s\n' "$frontend_index" | sed -n 's/.*href="\/\(assets\/index-[^"]*\.css\)".*/\1/p' | head -n 1)"
