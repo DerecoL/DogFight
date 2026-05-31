@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createFinishedBattleRecord, nextPhaseData, postBattleLargeItemReward, postBattleSellBonusItemGrowths, publicRelics, publicRun, publicRunHistory, toGameItems, upgradeChoiceSkipPhase } from './state'
+import { createFinishedBattleRecord, nextPhaseData, playerBattleGoldIncome, postBattleLargeItemReward, postBattleSellBonusItemGrowths, publicRelics, publicRun, publicRunHistory, toGameItems, upgradeChoiceSkipPhase } from './state'
 
 describe('public run relic data', () => {
   it('returns quality-adjusted relic descriptions for upgraded relics', () => {
@@ -80,6 +80,13 @@ describe('upgrade choice skip flow', () => {
 })
 
 describe('post-battle equipment rewards', () => {
+  it('uses the tighter player battle income curve after exploration map rewards were added', () => {
+    expect(playerBattleGoldIncome(1)).toBe(7)
+    expect(playerBattleGoldIncome(6)).toBe(12)
+    expect(playerBattleGoldIncome(12)).toBe(18)
+    expect(Array.from({ length: 12 }, (_, index) => playerBattleGoldIncome(index + 1)).reduce((sum, income) => sum + income, 0)).toBe(150)
+  })
+
   it('creates a bagged large item when bully vault is equipped', () => {
     const reward = postBattleLargeItemReward([
       { id: 'vault', defId: 'bully-vault', quality: 'GOLD', area: 'EQUIPMENT', x: 0, y: 0 },

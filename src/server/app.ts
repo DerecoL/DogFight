@@ -22,7 +22,7 @@ import { simulateBattle } from './game/battle'
 import { calculateLadderResult, ladderTierForScore, ladderTierLabels, ladderTiers, type LadderTier } from './game/ladder'
 import { STARTING_GOLD, isTrainingMatchRound, selectCasualGhostSnapshot, selectLadderGhostSnapshot, targetLadderOpponentWinsRange, targetOpponentWins } from './game/matchmaking'
 import type { BattleResult, DogType, EnchantmentChoice, FighterSnapshot, GameItem, PotionChoice, RelicInstance, ShopOffer, ShopType } from './game/types'
-import { applyRelicChoice, createFinishedBattleRecord, initialItems, makeChoices, makePotionChoices, makeRelicChoices, makeShop, nextPhaseData, parseJson, postBattleLargeItemReward, postBattleSellBonusItemGrowths, publicLadderSettlement, publicRun, publicRunHistory, relicsFromRun, removeRelicByInstanceId, seedGhost, snapshotFromRun, toGameItems, upgradeChoiceSkipPhase } from './state'
+import { applyRelicChoice, createFinishedBattleRecord, initialItems, makeChoices, makePotionChoices, makeRelicChoices, makeShop, nextPhaseData, parseJson, playerBattleGoldIncome, postBattleLargeItemReward, postBattleSellBonusItemGrowths, publicLadderSettlement, publicRun, publicRunHistory, relicsFromRun, removeRelicByInstanceId, seedGhost, snapshotFromRun, toGameItems, upgradeChoiceSkipPhase } from './state'
 import { accountSummary, claimAchievement, claimDaily, equipUserCosmetic, getAchievements, getCosmetics, getDailyTasks, getShop, purchaseShopItem, recordAccountEvent, refreshDaily, unequipUserCosmetic } from './account-services'
 import { getActiveSeason, publicSeason, publicSeasonSummary } from './seasons'
 
@@ -1471,7 +1471,7 @@ export function buildApp() {
     const battleRecord = createFinishedBattleRecord(result, wins, losses)
     const status = wins >= 12 || losses >= 5 ? 'COMPLETE' : 'ACTIVE'
     const nextRound = run.round + 1
-    const roundIncome = 5 + nextRound * 2
+    const roundIncome = playerBattleGoldIncome(nextRound)
     const currentItems = toGameItems(run.items)
     const sellBonusItemGrowths = postBattleSellBonusItemGrowths(currentItems)
     const postBattleReward = status === 'ACTIVE'

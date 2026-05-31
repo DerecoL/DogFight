@@ -115,13 +115,20 @@ describe('dogfight public room display state', () => {
     }
 
     const publicRoom = publicDogfightRoom(room as never, 'user-b')
+    const visibleA = publicRoom.members.find((member) => member.id === 'participant-a')
     const visibleB = publicRoom.members.find((member) => member.id === 'participant-b')
     const visibleBattle = publicRoom.battles[0]
 
+    expect(visibleA).toMatchObject({
+      wins: 2,
+      round: 2,
+      gold: 15,
+    })
     expect(visibleB).toMatchObject({
       wins: 1,
       losses: 4,
       round: 2,
+      gold: 10,
       eliminated: false,
       eliminatedRound: null,
       placement: null,
@@ -130,6 +137,7 @@ describe('dogfight public room display state', () => {
       wins: 1,
       losses: 4,
       round: 2,
+      gold: 10,
       status: 'DOGFIGHT_ACTIVE',
       phase: 'BATTLE',
     })

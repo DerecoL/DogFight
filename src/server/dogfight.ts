@@ -12,7 +12,7 @@ import { nextQuality, normalizeQuality } from './game/quality'
 import { canUseUpgradeShop, isUpgradeShopType } from './game/shop'
 import { simulateBattle } from './game/battle'
 import type { BattleEvent, BattleResult, DogType, EnchantmentChoice, FighterSnapshot, GameItem, PotionChoice, ShopType } from './game/types'
-import { applyRelicChoice, initialItems, makeChoices, makePotionChoices, makeRelicChoices, makeShop, nextPhaseData as buildNextPhaseData, parseJson, phaseDataAfterEnchant, postBattleLargeItemReward, postBattleSellBonusItemGrowths, publicRun, relicsFromRun, seedGhost, snapshotFromRun, toGameItems } from './state'
+import { applyRelicChoice, initialItems, makeChoices, makePotionChoices, makeRelicChoices, makeShop, nextPhaseData as buildNextPhaseData, parseJson, phaseDataAfterEnchant, playerBattleGoldIncome, postBattleLargeItemReward, postBattleSellBonusItemGrowths, publicRun, relicsFromRun, seedGhost, snapshotFromRun, toGameItems } from './state'
 import { getActiveSeason } from './seasons'
 
 const DOGFIGHT_TARGET_PLAYERS = 8
@@ -155,7 +155,7 @@ function visibleMemberRunValues(room: DogfightRoomWithDetails, participant: Dogf
   const delta = currentBattleResultDelta(room, participant.id)
   if (delta.wins === 0 && delta.losses === 0) return values
   const nextRound = room.currentRound + 1
-  const roundIncome = participant.eliminated ? 0 : 5 + nextRound * 2
+  const roundIncome = participant.eliminated ? 0 : playerBattleGoldIncome(nextRound)
   return {
     ...values,
     wins: Math.max(0, values.wins - delta.wins),
@@ -598,7 +598,7 @@ async function settleShopToBattle(tx: Tx, roomId: string, force = false) {
     const wins = participant.run.wins + participantResult.wins
     const losses = participant.run.losses + participantResult.losses
     const eliminated = losses >= DOGFIGHT_LOSS_LIMIT
-    const roundIncome = eliminated ? 0 : 5 + nextRound * 2
+    const roundIncome = eliminated ? 0 : playerBattleGoldIncome(nextRound)
     const gold = participant.run.gold + participantResult.goldCompensation + roundIncome
     const phaseData = eliminated ? { phase: 'COMPLETE' } : nextDogfightPhaseData({ ...participant.run, losses }, nextRound)
     const currentItems = toGameItems(participant.run.items)
