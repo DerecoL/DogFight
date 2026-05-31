@@ -225,7 +225,7 @@ function relicWithEffect(fighter: FighterSnapshot, effect: string) {
   return relicsOf(fighter).find((relic) => relicDef(relic.relicId).effect === effect) ?? null
 }
 
-function hasShieldStatusMitigation(fighter: FighterSnapshot, shield: number) {
+function hasShieldStatusImmunity(fighter: FighterSnapshot, shield: number) {
   return shield > 0 && triggerOrder(fighter.items).some((item) => itemDef(item.defId).advancedEffect === 'SHIELD_IMMUNITY')
 }
 
@@ -610,8 +610,8 @@ export function simulateBattle(player: FighterSnapshot, opponent: FighterSnapsho
   }
 
   const statusAmountAfterShieldMitigation = (target: Side, targetFighter: FighterSnapshot, amount: number) => {
-    if (!hasShieldStatusMitigation(targetFighter, state[target].shield)) return amount
-    return Math.ceil(amount / 2)
+    if (hasShieldStatusImmunity(targetFighter, state[target].shield)) return 0
+    return amount
   }
 
   const addPoison = (target: Side, targetFighter: FighterSnapshot, amount: number) => {

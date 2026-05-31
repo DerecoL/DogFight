@@ -211,7 +211,7 @@ export const BUILD_COMPONENTS: BuildComponent[] = [
   component('BIG_DICE', 'CORE', 'DOG', 'SAMOYED', '萨摩耶被动把骰点推向 4/5/6。'),
   component('BIG_DICE', 'ENGINE', 'RELIC', 'midas-left', '大点映射到小点触发。'),
   component('BIG_DICE', 'PAYOFF', 'ITEM', 'giant-bone', '大点高伤收益。'),
-  component('BIG_DICE', 'DEFENSE', 'ITEM', 'v3-golden-kennel', '高质量护盾与负面减半。'),
+  component('BIG_DICE', 'DEFENSE', 'ITEM', 'v3-golden-kennel', '高质量护盾与护盾期间负面免疫。'),
   component('BIG_DICE', 'COUNTER', 'ITEM', 'bully-demolish', '职业侧反大型装备。'),
   component('BIG_DICE', 'BRIDGE', 'ITEM', 'spiked-collar', '中期大点攻击过渡。'),
 
@@ -234,7 +234,7 @@ export const BUILD_COMPONENTS: BuildComponent[] = [
   component('POISON', 'CORE', 'ITEM', 'shiba-poison', '柴犬终阶毒核心。'),
   component('POISON', 'ENGINE', 'ITEM', 'v3-flea-disc', '低价叠毒入口。'),
   component('POISON', 'PAYOFF', 'RELIC', 'v3-bad-dog-manual', '毒结算额外伤害。'),
-  component('POISON', 'DEFENSE', 'ITEM', 'v3-golden-kennel', '护盾负面减半可拖毒伤时间。'),
+  component('POISON', 'DEFENSE', 'ITEM', 'v3-golden-kennel', '护盾期间免疫中毒和虚弱。'),
   component('POISON', 'DEFENSE', 'ITEM', 'v5-poison-blood-pump', '敌方中毒层数转化为己方治疗。'),
   component('POISON', 'COUNTER', 'ITEM', 'v3-dog-catnip', '自身负面净化。'),
   component('POISON', 'COUNTER', 'ITEM', 'v5-bitter-kibble', '中毒净化转护盾。'),
@@ -342,7 +342,7 @@ export const BUILD_COUNTER_RELATIONS: BuildCounterRelation[] = [
     counters: ['LIFESTEAL_GROWTH'],
     method: '反治疗：治疗降低、吸血失效或治疗转弱点。',
   },
-  { source: 'POISON', counters: ['SHIELD_THORNS'], method: '反毒：净化、负面减半或短时毒免。' },
+  { source: 'POISON', counters: ['SHIELD_THORNS'], method: '反毒：净化、护盾免疫或短时毒免。' },
   {
     source: 'LUCKY',
     counters: ['BIG_DICE', 'BOOM_FREQUENCY'],

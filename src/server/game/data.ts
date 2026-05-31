@@ -157,7 +157,7 @@ export const ITEM_DEFS: ItemDef[] = [
     defaultQuality: 'GOLD',
   }),
   slotItem('v3-golden-kennel', '不可侵犯的纯金狗窝', 4, 11, [4, 5], ['shield', 'immune'], { type: 'UTILITY', amount: 14, qualityBase: 'DIAMOND' }, {
-    description: '获得 14 点【护盾】。只要你拥有【护盾】，你受到的【中毒】和【虚弱】层数减半（向上取整）。',
+    description: '获得 14 点【护盾】。只要你拥有【护盾】，免疫你受到的【中毒】和【虚弱】。',
     advancedEffect: 'SHIELD_IMMUNITY',
     defaultQuality: 'DIAMOND',
   }),
@@ -423,7 +423,7 @@ export function itemDescription(itemId: string, quality?: string | null) {
   if (advanced === 'ADJACENT_TEMP_TRIGGER') return `触发时，额外触发【相邻】装备 ${nightPatrolLightTriggerCount(currentQuality)} 次。`
   if (advanced === 'LIFESTEAL') return `${baseEffect}并触发【吸血】。`
   if (advanced === 'POISON_AND_DISABLE_RIGHTMOST') return `对敌方施加 ${amount} 层【中毒】，并使敌方最右侧的一个装备【失效】一次。`
-  if (advanced === 'SHIELD_IMMUNITY') return `获得 ${amount} 点【护盾】。只要你拥有【护盾】，你受到的【中毒】和【虚弱】层数减半（向上取整）。`
+  if (advanced === 'SHIELD_IMMUNITY') return `获得 ${amount} 点【护盾】。只要你拥有【护盾】，免疫你受到的【中毒】和【虚弱】。`
   if (advanced === 'STEAL_ENEMY_BUFF') return `恢复 ${amount} 点生命值，并偷取敌方 1 层增益（优先【荆棘】，其次【加速】；【护盾】不算增益，不会被偷取）。`
   if (advanced === 'GRANT_LIFESTEAL_ADJACENT') return currentQuality === 'DIAMOND'
     ? '光环：战斗开始时，使左右【相邻】装备都获得【吸血】直到战斗结束。'

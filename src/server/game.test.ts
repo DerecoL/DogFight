@@ -2578,7 +2578,7 @@ describe('battle simulation', () => {
     expect(shieldEvent?.playerStatuses?.positive ?? []).not.toContainEqual(expect.objectContaining({ type: 'shield' }))
   })
 
-  it('lets golden kennel halve poison instead of fully blocking it', () => {
+  it('lets golden kennel fully block poison and weak while shielded', () => {
     const player: FighterSnapshot = {
       name: 'P',
       dogType: 'SHIBA',
@@ -2586,7 +2586,8 @@ describe('battle simulation', () => {
       losses: 0,
       round: 0,
       items: [
-        { id: 'shield', defId: 'v3-golden-kennel', quality: 'DIAMOND', area: 'EQUIPMENT', x: 0, y: 0 },
+        { id: 'shield-a', defId: 'v3-golden-kennel', quality: 'DIAMOND', area: 'EQUIPMENT', x: 0, y: 0 },
+        { id: 'shield-b', defId: 'v3-golden-kennel', quality: 'DIAMOND', area: 'EQUIPMENT', x: 4, y: 0 },
       ],
     }
     const opponent: FighterSnapshot = {
@@ -2597,15 +2598,19 @@ describe('battle simulation', () => {
       round: 0,
       items: [
         { id: 'poison', defId: 'shiba-poison', quality: 'DIAMOND', area: 'EQUIPMENT', x: 0, y: 0 },
+        { id: 'weak', defId: 'v3-hydrant-axe', quality: 'BRONZE', area: 'EQUIPMENT', x: 1, y: 0 },
       ],
     }
     const result = simulateBattle(player, opponent, 'shield-first-3')
-    const poisonApply = result.events.find((event) => event.defId === 'shiba-poison' && event.effectType === 'POISON')
-    const poisonTick = result.events.find((event) => event.kind === 'POISON' && event.target === 'player')
+    const poisonApplyWhileShielded = result.events.find((event) => event.defId === 'shiba-poison' && event.effectType === 'POISON' && event.playerShield > 0)
+    const weakApplyWhileShielded = result.events.find((event) => event.defId === 'v3-hydrant-axe' && event.effectType === 'UTILITY' && event.playerShield > 0)
+    const poisonTickWhileShielded = result.events.find((event) => event.kind === 'POISON' && event.target === 'player' && event.playerShield > 0)
+    const weakAttackWhileShielded = result.events.find((event) => event.defId === 'v3-hydrant-axe' && event.effectType === 'DAMAGE' && event.playerShield > 0)
 
-    expect(poisonApply?.amount).toBe(3)
-    expect(poisonApply?.playerStatuses?.negative).toContainEqual(expect.objectContaining({ type: 'poison', stacks: 3 }))
-    expect(poisonTick).toMatchObject({ amount: 3, target: 'player' })
+    expect(weakAttackWhileShielded).toBeDefined()
+    expect(poisonApplyWhileShielded).toBeUndefined()
+    expect(weakApplyWhileShielded).toBeUndefined()
+    expect(poisonTickWhileShielded).toBeUndefined()
   })
 
   it('lets spiked vest grant one shield while keeping its thorns', () => {
