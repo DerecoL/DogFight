@@ -178,6 +178,15 @@ describe('exploration map route board', () => {
     expect(css).toContain('.map-reward-preview-link')
   })
 
+  it('omits quality labels from expected monster reward links', () => {
+    const rewardLinksStart = app.indexOf('function MapRewardPreviewLinks')
+    const rewardLinksEnd = app.indexOf('function MapNodeSticker', rewardLinksStart)
+    const rewardLinks = app.slice(rewardLinksStart, rewardLinksEnd)
+
+    expect(rewardLinks).toContain('{def?.name ?? reward.defId}')
+    expect(rewardLinks).not.toContain('<small>{qualityLabel')
+  })
+
   it('adds a drawable planning layer with view, brush, eraser, and clear tools', () => {
     expect(app).toContain("type MapDrawingTool = 'inspect' | 'brush' | 'eraser'")
     expect(app).toContain('map-drawing-toolbar')
