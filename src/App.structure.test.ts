@@ -748,7 +748,7 @@ describe('selection screen structure', () => {
     expect(css).toContain('.exploration-map-screen')
     expect(css).toContain('.map-node-sticker')
     expect(css).toContain('.map-node-icon')
-    expect(css).toContain('.map-route-line')
+    expect(css).toContain('.map-route-path')
     expect(app).not.toContain('<Swords className="map-node-icon"')
     expect(app).not.toContain('<ShoppingBag className="map-node-icon"')
 

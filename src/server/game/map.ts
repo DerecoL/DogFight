@@ -55,7 +55,7 @@ export type ExplorationMapState = {
   pendingReward?: ExplorationPendingReward | null
 }
 
-const MAP_LAYER_COUNT = 12
+const MAP_LAYER_COUNT = 10
 export const EQUIPMENT_SHOP_TYPES = ['GENERAL', 'LARGE', 'MEDIUM', 'SMALL', 'SMALL_DICE', 'BIG_DICE'] as const satisfies readonly ShopType[]
 const FIXED_SHOP_TYPES = ['GENERAL', 'LARGE', 'MEDIUM', 'SMALL', 'SMALL_DICE', 'BIG_DICE', 'RELIC', 'UPGRADE_SILVER', 'UPGRADE_GOLD', 'POTION'] as const satisfies readonly ShopType[]
 const DOG_TYPES = ['SHIBA', 'SAMOYED', 'MUTT', 'BULLY', 'EMPEROR', 'FROG'] as const satisfies readonly DogType[]
@@ -97,14 +97,14 @@ function layerNodeKinds(layer: number): ExplorationMapNodeKind[] {
 
 function playerBattleLayerSet(seed: string) {
   const rng = createRng(`${seed}-player-battle-layers`)
-  const candidates = [4, 5, 6, 8, 10, 11]
+  const candidates = [4, 5, 6, 8, 9]
   for (let index = candidates.length - 1; index > 0; index -= 1) {
     const swapIndex = Math.floor(rng() * (index + 1))
     const value = candidates[index]
     candidates[index] = candidates[swapIndex]
     candidates[swapIndex] = value
   }
-  const count = rng() < 0.5 ? 5 : 6
+  const count = rng() < 0.5 ? 4 : 5
   return new Set(candidates.slice(0, count))
 }
 

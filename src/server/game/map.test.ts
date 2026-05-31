@@ -2,13 +2,13 @@ import { describe, expect, it } from 'vitest'
 import { applyMapNodeCompletion, createExplorationMapState, currentMapNode, explorationMapPublicState, mapNodeSelection, mapShopChoices } from './map'
 
 describe('exploration map generation', () => {
-  it('creates a deterministic randomized twelve-layer map with forward-only fair routes', () => {
+  it('creates a deterministic randomized ten-layer map with forward-only fair routes', () => {
     const first = createExplorationMapState('run-map-seed', 0, 0, 0)
     const second = createExplorationMapState('run-map-seed', 0, 0, 0)
 
     expect(first).toEqual(second)
-    expect(new Set(first.nodes.map((node) => node.layer))).toEqual(new Set(Array.from({ length: 12 }, (_, index) => index)))
-    for (let layer = 0; layer < 12; layer += 1) {
+    expect(new Set(first.nodes.map((node) => node.layer))).toEqual(new Set(Array.from({ length: 10 }, (_, index) => index)))
+    for (let layer = 0; layer < 10; layer += 1) {
       const layerNodes = first.nodes.filter((node) => node.layer === layer)
       expect(layerNodes.length).toBeGreaterThanOrEqual(2)
       expect(layerNodes.length).toBeLessThanOrEqual(4)
@@ -26,7 +26,7 @@ describe('exploration map generation', () => {
     expect(first.nodes.some((node) => node.kind === 'REST')).toBe(true)
     expect(first.nodes.some((node) => node.kind === 'EVENT' && node.event)).toBe(true)
 
-    for (const node of first.nodes.filter((entry) => entry.layer < 11)) {
+    for (const node of first.nodes.filter((entry) => entry.layer < 9)) {
       expect(node.nextNodeIds.length).toBeGreaterThan(0)
       expect(node.nextNodeIds.length).toBeLessThanOrEqual(2)
       for (const nextId of node.nextNodeIds) {
@@ -34,7 +34,7 @@ describe('exploration map generation', () => {
         expect(next?.layer).toBe(node.layer + 1)
       }
     }
-    for (const node of first.nodes.filter((entry) => entry.layer === 11)) {
+    for (const node of first.nodes.filter((entry) => entry.layer === 9)) {
       expect(node.nextNodeIds).toEqual([])
     }
 
@@ -42,8 +42,8 @@ describe('exploration map generation', () => {
     expect(completePaths.length).toBeGreaterThan(0)
     for (const path of completePaths) {
       const playerBattles = path.filter((node) => node.kind === 'PLAYER_BATTLE').length
-      expect(playerBattles).toBeGreaterThanOrEqual(5)
-      expect(playerBattles).toBeLessThanOrEqual(6)
+      expect(playerBattles).toBeGreaterThanOrEqual(4)
+      expect(playerBattles).toBeLessThanOrEqual(5)
     }
   })
 
@@ -64,7 +64,7 @@ function enumerateMapPaths(map: ReturnType<typeof createExplorationMapState>) {
   const visit = (path: typeof starts) => {
     const tail = path[path.length - 1]
     if (!tail) return
-    if (tail.layer === 11) {
+    if (tail.layer === 9) {
       paths.push(path)
       return
     }

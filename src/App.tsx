@@ -4328,6 +4328,7 @@ function ExplorationMapView({
   const currentLayer = completed.size > 0
     ? Math.max(...map.completedNodeIds.map((nodeId) => map.nodes.find((node) => node.id === nodeId)?.layer ?? 0)) + 1
     : 0
+  const mapLayerCount = Math.max(1, ...map.nodes.map((node) => node.layer + 1))
   const highlightedNode = selectedNodeId
     ? map.nodes.find((node) => node.id === selectedNodeId) ?? currentNode
     : currentNode ?? map.nodes.find((node) => available.has(node.id)) ?? map.nodes[0] ?? null
@@ -4339,7 +4340,7 @@ function ExplorationMapView({
           <div className="exploration-map-topbar">
             <div>
               <h2>探索地图</h2>
-              <p>第 {map.mapIndex + 1} 张地图 · 第 {Math.min(12, currentLayer + 1)} / 12 层</p>
+              <p>第 {map.mapIndex + 1} 张地图 · 第 {Math.min(mapLayerCount, currentLayer + 1)} / {mapLayerCount} 层</p>
             </div>
             <div className="map-run-stats">
               <ResourcePill icon={<Trophy size={16} />} label="胜场" value={`${run.wins}/12`} tone="gold" />
@@ -4350,27 +4351,23 @@ function ExplorationMapView({
 
           <div className="exploration-map-route-board">
             <div className="map-route-canvas" data-orientation={orientation}>
-              <div className="map-route-layer" aria-hidden="true">
+              <svg className="map-route-layer map-route-svg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
                 {map.nodes.flatMap((node) => node.nextNodeIds.map((nextId) => {
                   const next = map.nodes.find((entry) => entry.id === nextId)
                   if (!next) return null
-                  const start = mapNodePosition(node, orientation)
-                  const end = mapNodePosition(next, orientation)
-                  const dx = end.x - start.x
-                  const dy = end.y - start.y
-                  const length = Math.sqrt(dx * dx + dy * dy)
-                  const angle = Math.atan2(dy, dx) * 180 / Math.PI
+                  const start = mapNodePosition(node, orientation, mapLayerCount)
+                  const end = mapNodePosition(next, orientation, mapLayerCount)
                   const active = completed.has(node.id) && available.has(next.id)
                   const done = completed.has(node.id) && completed.has(next.id)
                   return (
-                    <span
+                    <path
                       key={`${node.id}:${next.id}`}
-                      className={`map-route-line ${active ? 'available' : ''} ${done ? 'completed' : ''}`}
-                      style={{ '--x1': start.x, '--y1': start.y, '--line-length': length, '--line-angle': `${angle}deg` } as React.CSSProperties}
+                      className={`map-route-path ${active ? 'available' : ''} ${done ? 'completed' : ''}`}
+                      d={routePathData(start, end, orientation)}
                     />
                   )
                 }))}
-              </div>
+              </svg>
               {map.nodes.map((node) => (
                 <MapNodeButton
                   key={node.id}
@@ -4443,13 +4440,23 @@ function ExplorationMapView({
   )
 }
 
-function mapNodePosition(node: Pick<ExplorationMapNode, 'layer' | 'column' | 'x'>, orientation: 'horizontal' | 'vertical' = 'horizontal') {
+function mapNodePosition(node: Pick<ExplorationMapNode, 'layer' | 'column' | 'x'>, orientation: 'horizontal' | 'vertical' = 'horizontal', layerCount = 10) {
   const lane = typeof node.x === 'number' ? node.x : ([0.18, 0.5, 0.82][node.column] ?? 0.5)
-  const progress = 0.05 + node.layer * (0.9 / 11)
+  const layerDivisor = Math.max(1, layerCount - 1)
+  const progress = 0.06 + node.layer * (0.88 / layerDivisor)
   if (orientation === 'vertical') {
     return { x: Math.max(8, Math.min(92, lane * 100)), y: progress * 100 }
   }
   return { x: progress * 100, y: Math.max(10, Math.min(90, lane * 100)) }
+}
+
+function routePathData(start: { x: number; y: number }, end: { x: number; y: number }, orientation: 'horizontal' | 'vertical') {
+  if (orientation === 'vertical') {
+    const middleY = start.y + (end.y - start.y) * 0.5
+    return `M ${start.x.toFixed(2)} ${start.y.toFixed(2)} C ${start.x.toFixed(2)} ${middleY.toFixed(2)}, ${end.x.toFixed(2)} ${middleY.toFixed(2)}, ${end.x.toFixed(2)} ${end.y.toFixed(2)}`
+  }
+  const middleX = start.x + (end.x - start.x) * 0.5
+  return `M ${start.x.toFixed(2)} ${start.y.toFixed(2)} C ${middleX.toFixed(2)} ${start.y.toFixed(2)}, ${middleX.toFixed(2)} ${end.y.toFixed(2)}, ${end.x.toFixed(2)} ${end.y.toFixed(2)}`
 }
 
 function MapNodeButton({ node, completed, available, current, selected, orientation, onInspect, onSelect }: { node: ExplorationMapNode; completed: boolean; available: boolean; current: boolean; selected: boolean; orientation: 'horizontal' | 'vertical'; onInspect: (nodeId: string) => void; onSelect: (nodeId: string) => void }) {

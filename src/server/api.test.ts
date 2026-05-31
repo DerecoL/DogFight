@@ -43,8 +43,8 @@ describeWithDatabase('run API', () => {
   it('starts new casual runs on the exploration map', async () => {
     const { run } = await createAuthenticatedRun()
     expect(run.phase).toBe('MAP')
-    expect(run.mapState.nodes.length).toBeGreaterThanOrEqual(24)
-    expect(run.mapState.nodes.length).toBeLessThanOrEqual(48)
+    expect(run.mapState.nodes.length).toBeGreaterThanOrEqual(20)
+    expect(run.mapState.nodes.length).toBeLessThanOrEqual(40)
     expect(run.mapState.availableNodeIds.length).toBeGreaterThanOrEqual(2)
     expect(run.mapState.availableNodeIds.length).toBeLessThanOrEqual(3)
   })

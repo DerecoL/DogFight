@@ -15,7 +15,7 @@
 - Modify: `src/server/game/map.ts`
   - 增加随机层节点数、入口节点、节点 `x` 坐标、低交叉连线、公平玩家对战层。
 - Modify: `src/server/game/map.test.ts`
-  - 用失败测试约束 12 层、每层 2-4 节点、出边数量、只向前连线、入口可选、路径玩家对战数 5-6。
+  - 用失败测试约束 10 层、每层 2-4 节点、出边数量、只向前连线、入口可选、路径玩家对战数 4-5。
 - Modify: `src/server/api.test.ts`
   - 更新新地图节点数量和初始可选数量断言，避免继续假设固定 36 节点。
 - Modify: `src/App.tsx`
@@ -39,9 +39,9 @@ const first = createExplorationMapState('run-map-seed', 0, 0, 0)
 const second = createExplorationMapState('run-map-seed', 0, 0, 0)
 
 expect(first).toEqual(second)
-expect(new Set(first.nodes.map((node) => node.layer))).toEqual(new Set(Array.from({ length: 12 }, (_, index) => index)))
+expect(new Set(first.nodes.map((node) => node.layer))).toEqual(new Set(Array.from({ length: 10 }, (_, index) => index)))
 
-for (let layer = 0; layer < 12; layer += 1) {
+for (let layer = 0; layer < 10; layer += 1) {
   const layerNodes = first.nodes.filter((node) => node.layer === layer)
   expect(layerNodes.length).toBeGreaterThanOrEqual(2)
   expect(layerNodes.length).toBeLessThanOrEqual(4)
@@ -52,7 +52,7 @@ for (let layer = 0; layer < 12; layer += 1) {
   }
 }
 
-for (const node of first.nodes.filter((entry) => entry.layer < 11)) {
+for (const node of first.nodes.filter((entry) => entry.layer < 9)) {
   expect(node.nextNodeIds.length).toBeGreaterThanOrEqual(1)
   expect(node.nextNodeIds.length).toBeLessThanOrEqual(2)
   for (const nextId of node.nextNodeIds) {
@@ -61,7 +61,7 @@ for (const node of first.nodes.filter((entry) => entry.layer < 11)) {
   }
 }
 
-for (const node of first.nodes.filter((entry) => entry.layer === 11)) {
+for (const node of first.nodes.filter((entry) => entry.layer === 9)) {
   expect(node.nextNodeIds).toEqual([])
 }
 
@@ -69,8 +69,8 @@ const completePaths = enumerateMapPaths(first)
 expect(completePaths.length).toBeGreaterThan(0)
 for (const path of completePaths) {
   const playerBattles = path.filter((node) => node.kind === 'PLAYER_BATTLE').length
-  expect(playerBattles).toBeGreaterThanOrEqual(5)
-  expect(playerBattles).toBeLessThanOrEqual(6)
+  expect(playerBattles).toBeGreaterThanOrEqual(4)
+  expect(playerBattles).toBeLessThanOrEqual(5)
 }
 ```
 
@@ -84,7 +84,7 @@ function enumerateMapPaths(map: ReturnType<typeof createExplorationMapState>) {
   const visit = (path: typeof starts) => {
     const tail = path[path.length - 1]
     if (!tail) return
-    if (tail.layer === 11) {
+    if (tail.layer === 9) {
       paths.push(path)
       return
     }
@@ -351,7 +351,7 @@ Change the map board area to:
     <div className="exploration-map-topbar">
       <div>
         <h2>探索地图</h2>
-        <p>第 {map.mapIndex + 1} 张地图 · 第 {Math.min(12, currentLayer + 1)} / 12 层</p>
+        <p>第 {map.mapIndex + 1} 张地图 · 第 {Math.min(mapLayerCount, currentLayer + 1)} / {mapLayerCount} 层</p>
       </div>
       <div className="map-run-stats">
         <ResourcePill icon={<Trophy size={16} />} label="胜场" value={`${run.wins}/12`} tone="gold" />
@@ -413,7 +413,7 @@ Replace `mapNodePosition()`:
 ```ts
 function mapNodePosition(node: Pick<ExplorationMapNode, 'layer' | 'column' | 'x'>, orientation: 'horizontal' | 'vertical' = 'horizontal') {
   const lane = typeof node.x === 'number' ? node.x : ([0.18, 0.5, 0.82][node.column] ?? 0.5)
-  const progress = 0.05 + node.layer * (0.9 / 11)
+  const progress = 0.06 + node.layer * (0.88 / Math.max(1, layerCount - 1))
   if (orientation === 'vertical') {
     return { x: Math.max(8, Math.min(92, lane * 100)), y: progress * 100 }
   }

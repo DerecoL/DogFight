@@ -60,6 +60,19 @@ describe('exploration map route board', () => {
     expect(app).toContain('orientation')
     expect(app).toContain('map-node-detail-panel')
   })
+
+  it('draws exploration routes as curved svg paths instead of straight dotted div lines', () => {
+    expect(app).toContain('routePathData')
+    expect(app).toContain('map-route-path')
+    expect(css).toContain('.map-route-svg')
+    expect(css).toContain('.map-route-path.available')
+    expect(css).not.toContain('border-top: 3px dashed rgba(61, 45, 37, .2)')
+  })
+
+  it('keeps the mobile exploration detail panel visible below the route canvas', () => {
+    expect(css).toContain('grid-template-rows: minmax(900px, auto) minmax(230px, auto)')
+    expect(css).toContain('min-height: 230px')
+  })
 })
 
 describe('equipment layout scale', () => {

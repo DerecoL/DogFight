@@ -7701,30 +7701,41 @@ progress {
   pointer-events: none;
 }
 
-.map-route-layer {
+.map-route-layer,
+.map-route-svg {
   position: absolute;
   inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: visible;
 }
 
-.map-route-line {
-  position: absolute;
-  left: calc(var(--x1) * 1%);
-  top: calc(var(--y1) * 1%);
-  width: calc(var(--line-length) * 1%);
-  height: 0;
-  border-top: 3px dashed rgba(61, 45, 37, .2);
-  transform: rotate(var(--line-angle));
-  transform-origin: left center;
+.map-route-path {
+  fill: none;
+  stroke: rgba(112, 89, 66, .26);
+  stroke-width: .48;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 1.1 1.45;
+  vector-effect: non-scaling-stroke;
+  filter: drop-shadow(0 1px 0 rgba(255, 255, 255, .55));
 }
 
-.map-route-line.available {
-  border-top-color: rgba(90, 132, 246, .82);
-  filter: drop-shadow(0 0 5px rgba(90, 132, 246, .44));
+.map-route-path.available {
+  stroke: rgba(73, 114, 232, .72);
+  stroke-width: .74;
+  stroke-dasharray: none;
+  filter:
+    drop-shadow(0 0 1px rgba(255, 255, 255, .9))
+    drop-shadow(0 0 5px rgba(90, 132, 246, .42));
 }
 
-.map-route-line.completed {
-  border-top-style: solid;
-  border-top-color: rgba(72, 150, 82, .78);
+.map-route-path.completed {
+  stroke: rgba(72, 150, 82, .78);
+  stroke-width: .7;
+  stroke-dasharray: none;
+  filter: drop-shadow(0 1px 0 rgba(255, 255, 255, .65));
 }
 
 .map-node {
@@ -7916,12 +7927,12 @@ progress {
 
   .exploration-map-route-board {
     grid-template-columns: 1fr;
-    grid-template-rows: minmax(1040px, auto) auto;
+    grid-template-rows: minmax(900px, auto) minmax(230px, auto);
     overflow: auto;
   }
 
   .map-route-canvas {
-    min-height: 1040px;
+    min-height: 900px;
   }
 
   .map-node.compact-route-node {
@@ -7940,6 +7951,7 @@ progress {
   }
 
   .map-node-detail-panel {
+    min-height: 230px;
     max-height: 230px;
   }
 }
