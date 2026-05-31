@@ -150,6 +150,15 @@ describe('exploration map route board', () => {
     expect(css).not.toContain('.map-route-legend')
   })
 
+  it('keeps exploration map layer markers above route nodes and planning strokes', () => {
+    expect(cssRule('.map-route-canvas')).toContain('isolation: isolate')
+    expect(cssRule('.map-layer-marker-row')).toContain('z-index: 7')
+    expect(cssRule('.map-node')).toContain('z-index: 3')
+    expect(cssRule('.map-node.selected')).toContain('z-index: 5')
+    expect(cssRule('.map-route-draft-svg')).toContain('z-index: 5')
+    expect(cssRule('.map-drawing-toolbar')).toContain('z-index: 6')
+  })
+
   it('separates route states into selectable, completed, inspected, and locked colors', () => {
     expect(app).toContain('inspectedRouteNodeIds')
     expect(cssRule('.map-route-path')).toContain('stroke-width: 2.5')

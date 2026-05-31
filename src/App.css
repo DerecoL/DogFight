@@ -7766,6 +7766,7 @@ progress {
 
 .map-route-canvas {
   position: relative;
+  isolation: isolate;
   min-height: 0;
   overflow: hidden;
   border: 0;
@@ -7787,7 +7788,7 @@ progress {
   position: absolute;
   inset: 0 0 auto;
   height: 58px;
-  z-index: 2;
+  z-index: 7;
   pointer-events: none;
 }
 
