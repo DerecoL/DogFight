@@ -31,7 +31,7 @@ func items_in_area(area: String) -> Array[Dictionary]:
 	var result: Array[Dictionary] = []
 	for item in run.get("items", []):
 		if item is Dictionary and str(item.get("area", "")) == area:
-			result.append(item)
+			result.append(item.duplicate(true))
 	result.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
 		var ay := int(a.get("y", 0))
 		var by := int(b.get("y", 0))
@@ -45,9 +45,9 @@ func shop_offers() -> Array[Dictionary]:
 	var result: Array[Dictionary] = []
 	for offer in run.get("shopItems", []):
 		if offer is Dictionary:
-			result.append(offer)
+			result.append(offer.duplicate(true))
 	return result
 
 func last_battle() -> Dictionary:
 	var battle := run.get("lastBattle", {})
-	return battle if battle is Dictionary else {}
+	return battle.duplicate(true) if battle is Dictionary else {}
