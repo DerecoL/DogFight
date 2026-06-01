@@ -33,8 +33,7 @@ func login(account: String, password: String) -> bool:
 		return false
 	current_user = response.data.get("user", {})
 	user_changed.emit(current_user)
-	await refresh_me()
-	return true
+	return await refresh_me()
 
 func refresh_me() -> bool:
 	var response := await api.get_json("/me")
@@ -55,7 +54,8 @@ func set_current_run(run: Dictionary) -> void:
 func _show_run_screen() -> void:
 	var login_screen := get_node_or_null("ScreenRoot/LoginScreen")
 	var run_screen := get_node_or_null("ScreenRoot/RunScreen")
+	if run_screen == null:
+		return
 	if login_screen != null:
 		login_screen.visible = false
-	if run_screen != null:
-		run_screen.visible = true
+	run_screen.visible = true

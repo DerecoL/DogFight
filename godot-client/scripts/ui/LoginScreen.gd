@@ -10,12 +10,15 @@ signal login_succeeded
 var session: Node
 
 func bind_session(next_session: Node) -> void:
+	if session != null and session.has_signal("error_raised") and session.error_raised.is_connected(_on_error_raised):
+		session.error_raised.disconnect(_on_error_raised)
 	session = next_session
 	if session != null and session.has_signal("error_raised") and not session.error_raised.is_connected(_on_error_raised):
 		session.error_raised.connect(_on_error_raised)
 
 func _ready() -> void:
-	login_button.pressed.connect(_on_login_pressed)
+	if not login_button.pressed.is_connected(_on_login_pressed):
+		login_button.pressed.connect(_on_login_pressed)
 
 func _on_login_pressed() -> void:
 	error_label.text = ""

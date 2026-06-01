@@ -48,8 +48,13 @@ unique_name_in_owner = true
 layout_mode = 2
 text = "登录"
 
-[node name="ErrorLabel" type="Label" parent="Margin/Form"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 48)
+[node name="ErrorScroll" type="ScrollContainer" parent="Margin/Form"]
+custom_minimum_size = Vector2(0, 58)
 layout_mode = 2
+horizontal_scroll_mode = 0
+
+[node name="ErrorLabel" type="Label" parent="Margin/Form/ErrorScroll"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
 autowrap_mode = 3
