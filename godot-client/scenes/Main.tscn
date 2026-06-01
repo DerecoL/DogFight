@@ -1,7 +1,8 @@
-[gd_scene load_steps=3 format=3 uid="uid://dogfight_main"]
+[gd_scene load_steps=4 format=3 uid="uid://dogfight_main"]
 
 [ext_resource type="Script" path="res://scripts/state/GameSession.gd" id="1_session"]
 [ext_resource type="PackedScene" path="res://scenes/LoginScreen.tscn" id="2_login"]
+[ext_resource type="PackedScene" path="res://scenes/RunScreen.tscn" id="3_run"]
 
 [node name="Main" type="Control"]
 layout_mode = 3
@@ -21,4 +22,7 @@ grow_horizontal = 2
 grow_vertical = 2
 
 [node name="LoginScreen" parent="ScreenRoot" instance=ExtResource("2_login")]
+layout_mode = 1
+
+[node name="RunScreen" parent="ScreenRoot" instance=ExtResource("3_run")]
 layout_mode = 1

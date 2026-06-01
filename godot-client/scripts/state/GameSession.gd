@@ -25,6 +25,9 @@ func _ready() -> void:
 		login_screen.bind_session(self)
 		if login_screen.has_signal("login_succeeded") and not login_screen.login_succeeded.is_connected(_show_run_screen):
 			login_screen.login_succeeded.connect(_show_run_screen)
+	var run_screen := get_node_or_null("ScreenRoot/RunScreen")
+	if run_screen != null and run_screen.has_method("bind_session"):
+		run_screen.bind_session(self)
 
 func login(account: String, password: String) -> bool:
 	var response := await api.post_json("/auth/login", {"account": account, "password": password})
@@ -46,6 +49,21 @@ func refresh_me() -> bool:
 	if active_run is Dictionary:
 		set_current_run(active_run)
 	return true
+
+func create_run(dog_type := "SHIBA", mode := "CASUAL", lucky_number: Variant = null) -> bool:
+	var body := {"dogType": dog_type, "mode": mode}
+	if lucky_number != null:
+		body["luckyNumber"] = int(lucky_number)
+	var response := await api.post_json("/runs", body)
+	if not response.ok:
+		error_raised.emit(str(response.error))
+		return false
+	var run := response.data.get("run", {})
+	if run is Dictionary:
+		set_current_run(run)
+		return true
+	error_raised.emit("创建跑局失败")
+	return false
 
 func set_current_run(run: Dictionary) -> void:
 	run_store.set_run(run)
