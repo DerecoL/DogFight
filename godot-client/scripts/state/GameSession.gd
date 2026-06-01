@@ -1,5 +1,9 @@
 extends Control
 
+signal user_changed(user: Dictionary)
+signal run_changed(run: Dictionary)
+signal error_raised(message: String)
+
 const ApiClient := preload("res://scripts/api/ApiClient.gd")
 const RunStore := preload("res://scripts/state/RunStore.gd")
 const DEFAULT_API_BASE_URL := "http://127.0.0.1:4000/api"
@@ -16,6 +20,42 @@ func _ready() -> void:
 	api = ApiClient.new()
 	api.configure(api_base_url)
 	add_child(api)
+	var login_screen := get_node_or_null("ScreenRoot/LoginScreen")
+	if login_screen != null and login_screen.has_method("bind_session"):
+		login_screen.bind_session(self)
+		if login_screen.has_signal("login_succeeded") and not login_screen.login_succeeded.is_connected(_show_run_screen):
+			login_screen.login_succeeded.connect(_show_run_screen)
+
+func login(account: String, password: String) -> bool:
+	var response := await api.post_json("/auth/login", {"account": account, "password": password})
+	if not response.ok:
+		error_raised.emit(str(response.error))
+		return false
+	current_user = response.data.get("user", {})
+	user_changed.emit(current_user)
+	await refresh_me()
+	return true
+
+func refresh_me() -> bool:
+	var response := await api.get_json("/me")
+	if not response.ok:
+		error_raised.emit(str(response.error))
+		return false
+	current_user = response.data.get("user", current_user)
+	user_changed.emit(current_user)
+	var active_run := response.data.get("activeRun", null)
+	if active_run is Dictionary:
+		set_current_run(active_run)
+	return true
 
 func set_current_run(run: Dictionary) -> void:
 	run_store.set_run(run)
+	run_changed.emit(run)
+
+func _show_run_screen() -> void:
+	var login_screen := get_node_or_null("ScreenRoot/LoginScreen")
+	var run_screen := get_node_or_null("ScreenRoot/RunScreen")
+	if login_screen != null:
+		login_screen.visible = false
+	if run_screen != null:
+		run_screen.visible = true
