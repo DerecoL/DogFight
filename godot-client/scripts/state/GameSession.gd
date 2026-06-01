@@ -59,7 +59,7 @@ func create_run(dog_type := "SHIBA", mode := "CASUAL", lucky_number: Variant = n
 		error_raised.emit(str(response.error))
 		return false
 	var run := response.data.get("run", {})
-	if run is Dictionary:
+	if run is Dictionary and str(run.get("id", "")).length() > 0:
 		set_current_run(run)
 		return true
 	error_raised.emit("创建跑局失败")
@@ -76,4 +76,6 @@ func _show_run_screen() -> void:
 		return
 	if login_screen != null:
 		login_screen.visible = false
+	if run_screen.has_method("clear_error"):
+		run_screen.call("clear_error")
 	run_screen.visible = true

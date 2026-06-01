@@ -29,6 +29,11 @@ func _ready() -> void:
 		create_run_button.pressed.connect(_on_create_run_pressed)
 	_render()
 
+func clear_error() -> void:
+	if not is_node_ready():
+		return
+	error_label.text = ""
+
 func _on_create_run_pressed() -> void:
 	error_label.text = ""
 	if session == null or not session.has_method("create_run"):
@@ -44,6 +49,7 @@ func _on_run_changed(_run: Dictionary) -> void:
 func _render() -> void:
 	if not is_node_ready():
 		return
+	clear_error()
 	var store = null if session == null else session.get("run_store")
 	if store == null or not store.has_run():
 		run_label.text = "暂无跑局"
@@ -82,6 +88,8 @@ func _render_items(container: VBoxContainer, items: Array) -> void:
 		var row := Button.new()
 		row.custom_minimum_size = Vector2(0, 44)
 		row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.clip_text = true
+		row.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 		row.text = "%s  %s  (%d,%d)" % [def_name, quality, x, y]
 		container.add_child(row)
 
@@ -100,6 +108,8 @@ func _render_shop(offers: Array) -> void:
 		var row := Button.new()
 		row.custom_minimum_size = Vector2(0, 44)
 		row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.clip_text = true
+		row.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 		row.text = "%s  价格: %d" % [def_name, price]
 		shop_list.add_child(row)
 
@@ -116,7 +126,10 @@ func _action_label(phase: String) -> String:
 
 func _clear_children(container: Node) -> void:
 	for child in container.get_children():
+		container.remove_child(child)
 		child.queue_free()
 
 func _on_error_raised(message: String) -> void:
+	if not visible:
+		return
 	error_label.text = message
