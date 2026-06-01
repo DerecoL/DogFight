@@ -43,6 +43,5 @@ prisma/dev.db-journal
 godot-client/.godot/
 godot-client/.import/
 godot-client/export.cfg
-godot-client/export_presets.cfg
 godot-client/*.translation
 godot-client/.env

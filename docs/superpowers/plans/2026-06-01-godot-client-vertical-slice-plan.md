@@ -20,6 +20,8 @@
 
 - Create: `godot-client/project.godot`  
   Godot 工程入口和基础窗口配置。
+- Create: `godot-client/icon.svg`
+  Godot 工程图标，与 `project.godot` 的 `config/icon` 保持一致。
 - Create: `godot-client/scenes/Main.tscn`  
   根场景，挂载 `GameSession`，切换登录、跑局和战斗回放界面。
 - Create: `godot-client/scenes/LoginScreen.tscn`  
@@ -57,6 +59,7 @@
 
 **Files:**
 - Create: `godot-client/project.godot`
+- Create: `godot-client/icon.svg`
 - Create: `godot-client/scenes/Main.tscn`
 - Create: `godot-client/scripts/state/GameSession.gd`
 - Create: `godot-client/scripts/tests/api_client_smoke.gd`
@@ -92,7 +95,22 @@ renderer/rendering_method="gl_compatibility"
 renderer/rendering_method.mobile="gl_compatibility"
 ```
 
-- [ ] **Step 2: 创建根场景**
+- [ ] **Step 2: 创建工程图标**
+
+创建 `godot-client/icon.svg`：
+
+```svg
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <rect width="128" height="128" rx="24" fill="#20242a"/>
+  <circle cx="64" cy="64" r="42" fill="#f1c27d"/>
+  <circle cx="48" cy="56" r="8" fill="#20242a"/>
+  <circle cx="80" cy="56" r="8" fill="#20242a"/>
+  <path d="M55 78c6 7 12 7 18 0" fill="none" stroke="#20242a" stroke-width="8" stroke-linecap="round"/>
+  <path d="M30 34l16 18M98 34L82 52" fill="none" stroke="#f1c27d" stroke-width="14" stroke-linecap="round"/>
+</svg>
+```
+
+- [ ] **Step 3: 创建根场景**
 
 Create `godot-client/scenes/Main.tscn`:
 
@@ -119,7 +137,7 @@ grow_horizontal = 2
 grow_vertical = 2
 ```
 
-- [ ] **Step 3: 创建最小会话脚本**
+- [ ] **Step 4: 创建最小会话脚本**
 
 Create `godot-client/scripts/state/GameSession.gd`:
 
@@ -138,7 +156,7 @@ func _ready() -> void:
 		api_base_url = override_url.rstrip("/")
 ```
 
-- [ ] **Step 4: 创建工程加载冒烟脚本**
+- [ ] **Step 5: 创建工程加载冒烟脚本**
 
 Create `godot-client/scripts/tests/api_client_smoke.gd`:
 
@@ -157,10 +175,16 @@ func _init() -> void:
 		push_error("Unexpected default api_base_url")
 		quit(1)
 		return
+	OS.set_environment("DOGFIGHT_API_BASE_URL", "http://127.0.0.1:4000/api/")
+	node._ready()
+	if node.api_base_url != "http://127.0.0.1:4000/api":
+		push_error("Unexpected normalized api_base_url after _ready")
+		quit(1)
+		return
 	quit(0)
 ```
 
-- [ ] **Step 5: 更新 Git 忽略规则**
+- [ ] **Step 6: 更新 Git 忽略规则**
 
 Append to `.gitignore`:
 
@@ -170,12 +194,11 @@ Append to `.gitignore`:
 godot-client/.godot/
 godot-client/.import/
 godot-client/export.cfg
-godot-client/export_presets.cfg
 godot-client/*.translation
 godot-client/.env
 ```
 
-- [ ] **Step 6: 验证工程文件存在**
+- [ ] **Step 7: 验证工程文件存在**
 
 Run:
 
@@ -183,11 +206,12 @@ Run:
 Test-Path E:\AI-GPT\DogFight\godot-client\project.godot
 Test-Path E:\AI-GPT\DogFight\godot-client\scenes\Main.tscn
 Test-Path E:\AI-GPT\DogFight\godot-client\scripts\state\GameSession.gd
+Test-Path E:\AI-GPT\DogFight\godot-client\icon.svg
 ```
 
 Expected: each command prints `True`.
 
-- [ ] **Step 7: 如果本机有 Godot CLI，运行 headless 冒烟测试**
+- [ ] **Step 8: 如果本机有 Godot CLI，运行 headless 冒烟测试**
 
 Run:
 
@@ -197,10 +221,10 @@ godot --headless --path E:\AI-GPT\DogFight\godot-client --script res://scripts/t
 
 Expected: exit code `0`. If `godot` is not installed or not on PATH, record that verification is blocked and continue with file existence checks.
 
-- [ ] **Step 8: Commit**
+- [ ] **Step 9: Commit**
 
 ```powershell
-git add .gitignore godot-client/project.godot godot-client/scenes/Main.tscn godot-client/scripts/state/GameSession.gd godot-client/scripts/tests/api_client_smoke.gd
+git add .gitignore godot-client/project.godot godot-client/icon.svg godot-client/scenes/Main.tscn godot-client/scripts/state/GameSession.gd godot-client/scripts/tests/api_client_smoke.gd
 git commit -m "Add Godot client project skeleton"
 ```
 
