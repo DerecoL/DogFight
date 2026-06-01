@@ -38,3 +38,11 @@ picture/
 backups
 prisma/dev.db
 prisma/dev.db-journal
+
+# Godot local/import artifacts
+godot-client/.godot/
+godot-client/.import/
+godot-client/export.cfg
+godot-client/export_presets.cfg
+godot-client/*.translation
+godot-client/.env
