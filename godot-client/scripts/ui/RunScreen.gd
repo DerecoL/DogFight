@@ -7,11 +7,15 @@ extends Control
 @onready var shop_list: VBoxContainer = %ShopList
 @onready var action_button: Button = %ActionButton
 @onready var error_label: Label = %ErrorLabel
-@onready var footer: HBoxContainer = $Root/Footer
+@onready var sell_selected_button: Button = %SellSelectedButton
+@onready var reroll_shop_button: Button = %RerollShopButton
+@onready var move_bag_button: Button = %MoveBagButton
+@onready var move_equipment_button: Button = %MoveEquipmentButton
 
 var session: Node
 var selected_item_id := ""
 var selected_item_area := ""
+var action_in_progress := false
 
 func bind_session(next_session: Node) -> void:
 	if session != null:
@@ -30,7 +34,10 @@ func bind_session(next_session: Node) -> void:
 func _ready() -> void:
 	if not create_run_button.pressed.is_connected(_on_create_run_pressed):
 		create_run_button.pressed.connect(_on_create_run_pressed)
-	_ensure_footer_action_buttons()
+	_connect_button_once(sell_selected_button, _on_sell_selected_pressed)
+	_connect_button_once(reroll_shop_button, _on_reroll_shop_pressed)
+	_connect_button_once(move_bag_button, _on_move_to_bag_pressed)
+	_connect_button_once(move_equipment_button, _on_move_to_equipment_pressed)
 	_render()
 
 func clear_error() -> void:
@@ -64,6 +71,7 @@ func _render() -> void:
 		_render_items(equipment_list, [], "EQUIPMENT")
 		_render_items(bag_list, [], "BAG")
 		_render_shop([])
+		_update_action_controls_disabled()
 		return
 	var phase := store.phase()
 	run_label.text = "阶段: %s  回合: %d  金币: %d  胜: %d  负: %d" % [
@@ -77,6 +85,7 @@ func _render() -> void:
 	_render_items(bag_list, store.items_in_area("BAG"), "BAG")
 	_render_shop(store.shop_offers())
 	action_button.text = _action_label(phase)
+	_update_action_controls_disabled()
 
 func _render_items(container: VBoxContainer, items: Array, area: String) -> void:
 	_clear_children(container)
@@ -98,6 +107,7 @@ func _render_items(container: VBoxContainer, items: Array, area: String) -> void
 		var row := Button.new()
 		row.custom_minimum_size = Vector2(0, 44)
 		row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.disabled = action_in_progress
 		row.clip_text = true
 		row.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 		row.text = "%s  %s  (%d,%d)" % [def_name, quality, x, y]
@@ -119,31 +129,38 @@ func _render_shop(offers: Array) -> void:
 		var row := Button.new()
 		row.custom_minimum_size = Vector2(0, 44)
 		row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.disabled = action_in_progress
 		row.clip_text = true
 		row.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 		row.text = "%s  价格: %d" % [def_name, price]
 		row.pressed.connect(_on_shop_offer_pressed.bind(str(offer.get("offerId", ""))))
 		shop_list.add_child(row)
 
-func _ensure_footer_action_buttons() -> void:
-	_add_footer_button("SellSelectedButton", "出售选中", _on_sell_selected_pressed)
-	_add_footer_button("RerollShopButton", "刷新商店", _on_reroll_shop_pressed)
-	_add_footer_button("MoveBagButton", "移到背包0,0", _on_move_to_bag_pressed)
-	_add_footer_button("MoveEquipmentButton", "移到装备0,0", _on_move_to_equipment_pressed)
-
-func _add_footer_button(button_name: String, label: String, handler: Callable) -> void:
-	var button := footer.get_node_or_null(button_name) as Button
-	if button == null:
-		button = Button.new()
-		button.name = button_name
-		button.custom_minimum_size = Vector2(132, 44)
-		button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-		footer.add_child(button)
-	button.text = label
-	button.clip_text = true
-	button.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+func _connect_button_once(button: Button, handler: Callable) -> void:
 	if not button.pressed.is_connected(handler):
 		button.pressed.connect(handler)
+
+func _begin_run_action() -> bool:
+	if action_in_progress:
+		return false
+	action_in_progress = true
+	_update_action_controls_disabled()
+	return true
+
+func _finish_run_action() -> void:
+	action_in_progress = false
+	_update_action_controls_disabled()
+
+func _update_action_controls_disabled() -> void:
+	if not is_node_ready():
+		return
+	sell_selected_button.disabled = action_in_progress
+	reroll_shop_button.disabled = action_in_progress
+	move_bag_button.disabled = action_in_progress
+	move_equipment_button.disabled = action_in_progress
+	for row in shop_list.get_children():
+		if row is Button:
+			row.disabled = action_in_progress
 
 func _on_item_pressed(item_id: String, area: String, label: String) -> void:
 	selected_item_id = item_id
@@ -157,7 +174,10 @@ func _on_shop_offer_pressed(offer_id: String) -> void:
 	if session == null or not session.has_method("buy_offer"):
 		error_label.text = "跑局会话未初始化"
 		return
+	if not _begin_run_action():
+		return
 	await session.buy_offer(offer_id, "BAG")
+	_finish_run_action()
 
 func _on_sell_selected_pressed() -> void:
 	if not _has_selected_item():
@@ -165,15 +185,21 @@ func _on_sell_selected_pressed() -> void:
 	if session == null or not session.has_method("sell_item"):
 		error_label.text = "跑局会话未初始化"
 		return
+	if not _begin_run_action():
+		return
 	if await session.sell_item(selected_item_id):
 		selected_item_id = ""
 		selected_item_area = ""
+	_finish_run_action()
 
 func _on_reroll_shop_pressed() -> void:
 	if session == null or not session.has_method("reroll_shop"):
 		error_label.text = "跑局会话未初始化"
 		return
+	if not _begin_run_action():
+		return
 	await session.reroll_shop()
+	_finish_run_action()
 
 func _on_move_to_bag_pressed() -> void:
 	await _move_selected_item("BAG")
@@ -187,8 +213,11 @@ func _move_selected_item(area: String) -> void:
 	if session == null or not session.has_method("move_item"):
 		error_label.text = "跑局会话未初始化"
 		return
+	if not _begin_run_action():
+		return
 	if await session.move_item(selected_item_id, area, 0, 0):
 		selected_item_area = area
+	_finish_run_action()
 
 func _has_selected_item() -> bool:
 	if selected_item_id.is_empty():

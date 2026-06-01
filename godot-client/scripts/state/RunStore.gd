@@ -7,10 +7,11 @@ func set_run(next_run: Dictionary) -> void:
 	run = next_run.duplicate(true)
 
 func has_run() -> bool:
-	return not run.is_empty() and run.has("id")
+	return not run.is_empty() and run_id().length() > 0
 
 func run_id() -> String:
-	return str(run.get("id", ""))
+	var id = run.get("id", "")
+	return "" if id == null else str(id)
 
 func phase() -> String:
 	return str(run.get("phase", ""))

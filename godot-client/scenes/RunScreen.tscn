@@ -113,6 +113,42 @@ custom_minimum_size = Vector2(160, 44)
 layout_mode = 2
 text = "等待阶段操作"
 
+[node name="SellSelectedButton" type="Button" parent="Root/Footer"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(132, 44)
+layout_mode = 2
+size_flags_horizontal = 4
+text = "出售选中"
+clip_text = true
+text_overrun_behavior = 3
+
+[node name="RerollShopButton" type="Button" parent="Root/Footer"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(132, 44)
+layout_mode = 2
+size_flags_horizontal = 4
+text = "刷新商店"
+clip_text = true
+text_overrun_behavior = 3
+
+[node name="MoveBagButton" type="Button" parent="Root/Footer"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(132, 44)
+layout_mode = 2
+size_flags_horizontal = 4
+text = "移到背包0,0"
+clip_text = true
+text_overrun_behavior = 3
+
+[node name="MoveEquipmentButton" type="Button" parent="Root/Footer"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(132, 44)
+layout_mode = 2
+size_flags_horizontal = 4
+text = "移到装备0,0"
+clip_text = true
+text_overrun_behavior = 3
+
 [node name="ErrorLabel" type="Label" parent="Root/Footer"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 44)

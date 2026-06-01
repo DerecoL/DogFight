@@ -7,6 +7,16 @@ func _init() -> void:
 		quit(1)
 		return
 	var store := script.new()
+	store.set_run({"id": ""})
+	if store.has_run():
+		push_error("RunStore must reject empty run ids")
+		quit(1)
+		return
+	store.set_run({"id": null})
+	if store.has_run():
+		push_error("RunStore must reject null run ids")
+		quit(1)
+		return
 	var source_run := {
 		"id": "run-1",
 		"phase": "SHOP",
