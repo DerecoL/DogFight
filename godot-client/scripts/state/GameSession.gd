@@ -65,6 +65,33 @@ func create_run(dog_type := "SHIBA", mode := "CASUAL", lucky_number: Variant = n
 	error_raised.emit("创建跑局失败")
 	return false
 
+func move_item(item_id: String, area: String, x: int, y: int) -> bool:
+	return await _post_run_action("/items/move", {"itemId": item_id, "area": area, "x": x, "y": y})
+
+func buy_offer(offer_id: String, area := "BAG") -> bool:
+	return await _post_run_action("/shop/buy", {"offerId": offer_id, "area": area})
+
+func sell_item(item_id: String) -> bool:
+	return await _post_run_action("/shop/sell", {"itemId": item_id})
+
+func reroll_shop() -> bool:
+	return await _post_run_action("/shop/reroll", {})
+
+func _post_run_action(suffix: String, body: Dictionary) -> bool:
+	if not run_store.has_run():
+		error_raised.emit("没有当前跑局")
+		return false
+	var response := await api.post_json("/runs/%s%s" % [run_store.run_id(), suffix], body)
+	if not response.ok:
+		error_raised.emit(str(response.error))
+		return false
+	var run := response.data.get("run", {})
+	if run is Dictionary and str(run.get("id", "")).length() > 0:
+		set_current_run(run)
+		return true
+	error_raised.emit("服务器没有返回跑局")
+	return false
+
 func set_current_run(run: Dictionary) -> void:
 	run_store.set_run(run)
 	run_changed.emit(run)
