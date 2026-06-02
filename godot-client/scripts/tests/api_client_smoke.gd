@@ -21,6 +21,18 @@ func _init() -> void:
 		push_error("ApiRoutes.run_battle_start returned wrong path")
 		quit(1)
 		return
+	var account_store_script := load("res://scripts/state/AccountStore.gd")
+	var app_store_script := load("res://scripts/state/AppStore.gd")
+	if account_store_script == null or app_store_script == null:
+		push_error("Store foundation scripts failed to load")
+		quit(1)
+		return
+	var app_store = app_store_script.new()
+	app_store.set_user({"id": "user-1", "account": "tester", "nickname": "测试员"})
+	if str(app_store.account.user_id()) != "user-1":
+		push_error("AppStore did not update AccountStore user")
+		quit(1)
+		return
 	var node := Control.new()
 	node.set_script(session_script)
 	if node.api_base_url != "http://127.0.0.1:4000/api":

@@ -6,13 +6,16 @@ signal error_raised(message: String)
 signal battle_started(battle: Dictionary)
 
 const ApiClient := preload("res://scripts/api/ApiClient.gd")
+const ApiRoutes := preload("res://scripts/api/ApiRoutes.gd")
+const AppStore := preload("res://scripts/state/AppStore.gd")
 const RunStore := preload("res://scripts/state/RunStore.gd")
 const DEFAULT_API_BASE_URL := "http://127.0.0.1:4000/api"
 
 var api_base_url: String = DEFAULT_API_BASE_URL
 var api: ApiClient
 var current_user: Dictionary = {}
-var run_store: RunStore = RunStore.new()
+var store: AppStore = AppStore.new()
+var run_store: RunStore = store.run
 
 func _ready() -> void:
 	var override_url := OS.get_environment("DOGFIGHT_API_BASE_URL")
@@ -38,20 +41,22 @@ func _ready() -> void:
 		run_changed.connect(_on_run_changed_for_screen)
 
 func login(account: String, password: String) -> bool:
-	var response := await api.post_json("/auth/login", {"account": account, "password": password})
+	var response := await api.post_json(ApiRoutes.login(), {"account": account, "password": password})
 	if not response.ok:
-		error_raised.emit(str(response.error))
+		_raise_error(str(response.error))
 		return false
 	current_user = response.data.get("user", {})
+	store.set_user(current_user)
 	user_changed.emit(current_user)
 	return await refresh_me()
 
 func refresh_me() -> bool:
-	var response := await api.get_json("/me")
+	var response := await api.get_json(ApiRoutes.me())
 	if not response.ok:
-		error_raised.emit(str(response.error))
+		_raise_error(str(response.error))
 		return false
 	current_user = response.data.get("user", current_user)
+	store.set_user(current_user)
 	user_changed.emit(current_user)
 	var active_run = response.data.get("activeRun", null)
 	if active_run is Dictionary:
@@ -64,13 +69,13 @@ func create_run(dog_type := "SHIBA", mode := "CASUAL", lucky_number: Variant = n
 		body["luckyNumber"] = int(lucky_number)
 	var response := await api.post_json("/runs", body)
 	if not response.ok:
-		error_raised.emit(str(response.error))
+		_raise_error(str(response.error))
 		return false
 	var run = response.data.get("run", {})
 	if run is Dictionary and str(run.get("id", "")).length() > 0:
 		set_current_run(run)
 		return true
-	error_raised.emit("创建跑局失败")
+	_raise_error("创建跑局失败")
 	return false
 
 func select_map_node(node_id: String) -> bool:
@@ -93,11 +98,11 @@ func match_battle() -> bool:
 
 func start_battle() -> bool:
 	if not run_store.has_run():
-		error_raised.emit("没有当前跑局")
+		_raise_error("没有当前跑局")
 		return false
 	var response := await api.post_json("/runs/%s/battle/start" % run_store.run_id(), {})
 	if not response.ok:
-		error_raised.emit(str(response.error))
+		_raise_error(str(response.error))
 		return false
 	var run = response.data.get("run", {})
 	if run is Dictionary and str(run.get("id", "")).length() > 0:
@@ -106,7 +111,7 @@ func start_battle() -> bool:
 	if battle is Dictionary:
 		battle_started.emit(battle)
 		return true
-	error_raised.emit("服务器没有返回战斗结果")
+	_raise_error("服务器没有返回战斗结果")
 	return false
 
 func finish_battle() -> bool:
@@ -114,22 +119,26 @@ func finish_battle() -> bool:
 
 func _post_run_action(suffix: String, body: Dictionary) -> bool:
 	if not run_store.has_run():
-		error_raised.emit("没有当前跑局")
+		_raise_error("没有当前跑局")
 		return false
 	var response := await api.post_json("/runs/%s%s" % [run_store.run_id(), suffix], body)
 	if not response.ok:
-		error_raised.emit(str(response.error))
+		_raise_error(str(response.error))
 		return false
 	var run = response.data.get("run", {})
 	if run is Dictionary and str(run.get("id", "")).length() > 0:
 		set_current_run(run)
 		return true
-	error_raised.emit("服务器没有返回跑局")
+	_raise_error("服务器没有返回跑局")
 	return false
 
 func set_current_run(run: Dictionary) -> void:
-	run_store.set_run(run)
+	store.set_current_run(run)
 	run_changed.emit(run)
+
+func _raise_error(message: String) -> void:
+	store.raise_error(message)
+	error_raised.emit(message)
 
 func _show_run_screen() -> void:
 	var login_screen := get_node_or_null("ScreenRoot/LoginScreen")
