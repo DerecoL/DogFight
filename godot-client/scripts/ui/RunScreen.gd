@@ -395,19 +395,19 @@ func _render_reward_choices(run: Dictionary) -> void:
 	for relic in relics:
 		if relic is Dictionary:
 			var def: Dictionary = _dict(relic, "def")
-			card.add_child(_action_button("选择遗物：%s" % _fallback(str(def.get("name", "")), str(relic.get("relicId", ""))), _call_session.bind("select_relic", [str(relic.get("relicId", ""))])))
+			card.add_child(_action_button("查看遗物：%s" % _fallback(str(def.get("name", "")), str(relic.get("relicId", ""))), _show_relic_choice_modal.bind(relic)))
 		else:
 			card.add_child(_action_button("选择遗物：%s" % str(relic), _call_session.bind("select_relic", [str(relic)])))
 	for item in classes:
 		if item is Dictionary:
 			var item_def: Dictionary = _dict(item, "def")
-			card.add_child(_action_button("领取职业装备：%s" % _fallback(str(item_def.get("name", "")), str(item.get("defId", ""))), _call_session.bind("select_class_reward", [str(item.get("defId", ""))])))
+			card.add_child(_action_button("查看职业装备：%s" % _fallback(str(item_def.get("name", "")), str(item.get("defId", ""))), _show_class_reward_modal.bind(item)))
 	for enchant in enchants:
 		if enchant is Dictionary:
-			card.add_child(_action_button("附魔到选中装备：%s" % str(enchant.get("label", enchant.get("id", ""))), _select_enchant.bind(str(enchant.get("id", "")))))
+			card.add_child(_action_button("查看附魔：%s" % _enchant_choice_label(enchant), _show_enchant_choice_modal.bind(enchant)))
 	for potion in potions:
 		if potion is Dictionary:
-			card.add_child(_action_button("药水给选中装备：%s" % str(potion.get("label", potion.get("id", ""))), _select_potion.bind(str(potion.get("id", "")))))
+			card.add_child(_action_button("查看药水：%s" % _potion_choice_label(potion), _show_potion_choice_modal.bind(potion)))
 	if str(run.get("phase", "")) == "UPGRADE_CHOICE":
 		card.add_child(_action_button("升级选中装备", _select_upgrade_item))
 		card.add_child(_action_button("跳过升级", _call_session.bind("skip_upgrade_choice", [])))
@@ -1199,6 +1199,66 @@ func _show_offer_modal(offer: Dictionary) -> void:
 	box.add_child(_action_button("购买到背包", _buy_offer_from_modal.bind(str(offer.get("offerId", "")))))
 	_push_modal(modal["panel"])
 
+func _show_class_reward_modal(choice: Dictionary) -> void:
+	var def: Dictionary = _dict(choice, "def")
+	var title := _fallback(str(def.get("name", "")), str(choice.get("defId", "")))
+	var modal := _modal_panel("职业装备奖励", Vector2(560, 500))
+	if modal.is_empty():
+		return
+	var box: VBoxContainer = modal["box"]
+	_render_detail_header(box, _sticker_texture(str(choice.get("defId", ""))), title, "职业装备奖励 · %s" % str(choice.get("quality", "")))
+	_add_item_def_details(box, def, str(choice.get("quality", "")), str(choice.get("defId", "")))
+	box.add_child(_action_button("领取职业装备", _class_reward_from_modal.bind(str(choice.get("defId", "")))))
+	_push_modal(modal["panel"])
+
+func _show_relic_choice_modal(choice: Dictionary) -> void:
+	var def: Dictionary = _dict(choice, "def")
+	var title := _fallback(str(def.get("name", "")), str(choice.get("relicId", "")))
+	var modal := _modal_panel("遗物选择", Vector2(520, 430))
+	if modal.is_empty():
+		return
+	var box: VBoxContainer = modal["box"]
+	_render_detail_header(box, _relic_texture(choice), title, "遗物选择 · %s" % str(choice.get("quality", "")))
+	_add_line(box, "品质", str(choice.get("quality", "")))
+	var description := _detail_description(def)
+	if not description.is_empty():
+		_add_line(box, "说明", description)
+	var effect := str(def.get("effect", ""))
+	if not effect.is_empty():
+		_add_line(box, "效果", effect)
+	box.add_child(_action_button("选择遗物", _relic_choice_from_modal.bind(str(choice.get("relicId", "")))))
+	_push_modal(modal["panel"])
+
+func _show_enchant_choice_modal(choice: Dictionary) -> void:
+	var modal := _modal_panel("附魔选择", Vector2(540, 430))
+	if modal.is_empty():
+		return
+	var box: VBoxContainer = modal["box"]
+	var enchant: Dictionary = _dict(choice, "enchant")
+	_add_line(box, "名称", _enchant_choice_label(choice))
+	_add_line(box, "说明", str(choice.get("description", "")))
+	if not enchant.is_empty():
+		_add_line(box, "类型", str(enchant.get("kind", "")))
+		if enchant.has("target"):
+			_add_line(box, "目标", str(enchant.get("target", "")))
+		if enchant.has("effect"):
+			_add_line(box, "效果", str(enchant.get("effect", "")))
+		if enchant.has("amount"):
+			_add_line(box, "数值", str(enchant.get("amount", "")))
+	box.add_child(_action_button("附魔到选中装备", _enchant_from_modal.bind(str(choice.get("id", "")))))
+	_push_modal(modal["panel"])
+
+func _show_potion_choice_modal(choice: Dictionary) -> void:
+	var modal := _modal_panel("药水选择", Vector2(540, 430))
+	if modal.is_empty():
+		return
+	var box: VBoxContainer = modal["box"]
+	_add_line(box, "类型", str(choice.get("category", "")))
+	_add_line(box, "点数", _detail_array_text(choice.get("dice", [])))
+	_add_line(box, "说明", str(choice.get("description", "")))
+	box.add_child(_action_button("药水给选中装备", _potion_from_modal.bind(str(choice.get("id", "")))))
+	_push_modal(modal["panel"])
+
 func _show_item_detail_modal(item: Dictionary) -> void:
 	var def: Dictionary = _dict(item, "def")
 	var title := _fallback(str(def.get("name", "")), str(item.get("defId", item.get("id", ""))))
@@ -1323,9 +1383,32 @@ func _area_label(area: String) -> String:
 		_:
 			return _fallback(area, "未知区域")
 
+func _enchant_choice_label(choice: Dictionary) -> String:
+	var enchant: Dictionary = _dict(choice, "enchant")
+	return _fallback(str(enchant.get("label", "")), _fallback(str(choice.get("label", "")), str(choice.get("id", ""))))
+
+func _potion_choice_label(choice: Dictionary) -> String:
+	return _fallback(str(choice.get("description", "")), _fallback(str(choice.get("category", "")), str(choice.get("id", ""))))
+
 func _buy_offer_from_modal(offer_id: String) -> void:
 	_close_top_modal()
 	await _call_session("buy_offer", [offer_id, "BAG"])
+
+func _class_reward_from_modal(def_id: String) -> void:
+	_close_top_modal()
+	await _call_session("select_class_reward", [def_id])
+
+func _relic_choice_from_modal(relic_id: String) -> void:
+	_close_top_modal()
+	await _call_session("select_relic", [relic_id])
+
+func _enchant_from_modal(enchant_id: String) -> void:
+	_close_top_modal()
+	await _select_enchant(enchant_id)
+
+func _potion_from_modal(potion_id: String) -> void:
+	_close_top_modal()
+	await _select_potion(potion_id)
 
 func _item_action_from_modal(method: String, item_id: String) -> void:
 	_close_top_modal()
