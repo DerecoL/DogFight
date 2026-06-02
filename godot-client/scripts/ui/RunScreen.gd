@@ -735,16 +735,13 @@ func _render_map_or_shop(run: Dictionary) -> void:
 				shop_card.add_child(offer_button)
 
 func _render_achievements_tab() -> void:
-	var card := _section("成就")
+	var card := _section("成就与每日任务")
 	var wallet: Dictionary = _dict(achievements_data, "wallet")
-	_add_line(card, "钱包", "余额 %d / 今日获得 %d" % [int(wallet.get("balance", 0)), int(wallet.get("dailyEarned", 0))])
+	_add_line(card, "长期目标", "余额 %d / 今日获得 %d" % [int(wallet.get("balance", 0)), int(wallet.get("dailyEarned", 0))])
+	_add_line(card, "分类", _achievement_category_summary(_array(achievements_data, "achievements")))
 	for achievement in _array(achievements_data, "achievements"):
 		if achievement is Dictionary:
-			var text := "%s  %d/%d  奖励 %d" % [str(achievement.get("title", "")), int(achievement.get("progress", 0)), int(achievement.get("target", 0)), int(achievement.get("reward", 0))]
-			if bool(achievement.get("claimable", false)):
-				card.add_child(_action_button("可领取 " + text, _show_achievement_modal.bind(achievement)))
-			else:
-				card.add_child(_action_button(("已领取 " if bool(achievement.get("claimed", false)) else "查看 ") + text, _show_achievement_modal.bind(achievement)))
+			card.add_child(_action_button(_achievement_button_label(achievement), _show_achievement_modal.bind(achievement)))
 
 func _render_daily_tab() -> void:
 	var card := _section("每日任务")
@@ -1670,6 +1667,11 @@ func _show_achievement_modal(achievement: Dictionary) -> void:
 	var description := str(achievement.get("description", ""))
 	if not description.is_empty():
 		_add_line(box, "说明", description)
+	var category := str(achievement.get("category", ""))
+	if not category.is_empty():
+		_add_line(box, "分类", category)
+	if bool(achievement.get("hidden", false)):
+		_add_line(box, "可见性", "隐藏成就")
 	_add_line(box, "进度", "%d/%d" % [int(achievement.get("progress", 0)), int(achievement.get("target", 0))])
 	_add_line(box, "奖励", "%d" % int(achievement.get("reward", 0)))
 	_add_line(box, "状态", _claim_status_label(bool(achievement.get("claimable", false)), bool(achievement.get("claimed", false)), int(achievement.get("progress", 0)), int(achievement.get("target", 0))))
@@ -1903,6 +1905,25 @@ func _signed_int(value: int) -> String:
 
 func _reward_amount(source: Dictionary, def: Dictionary) -> int:
 	return int(source.get("reward", def.get("reward", 0)))
+
+func _achievement_category_summary(achievements: Array) -> String:
+	var categories := ["全部"]
+	for achievement in achievements:
+		if achievement is Dictionary:
+			var category := str((achievement as Dictionary).get("category", ""))
+			if not category.is_empty() and not categories.has(category):
+				categories.append(category)
+	return " / ".join(categories)
+
+func _achievement_button_label(achievement: Dictionary) -> String:
+	var claimed := bool(achievement.get("claimed", false))
+	var claimable := bool(achievement.get("claimable", false))
+	var status := "已领取" if claimed else ("可领取" if claimable else "未完成")
+	var hidden_text := " 隐藏成就" if bool(achievement.get("hidden", false)) else ""
+	var title := _fallback(str(achievement.get("title", "")), str(achievement.get("id", "")))
+	var category := str(achievement.get("category", ""))
+	var category_text := "  %s" % category if not category.is_empty() else ""
+	return "%s%s %s%s  %d/%d  奖励 %d" % [status, hidden_text, title, category_text, int(achievement.get("progress", 0)), int(achievement.get("target", 0)), int(achievement.get("reward", 0))]
 
 func _claim_status_label(claimable: bool, claimed: bool, progress: int, target: int) -> String:
 	if claimed:
