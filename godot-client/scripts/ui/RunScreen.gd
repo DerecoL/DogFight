@@ -45,8 +45,12 @@ var selected_room_id := ""
 var active_room: Dictionary = {}
 
 var root: VBoxContainer
+var background_rect: TextureRect
 var title_label: Label
 var status_label: Label
+var profile_badge_label: Label
+var profile_name_label: Label
+var profile_title_label: Label
 var refresh_button: Button
 var dog_type_select: OptionButton
 var mode_select: OptionButton
@@ -96,6 +100,7 @@ func clear_error() -> void:
 func _build_layout() -> void:
 	var background := TextureRect.new()
 	background.name = "Background"
+	background_rect = background
 	background.set_anchors_preset(Control.PRESET_FULL_RECT)
 	background.texture = _texture("res://assets/backgrounds/storybook-dog-park.webp")
 	background.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
@@ -141,6 +146,29 @@ func _build_layout() -> void:
 	title_label.custom_minimum_size = Vector2(240, 44)
 	title_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	header.add_child(title_label)
+
+	var profile_card := HBoxContainer.new()
+	profile_card.name = "ProfileCard"
+	profile_card.custom_minimum_size = Vector2(188, 44)
+	profile_card.add_theme_constant_override("separation", 6)
+	header.add_child(profile_card)
+	profile_badge_label = Label.new()
+	profile_badge_label.name = "ProfileAvatar"
+	profile_badge_label.custom_minimum_size = Vector2(34, 34)
+	profile_badge_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	profile_badge_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	profile_card.add_child(profile_badge_label)
+	var profile_text := VBoxContainer.new()
+	profile_text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	profile_card.add_child(profile_text)
+	profile_name_label = Label.new()
+	profile_name_label.clip_text = true
+	profile_name_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	profile_text.add_child(profile_name_label)
+	profile_title_label = Label.new()
+	profile_title_label.clip_text = true
+	profile_title_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	profile_text.add_child(profile_title_label)
 
 	dog_type_select = OptionButton.new()
 	dog_type_select.custom_minimum_size = Vector2(132, 36)
@@ -203,6 +231,7 @@ func _build_layout() -> void:
 	content_scroll.add_child(content)
 
 func _render_shell() -> void:
+	_apply_equipped_cosmetic_shell()
 	_clear_children(nav_list)
 	for tab in [TAB_LOBBY, TAB_RUN, TAB_ACCOUNT, TAB_ACHIEVEMENTS, TAB_DAILY, TAB_SHOP, TAB_LEADERBOARDS, TAB_SEASON, TAB_ROOMS, TAB_SETTINGS]:
 		var button := _button(tab, 0)
@@ -1140,6 +1169,46 @@ func _cosmetic_type_label(cosmetic_type: String) -> String:
 			return "战斗特效"
 		_:
 			return _fallback(cosmetic_type, "外观")
+
+func _apply_equipped_cosmetic_shell() -> void:
+	if background_rect != null:
+		background_rect.texture = _texture(_equipped_background_path())
+	if profile_badge_label == null or profile_name_label == null or profile_title_label == null:
+		return
+	var user: Dictionary = _dict(me_data, "user")
+	var title_item := _equipped_cosmetic("TITLE")
+	var avatar_item := _equipped_cosmetic("AVATAR")
+	profile_badge_label.text = _avatar_glyph(_cosmetic_catalog_id(avatar_item))
+	profile_name_label.text = _fallback(str(user.get("nickname", "")), _fallback(str(user.get("account", "")), "玩家"))
+	profile_title_label.text = _fallback(_cosmetic_display_name(title_item), "公园新星")
+
+func _equipped_cosmetic(cosmetic_type: String) -> Dictionary:
+	for entry in _array(cosmetics_data, "equipped"):
+		if entry is Dictionary and str(entry.get("slot", entry.get("cosmeticType", ""))) == cosmetic_type:
+			var item := _cosmetic_item(entry)
+			if item.is_empty():
+				return entry.duplicate(true)
+			return item
+	return {}
+
+func _equipped_background_path() -> String:
+	var background := _equipped_cosmetic("BACKGROUND")
+	match _cosmetic_catalog_id(background):
+		"bg-royal-kennel":
+			return "res://assets/backgrounds/storybook-royal-kennel.webp"
+		"bg-dog-park-night":
+			return "res://assets/backgrounds/storybook-dog-park.webp"
+		_:
+			return "res://assets/backgrounds/storybook-dog-park.webp"
+
+func _avatar_glyph(catalog_id: String) -> String:
+	match catalog_id:
+		"avatar-crown":
+			return "冠"
+		"avatar-bone":
+			return "骨"
+		_:
+			return "狗"
 
 func _rarity_label(rarity: String) -> String:
 	match rarity:
