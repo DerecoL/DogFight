@@ -2,6 +2,15 @@ extends Control
 
 signal replay_finished
 
+const DOG_NAMES := {
+	"SHIBA": "柴犬",
+	"SAMOYED": "萨摩耶",
+	"MUTT": "土狗",
+	"BULLY": "恶霸",
+	"EMPEROR": "狗皇帝",
+	"FROG": "祖灵",
+}
+
 @onready var player_hp: ProgressBar = %PlayerHp
 @onready var opponent_hp: ProgressBar = %OpponentHp
 @onready var dice_label: Label = %DiceLabel
@@ -375,7 +384,7 @@ func _render_snapshot(name_label: Label, avatar: TextureRect, grid: GridContaine
 	var dog_type := str(snapshot.get("dogType", ""))
 	name_label.text = "%s · %s · %d胜 %d负 · 第%d回合" % [
 		str(snapshot.get("name", fallback_name)),
-		dog_type,
+		_dog_name(dog_type),
 		int(snapshot.get("wins", 0)),
 		int(snapshot.get("losses", 0)),
 		int(snapshot.get("round", 0)),
@@ -421,8 +430,8 @@ func _render_event_stage(event: Dictionary) -> void:
 		return
 	stage_label.text = "%ss · %s · %s%s\n%s" % [
 		str(event.get("time", "0")),
-		str(event.get("actor", "system")),
-		str(event.get("kind", "")),
+		_battle_actor_label(str(event.get("actor", "system"))),
+		_battle_kind_label(str(event.get("kind", ""))),
 		_battle_effect_suffix(),
 		str(event.get("text", "")),
 	]
@@ -465,7 +474,7 @@ func _refresh_log_view() -> void:
 		if event is Dictionary and _event_matches_filter(event, log_filter):
 			log_view.append_text("%ss | %s | %s\n" % [
 				str(event.get("time", "0")),
-				str(event.get("actor", "system")),
+				_battle_actor_label(str(event.get("actor", "system"))),
 				str(event.get("text", "")),
 			])
 
@@ -1147,6 +1156,35 @@ func _battle_slot_count(snapshot: Dictionary) -> int:
 			if str(def.get("effect", "")) == "EXTRA_EQUIPMENT_REDUCED_EFFECT":
 				return 18
 	return 12
+
+func _dog_name(dog_type: String) -> String:
+	return str(DOG_NAMES.get(dog_type, dog_type))
+
+func _battle_actor_label(actor: String) -> String:
+	match actor.to_lower():
+		"player":
+			return "我方"
+		"opponent":
+			return "对手"
+		"system":
+			return "系统"
+		_:
+			return actor
+
+func _battle_kind_label(kind: String) -> String:
+	match kind.to_upper():
+		"ROLL":
+			return "掷骰"
+		"ITEM":
+			return "装备触发"
+		"POISON":
+			return "中毒结算"
+		"END":
+			return "战斗结束"
+		"STATUS":
+			return "状态变化"
+		_:
+			return kind
 
 func _battle_item_label(item: Dictionary) -> String:
 	var def: Dictionary = _dict(item, "def")

@@ -32,6 +32,10 @@ const DOG_TRAITS := {
 	"EMPEROR": "指定天命数字，命中时有爆发上限",
 	"FROG": "围绕蓄水池和雨季构筑持续收益",
 }
+const MODE_NAMES := {
+	"CASUAL": "休闲模式",
+	"LADDER": "天梯模式",
+}
 
 const TUTORIAL_STATUS_PATH := "user://dogfight_tutorial.cfg"
 const TUTORIAL_SECTION := "casual_tutorial"
@@ -194,7 +198,9 @@ func _build_layout() -> void:
 	mode_select = OptionButton.new()
 	mode_select.custom_minimum_size = Vector2(112, 36)
 	for mode in ["CASUAL", "LADDER"]:
-		mode_select.add_item(mode)
+		var mode_index := mode_select.item_count
+		mode_select.add_item(_mode_name(mode))
+		mode_select.set_item_metadata(mode_index, mode)
 	_apply_button_style(mode_select)
 	header.add_child(mode_select)
 
@@ -911,7 +917,7 @@ func _render_settings_tab() -> void:
 
 func _on_create_run_pressed() -> void:
 	var dog_type := _selected_dog_type()
-	var mode := mode_select.get_item_text(mode_select.selected)
+	var mode := _selected_mode()
 	var lucky: Variant = null
 	if dog_type == "EMPEROR":
 		if lucky_select.selected <= 0:
@@ -943,7 +949,7 @@ func _current_run_mode() -> String:
 
 func _start_mode(mode: String) -> void:
 	for index in range(mode_select.item_count):
-		if mode_select.get_item_text(index) == mode:
+		if str(mode_select.get_item_metadata(index)) == mode:
 			mode_select.select(index)
 			break
 	current_tab = TAB_RUN
@@ -986,6 +992,9 @@ func _select_dog_type(dog_type: String) -> void:
 func _dog_name(dog_type: String) -> String:
 	return str(DOG_NAMES.get(dog_type, dog_type))
 
+func _mode_name(mode: String) -> String:
+	return str(MODE_NAMES.get(mode, mode))
+
 func _selected_dog_type() -> String:
 	if dog_type_select == null or dog_type_select.item_count == 0:
 		return DOG_TYPES[0]
@@ -993,6 +1002,14 @@ func _selected_dog_type() -> String:
 	if metadata != null:
 		return str(metadata)
 	return str(dog_type_select.get_item_text(dog_type_select.selected))
+
+func _selected_mode() -> String:
+	if mode_select == null or mode_select.item_count == 0:
+		return "CASUAL"
+	var metadata = mode_select.get_item_metadata(mode_select.selected)
+	if metadata != null:
+		return str(metadata)
+	return str(mode_select.get_item_text(mode_select.selected))
 
 func _dog_texture(dog_type: String) -> Texture2D:
 	if dog_type == "FROG":
