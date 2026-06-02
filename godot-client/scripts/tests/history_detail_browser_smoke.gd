@@ -46,7 +46,7 @@ func _run() -> void:
 	item_button.pressed.emit()
 	await process_frame
 	text = _collect_text(modal_layer)
-	for part in ["快照装备详情", "历史冰牙", "GOLD", "造成 8 点伤害"]:
+	for part in ["快照装备详情", "历史冰牙", "黄金", "造成 8 点伤害"]:
 		if not text.contains(str(part)):
 			_fail("History item detail missing: %s" % str(part))
 			return

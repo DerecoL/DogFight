@@ -36,6 +36,12 @@ const MODE_NAMES := {
 	"CASUAL": "休闲模式",
 	"LADDER": "天梯模式",
 }
+const QUALITY_NAMES := {
+	"BRONZE": "青铜",
+	"SILVER": "白银",
+	"GOLD": "黄金",
+	"DIAMOND": "钻石",
+}
 
 const TUTORIAL_STATUS_PATH := "user://dogfight_tutorial.cfg"
 const TUTORIAL_SECTION := "casual_tutorial"
@@ -687,7 +693,7 @@ func _render_shop_offer_card(parent: VBoxContainer, run: Dictionary, offer: Dict
 	box.custom_minimum_size = Vector2(0, 118)
 	box.add_theme_constant_override("separation", 4)
 	parent.add_child(box)
-	var header := _action_button("%s  %s  %s格" % [_offer_label(offer), str(offer.get("quality", "")), _detail_size_text(def)], _show_offer_modal.bind(offer))
+	var header := _action_button("%s  %s格" % [_offer_label(offer), _detail_size_text(def)], _show_offer_modal.bind(offer))
 	_apply_button_icon(header, _offer_texture(offer))
 	box.add_child(header)
 	var owned_count := _shop_offer_owned_count(run, offer)
@@ -994,6 +1000,9 @@ func _dog_name(dog_type: String) -> String:
 
 func _mode_name(mode: String) -> String:
 	return str(MODE_NAMES.get(mode, mode))
+
+func _quality_label(quality: String) -> String:
+	return str(QUALITY_NAMES.get(quality, quality))
 
 func _selected_dog_type() -> String:
 	if dog_type_select == null or dog_type_select.item_count == 0:
@@ -1448,7 +1457,7 @@ func _render_history_run_details(parent: VBoxContainer, run: Dictionary) -> void
 		if relic is Dictionary:
 			var relic_def: Dictionary = _dict(relic, "def")
 			var relic_title := _fallback(str(relic_def.get("name", "")), str(relic.get("relicId", "")))
-			parent.add_child(_action_button("%s  %s" % [relic_title, str(relic.get("quality", ""))], _show_snapshot_relic_modal.bind(relic)))
+			parent.add_child(_action_button("%s  %s" % [relic_title, _quality_label(str(relic.get("quality", "")))], _show_snapshot_relic_modal.bind(relic)))
 
 func _run_status_label(status: String) -> String:
 	match status:
@@ -1508,7 +1517,7 @@ func _show_snapshot_modal(snapshot: Dictionary, title: String) -> void:
 		if relic is Dictionary:
 			var relic_def: Dictionary = _dict(relic, "def")
 			var relic_title := _fallback(str(relic_def.get("name", "")), str(relic.get("relicId", "")))
-			box.add_child(_action_button("%s  %s" % [relic_title, str(relic.get("quality", ""))], _show_snapshot_relic_modal.bind(relic)))
+			box.add_child(_action_button("%s  %s" % [relic_title, _quality_label(str(relic.get("quality", "")))], _show_snapshot_relic_modal.bind(relic)))
 	_push_modal(modal["panel"])
 
 func _render_snapshot_items(parent: VBoxContainer, title: String, items: Array) -> void:
@@ -1517,7 +1526,7 @@ func _render_snapshot_items(parent: VBoxContainer, title: String, items: Array) 
 		if item is Dictionary:
 			var def: Dictionary = _dict(item, "def")
 			var title_text := _fallback(str(def.get("name", "")), str(item.get("defId", item.get("id", ""))))
-			var button := _action_button("%s  %s  (%d,%d)" % [title_text, str(item.get("quality", "")), int(item.get("x", 0)), int(item.get("y", 0))], _show_snapshot_item_modal.bind(item))
+			var button := _action_button("%s  %s  (%d,%d)" % [title_text, _quality_label(str(item.get("quality", ""))), int(item.get("x", 0)), int(item.get("y", 0))], _show_snapshot_item_modal.bind(item))
 			button.icon = _item_texture(item)
 			button.expand_icon = true
 			parent.add_child(button)
@@ -1529,7 +1538,7 @@ func _show_snapshot_item_modal(item: Dictionary) -> void:
 	if modal.is_empty():
 		return
 	var box: VBoxContainer = modal["box"]
-	_render_detail_header(box, _item_texture(item), title, "快照装备 · %s" % str(item.get("quality", "")))
+	_render_detail_header(box, _item_texture(item), title, "快照装备 · %s" % _quality_label(str(item.get("quality", ""))))
 	_add_item_def_details(box, def, str(item.get("quality", "")), str(item.get("defId", item.get("id", ""))))
 	_add_line(box, "触发点数", _map_preview_trigger_text(item))
 	_add_line(box, "位置", "%s  (%d,%d)" % [str(item.get("area", "")), int(item.get("x", 0)), int(item.get("y", 0))])
@@ -1542,8 +1551,8 @@ func _show_snapshot_relic_modal(relic: Dictionary) -> void:
 	if modal.is_empty():
 		return
 	var box: VBoxContainer = modal["box"]
-	_render_detail_header(box, _relic_texture(relic), title, "快照遗物 · %s" % str(relic.get("quality", "")))
-	_add_line(box, "品质", str(relic.get("quality", "")))
+	_render_detail_header(box, _relic_texture(relic), title, "快照遗物 · %s" % _quality_label(str(relic.get("quality", ""))))
+	_add_line(box, "品质", _quality_label(str(relic.get("quality", ""))))
 	var description := _detail_description(def)
 	if not description.is_empty():
 		_add_line(box, "说明", description)
@@ -2083,7 +2092,7 @@ func _show_offer_modal(offer: Dictionary) -> void:
 	if modal.is_empty():
 		return
 	var box: VBoxContainer = modal["box"]
-	_render_detail_header(box, _offer_texture(offer), title, "商店报价 · %s" % str(offer.get("quality", "")))
+	_render_detail_header(box, _offer_texture(offer), title, "商店报价 · %s" % _quality_label(str(offer.get("quality", ""))))
 	_add_item_def_details(box, def, str(offer.get("quality", "")), str(offer.get("defId", offer.get("offerId", ""))))
 	_add_line(box, "价格", "%d 金币" % int(offer.get("price", 0)))
 	var discount := int(offer.get("discount", 0))
@@ -2099,7 +2108,7 @@ func _show_class_reward_modal(choice: Dictionary) -> void:
 	if modal.is_empty():
 		return
 	var box: VBoxContainer = modal["box"]
-	_render_detail_header(box, _sticker_texture(str(choice.get("defId", ""))), title, "职业装备奖励 · %s" % str(choice.get("quality", "")))
+	_render_detail_header(box, _sticker_texture(str(choice.get("defId", ""))), title, "职业装备奖励 · %s" % _quality_label(str(choice.get("quality", ""))))
 	_add_item_def_details(box, def, str(choice.get("quality", "")), str(choice.get("defId", "")))
 	box.add_child(_action_button("领取职业装备", _class_reward_from_modal.bind(str(choice.get("defId", "")))))
 	_push_modal(modal["panel"])
@@ -2111,8 +2120,8 @@ func _show_relic_choice_modal(choice: Dictionary) -> void:
 	if modal.is_empty():
 		return
 	var box: VBoxContainer = modal["box"]
-	_render_detail_header(box, _relic_texture(choice), title, "遗物选择 · %s" % str(choice.get("quality", "")))
-	_add_line(box, "品质", str(choice.get("quality", "")))
+	_render_detail_header(box, _relic_texture(choice), title, "遗物选择 · %s" % _quality_label(str(choice.get("quality", ""))))
+	_add_line(box, "品质", _quality_label(str(choice.get("quality", ""))))
 	var description := _detail_description(def)
 	if not description.is_empty():
 		_add_line(box, "说明", description)
@@ -2159,7 +2168,7 @@ func _show_item_detail_modal(item: Dictionary) -> void:
 	if modal.is_empty():
 		return
 	var box: VBoxContainer = modal["box"]
-	_render_detail_header(box, _item_texture(item), title, "装备详情 · %s" % str(item.get("quality", "")))
+	_render_detail_header(box, _item_texture(item), title, "装备详情 · %s" % _quality_label(str(item.get("quality", ""))))
 	_add_item_def_details(box, def, str(item.get("quality", "")), str(item.get("defId", item.get("id", ""))))
 	_add_line(box, "位置", "%s  (%d,%d)" % [_area_label(str(item.get("area", ""))), int(item.get("x", 0)), int(item.get("y", 0))])
 	var id := str(item.get("id", ""))
@@ -2178,8 +2187,8 @@ func _show_relic_detail_modal(relic: Dictionary) -> void:
 	if modal.is_empty():
 		return
 	var box: VBoxContainer = modal["box"]
-	_render_detail_header(box, _relic_texture(relic), title, "遗物详情 · %s" % str(relic.get("quality", "")))
-	_add_line(box, "品质", str(relic.get("quality", "")))
+	_render_detail_header(box, _relic_texture(relic), title, "遗物详情 · %s" % _quality_label(str(relic.get("quality", ""))))
+	_add_line(box, "品质", _quality_label(str(relic.get("quality", ""))))
 	var description := _detail_description(def)
 	if not description.is_empty():
 		_add_line(box, "说明", description)
@@ -2225,7 +2234,7 @@ func _render_detail_header(parent: VBoxContainer, texture: Texture2D, title: Str
 	labels.add_child(subtitle_label)
 
 func _add_item_def_details(parent: VBoxContainer, def: Dictionary, quality: String, fallback_id: String) -> void:
-	_add_line(parent, "品质", quality)
+	_add_line(parent, "品质", _quality_label(quality))
 	if not fallback_id.is_empty():
 		_add_line(parent, "资源", fallback_id)
 	var dice_text := _detail_array_text(def.get("triggerDice", def.get("dice", [])))
@@ -2513,7 +2522,7 @@ func _render_relic_rail(parent: VBoxContainer, run: Dictionary) -> void:
 		else:
 			var relic_def: Dictionary = _dict(relic, "def")
 			var name := _fallback(str(relic_def.get("name", "")), str(relic.get("relicId", "")))
-			var label := "遗物：%s  %s" % [name, str(relic.get("quality", ""))]
+			var label := "遗物：%s  %s" % [name, _quality_label(str(relic.get("quality", "")))]
 			_apply_button_icon(button, _relic_texture(relic))
 			button.pressed.connect(_open_relic_from_rail.bind(relic, label))
 		grid.add_child(button)
@@ -2644,7 +2653,7 @@ func _render_map_reward_preview(parent: VBoxContainer, rewards: Array) -> void:
 		if reward is Dictionary:
 			var def: Dictionary = _dict(reward, "def")
 			var reward_name := _fallback(str(def.get("name", "")), str(reward.get("defId", "")))
-			var text := "%s\n%s" % [str(reward.get("quality", "")), reward_name]
+			var text := "%s\n%s" % [_quality_label(str(reward.get("quality", ""))), reward_name]
 			var button := _button(text, 82)
 			button.custom_minimum_size = Vector2(82, 62)
 			button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -2659,7 +2668,7 @@ func _show_map_monster_item_modal(item: Dictionary) -> void:
 	if modal.is_empty():
 		return
 	var box: VBoxContainer = modal["box"]
-	_render_detail_header(box, _item_texture(item), title, "野怪装备预览 · %s" % str(item.get("quality", "")))
+	_render_detail_header(box, _item_texture(item), title, "野怪装备预览 · %s" % _quality_label(str(item.get("quality", ""))))
 	_add_item_def_details(box, def, str(item.get("quality", "")), str(item.get("defId", item.get("id", ""))))
 	_add_line(box, "触发点数", _map_preview_trigger_text(item))
 	_add_line(box, "位置", "%s  (%d,%d)" % [_area_label(str(item.get("area", ""))), int(item.get("x", 0)), int(item.get("y", 0))])
@@ -2672,7 +2681,7 @@ func _show_map_reward_modal(reward: Dictionary) -> void:
 	if modal.is_empty():
 		return
 	var box: VBoxContainer = modal["box"]
-	_render_detail_header(box, _item_reward_texture(reward), title, "可能掉落 · %s" % str(reward.get("quality", "")))
+	_render_detail_header(box, _item_reward_texture(reward), title, "可能掉落 · %s" % _quality_label(str(reward.get("quality", ""))))
 	_add_item_def_details(box, def, str(reward.get("quality", "")), str(reward.get("defId", "")))
 	_add_line(box, "触发点数", _map_preview_trigger_text(reward))
 	_push_modal(modal["panel"])
@@ -2702,14 +2711,14 @@ func _slot_label(item: Dictionary, x: int) -> String:
 		return str(x + 1)
 	var def: Dictionary = _dict(item, "def")
 	var name := _fallback(str(def.get("name", "")), str(item.get("defId", item.get("id", ""))))
-	return "%d\n%s\n%s" % [x + 1, str(item.get("quality", "")), name]
+	return "%d\n%s\n%s" % [x + 1, _quality_label(str(item.get("quality", ""))), name]
 
 func _relic_slot_label(relic: Dictionary, slot: int) -> String:
 	if relic.is_empty():
 		return "遗物槽 %d\n空遗物槽 %d" % [slot + 1, slot + 1]
 	var def: Dictionary = _dict(relic, "def")
 	var name := _fallback(str(def.get("name", "")), str(relic.get("relicId", relic.get("id", ""))))
-	return "遗物槽 %d\n%s\n%s" % [slot + 1, name, str(relic.get("quality", ""))]
+	return "遗物槽 %d\n%s\n%s" % [slot + 1, name, _quality_label(str(relic.get("quality", "")))]
 
 func _equipment_slot_count(run: Dictionary) -> int:
 	for relic in _array(run, "relics"):
@@ -2745,7 +2754,7 @@ func _item_label(item: Dictionary) -> String:
 	var def: Dictionary = _dict(item, "def")
 	return "%s  %s  %s (%d,%d)" % [
 		_fallback(str(def.get("name", "")), str(item.get("defId", item.get("id", "")))),
-		str(item.get("quality", "")),
+		_quality_label(str(item.get("quality", ""))),
 		str(item.get("area", "")),
 		int(item.get("x", 0)),
 		int(item.get("y", 0)),
@@ -2753,7 +2762,7 @@ func _item_label(item: Dictionary) -> String:
 
 func _offer_label(offer: Dictionary) -> String:
 	var def: Dictionary = _dict(offer, "def")
-	return "%s  %s" % [_fallback(str(def.get("name", "")), str(offer.get("defId", offer.get("offerId", "")))), str(offer.get("quality", ""))]
+	return "%s  %s" % [_fallback(str(def.get("name", "")), str(offer.get("defId", offer.get("offerId", "")))), _quality_label(str(offer.get("quality", "")))]
 
 func _item_texture(item: Dictionary) -> Texture2D:
 	var def_id := str(item.get("defId", ""))

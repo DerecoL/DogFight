@@ -30,7 +30,7 @@ func _run() -> void:
 		"def": {"name": "1点牙咬", "description": "命中 1 点时造成伤害", "triggerDice": [1], "tags": ["伤害"]},
 	})
 	await process_frame
-	_assert_modal_text(modal_layer, ["职业装备奖励", "1点牙咬", "BRONZE", "触发点数", "领取职业装备"])
+	_assert_modal_text(modal_layer, ["职业装备奖励", "1点牙咬", "青铜", "触发点数", "领取职业装备"])
 	run_screen.call("_close_top_modal")
 	await process_frame
 	run_screen.call("_show_relic_choice_modal", {
@@ -39,7 +39,7 @@ func _run() -> void:
 		"def": {"name": "双面金牌", "description": "商店折扣提高"},
 	})
 	await process_frame
-	_assert_modal_text(modal_layer, ["遗物选择", "双面金牌", "SILVER", "商店折扣提高", "选择遗物"])
+	_assert_modal_text(modal_layer, ["遗物选择", "双面金牌", "白银", "商店折扣提高", "选择遗物"])
 	run_screen.call("_close_top_modal")
 	await process_frame
 	run_screen.call("_show_enchant_choice_modal", {

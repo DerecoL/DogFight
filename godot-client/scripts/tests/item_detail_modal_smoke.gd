@@ -55,7 +55,7 @@ func _run() -> void:
 		"def": {"name": "双面金牌", "description": "商店折扣提高"},
 	})
 	await process_frame
-	_assert_modal_text(modal_layer, ["遗物详情", "双面金牌", "SILVER", "商店折扣提高", "出售遗物"])
+	_assert_modal_text(modal_layer, ["遗物详情", "双面金牌", "白银", "商店折扣提高", "出售遗物"])
 	main.queue_free()
 	for _frame in range(5):
 		await process_frame

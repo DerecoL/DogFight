@@ -28,7 +28,7 @@ func _run() -> void:
 	run_screen.call("_render_current_tab")
 	await process_frame
 	var text := _collect_text(run_screen)
-	for part in ["遗物", "6槽，重复获得升级", "遗物槽 1", "遗物槽 6", "空遗物槽 2", "双面金牌", "GOLD", "成长徽章", "SILVER"]:
+	for part in ["遗物", "6槽，重复获得升级", "遗物槽 1", "遗物槽 6", "空遗物槽 2", "双面金牌", "黄金", "成长徽章", "白银"]:
 		if not text.contains(str(part)):
 			_fail("Relic rail missing: %s" % str(part))
 			return
@@ -38,7 +38,7 @@ func _run() -> void:
 		return
 	relic_button.pressed.emit()
 	await process_frame
-	_assert_modal_text(modal_layer, ["遗物详情", "双面金牌", "GOLD", "商店折扣提高", "出售遗物"])
+	_assert_modal_text(modal_layer, ["遗物详情", "双面金牌", "黄金", "商店折扣提高", "出售遗物"])
 	main.queue_free()
 	for _frame in range(5):
 		await process_frame

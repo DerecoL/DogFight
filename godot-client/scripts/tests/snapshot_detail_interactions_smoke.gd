@@ -33,7 +33,7 @@ func _run() -> void:
 	item_button.pressed.emit()
 	await process_frame
 	var text := _collect_text(modal_layer)
-	for part in ["快照装备详情", "历史牙咬", "SILVER", "触发点数", "造成 5 点伤害", "EQUIPMENT"]:
+	for part in ["快照装备详情", "历史牙咬", "白银", "触发点数", "造成 5 点伤害", "EQUIPMENT"]:
 		if not text.contains(str(part)):
 			_fail("Snapshot item detail missing: %s" % str(part))
 			return
@@ -46,7 +46,7 @@ func _run() -> void:
 	relic_button.pressed.emit()
 	await process_frame
 	text = _collect_text(modal_layer)
-	for part in ["快照遗物详情", "历史遗物", "GOLD", "额外装备槽"]:
+	for part in ["快照遗物详情", "历史遗物", "黄金", "额外装备槽"]:
 		if not text.contains(str(part)):
 			_fail("Snapshot relic detail missing: %s" % str(part))
 			return

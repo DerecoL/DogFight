@@ -33,7 +33,7 @@ func _run() -> void:
 	equipment_button.pressed.emit()
 	await process_frame
 	var text := _collect_text(modal_layer)
-	for part in ["野怪装备详情", "野怪牙咬", "SILVER", "触发点数", "造成 5 点伤害"]:
+	for part in ["野怪装备详情", "野怪牙咬", "白银", "触发点数", "造成 5 点伤害"]:
 		if not text.contains(str(part)):
 			_fail("Monster equipment detail missing: %s" % str(part))
 			return
@@ -46,7 +46,7 @@ func _run() -> void:
 	reward_button.pressed.emit()
 	await process_frame
 	text = _collect_text(modal_layer)
-	for part in ["地图掉落预览", "奖励牙咬", "GOLD", "造成 7 点伤害"]:
+	for part in ["地图掉落预览", "奖励牙咬", "黄金", "造成 7 点伤害"]:
 		if not text.contains(str(part)):
 			_fail("Map reward detail missing: %s" % str(part))
 			return

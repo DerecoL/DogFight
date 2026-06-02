@@ -39,7 +39,7 @@ func _run() -> void:
 		_fail("Battle relic detail modal was not pushed")
 		return
 	var text := _collect_text(modal_layer)
-	for part in ["战斗遗物详情", "我方", "战斗遗物", "GOLD", "额外装备槽", "EXTRA_EQUIPMENT_REDUCED_EFFECT"]:
+	for part in ["战斗遗物详情", "我方", "战斗遗物", "黄金", "额外装备槽", "EXTRA_EQUIPMENT_REDUCED_EFFECT"]:
 		if not text.contains(str(part)):
 			_fail("Battle relic detail missing: %s" % str(part))
 			return

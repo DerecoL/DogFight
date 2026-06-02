@@ -10,6 +10,12 @@ const DOG_NAMES := {
 	"EMPEROR": "狗皇帝",
 	"FROG": "祖灵",
 }
+const QUALITY_NAMES := {
+	"BRONZE": "青铜",
+	"SILVER": "白银",
+	"GOLD": "黄金",
+	"DIAMOND": "钻石",
+}
 
 @onready var player_hp: ProgressBar = %PlayerHp
 @onready var opponent_hp: ProgressBar = %OpponentHp
@@ -924,7 +930,7 @@ func _show_battle_item_modal(item: Dictionary, side: String) -> void:
 	var item_name := _fallback(str(item_def.get("name", "")), str(item.get("defId", item.get("id", ""))))
 	_add_modal_line(lines, "归属", "我方" if side == "player" else "对手")
 	_add_modal_line(lines, "名称", item_name)
-	_add_modal_line(lines, "品质", str(item.get("quality", "")))
+	_add_modal_line(lines, "品质", _quality_label(str(item.get("quality", ""))))
 	_add_modal_line(lines, "占格", str(int(item_def.get("size", item.get("size", 1)))))
 	_add_modal_line(lines, "触发点数", _item_trigger_text(item))
 	_add_modal_line(lines, "位置", "%s (%d,%d)" % [str(item.get("area", "")), int(item.get("x", 0)), int(item.get("y", 0))])
@@ -1030,7 +1036,7 @@ func _show_battle_relic_modal(relic: Dictionary, side: String) -> void:
 	var relic_name := _fallback(str(def.get("name", "")), str(relic.get("relicId", relic.get("id", ""))))
 	_add_modal_line(lines, "归属", "我方" if side == "player" else "对手")
 	_add_modal_line(lines, "名称", relic_name)
-	_add_modal_line(lines, "品质", str(relic.get("quality", "")))
+	_add_modal_line(lines, "品质", _quality_label(str(relic.get("quality", ""))))
 	var description := str(def.get("description", ""))
 	if not description.is_empty():
 		_add_modal_line(lines, "说明", description)
@@ -1160,6 +1166,9 @@ func _battle_slot_count(snapshot: Dictionary) -> int:
 func _dog_name(dog_type: String) -> String:
 	return str(DOG_NAMES.get(dog_type, dog_type))
 
+func _quality_label(quality: String) -> String:
+	return str(QUALITY_NAMES.get(quality, quality))
+
 func _battle_actor_label(actor: String) -> String:
 	match actor.to_lower():
 		"player":
@@ -1189,7 +1198,7 @@ func _battle_kind_label(kind: String) -> String:
 func _battle_item_label(item: Dictionary) -> String:
 	var def: Dictionary = _dict(item, "def")
 	return "%s\n%s" % [
-		str(item.get("quality", "")),
+		_quality_label(str(item.get("quality", ""))),
 		_fallback(str(def.get("name", "")), str(item.get("defId", item.get("id", "")))),
 	]
 

@@ -41,7 +41,7 @@ func _run() -> void:
 		_fail("Battle item detail modal was not pushed")
 		return
 	var text := _collect_text(modal_layer)
-	for part in ["战斗装备详情", "我方", "闪亮牙咬", "SILVER", "触发点数", "造成 5 点伤害", "本场贡献 5"]:
+	for part in ["战斗装备详情", "我方", "闪亮牙咬", "白银", "触发点数", "造成 5 点伤害", "本场贡献 5"]:
 		if not text.contains(str(part)):
 			_fail("Battle item detail modal missing: %s" % str(part))
 			return
