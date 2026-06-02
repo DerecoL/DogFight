@@ -15,8 +15,9 @@ func _run() -> void:
 	var login = login_scene.instantiate()
 	root.add_child(login)
 	await process_frame
-	if login.get_theme_stylebox("panel") == null:
-		_fail("Login panel must use a custom paper style")
+	var auth_panel = login.get_node_or_null("%AuthPanel")
+	if not auth_panel is PanelContainer or (auth_panel as PanelContainer).get_theme_stylebox("panel") == null:
+		_fail("Login auth panel must use a custom paper style")
 		return
 	var login_button = login.get_node_or_null("%LoginButton")
 	var account_input = login.get_node_or_null("%AccountInput")

@@ -1,9 +1,10 @@
-extends PanelContainer
+extends Control
 
 signal login_succeeded
 
 const UiTokens := preload("res://scripts/ui/kit/UiTokens.gd")
 
+@onready var auth_panel: PanelContainer = %AuthPanel
 @onready var account_input: LineEdit = %AccountInput
 @onready var password_input: LineEdit = %PasswordInput
 @onready var login_button: Button = %LoginButton
@@ -102,7 +103,8 @@ func _on_error_raised(message: String) -> void:
 		error_label.text = message
 
 func _apply_visual_style() -> void:
-	add_theme_stylebox_override("panel", UiTokens.modal_panel_style())
+	if auth_panel != null:
+		auth_panel.add_theme_stylebox_override("panel", UiTokens.modal_panel_style())
 	for button in [login_button, register_button, quick_start_button, taptap_button]:
 		_apply_button_style(button)
 	for input in [account_input, password_input, taptap_code_input]:
