@@ -2,6 +2,8 @@ extends PanelContainer
 
 signal login_succeeded
 
+const UiTokens := preload("res://scripts/ui/kit/UiTokens.gd")
+
 @onready var account_input: LineEdit = %AccountInput
 @onready var password_input: LineEdit = %PasswordInput
 @onready var login_button: Button = %LoginButton
@@ -21,6 +23,7 @@ func bind_session(next_session: Node) -> void:
 		session.error_raised.connect(_on_error_raised)
 
 func _ready() -> void:
+	_apply_visual_style()
 	if not login_button.pressed.is_connected(_on_login_pressed):
 		login_button.pressed.connect(_on_login_pressed)
 	if not register_button.pressed.is_connected(_on_register_pressed):
@@ -94,3 +97,28 @@ func _set_busy(busy: bool) -> void:
 
 func _on_error_raised(message: String) -> void:
 	error_label.text = message
+
+func _apply_visual_style() -> void:
+	add_theme_stylebox_override("panel", UiTokens.modal_panel_style())
+	for button in [login_button, register_button, quick_start_button, taptap_button]:
+		_apply_button_style(button)
+	for input in [account_input, password_input, taptap_code_input]:
+		_apply_input_style(input)
+	error_label.add_theme_color_override("font_color", Color(0.95, 0.32, 0.18, 1.0))
+
+func _apply_button_style(button: Button) -> void:
+	button.custom_minimum_size.y = max(button.custom_minimum_size.y, UiTokens.touch_target_height())
+	button.add_theme_stylebox_override("normal", UiTokens.button_style())
+	button.add_theme_stylebox_override("hover", UiTokens.button_hover_style())
+	button.add_theme_stylebox_override("pressed", UiTokens.button_pressed_style())
+	button.add_theme_stylebox_override("disabled", UiTokens.button_disabled_style())
+	button.add_theme_color_override("font_color", UiTokens.ink_color())
+	button.add_theme_color_override("font_hover_color", UiTokens.ink_color())
+	button.add_theme_color_override("font_pressed_color", UiTokens.ink_color())
+
+func _apply_input_style(input: LineEdit) -> void:
+	input.custom_minimum_size.y = max(input.custom_minimum_size.y, UiTokens.touch_target_height())
+	input.add_theme_stylebox_override("normal", UiTokens.input_style())
+	input.add_theme_stylebox_override("focus", UiTokens.input_focus_style())
+	input.add_theme_color_override("font_color", Color(0.98, 0.92, 0.82, 1.0))
+	input.add_theme_color_override("font_placeholder_color", Color(0.75, 0.66, 0.54, 0.90))

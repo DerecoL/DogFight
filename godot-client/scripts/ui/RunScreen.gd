@@ -2,6 +2,7 @@ extends Control
 
 const ApiClient := preload("res://scripts/api/ApiClient.gd")
 const ApiRoutes := preload("res://scripts/api/ApiRoutes.gd")
+const UiTokens := preload("res://scripts/ui/kit/UiTokens.gd")
 
 const TAB_LOBBY := "大厅"
 const TAB_RUN := "跑局"
@@ -101,6 +102,12 @@ func _build_layout() -> void:
 	background.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
 	background.modulate = Color(0.55, 0.55, 0.55, 1.0)
 	add_child(background)
+	var wash := ColorRect.new()
+	wash.name = "PaperWash"
+	wash.set_anchors_preset(Control.PRESET_FULL_RECT)
+	wash.color = Color(0.18, 0.11, 0.06, 0.36)
+	wash.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(wash)
 
 	music_player = AudioStreamPlayer.new()
 	music_player.name = "BackgroundMusic"
@@ -139,12 +146,14 @@ func _build_layout() -> void:
 	dog_type_select.custom_minimum_size = Vector2(132, 36)
 	for dog_type in DOG_TYPES:
 		dog_type_select.add_item(dog_type)
+	_apply_button_style(dog_type_select)
 	header.add_child(dog_type_select)
 
 	mode_select = OptionButton.new()
 	mode_select.custom_minimum_size = Vector2(112, 36)
 	for mode in ["CASUAL", "LADDER"]:
 		mode_select.add_item(mode)
+	_apply_button_style(mode_select)
 	header.add_child(mode_select)
 
 	lucky_select = OptionButton.new()
@@ -152,6 +161,7 @@ func _build_layout() -> void:
 	lucky_select.add_item("无幸运")
 	for lucky in range(1, 7):
 		lucky_select.add_item("幸运 %d" % lucky)
+	_apply_button_style(lucky_select)
 	header.add_child(lucky_select)
 
 	create_run_button = _button("新建跑局", 118)
@@ -327,6 +337,7 @@ func _render_account_tab() -> void:
 	nickname_input.max_length = 16
 	nickname_input.custom_minimum_size = Vector2(220, 38)
 	nickname_input.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_apply_input_style(nickname_input)
 	profile_row.add_child(nickname_input)
 	profile_row.add_child(_action_button("保存昵称", _save_nickname.bind(nickname_input)))
 	card.add_child(_action_button("退出登录", _call_session.bind("logout", [])))
@@ -1286,6 +1297,7 @@ func _modal_panel(title: String, size: Vector2) -> Dictionary:
 		return {}
 	var panel := PanelContainer.new()
 	panel.custom_minimum_size = size
+	panel.add_theme_stylebox_override("panel", UiTokens.modal_panel_style())
 	panel.set_anchors_preset(Control.PRESET_CENTER)
 	panel.offset_left = -size.x / 2.0
 	panel.offset_right = size.x / 2.0
@@ -1681,6 +1693,7 @@ func _apply_button_icon(button: Button, texture: Texture2D) -> void:
 func _section(title: String) -> VBoxContainer:
 	var panel := PanelContainer.new()
 	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	panel.add_theme_stylebox_override("panel", UiTokens.paper_panel_style())
 	content.add_child(panel)
 	var box := VBoxContainer.new()
 	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -1699,7 +1712,26 @@ func _add_line(parent: VBoxContainer, label: String, value: String) -> void:
 	row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	row.text = "%s：%s" % [label, value] if not label.is_empty() else value
+	row.add_theme_color_override("font_color", UiTokens.ink_color())
 	parent.add_child(row)
+
+func _apply_button_style(button: Button) -> void:
+	button.custom_minimum_size.y = max(button.custom_minimum_size.y, UiTokens.touch_target_height())
+	button.add_theme_stylebox_override("normal", UiTokens.button_style())
+	button.add_theme_stylebox_override("hover", UiTokens.button_hover_style())
+	button.add_theme_stylebox_override("pressed", UiTokens.button_pressed_style())
+	button.add_theme_stylebox_override("disabled", UiTokens.button_disabled_style())
+	button.add_theme_color_override("font_color", UiTokens.ink_color())
+	button.add_theme_color_override("font_hover_color", UiTokens.ink_color())
+	button.add_theme_color_override("font_pressed_color", UiTokens.ink_color())
+	button.add_theme_color_override("font_disabled_color", Color(0.24, 0.20, 0.16, 0.70))
+
+func _apply_input_style(input: LineEdit) -> void:
+	input.custom_minimum_size.y = max(input.custom_minimum_size.y, UiTokens.touch_target_height())
+	input.add_theme_stylebox_override("normal", UiTokens.input_style())
+	input.add_theme_stylebox_override("focus", UiTokens.input_focus_style())
+	input.add_theme_color_override("font_color", Color(0.98, 0.92, 0.82, 1.0))
+	input.add_theme_color_override("font_placeholder_color", Color(0.75, 0.66, 0.54, 0.90))
 
 func _button(text: String, min_width: int) -> Button:
 	var button := Button.new()
@@ -1708,6 +1740,7 @@ func _button(text: String, min_width: int) -> Button:
 	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL if min_width == 0 else Control.SIZE_SHRINK_BEGIN
 	button.clip_text = true
 	button.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	_apply_button_style(button)
 	return button
 
 func _action_button(text: String, handler: Callable) -> Button:
