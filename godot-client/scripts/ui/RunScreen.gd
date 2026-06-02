@@ -185,7 +185,9 @@ func _build_layout() -> void:
 	dog_type_select = OptionButton.new()
 	dog_type_select.custom_minimum_size = Vector2(132, 36)
 	for dog_type in DOG_TYPES:
-		dog_type_select.add_item(dog_type)
+		var index := dog_type_select.item_count
+		dog_type_select.add_item(_dog_name(dog_type))
+		dog_type_select.set_item_metadata(index, dog_type)
 	_apply_button_style(dog_type_select)
 	header.add_child(dog_type_select)
 
@@ -343,7 +345,7 @@ func _render_lobby_tab() -> void:
 	if best_run.is_empty():
 		_add_line(history, "最佳成绩", "暂无对局")
 	else:
-		_add_line(history, "最佳成绩", "%s · %d胜 %d负 · 第%d回合" % [str(best_run.get("dogType", "")), int(best_run.get("wins", 0)), int(best_run.get("losses", 0)), int(best_run.get("round", 0))])
+		_add_line(history, "最佳成绩", "%s · %d胜 %d负 · 第%d回合" % [_dog_name(str(best_run.get("dogType", ""))), int(best_run.get("wins", 0)), int(best_run.get("losses", 0)), int(best_run.get("round", 0))])
 	var shortcuts := HBoxContainer.new()
 	shortcuts.add_theme_constant_override("separation", 8)
 	history.add_child(shortcuts)
@@ -403,7 +405,7 @@ func _render_run_tab() -> void:
 	var run: Dictionary = store.get("run")
 	var summary := _section("当前跑局")
 	_add_line(summary, "阶段", "%s / %s" % [str(run.get("phase", "")), str(run.get("status", ""))])
-	_add_line(summary, "犬种", "%s  幸运号 %s" % [str(run.get("dogType", "")), str(run.get("luckyNumber", "-"))])
+	_add_line(summary, "犬种", "%s  幸运号 %s" % [_dog_name(str(run.get("dogType", ""))), str(run.get("luckyNumber", "-"))])
 	_add_line(summary, "进度", "第 %d 回合 · %d 胜 %d 负 · 金币 %d" % [int(run.get("round", 0)), int(run.get("wins", 0)), int(run.get("losses", 0)), int(run.get("gold", 0))])
 	_render_run_actions(run, summary)
 	_render_settlement_summary(run)
@@ -812,7 +814,7 @@ func _render_leaderboards_tab() -> void:
 	for candidate in candidates:
 		if candidate is Dictionary:
 			var run_id := str(candidate.get("id", ""))
-			var candidate_text := "%s  %d-%d  第%d回合" % [str(candidate.get("dogType", candidate.get("mode", ""))), int(candidate.get("wins", 0)), int(candidate.get("losses", 0)), int(candidate.get("round", 0))]
+			var candidate_text := _apex_run_summary_label(candidate)
 			apex_card.add_child(_action_button("提交巅峰 " + candidate_text, _submit_apex_candidate.bind(run_id)))
 	for board_name in ["overall", "daily"]:
 		if board_name == "daily":
@@ -822,7 +824,7 @@ func _render_leaderboards_tab() -> void:
 		for entry in _array(leaderboards, board_name).slice(0, 20):
 			if entry is Dictionary:
 				var marker := "我的记录" if bool(entry.get("isMine", false)) else ("种子" if bool(entry.get("isSeed", false)) else "防守连胜 %d" % int(entry.get("challengeWins", 0)))
-				var entry_label := "查看配置  #%s  %s  %d-%d  第%d回合  %s" % [str(entry.get("rank", "-")), str(entry.get("name", "")), int(entry.get("wins", 0)), int(entry.get("losses", 0)), int(entry.get("round", 0)), marker]
+				var entry_label := "查看配置  #%s  %s  %s  %s" % [str(entry.get("rank", "-")), str(entry.get("name", "")), _apex_run_summary_label(entry), marker]
 				apex_card.add_child(_action_button(entry_label, _show_snapshot_modal.bind(entry, "巅峰配置详情")))
 
 func _render_season_tab() -> void:
@@ -908,7 +910,7 @@ func _render_settings_tab() -> void:
 				groups.add_child(_action_button(("%s %s" % ["已装备" if _is_cosmetic_equipped(item) else "查看", _cosmetic_display_name(item)]), _show_cosmetic_modal.bind(item)))
 
 func _on_create_run_pressed() -> void:
-	var dog_type := dog_type_select.get_item_text(dog_type_select.selected)
+	var dog_type := _selected_dog_type()
 	var mode := mode_select.get_item_text(mode_select.selected)
 	var lucky: Variant = null
 	if dog_type == "EMPEROR":
@@ -961,8 +963,8 @@ func _render_dog_picker(parent: VBoxContainer) -> void:
 		grid.add_child(_dog_card_button(dog_type))
 
 func _dog_card_button(dog_type: String) -> Button:
-	var selected: bool = dog_type_select.get_item_text(dog_type_select.selected) == dog_type
-	var label := "%s\n%s\n%s" % [_dog_name(dog_type), dog_type, str(DOG_TRAITS.get(dog_type, ""))]
+	var selected: bool = _selected_dog_type() == dog_type
+	var label := "%s\n%s" % [_dog_name(dog_type), str(DOG_TRAITS.get(dog_type, ""))]
 	var button := _button(label, 0)
 	button.custom_minimum_size = Vector2(180, 98)
 	button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -974,7 +976,7 @@ func _dog_card_button(dog_type: String) -> Button:
 
 func _select_dog_type(dog_type: String) -> void:
 	for index in range(dog_type_select.item_count):
-		if dog_type_select.get_item_text(index) == dog_type:
+		if str(dog_type_select.get_item_metadata(index)) == dog_type:
 			dog_type_select.select(index)
 			break
 	if dog_type == "EMPEROR" and lucky_select.selected <= 0:
@@ -983,6 +985,14 @@ func _select_dog_type(dog_type: String) -> void:
 
 func _dog_name(dog_type: String) -> String:
 	return str(DOG_NAMES.get(dog_type, dog_type))
+
+func _selected_dog_type() -> String:
+	if dog_type_select == null or dog_type_select.item_count == 0:
+		return DOG_TYPES[0]
+	var metadata = dog_type_select.get_item_metadata(dog_type_select.selected)
+	if metadata != null:
+		return str(metadata)
+	return str(dog_type_select.get_item_text(dog_type_select.selected))
 
 func _dog_texture(dog_type: String) -> Texture2D:
 	if dog_type == "FROG":
@@ -1198,7 +1208,7 @@ func _room_action(action: String, body: Dictionary) -> void:
 	await _apply_room_response(response, "%s_room" % action)
 
 func _choose_room_dog() -> void:
-	var dog_type := dog_type_select.get_item_text(dog_type_select.selected)
+	var dog_type := _selected_dog_type()
 	var body := {"dogType": dog_type}
 	if dog_type == "EMPEROR":
 		if lucky_select.selected <= 0:
@@ -1439,7 +1449,7 @@ func _show_snapshot_modal(snapshot: Dictionary, title: String) -> void:
 	if modal.is_empty():
 		return
 	var box: VBoxContainer = modal["box"]
-	_add_line(box, "战绩", "%s · %d胜 %d负 · 第%d回合" % [str(snapshot.get("dogType", snapshot.get("mode", ""))), int(snapshot.get("wins", 0)), int(snapshot.get("losses", 0)), int(snapshot.get("round", 0))])
+	_add_line(box, "战绩", "%s · %d胜 %d负 · 第%d回合" % [_dog_name(str(snapshot.get("dogType", snapshot.get("mode", "")))), int(snapshot.get("wins", 0)), int(snapshot.get("losses", 0)), int(snapshot.get("round", 0))])
 	if snapshot.has("name"):
 		_add_line(box, "名称", str(snapshot.get("name", "")))
 	if snapshot.has("rank"):
@@ -1891,6 +1901,11 @@ func _season_summary_button_label(summary: Dictionary) -> String:
 	if int(summary.get("apexRank", 0)) > 0:
 		apex_text = "巅峰第 %d 名 · %d胜%d败" % [int(summary.get("apexRank", 0)), int(summary.get("apexWins", 0)), int(summary.get("apexLosses", 0))]
 	return "%s  天梯 %s%s%s  %s" % [name, tier, score_text, dog_king, apex_text]
+
+func _apex_run_summary_label(run_like: Dictionary) -> String:
+	var item_count := _array(run_like, "items").size()
+	var relic_count := _array(run_like, "relics").size()
+	return "%s  %d胜%d负  第%d回合 · 遗物 %d · 装备 %d" % [_dog_name(str(run_like.get("dogType", ""))), int(run_like.get("wins", 0)), int(run_like.get("losses", 0)), int(run_like.get("round", 0)), relic_count, item_count]
 
 func _room_member_status(member: Dictionary) -> String:
 	if bool(member.get("eliminated", false)):
