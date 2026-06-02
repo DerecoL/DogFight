@@ -1148,7 +1148,8 @@ func _show_snapshot_modal(snapshot: Dictionary, title: String) -> void:
 	for relic in relics.slice(0, 10):
 		if relic is Dictionary:
 			var relic_def: Dictionary = _dict(relic, "def")
-			_add_line(box, "", "%s  %s" % [_fallback(str(relic_def.get("name", "")), str(relic.get("relicId", ""))), str(relic.get("quality", ""))])
+			var relic_title := _fallback(str(relic_def.get("name", "")), str(relic.get("relicId", "")))
+			box.add_child(_action_button("%s  %s" % [relic_title, str(relic.get("quality", ""))], _show_snapshot_relic_modal.bind(relic)))
 	_push_modal(modal["panel"])
 
 func _render_snapshot_items(parent: VBoxContainer, title: String, items: Array) -> void:
@@ -1156,7 +1157,41 @@ func _render_snapshot_items(parent: VBoxContainer, title: String, items: Array) 
 	for item in items.slice(0, 12):
 		if item is Dictionary:
 			var def: Dictionary = _dict(item, "def")
-			_add_line(parent, "", "%s  %s  (%d,%d)" % [_fallback(str(def.get("name", "")), str(item.get("defId", item.get("id", "")))), str(item.get("quality", "")), int(item.get("x", 0)), int(item.get("y", 0))])
+			var title_text := _fallback(str(def.get("name", "")), str(item.get("defId", item.get("id", ""))))
+			var button := _action_button("%s  %s  (%d,%d)" % [title_text, str(item.get("quality", "")), int(item.get("x", 0)), int(item.get("y", 0))], _show_snapshot_item_modal.bind(item))
+			button.icon = _item_texture(item)
+			button.expand_icon = true
+			parent.add_child(button)
+
+func _show_snapshot_item_modal(item: Dictionary) -> void:
+	var def: Dictionary = _dict(item, "def")
+	var title := _fallback(str(def.get("name", "")), str(item.get("defId", item.get("id", ""))))
+	var modal := _modal_panel("快照装备详情", Vector2(560, 500))
+	if modal.is_empty():
+		return
+	var box: VBoxContainer = modal["box"]
+	_render_detail_header(box, _item_texture(item), title, "快照装备 · %s" % str(item.get("quality", "")))
+	_add_item_def_details(box, def, str(item.get("quality", "")), str(item.get("defId", item.get("id", ""))))
+	_add_line(box, "触发点数", _map_preview_trigger_text(item))
+	_add_line(box, "位置", "%s  (%d,%d)" % [str(item.get("area", "")), int(item.get("x", 0)), int(item.get("y", 0))])
+	_push_modal(modal["panel"])
+
+func _show_snapshot_relic_modal(relic: Dictionary) -> void:
+	var def: Dictionary = _dict(relic, "def")
+	var title := _fallback(str(def.get("name", "")), str(relic.get("relicId", relic.get("id", ""))))
+	var modal := _modal_panel("快照遗物详情", Vector2(520, 420))
+	if modal.is_empty():
+		return
+	var box: VBoxContainer = modal["box"]
+	_render_detail_header(box, _relic_texture(relic), title, "快照遗物 · %s" % str(relic.get("quality", "")))
+	_add_line(box, "品质", str(relic.get("quality", "")))
+	var description := _detail_description(def)
+	if not description.is_empty():
+		_add_line(box, "说明", description)
+	var effect := str(def.get("effect", ""))
+	if not effect.is_empty():
+		_add_line(box, "效果", effect)
+	_push_modal(modal["panel"])
 
 func _current_user_id() -> String:
 	var user: Dictionary = _dict(me_data, "user")
