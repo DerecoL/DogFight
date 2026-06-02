@@ -12,6 +12,24 @@ func _init() -> void:
 		push_error("Overlay foundation scripts failed to load")
 		quit(1)
 		return
+	var responsive_script := load("res://scripts/ui/kit/Responsive.gd")
+	var tokens_script := load("res://scripts/ui/kit/UiTokens.gd")
+	if responsive_script == null or tokens_script == null:
+		push_error("UI kit foundation scripts failed to load")
+		quit(1)
+		return
+	if responsive_script.breakpoint_for_width(480) != "mobile":
+		push_error("Responsive mobile breakpoint failed")
+		quit(1)
+		return
+	if responsive_script.breakpoint_for_width(1280) != "desktop":
+		push_error("Responsive desktop breakpoint failed")
+		quit(1)
+		return
+	if tokens_script.touch_target_height() < 44:
+		push_error("UiTokens touch target is too small")
+		quit(1)
+		return
 	var overlay_scene := load("res://scenes/overlays/OverlayRoot.tscn")
 	if overlay_scene == null:
 		push_error("OverlayRoot scene failed to load")
