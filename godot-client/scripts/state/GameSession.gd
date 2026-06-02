@@ -105,18 +105,41 @@ func create_run(dog_type := "SHIBA", mode := "CASUAL", lucky_number: Variant = n
 	if not response.ok:
 		_raise_error(str(response.error))
 		return false
-	var run = response.data.get("run", {})
-	if run is Dictionary and str(run.get("id", "")).length() > 0:
-		set_current_run(run)
-		return true
-	_raise_error("创建跑局失败")
-	return false
+	return _apply_run_response(response, "创建跑局失败")
+
+func load_run(run_id: String) -> bool:
+	var response := await api.get_json(ApiRoutes.run_detail(run_id))
+	if not response.ok:
+		_raise_error(str(response.error))
+		return false
+	return _apply_run_response(response, "服务端没有返回跑局")
 
 func select_map_node(node_id: String) -> bool:
 	return await _post_run_action(ApiRoutes.run_map_select(run_store.run_id()), {"nodeId": node_id})
 
+func resolve_map_event(choice_id := "") -> bool:
+	var body := {}
+	if not choice_id.is_empty():
+		body["choiceId"] = choice_id
+	return await _post_run_action(ApiRoutes.run_map_event(run_store.run_id()), body)
+
+func complete_map_node() -> bool:
+	return await _post_run_action(ApiRoutes.run_map_complete_node(run_store.run_id()), {})
+
+func claim_monster_reward() -> bool:
+	return await _post_run_action(ApiRoutes.run_monster_reward_claim(run_store.run_id()), {})
+
+func skip_monster_reward() -> bool:
+	return await _post_run_action(ApiRoutes.run_monster_reward_skip(run_store.run_id()), {})
+
 func move_item(item_id: String, area: String, x: int, y: int) -> bool:
 	return await _post_run_action(ApiRoutes.run_item_move(run_store.run_id()), {"itemId": item_id, "area": area, "x": x, "y": y})
+
+func upgrade_item(item_id: String, target_item_id := "") -> bool:
+	var body := {"itemId": item_id}
+	if not target_item_id.is_empty():
+		body["targetItemId"] = target_item_id
+	return await _post_run_action(ApiRoutes.run_item_upgrade(run_store.run_id()), body)
 
 func buy_offer(offer_id: String, area := "BAG") -> bool:
 	return await _post_run_action(ApiRoutes.run_shop_buy(run_store.run_id()), {"offerId": offer_id, "area": area})
@@ -130,6 +153,33 @@ func reroll_shop() -> bool:
 func match_battle() -> bool:
 	return await _post_run_action(ApiRoutes.run_battle_match(run_store.run_id()), {})
 
+func select_shop_choice(shop_type: String) -> bool:
+	return await _post_run_action(ApiRoutes.run_choice_select(run_store.run_id()), {"shopType": shop_type})
+
+func select_upgrade_item(item_id: String) -> bool:
+	return await _post_run_action(ApiRoutes.run_upgrade_select(run_store.run_id()), {"itemId": item_id})
+
+func skip_upgrade_choice() -> bool:
+	return await _post_run_action(ApiRoutes.run_upgrade_skip(run_store.run_id()), {})
+
+func select_potion(potion_id: String, item_id: String) -> bool:
+	return await _post_run_action(ApiRoutes.run_potion_select(run_store.run_id()), {"potionId": potion_id, "itemId": item_id})
+
+func select_class_reward(def_id: String) -> bool:
+	return await _post_run_action(ApiRoutes.run_class_reward_select(run_store.run_id()), {"defId": def_id})
+
+func select_enchant(enchant_id: String, item_id: String) -> bool:
+	return await _post_run_action(ApiRoutes.run_enchant_select(run_store.run_id()), {"enchantId": enchant_id, "itemId": item_id})
+
+func select_relic(relic_id: String) -> bool:
+	return await _post_run_action(ApiRoutes.run_relic_select(run_store.run_id()), {"relicId": relic_id})
+
+func sell_relic(relic_id: String) -> bool:
+	return await _post_run_action(ApiRoutes.run_relic_sell(run_store.run_id()), {"relicId": relic_id})
+
+func settle_run() -> bool:
+	return await _post_run_action(ApiRoutes.run_settle(run_store.run_id()), {})
+
 func start_battle() -> bool:
 	if not run_store.has_run():
 		_raise_error("没有当前跑局")
@@ -138,14 +188,12 @@ func start_battle() -> bool:
 	if not response.ok:
 		_raise_error(str(response.error))
 		return false
-	var run = response.data.get("run", {})
-	if run is Dictionary and str(run.get("id", "")).length() > 0:
-		set_current_run(run)
+	_apply_run_response(response, "服务端没有返回跑局")
 	var battle = response.data.get("battle", {})
 	if battle is Dictionary:
 		battle_started.emit(battle)
 		return true
-	_raise_error("服务器没有返回战斗结果")
+	_raise_error("服务端没有返回战斗结果")
 	return false
 
 func finish_battle() -> bool:
@@ -159,11 +207,14 @@ func _post_run_action(path: String, body: Dictionary) -> bool:
 	if not response.ok:
 		_raise_error(str(response.error))
 		return false
+	return _apply_run_response(response, "服务端没有返回跑局")
+
+func _apply_run_response(response: Dictionary, fallback_error: String) -> bool:
 	var run = response.data.get("run", {})
 	if run is Dictionary and str(run.get("id", "")).length() > 0:
 		set_current_run(run)
 		return true
-	_raise_error("服务器没有返回跑局")
+	_raise_error(fallback_error)
 	return false
 
 func set_current_run(run: Dictionary) -> void:

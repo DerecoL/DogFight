@@ -21,6 +21,14 @@ func _init() -> void:
 		push_error("ApiRoutes.register returned wrong path")
 		quit(1)
 		return
+	if routes_script.achievements() != "/achievements" or routes_script.daily_tasks() != "/daily-tasks":
+		push_error("ApiRoutes account progression paths are invalid")
+		quit(1)
+		return
+	if routes_script.dogfight_rooms() != "/dogfight/rooms" or routes_script.dogfight_room_ready("room-1") != "/dogfight/rooms/room-1/ready":
+		push_error("ApiRoutes dogfight room paths are invalid")
+		quit(1)
+		return
 	if routes_script.run_battle_start("run-1") != "/runs/run-1/battle/start":
 		push_error("ApiRoutes.run_battle_start returned wrong path")
 		quit(1)
@@ -79,6 +87,17 @@ func _init() -> void:
 		quit(1)
 		return
 	login_screen.free()
+	var run_scene := load("res://scenes/RunScreen.tscn")
+	if run_scene == null:
+		push_error("RunScreen scene failed to load")
+		quit(1)
+		return
+	var run_screen = run_scene.instantiate()
+	if not run_screen.has_method("bind_session"):
+		push_error("RunScreen must expose bind_session")
+		quit(1)
+		return
+	run_screen.free()
 	api.free()
 	node.free()
 	quit(0)

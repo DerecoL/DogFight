@@ -1,323 +1,772 @@
 extends Control
 
-@onready var run_label: Label = %RunLabel
-@onready var create_run_button: Button = %CreateRunButton
-@onready var equipment_list: VBoxContainer = %EquipmentList
-@onready var bag_list: VBoxContainer = %BagList
-@onready var shop_list: VBoxContainer = %ShopList
-@onready var action_button: Button = %ActionButton
-@onready var error_label: Label = %ErrorLabel
-@onready var sell_selected_button: Button = %SellSelectedButton
-@onready var reroll_shop_button: Button = %RerollShopButton
-@onready var move_bag_button: Button = %MoveBagButton
-@onready var move_equipment_button: Button = %MoveEquipmentButton
+const ApiClient := preload("res://scripts/api/ApiClient.gd")
+const ApiRoutes := preload("res://scripts/api/ApiRoutes.gd")
+
+const TAB_RUN := "跑局"
+const TAB_ACCOUNT := "账号"
+const TAB_ACHIEVEMENTS := "成就"
+const TAB_DAILY := "每日"
+const TAB_SHOP := "商城"
+const TAB_LEADERBOARDS := "排行"
+const TAB_SEASON := "赛季"
+const TAB_ROOMS := "房间"
 
 var session: Node
-var selected_item_id := ""
-var selected_item_area := ""
+var current_tab := TAB_RUN
 var action_in_progress := false
+var selected_item_id := ""
+var selected_item_label := ""
+var selected_relic_id := ""
+var selected_room_id := ""
+var active_room: Dictionary = {}
+
+var root: VBoxContainer
+var title_label: Label
+var status_label: Label
+var refresh_button: Button
+var dog_type_select: OptionButton
+var mode_select: OptionButton
+var lucky_select: OptionButton
+var create_run_button: Button
+var nav_list: VBoxContainer
+var content_scroll: ScrollContainer
+var content: VBoxContainer
+
+var me_data: Dictionary = {}
+var achievements_data: Dictionary = {}
+var daily_data: Dictionary = {}
+var meta_shop_data: Dictionary = {}
+var cosmetics_data: Dictionary = {}
+var ladder_data: Dictionary = {}
+var leaderboard_data: Dictionary = {}
+var apex_data: Dictionary = {}
+var history_data: Dictionary = {}
+var rooms_data: Dictionary = {}
 
 func bind_session(next_session: Node) -> void:
 	if session != null:
 		if session.has_signal("run_changed") and session.run_changed.is_connected(_on_run_changed):
 			session.run_changed.disconnect(_on_run_changed)
+		if session.has_signal("user_changed") and session.user_changed.is_connected(_on_user_changed):
+			session.user_changed.disconnect(_on_user_changed)
 		if session.has_signal("error_raised") and session.error_raised.is_connected(_on_error_raised):
 			session.error_raised.disconnect(_on_error_raised)
 	session = next_session
 	if session != null:
 		if session.has_signal("run_changed") and not session.run_changed.is_connected(_on_run_changed):
 			session.run_changed.connect(_on_run_changed)
+		if session.has_signal("user_changed") and not session.user_changed.is_connected(_on_user_changed):
+			session.user_changed.connect(_on_user_changed)
 		if session.has_signal("error_raised") and not session.error_raised.is_connected(_on_error_raised):
 			session.error_raised.connect(_on_error_raised)
-	_render()
 
 func _ready() -> void:
-	if not create_run_button.pressed.is_connected(_on_create_run_pressed):
-		create_run_button.pressed.connect(_on_create_run_pressed)
-	_connect_button_once(action_button, _on_action_pressed)
-	_connect_button_once(sell_selected_button, _on_sell_selected_pressed)
-	_connect_button_once(reroll_shop_button, _on_reroll_shop_pressed)
-	_connect_button_once(move_bag_button, _on_move_to_bag_pressed)
-	_connect_button_once(move_equipment_button, _on_move_to_equipment_pressed)
-	_render()
+	_build_layout()
+	_render_shell()
 
 func clear_error() -> void:
-	if not is_node_ready():
+	if status_label != null:
+		status_label.text = ""
+
+func _build_layout() -> void:
+	root = VBoxContainer.new()
+	root.name = "HubRoot"
+	root.set_anchors_preset(Control.PRESET_FULL_RECT)
+	root.add_theme_constant_override("separation", 10)
+	add_child(root)
+
+	var header := HBoxContainer.new()
+	header.name = "Header"
+	header.custom_minimum_size = Vector2(0, 58)
+	header.add_theme_constant_override("separation", 10)
+	root.add_child(header)
+
+	title_label = Label.new()
+	title_label.text = "狗骰乱斗 Godot 工作台"
+	title_label.custom_minimum_size = Vector2(240, 44)
+	title_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	header.add_child(title_label)
+
+	dog_type_select = OptionButton.new()
+	dog_type_select.custom_minimum_size = Vector2(132, 36)
+	for dog_type in ["SHIBA", "MUTT", "HUSKY", "CORGI", "EMPEROR"]:
+		dog_type_select.add_item(dog_type)
+	header.add_child(dog_type_select)
+
+	mode_select = OptionButton.new()
+	mode_select.custom_minimum_size = Vector2(112, 36)
+	for mode in ["CASUAL", "LADDER"]:
+		mode_select.add_item(mode)
+	header.add_child(mode_select)
+
+	lucky_select = OptionButton.new()
+	lucky_select.custom_minimum_size = Vector2(96, 36)
+	lucky_select.add_item("无幸运")
+	for lucky in range(1, 7):
+		lucky_select.add_item("幸运 %d" % lucky)
+	header.add_child(lucky_select)
+
+	create_run_button = _button("新建跑局", 118)
+	create_run_button.pressed.connect(_on_create_run_pressed)
+	header.add_child(create_run_button)
+
+	refresh_button = _button("刷新全部", 104)
+	refresh_button.pressed.connect(_refresh_all)
+	header.add_child(refresh_button)
+
+	status_label = Label.new()
+	status_label.custom_minimum_size = Vector2(0, 44)
+	status_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	status_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	status_label.clip_text = true
+	status_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	header.add_child(status_label)
+
+	var body := HBoxContainer.new()
+	body.name = "Body"
+	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	body.add_theme_constant_override("separation", 10)
+	root.add_child(body)
+
+	nav_list = VBoxContainer.new()
+	nav_list.custom_minimum_size = Vector2(128, 0)
+	nav_list.add_theme_constant_override("separation", 8)
+	body.add_child(nav_list)
+
+	content_scroll = ScrollContainer.new()
+	content_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	content_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	content_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	body.add_child(content_scroll)
+
+	content = VBoxContainer.new()
+	content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	content.add_theme_constant_override("separation", 10)
+	content_scroll.add_child(content)
+
+func _render_shell() -> void:
+	_clear_children(nav_list)
+	for tab in [TAB_RUN, TAB_ACCOUNT, TAB_ACHIEVEMENTS, TAB_DAILY, TAB_SHOP, TAB_LEADERBOARDS, TAB_SEASON, TAB_ROOMS]:
+		var button := _button(tab, 0)
+		button.custom_minimum_size = Vector2(0, 42)
+		button.disabled = action_in_progress
+		button.toggle_mode = true
+		button.button_pressed = tab == current_tab
+		button.pressed.connect(_on_tab_pressed.bind(tab))
+		nav_list.add_child(button)
+	_render_current_tab()
+
+func _refresh_all() -> void:
+	if action_in_progress or session == null:
 		return
-	error_label.text = ""
+	action_in_progress = true
+	_update_controls()
+	status_label.text = "正在同步网页版数据..."
+	await _fetch_into("me", ApiRoutes.me())
+	await _fetch_into("achievements", ApiRoutes.achievements())
+	await _fetch_into("daily", ApiRoutes.daily_tasks())
+	await _fetch_into("shop", ApiRoutes.shop())
+	await _fetch_into("cosmetics", ApiRoutes.cosmetics_me())
+	await _fetch_into("ladder", ApiRoutes.ladder_me())
+	await _fetch_into("leaderboard", ApiRoutes.ladder_leaderboard())
+	await _fetch_into("apex", ApiRoutes.apex())
+	await _fetch_into("history", ApiRoutes.runs_history())
+	await _fetch_into("rooms", ApiRoutes.dogfight_rooms())
+	status_label.text = "已同步"
+	action_in_progress = false
+	_update_controls()
+	_render_shell()
+
+func _fetch_into(key: String, path: String) -> void:
+	var response: Dictionary = await _api_get(path)
+	if not bool(response.get("ok", false)):
+		status_label.text = "%s 同步失败：%s" % [key, str(response.get("error", ""))]
+		return
+	match key:
+		"me":
+			me_data = _data(response)
+			var active_run = me_data.get("activeRun", null)
+			if active_run is Dictionary and session != null and session.has_method("set_current_run"):
+				session.set_current_run(active_run)
+		"achievements":
+			achievements_data = _data(response)
+		"daily":
+			daily_data = _data(response)
+		"shop":
+			meta_shop_data = _data(response)
+		"cosmetics":
+			cosmetics_data = _data(response)
+		"ladder":
+			ladder_data = _data(response)
+		"leaderboard":
+			leaderboard_data = _data(response)
+		"apex":
+			apex_data = _data(response)
+		"history":
+			history_data = _data(response)
+		"rooms":
+			rooms_data = _data(response)
+
+func _render_current_tab() -> void:
+	if content == null:
+		return
+	_clear_children(content)
+	match current_tab:
+		TAB_RUN:
+			_render_run_tab()
+		TAB_ACCOUNT:
+			_render_account_tab()
+		TAB_ACHIEVEMENTS:
+			_render_achievements_tab()
+		TAB_DAILY:
+			_render_daily_tab()
+		TAB_SHOP:
+			_render_shop_tab()
+		TAB_LEADERBOARDS:
+			_render_leaderboards_tab()
+		TAB_SEASON:
+			_render_season_tab()
+		TAB_ROOMS:
+			_render_rooms_tab()
+
+func _render_account_tab() -> void:
+	var card := _section("账号面板")
+	var user: Dictionary = _dict(me_data, "user")
+	var account: Dictionary = _dict(me_data, "account")
+	var wallet: Dictionary = _dict(account, "wallet")
+	_add_line(card, "账号", _fallback(str(user.get("account", "")), "未登录"))
+	_add_line(card, "昵称", _fallback(str(user.get("nickname", "")), "未设置"))
+	_add_line(card, "钱包", "余额 %d / 今日获得 %d" % [int(wallet.get("balance", 0)), int(wallet.get("dailyEarned", 0))])
+	var history_card := _section("跑局记录")
+	_add_line(history_card, "总跑局", str(int(history_data.get("totalRuns", 0))))
+	_add_line(history_card, "完成 / 放弃", "%d / %d" % [int(history_data.get("completedRuns", 0)), int(history_data.get("abandonedRuns", 0))])
+	_add_line(history_card, "胜负", "%d 胜 / %d 负" % [int(history_data.get("totalWins", 0)), int(history_data.get("totalLosses", 0))])
+	for run in _array(history_data, "recentRuns").slice(0, 8):
+		if run is Dictionary:
+			var row := _button("%s  %s  %d-%d  第%d回合" % [str(run.get("mode", "")), str(run.get("status", "")), int(run.get("wins", 0)), int(run.get("losses", 0)), int(run.get("round", 0))], 0)
+			row.pressed.connect(_on_history_run_pressed.bind(str(run.get("id", ""))))
+			history_card.add_child(row)
+
+func _render_run_tab() -> void:
+	var store: Object = _run_store()
+	if store == null or not store.has_method("has_run") or not store.has_run():
+		var empty := _section("当前跑局")
+		_add_line(empty, "状态", "暂无跑局。选择犬种/模式后点击“新建跑局”。")
+		return
+	var run: Dictionary = store.get("run")
+	var summary := _section("当前跑局")
+	_add_line(summary, "阶段", "%s / %s" % [str(run.get("phase", "")), str(run.get("status", ""))])
+	_add_line(summary, "犬种", "%s  幸运号 %s" % [str(run.get("dogType", "")), str(run.get("luckyNumber", "-"))])
+	_add_line(summary, "进度", "第 %d 回合 · %d 胜 %d 负 · 金币 %d" % [int(run.get("round", 0)), int(run.get("wins", 0)), int(run.get("losses", 0)), int(run.get("gold", 0))])
+	_render_run_actions(run, summary)
+	_render_reward_choices(run)
+	_render_inventory(run)
+	_render_map_or_shop(run)
+
+func _render_run_actions(run: Dictionary, card: VBoxContainer) -> void:
+	var phase := str(run.get("phase", ""))
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 8)
+	card.add_child(row)
+	if phase == "PREP":
+		row.add_child(_action_button("匹配对手", _call_session.bind("match_battle", [])))
+	elif phase == "MATCH":
+		row.add_child(_action_button("开始战斗", _call_session.bind("start_battle", [])))
+	elif phase == "BATTLE":
+		row.add_child(_action_button("完成结算", _call_session.bind("finish_battle", [])))
+	row.add_child(_action_button("放弃并结算", _call_session.bind("settle_run", [])))
+
+func _render_reward_choices(run: Dictionary) -> void:
+	var choices: Array = _array(run, "choices")
+	var relics: Array = _array(run, "relicChoices")
+	var classes: Array = _array(run, "classRewardChoices")
+	var enchants: Array = _array(run, "enchantChoices")
+	var potions: Array = _array(run, "potionChoices")
+	if choices.is_empty() and relics.is_empty() and classes.is_empty() and enchants.is_empty() and potions.is_empty() and str(run.get("phase", "")) != "UPGRADE_CHOICE":
+		return
+	var card := _section("奖励 / 选择")
+	for choice in choices:
+		card.add_child(_action_button("选择商店：%s" % str(choice), _call_session.bind("select_shop_choice", [str(choice)])))
+	for relic in relics:
+		if relic is Dictionary:
+			var def: Dictionary = _dict(relic, "def")
+			card.add_child(_action_button("选择遗物：%s" % _fallback(str(def.get("name", "")), str(relic.get("relicId", ""))), _call_session.bind("select_relic", [str(relic.get("relicId", ""))])))
+		else:
+			card.add_child(_action_button("选择遗物：%s" % str(relic), _call_session.bind("select_relic", [str(relic)])))
+	for item in classes:
+		if item is Dictionary:
+			var item_def: Dictionary = _dict(item, "def")
+			card.add_child(_action_button("领取职业装备：%s" % _fallback(str(item_def.get("name", "")), str(item.get("defId", ""))), _call_session.bind("select_class_reward", [str(item.get("defId", ""))])))
+	for enchant in enchants:
+		if enchant is Dictionary:
+			card.add_child(_action_button("附魔到选中装备：%s" % str(enchant.get("label", enchant.get("id", ""))), _select_enchant.bind(str(enchant.get("id", "")))))
+	for potion in potions:
+		if potion is Dictionary:
+			card.add_child(_action_button("药水给选中装备：%s" % str(potion.get("label", potion.get("id", ""))), _select_potion.bind(str(potion.get("id", "")))))
+	if str(run.get("phase", "")) == "UPGRADE_CHOICE":
+		card.add_child(_action_button("升级选中装备", _select_upgrade_item))
+		card.add_child(_action_button("跳过升级", _call_session.bind("skip_upgrade_choice", [])))
+
+func _render_inventory(run: Dictionary) -> void:
+	var card := _section("装备 / 背包 / 遗物")
+	var toolbar := HBoxContainer.new()
+	toolbar.add_theme_constant_override("separation", 8)
+	card.add_child(toolbar)
+	toolbar.add_child(_action_button("移到背包 0,0", _move_selected.bind("BAG")))
+	toolbar.add_child(_action_button("移到装备 0,0", _move_selected.bind("EQUIPMENT")))
+	toolbar.add_child(_action_button("出售选中装备", _call_selected_item.bind("sell_item")))
+	toolbar.add_child(_action_button("合成升级选中", _call_selected_item.bind("upgrade_item")))
+	_add_line(card, "当前选中", _fallback(selected_item_label, "无"))
+	for area in ["EQUIPMENT", "BAG"]:
+		_add_line(card, area, "")
+		for item in _array(run, "items"):
+			if item is Dictionary and str(item.get("area", "")) == area:
+				var item_label := _item_label(item)
+				var button := _button(item_label, 0)
+				button.pressed.connect(_select_item.bind(str(item.get("id", "")), item_label))
+				card.add_child(button)
+	for relic in _array(run, "relics"):
+		if relic is Dictionary:
+			var relic_def: Dictionary = _dict(relic, "def")
+			var label := "遗物：%s  %s" % [_fallback(str(relic_def.get("name", "")), str(relic.get("relicId", ""))), str(relic.get("quality", ""))]
+			var button := _button(label, 0)
+			button.pressed.connect(_select_relic.bind(str(relic.get("id", relic.get("relicId", ""))), label))
+			card.add_child(button)
+	if not selected_relic_id.is_empty():
+		card.add_child(_action_button("出售选中遗物", _call_session.bind("sell_relic", [selected_relic_id])))
+
+func _render_map_or_shop(run: Dictionary) -> void:
+	var phase := str(run.get("phase", ""))
+	if phase == "MAP":
+		var card := _section("探索地图")
+		var map_state: Dictionary = _dict(run, "mapState")
+		_add_line(card, "当前节点", str(map_state.get("currentNodeId", "无")))
+		for node in _available_map_nodes(map_state):
+			card.add_child(_action_button("前往 %s L%d-%d" % [str(node.get("kind", "UNKNOWN")), int(node.get("layer", 0)), int(node.get("column", 0))], _call_session.bind("select_map_node", [str(node.get("id", ""))])))
+		card.add_child(_action_button("处理事件", _call_session.bind("resolve_map_event", [])))
+		card.add_child(_action_button("完成节点", _call_session.bind("complete_map_node", [])))
+		card.add_child(_action_button("领取怪物奖励", _call_session.bind("claim_monster_reward", [])))
+		card.add_child(_action_button("跳过怪物奖励", _call_session.bind("skip_monster_reward", [])))
+	else:
+		var shop_card := _section("跑局商店")
+		_add_line(shop_card, "类型 / 刷新费", "%s / %d" % [str(run.get("shopType", "")), int(run.get("refreshCost", 0))])
+		shop_card.add_child(_action_button("刷新跑局商店", _call_session.bind("reroll_shop", [])))
+		for offer in _array(run, "shopItems"):
+			if offer is Dictionary:
+				shop_card.add_child(_action_button("%s  价格 %d" % [_offer_label(offer), int(offer.get("price", 0))], _call_session.bind("buy_offer", [str(offer.get("offerId", "")), "BAG"])))
+
+func _render_achievements_tab() -> void:
+	var card := _section("成就")
+	var wallet: Dictionary = _dict(achievements_data, "wallet")
+	_add_line(card, "钱包", "余额 %d / 今日获得 %d" % [int(wallet.get("balance", 0)), int(wallet.get("dailyEarned", 0))])
+	for achievement in _array(achievements_data, "achievements"):
+		if achievement is Dictionary:
+			var text := "%s  %d/%d  奖励 %d" % [str(achievement.get("title", "")), int(achievement.get("progress", 0)), int(achievement.get("target", 0)), int(achievement.get("reward", 0))]
+			if bool(achievement.get("claimable", false)):
+				card.add_child(_action_button("领取 " + text, _claim_achievement.bind(str(achievement.get("id", "")))))
+			else:
+				_add_line(card, "已领取" if bool(achievement.get("claimed", false)) else "进度", text)
+
+func _render_daily_tab() -> void:
+	var card := _section("每日任务")
+	var wallet: Dictionary = _dict(daily_data, "wallet")
+	_add_line(card, "日期 / 钱包", "%s · 余额 %d" % [str(daily_data.get("dateKey", "")), int(wallet.get("balance", 0))])
+	card.add_child(_action_button("刷新每日任务", _refresh_daily))
+	for task in _array(daily_data, "tasks"):
+		if task is Dictionary:
+			var def: Dictionary = _dict(task, "def")
+			var text := "%s  %d/%d  奖励 %d" % [_fallback(str(def.get("title", "")), str(task.get("taskId", ""))), int(task.get("progress", 0)), int(task.get("target", 0)), int(def.get("reward", 0))]
+			if int(task.get("progress", 0)) >= int(task.get("target", 0)) and str(task.get("claimedAt", "")).is_empty():
+				card.add_child(_action_button("领取 " + text, _claim_daily.bind(str(task.get("taskId", "")))))
+			else:
+				_add_line(card, "任务", text)
+
+func _render_shop_tab() -> void:
+	var card := _section("账号商城 / 外观")
+	var wallet: Dictionary = _dict(meta_shop_data, "wallet")
+	_add_line(card, "钱包", "余额 %d / 今日获得 %d" % [int(wallet.get("balance", 0)), int(wallet.get("dailyEarned", 0))])
+	var sections: Dictionary = _dict(meta_shop_data, "sections")
+	for section_name in ["featured", "permanent"]:
+		_add_line(card, section_name, "")
+		for item in _array(sections, section_name):
+			if item is Dictionary:
+				var text := "%s  %s  %d" % [str(item.get("name", item.get("id", ""))), str(item.get("rarity", "")), int(item.get("price", 0))]
+				if bool(item.get("owned", false)):
+					card.add_child(_action_button("装备 " + text, _equip_cosmetic.bind(str(item.get("id", "")))))
+				else:
+					card.add_child(_action_button("购买 " + text, _purchase_shop_item.bind(str(item.get("id", "")))))
+	var cosmetic_card := _section("已拥有外观")
+	for item in _array(cosmetics_data, "inventory"):
+		if item is Dictionary:
+			cosmetic_card.add_child(_action_button("装备 %s" % str(item.get("name", item.get("catalogItemId", ""))), _equip_cosmetic.bind(str(item.get("catalogItemId", item.get("id", ""))))))
+
+func _render_leaderboards_tab() -> void:
+	var ladder_card := _section("天梯排行榜")
+	var player_profile: Dictionary = _dict(leaderboard_data, "playerProfile")
+	_add_line(ladder_card, "我的段位", "%s  %d分  排名 %s" % [str(player_profile.get("tier", "")), int(player_profile.get("score", 0)), str(leaderboard_data.get("playerRank", "-"))])
+	for entry in _array(leaderboard_data, "leaderboard"):
+		if entry is Dictionary:
+			_add_line(ladder_card, "#%d" % int(entry.get("rank", 0)), "%s  %s" % [str(entry.get("name", "")), str(entry.get("title", ""))])
+	var apex_card := _section("巅峰榜")
+	var leaderboards: Dictionary = _dict(apex_data, "leaderboards")
+	for board_name in ["overall", "daily"]:
+		_add_line(apex_card, board_name, "")
+		for entry in _array(leaderboards, board_name).slice(0, 20):
+			if entry is Dictionary:
+				_add_line(apex_card, "#%s" % str(entry.get("rank", "-")), "%s  %d-%d  第%d回合" % [str(entry.get("name", "")), int(entry.get("wins", 0)), int(entry.get("losses", 0)), int(entry.get("round", 0))])
+
+func _render_season_tab() -> void:
+	var card := _section("赛季")
+	var season: Dictionary = _dict(ladder_data, "season")
+	var profile: Dictionary = _dict(ladder_data, "profile")
+	_add_line(card, "当前赛季", "%s  %s - %s" % [str(season.get("name", season.get("id", ""))), str(season.get("startsAt", "")), str(season.get("endsAt", ""))])
+	_add_line(card, "我的天梯", "%s  %d分  胜负 %d/%d" % [str(profile.get("tier", "")), int(profile.get("score", 0)), int(profile.get("wins", 0)), int(profile.get("losses", 0))])
+	for settlement in _array(ladder_data, "recentSettlements"):
+		if settlement is Dictionary:
+			_add_line(card, "结算", "%s -> %s  %+d" % [str(settlement.get("beforeTier", "")), str(settlement.get("afterTier", "")), int(settlement.get("delta", 0))])
+	for summary in _array(history_data, "seasonSummaries"):
+		if summary is Dictionary:
+			_add_line(card, "赛季记录", "%s  %d-%d" % [str(summary.get("seasonName", summary.get("seasonId", ""))), int(summary.get("wins", 0)), int(summary.get("losses", 0))])
+
+func _render_rooms_tab() -> void:
+	var card := _section("多人房间")
+	var room_toolbar := HBoxContainer.new()
+	room_toolbar.add_theme_constant_override("separation", 8)
+	card.add_child(room_toolbar)
+	room_toolbar.add_child(_action_button("创建房间", _create_room))
+	room_toolbar.add_child(_action_button("随机匹配", _match_room))
+	room_toolbar.add_child(_action_button("刷新房间", _refresh_rooms))
+	if not active_room.is_empty():
+		var detail := _section("当前房间")
+		_add_line(detail, "状态", "%s / %s / 第%d回合" % [str(active_room.get("status", "")), str(active_room.get("phase", "")), int(active_room.get("currentRound", 0))])
+		detail.add_child(_action_button("离开房间", _leave_active_room))
+		detail.add_child(_action_button("开始房间", _room_action.bind("start", {})))
+		detail.add_child(_action_button("准备 / 完成本回合", _room_action.bind("ready", {})))
+		detail.add_child(_action_button("选择柴犬", _room_action.bind("dog-choice", {"dogType": "SHIBA"})))
+		for member in _array(active_room, "members"):
+			if member is Dictionary:
+				_add_line(detail, str(member.get("nickname", member.get("kind", ""))), "%s  %d-%d  %s" % [str(member.get("kind", "")), int(member.get("wins", 0)), int(member.get("losses", 0)), "淘汰" if bool(member.get("eliminated", false)) else "存活"])
+		for battle in _array(active_room, "battles"):
+			if battle is Dictionary:
+				detail.add_child(_action_button("查看战报 第%d回合 %s" % [int(battle.get("round", 0)), str(battle.get("id", ""))], _load_room_battle.bind(str(battle.get("id", "")))))
+	for room in _array(rooms_data, "rooms"):
+		if room is Dictionary:
+			var room_id := str(room.get("id", ""))
+			var text := "%s 的房间  %s/%s  真人 %d/%d  存活 %d/%d" % [str(room.get("hostName", "")), str(room.get("status", "")), str(room.get("phase", "")), int(room.get("memberCount", 0)), int(room.get("maxPlayers", 0)), int(room.get("aliveCount", 0)), int(room.get("targetPlayerCount", 0))]
+			card.add_child(_action_button(text, _enter_or_view_room.bind(room_id, str(room.get("status", "")))))
 
 func _on_create_run_pressed() -> void:
-	error_label.text = ""
-	if session == null or not session.has_method("create_run"):
-		error_label.text = "跑局会话未初始化"
+	var dog_type := dog_type_select.get_item_text(dog_type_select.selected)
+	var mode := mode_select.get_item_text(mode_select.selected)
+	var lucky: Variant = null
+	if lucky_select.selected > 0:
+		lucky = lucky_select.selected
+	await _call_session("create_run", [dog_type, mode, lucky])
+
+func _on_history_run_pressed(run_id: String) -> void:
+	if run_id.is_empty():
 		return
-	if not _begin_run_action():
-		return
-	await session.create_run("SHIBA", "CASUAL")
-	_finish_run_action()
+	await _call_session("load_run", [run_id])
+	current_tab = TAB_RUN
+	_render_shell()
+
+func _on_tab_pressed(tab: String) -> void:
+	current_tab = tab
+	_render_shell()
 
 func _on_run_changed(_run: Dictionary) -> void:
-	_clear_stale_selection()
-	_render()
+	_render_current_tab()
 
-func _render() -> void:
-	if not is_node_ready():
+func _on_user_changed(_user: Dictionary) -> void:
+	call_deferred("_refresh_all")
+
+func _on_error_raised(message: String) -> void:
+	status_label.text = message
+
+func _call_session(method: String, args: Array) -> void:
+	if action_in_progress or session == null or not session.has_method(method):
 		return
-	clear_error()
-	var store = null if session == null else session.get("run_store")
-	if store == null or not store.has_run():
-		run_label.text = "暂无跑局"
-		action_button.text = _action_label("")
-		selected_item_id = ""
-		selected_item_area = ""
-		_render_items(equipment_list, [], "EQUIPMENT")
-		_render_items(bag_list, [], "BAG")
-		_render_shop([])
-		_update_action_controls_disabled()
-		return
-	var phase = store.phase()
-	run_label.text = "阶段: %s  回合: %d  金币: %d  胜: %d  负: %d" % [
-		phase,
-		store.round_number(),
-		store.gold(),
-		store.wins(),
-		store.losses()
-	]
-	_render_items(equipment_list, store.items_in_area("EQUIPMENT"), "EQUIPMENT")
-	_render_items(bag_list, store.items_in_area("BAG"), "BAG")
-	if phase == "MAP":
-		_render_map_nodes(store.map_available_nodes())
-	else:
-		_render_shop(store.shop_offers())
-	action_button.text = _action_label(phase)
-	_update_action_controls_disabled()
-
-func _render_items(container: VBoxContainer, items: Array, area: String) -> void:
-	_clear_children(container)
-	for item in items:
-		if not item is Dictionary:
-			continue
-		var item_id := str(item.get("id", ""))
-		if item_id.is_empty():
-			continue
-		var def_data = item.get("def", {})
-		var def_name := ""
-		if def_data is Dictionary:
-			def_name = str(def_data.get("name", ""))
-		if def_name.is_empty():
-			def_name = str(item.get("defId", item.get("id", "未知道具")))
-		var quality := str(item.get("quality", ""))
-		var x := int(item.get("x", 0))
-		var y := int(item.get("y", 0))
-		var row := Button.new()
-		row.custom_minimum_size = Vector2(0, 44)
-		row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		row.disabled = action_in_progress
-		row.clip_text = true
-		row.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-		row.text = "%s  %s  (%d,%d)" % [def_name, quality, x, y]
-		row.pressed.connect(_on_item_pressed.bind(item_id, area, def_name))
-		container.add_child(row)
-
-func _render_shop(offers: Array) -> void:
-	_clear_children(shop_list)
-	for offer in offers:
-		if not offer is Dictionary:
-			continue
-		var def_data = offer.get("def", {})
-		var def_name := ""
-		if def_data is Dictionary:
-			def_name = str(def_data.get("name", ""))
-		if def_name.is_empty():
-			def_name = str(offer.get("defId", offer.get("offerId", "未知商品")))
-		var price := int(offer.get("price", 0))
-		var row := Button.new()
-		row.custom_minimum_size = Vector2(0, 44)
-		row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		row.disabled = action_in_progress
-		row.clip_text = true
-		row.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-		row.text = "%s  价格: %d" % [def_name, price]
-		row.pressed.connect(_on_shop_offer_pressed.bind(str(offer.get("offerId", ""))))
-		shop_list.add_child(row)
-
-func _render_map_nodes(nodes: Array) -> void:
-	_clear_children(shop_list)
-	for node in nodes:
-		if not node is Dictionary:
-			continue
-		var node_id := str(node.get("id", ""))
-		if node_id.is_empty():
-			continue
-		var kind := str(node.get("kind", "UNKNOWN"))
-		var layer := int(node.get("layer", 0))
-		var column := int(node.get("column", 0))
-		var row := Button.new()
-		row.custom_minimum_size = Vector2(0, 44)
-		row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		row.disabled = action_in_progress
-		row.clip_text = true
-		row.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-		row.text = "地图 %s  L%d-%d" % [kind, layer, column]
-		row.pressed.connect(_on_map_node_pressed.bind(node_id))
-		shop_list.add_child(row)
-
-func _connect_button_once(button: Button, handler: Callable) -> void:
-	if not button.pressed.is_connected(handler):
-		button.pressed.connect(handler)
-
-func _begin_run_action() -> bool:
-	if action_in_progress:
-		return false
 	action_in_progress = true
-	_update_action_controls_disabled()
-	return true
-
-func _finish_run_action() -> void:
+	_update_controls()
+	var ok: bool = await session.callv(method, args)
 	action_in_progress = false
-	_update_action_controls_disabled()
+	_update_controls()
+	if ok:
+		await _refresh_after_action()
 
-func _update_action_controls_disabled() -> void:
-	if not is_node_ready():
-		return
-	sell_selected_button.disabled = action_in_progress
-	reroll_shop_button.disabled = action_in_progress
-	move_bag_button.disabled = action_in_progress
-	move_equipment_button.disabled = action_in_progress
-	create_run_button.disabled = action_in_progress
-	action_button.disabled = action_in_progress
-	for row in shop_list.get_children():
-		if row is Button:
-			row.disabled = action_in_progress
+func _refresh_after_action() -> void:
+	await _fetch_into("me", ApiRoutes.me())
+	await _fetch_into("history", ApiRoutes.runs_history())
+	if current_tab == TAB_ACHIEVEMENTS:
+		await _fetch_into("achievements", ApiRoutes.achievements())
+	elif current_tab == TAB_DAILY:
+		await _fetch_into("daily", ApiRoutes.daily_tasks())
+	elif current_tab == TAB_ROOMS:
+		await _fetch_into("rooms", ApiRoutes.dogfight_rooms())
+	_render_shell()
 
-func _on_item_pressed(item_id: String, area: String, label: String) -> void:
-	selected_item_id = item_id
-	selected_item_area = area
-	error_label.text = "已选中 %s" % label
+func _claim_achievement(achievement_id: String) -> void:
+	await _post_and_store(ApiRoutes.achievement_claim(achievement_id), {}, "achievements")
 
-func _on_shop_offer_pressed(offer_id: String) -> void:
-	if offer_id.is_empty():
-		error_label.text = "商品无效"
-		return
-	if session == null or not session.has_method("buy_offer"):
-		error_label.text = "跑局会话未初始化"
-		return
-	if not _begin_run_action():
-		return
-	await session.buy_offer(offer_id, "BAG")
-	_finish_run_action()
+func _refresh_daily() -> void:
+	await _post_and_store(ApiRoutes.daily_tasks_refresh(), {}, "daily")
 
-func _on_map_node_pressed(node_id: String) -> void:
-	if node_id.is_empty():
-		error_label.text = "地图节点无效"
-		return
-	if session == null or not session.has_method("select_map_node"):
-		error_label.text = "璺戝眬浼氳瘽鏈垵濮嬪寲"
-		return
-	if not _begin_run_action():
-		return
-	await session.select_map_node(node_id)
-	_finish_run_action()
+func _claim_daily(task_id: String) -> void:
+	await _post_and_store(ApiRoutes.daily_task_claim(task_id), {}, "daily")
 
-func _on_sell_selected_pressed() -> void:
-	if not _has_selected_item():
-		return
-	if session == null or not session.has_method("sell_item"):
-		error_label.text = "跑局会话未初始化"
-		return
-	if not _begin_run_action():
-		return
-	if await session.sell_item(selected_item_id):
-		selected_item_id = ""
-		selected_item_area = ""
-	_finish_run_action()
+func _purchase_shop_item(catalog_item_id: String) -> void:
+	await _post_and_store(ApiRoutes.shop_purchase(), {"catalogItemId": catalog_item_id}, "shop")
+	await _fetch_into("cosmetics", ApiRoutes.cosmetics_me())
+	_render_shell()
 
-func _on_reroll_shop_pressed() -> void:
-	if session == null or not session.has_method("reroll_shop"):
-		error_label.text = "跑局会话未初始化"
-		return
-	if not _begin_run_action():
-		return
-	await session.reroll_shop()
-	_finish_run_action()
+func _equip_cosmetic(catalog_item_id: String) -> void:
+	await _post_and_store(ApiRoutes.cosmetics_equip(), {"catalogItemId": catalog_item_id}, "cosmetics")
 
-func _on_action_pressed() -> void:
-	if session == null:
-		error_label.text = "璺戝眬浼氳瘽鏈垵濮嬪寲"
+func _refresh_rooms() -> void:
+	await _fetch_into("rooms", ApiRoutes.dogfight_rooms())
+	_render_shell()
+
+func _create_room() -> void:
+	var response: Dictionary = await _api_post(ApiRoutes.dogfight_rooms(), {})
+	await _apply_room_response(response)
+
+func _match_room() -> void:
+	var response: Dictionary = await _api_post(ApiRoutes.dogfight_match(), {})
+	await _apply_room_response(response)
+
+func _enter_or_view_room(room_id: String, status: String) -> void:
+	if room_id.is_empty():
 		return
-	var store = session.get("run_store")
-	if store == null or not store.has_run():
-		error_label.text = "没有当前跑局"
-		return
-	if not _begin_run_action():
-		return
-	var phase = store.phase()
-	if phase == "PREP" and session.has_method("match_battle"):
-		await session.match_battle()
-	elif phase == "MATCH" and session.has_method("start_battle"):
-		await session.start_battle()
-	elif phase == "BATTLE" and session.has_method("finish_battle"):
-		await session.finish_battle()
+	var path := ApiRoutes.dogfight_room(room_id)
+	var response: Dictionary
+	if status == "WAITING":
+		response = await _api_post(ApiRoutes.dogfight_room_join(room_id), {})
 	else:
-		error_label.text = "当前阶段不能执行战斗操作"
-	_finish_run_action()
+		response = await _api_get(path)
+	await _apply_room_response(response)
 
-func _on_move_to_bag_pressed() -> void:
-	await _move_selected_item("BAG")
+func _leave_active_room() -> void:
+	var room_id := str(active_room.get("id", ""))
+	if room_id.is_empty():
+		return
+	var response: Dictionary = await _api_post(ApiRoutes.dogfight_room_leave(room_id), {})
+	if bool(response.get("ok", false)):
+		active_room = {}
+		await _refresh_rooms()
+	else:
+		_show_error(str(response.get("error", "")))
 
-func _on_move_to_equipment_pressed() -> void:
-	await _move_selected_item("EQUIPMENT")
+func _room_action(action: String, body: Dictionary) -> void:
+	var room_id := str(active_room.get("id", ""))
+	if room_id.is_empty():
+		return
+	var path := ""
+	match action:
+		"start":
+			path = ApiRoutes.dogfight_room_start(room_id)
+		"ready":
+			path = ApiRoutes.dogfight_room_ready(room_id)
+		"dog-choice":
+			path = ApiRoutes.dogfight_room_dog_choice(room_id)
+	if path.is_empty():
+		return
+	var response: Dictionary = await _api_post(path, body)
+	await _apply_room_response(response)
 
-func _move_selected_item(area: String) -> void:
-	if not _has_selected_item():
+func _load_room_battle(battle_id: String) -> void:
+	var response: Dictionary = await _api_get(ApiRoutes.dogfight_battle(battle_id))
+	if not bool(response.get("ok", false)):
+		_show_error(str(response.get("error", "")))
 		return
-	if session == null or not session.has_method("move_item"):
-		error_label.text = "跑局会话未初始化"
-		return
-	if not _begin_run_action():
-		return
-	if await session.move_item(selected_item_id, area, 0, 0):
-		selected_item_area = area
-	_finish_run_action()
+	var data: Dictionary = _data(response)
+	var battle: Dictionary = _dict(data, "battle")
+	if session != null and session.has_signal("battle_started"):
+		session.battle_started.emit(_dict(battle, "result"))
 
-func _has_selected_item() -> bool:
-	if selected_item_id.is_empty():
-		error_label.text = "请先选中道具"
-		return false
-	return true
+func _apply_room_response(response: Dictionary) -> void:
+	if not bool(response.get("ok", false)):
+		_show_error(str(response.get("error", "")))
+		return
+	var data: Dictionary = _data(response)
+	active_room = _dict(data, "room")
+	current_tab = TAB_ROOMS
+	await _refresh_rooms()
 
-func _clear_stale_selection() -> void:
-	if selected_item_id.is_empty() or session == null:
+func _post_and_store(path: String, body: Dictionary, target: String) -> void:
+	var response: Dictionary = await _api_post(path, body)
+	if not bool(response.get("ok", false)):
+		_show_error(str(response.get("error", "")))
 		return
-	var store = session.get("run_store")
-	if store == null or not store.has_run():
-		selected_item_id = ""
-		selected_item_area = ""
-		return
-	for area in ["EQUIPMENT", "BAG"]:
-		for item in store.items_in_area(area):
-			if item is Dictionary and str(item.get("id", "")) == selected_item_id:
-				return
+	match target:
+		"achievements":
+			achievements_data = _data(response)
+		"daily":
+			daily_data = _data(response)
+		"shop":
+			meta_shop_data = _data(response)
+		"cosmetics":
+			cosmetics_data = _data(response)
+	_render_shell()
+
+func _select_item(item_id: String, label: String) -> void:
+	selected_item_id = item_id
+	selected_item_label = label
+	selected_relic_id = ""
+	status_label.text = "已选中：%s" % label
+	_render_current_tab()
+
+func _select_relic(relic_id: String, label: String) -> void:
+	selected_relic_id = relic_id
 	selected_item_id = ""
-	selected_item_area = ""
+	selected_item_label = ""
+	status_label.text = "已选中：%s" % label
+	_render_current_tab()
 
-func _action_label(phase: String) -> String:
-	match phase:
-		"PREP":
-			return "匹配对手"
-		"MATCH":
-			return "开始战斗"
-		"BATTLE":
-			return "继续结算"
-		_:
-			return "等待阶段操作"
+func _call_selected_item(method: String) -> void:
+	if selected_item_id.is_empty():
+		_show_error("请先选中装备或背包道具")
+		return
+	await _call_session(method, [selected_item_id])
+
+func _move_selected(area: String) -> void:
+	if selected_item_id.is_empty():
+		_show_error("请先选中装备或背包道具")
+		return
+	await _call_session("move_item", [selected_item_id, area, 0, 0])
+
+func _select_upgrade_item() -> void:
+	if selected_item_id.is_empty():
+		_show_error("请先选中要升级的装备")
+		return
+	await _call_session("select_upgrade_item", [selected_item_id])
+
+func _select_potion(potion_id: String) -> void:
+	if selected_item_id.is_empty():
+		_show_error("请先选中要使用药水的装备")
+		return
+	await _call_session("select_potion", [potion_id, selected_item_id])
+
+func _select_enchant(enchant_id: String) -> void:
+	if selected_item_id.is_empty():
+		_show_error("请先选中要附魔的装备")
+		return
+	await _call_session("select_enchant", [enchant_id, selected_item_id])
+
+func _api_get(path: String) -> Dictionary:
+	var client: ApiClient = _api()
+	if client == null:
+		return {"ok": false, "error": "API 未初始化", "data": {}}
+	return await client.get_json(path)
+
+func _api_post(path: String, body: Dictionary) -> Dictionary:
+	var client: ApiClient = _api()
+	if client == null:
+		return {"ok": false, "error": "API 未初始化", "data": {}}
+	return await client.post_json(path, body)
+
+func _api() -> ApiClient:
+	if session == null:
+		return null
+	return session.get("api") as ApiClient
+
+func _run_store() -> Object:
+	if session == null:
+		return null
+	return session.get("run_store")
+
+func _data(response: Dictionary) -> Dictionary:
+	var value = response.get("data", {})
+	return value if value is Dictionary else {}
+
+func _dict(source: Dictionary, key: String) -> Dictionary:
+	var value = source.get(key, {})
+	return value if value is Dictionary else {}
+
+func _array(source: Dictionary, key: String) -> Array:
+	var value = source.get(key, [])
+	return value if value is Array else []
+
+func _available_map_nodes(map_state: Dictionary) -> Array:
+	var available = map_state.get("availableNodeIds", [])
+	var nodes = map_state.get("nodes", [])
+	var result: Array = []
+	if not available is Array or not nodes is Array:
+		return result
+	for node in nodes:
+		if node is Dictionary and available.has(str(node.get("id", ""))):
+			result.append(node)
+	return result
+
+func _item_label(item: Dictionary) -> String:
+	var def: Dictionary = _dict(item, "def")
+	return "%s  %s  %s (%d,%d)" % [
+		_fallback(str(def.get("name", "")), str(item.get("defId", item.get("id", "")))),
+		str(item.get("quality", "")),
+		str(item.get("area", "")),
+		int(item.get("x", 0)),
+		int(item.get("y", 0)),
+	]
+
+func _offer_label(offer: Dictionary) -> String:
+	var def: Dictionary = _dict(offer, "def")
+	return "%s  %s" % [_fallback(str(def.get("name", "")), str(offer.get("defId", offer.get("offerId", "")))), str(offer.get("quality", ""))]
+
+func _section(title: String) -> VBoxContainer:
+	var panel := PanelContainer.new()
+	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	content.add_child(panel)
+	var box := VBoxContainer.new()
+	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	box.add_theme_constant_override("separation", 8)
+	panel.add_child(box)
+	var label := Label.new()
+	label.text = title
+	label.custom_minimum_size = Vector2(0, 32)
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	box.add_child(label)
+	return box
+
+func _add_line(parent: VBoxContainer, label: String, value: String) -> void:
+	var row := Label.new()
+	row.custom_minimum_size = Vector2(0, 28)
+	row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	row.text = "%s：%s" % [label, value] if not label.is_empty() else value
+	parent.add_child(row)
+
+func _button(text: String, min_width: int) -> Button:
+	var button := Button.new()
+	button.text = text
+	button.custom_minimum_size = Vector2(min_width, 38)
+	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL if min_width == 0 else Control.SIZE_SHRINK_BEGIN
+	button.clip_text = true
+	button.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	return button
+
+func _action_button(text: String, handler: Callable) -> Button:
+	var button := _button(text, 0)
+	button.disabled = action_in_progress
+	button.pressed.connect(handler)
+	return button
+
+func _update_controls() -> void:
+	if create_run_button != null:
+		create_run_button.disabled = action_in_progress
+	if refresh_button != null:
+		refresh_button.disabled = action_in_progress
+	if nav_list != null:
+		for child in nav_list.get_children():
+			if child is Button:
+				child.disabled = action_in_progress
 
 func _clear_children(container: Node) -> void:
 	for child in container.get_children():
 		container.remove_child(child)
 		child.queue_free()
 
-func _on_error_raised(message: String) -> void:
-	if not visible:
-		return
-	error_label.text = message
+func _fallback(value: String, fallback: String) -> String:
+	return fallback if value.is_empty() or value == "<null>" else value
+
+func _show_error(message: String) -> void:
+	status_label.text = message
