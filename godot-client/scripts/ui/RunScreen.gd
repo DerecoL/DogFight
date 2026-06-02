@@ -445,9 +445,9 @@ func _render_achievements_tab() -> void:
 		if achievement is Dictionary:
 			var text := "%s  %d/%d  奖励 %d" % [str(achievement.get("title", "")), int(achievement.get("progress", 0)), int(achievement.get("target", 0)), int(achievement.get("reward", 0))]
 			if bool(achievement.get("claimable", false)):
-				card.add_child(_action_button("领取 " + text, _claim_achievement.bind(str(achievement.get("id", "")))))
+				card.add_child(_action_button("可领取 " + text, _show_achievement_modal.bind(achievement)))
 			else:
-				_add_line(card, "已领取" if bool(achievement.get("claimed", false)) else "进度", text)
+				card.add_child(_action_button(("已领取 " if bool(achievement.get("claimed", false)) else "查看 ") + text, _show_achievement_modal.bind(achievement)))
 
 func _render_daily_tab() -> void:
 	var card := _section("每日任务")
@@ -457,11 +457,11 @@ func _render_daily_tab() -> void:
 	for task in _array(daily_data, "tasks"):
 		if task is Dictionary:
 			var def: Dictionary = _dict(task, "def")
-			var text := "%s  %d/%d  奖励 %d" % [_fallback(str(def.get("title", "")), str(task.get("taskId", ""))), int(task.get("progress", 0)), int(task.get("target", 0)), int(def.get("reward", 0))]
+			var text := "%s  %d/%d  奖励 %d" % [_fallback(str(def.get("title", "")), str(task.get("taskId", ""))), int(task.get("progress", 0)), int(task.get("target", 0)), _reward_amount(task, def)]
 			if int(task.get("progress", 0)) >= int(task.get("target", 0)) and str(task.get("claimedAt", "")).is_empty():
-				card.add_child(_action_button("领取 " + text, _claim_daily.bind(str(task.get("taskId", "")))))
+				card.add_child(_action_button("可领取 " + text, _show_daily_task_modal.bind(task)))
 			else:
-				_add_line(card, "任务", text)
+				card.add_child(_action_button("查看 " + text, _show_daily_task_modal.bind(task)))
 
 func _render_shop_tab() -> void:
 	var card := _section("账号商城 / 外观")
@@ -472,11 +472,11 @@ func _render_shop_tab() -> void:
 		_add_line(card, section_name, "")
 		for item in _array(sections, section_name):
 			if item is Dictionary:
-				var text := "%s  %s  %d" % [str(item.get("name", item.get("id", ""))), str(item.get("rarity", "")), int(item.get("price", 0))]
+				var text := "%s  %s  %d" % [_cosmetic_display_name(item), _rarity_label(str(item.get("rarity", ""))), int(item.get("price", 0))]
 				if bool(item.get("owned", false)):
-					card.add_child(_action_button("装备 " + text, _equip_cosmetic.bind(str(item.get("id", "")))))
+					card.add_child(_action_button(("已装备 " if bool(item.get("equipped", false)) else "查看 ") + text, _show_cosmetic_modal.bind(item)))
 				else:
-					card.add_child(_action_button("购买 " + text, _purchase_shop_item.bind(str(item.get("id", "")))))
+					card.add_child(_action_button("查看 " + text, _show_cosmetic_modal.bind(item)))
 	var cosmetic_card := _section("已拥有外观")
 	var default_row := HBoxContainer.new()
 	default_row.add_theme_constant_override("separation", 8)
@@ -485,7 +485,7 @@ func _render_shop_tab() -> void:
 		default_row.add_child(_action_button("默认 " + cosmetic_type, _unequip_cosmetic.bind(cosmetic_type)))
 	for item in _array(cosmetics_data, "inventory"):
 		if item is Dictionary:
-			cosmetic_card.add_child(_action_button("装备 %s" % str(item.get("name", item.get("catalogItemId", ""))), _equip_cosmetic.bind(str(item.get("catalogItemId", item.get("id", ""))))))
+			cosmetic_card.add_child(_action_button("查看 %s" % _cosmetic_display_name(item), _show_cosmetic_modal.bind(item)))
 
 func _render_leaderboards_tab() -> void:
 	var ladder_card := _section("天梯排行榜")
@@ -566,8 +566,8 @@ func _render_settings_tab() -> void:
 		_add_line(groups, cosmetic_type, "默认外观可直接恢复")
 		groups.add_child(_action_button("选择默认 " + cosmetic_type, _unequip_cosmetic.bind(cosmetic_type)))
 		for item in _array(cosmetics_data, "inventory"):
-			if item is Dictionary and str(item.get("type", item.get("cosmeticType", ""))) == cosmetic_type:
-				groups.add_child(_action_button("装备 %s" % str(item.get("name", item.get("catalogItemId", ""))), _equip_cosmetic.bind(str(item.get("catalogItemId", item.get("id", ""))))))
+			if item is Dictionary and _cosmetic_type(item) == cosmetic_type:
+				groups.add_child(_action_button("查看 %s" % _cosmetic_display_name(item), _show_cosmetic_modal.bind(item)))
 
 func _on_create_run_pressed() -> void:
 	var dog_type := dog_type_select.get_item_text(dog_type_select.selected)
@@ -859,6 +859,158 @@ func _render_snapshot_items(parent: VBoxContainer, title: String, items: Array) 
 		if item is Dictionary:
 			var def: Dictionary = _dict(item, "def")
 			_add_line(parent, "", "%s  %s  (%d,%d)" % [_fallback(str(def.get("name", "")), str(item.get("defId", item.get("id", "")))), str(item.get("quality", "")), int(item.get("x", 0)), int(item.get("y", 0))])
+
+func _show_cosmetic_modal(raw_item: Dictionary) -> void:
+	var item: Dictionary = _cosmetic_item(raw_item)
+	var title := _cosmetic_display_name(raw_item)
+	var modal := _modal_panel("外观详情", Vector2(520, 460))
+	if modal.is_empty():
+		return
+	var box: VBoxContainer = modal["box"]
+	_add_line(box, "名称", title)
+	_add_line(box, "类型", _cosmetic_type_label(_cosmetic_type(raw_item)))
+	_add_line(box, "稀有度", _rarity_label(str(item.get("rarity", ""))))
+	_add_line(box, "价格", "%d" % int(item.get("price", 0)))
+	var description := str(item.get("description", ""))
+	if not description.is_empty():
+		_add_line(box, "说明", description)
+	_add_line(box, "状态", _cosmetic_status_label(raw_item))
+	var catalog_item_id := _cosmetic_catalog_id(raw_item)
+	if not catalog_item_id.is_empty():
+		if bool(item.get("owned", raw_item.get("owned", false))):
+			if bool(item.get("equipped", raw_item.get("equipped", false))):
+				var equipped_button := _button("已装备", 120)
+				equipped_button.disabled = true
+				box.add_child(equipped_button)
+			else:
+				box.add_child(_action_button("装备", _cosmetic_action_from_modal.bind("equip", catalog_item_id)))
+		else:
+			box.add_child(_action_button("购买", _cosmetic_action_from_modal.bind("purchase", catalog_item_id)))
+	_push_modal(modal["panel"])
+
+func _show_achievement_modal(achievement: Dictionary) -> void:
+	var title := _fallback(str(achievement.get("title", "")), str(achievement.get("id", "")))
+	var modal := _modal_panel("成就详情", Vector2(520, 420))
+	if modal.is_empty():
+		return
+	var box: VBoxContainer = modal["box"]
+	_add_line(box, "名称", title)
+	var description := str(achievement.get("description", ""))
+	if not description.is_empty():
+		_add_line(box, "说明", description)
+	_add_line(box, "进度", "%d/%d" % [int(achievement.get("progress", 0)), int(achievement.get("target", 0))])
+	_add_line(box, "奖励", "%d" % int(achievement.get("reward", 0)))
+	_add_line(box, "状态", _claim_status_label(bool(achievement.get("claimable", false)), bool(achievement.get("claimed", false)), int(achievement.get("progress", 0)), int(achievement.get("target", 0))))
+	var achievement_id := str(achievement.get("id", ""))
+	if bool(achievement.get("claimable", false)) and not achievement_id.is_empty():
+		box.add_child(_action_button("领取奖励", _achievement_action_from_modal.bind(achievement_id)))
+	_push_modal(modal["panel"])
+
+func _show_daily_task_modal(task: Dictionary) -> void:
+	var def: Dictionary = _dict(task, "def")
+	var title := _fallback(str(def.get("title", "")), str(task.get("taskId", "")))
+	var modal := _modal_panel("每日任务详情", Vector2(520, 420))
+	if modal.is_empty():
+		return
+	var box: VBoxContainer = modal["box"]
+	_add_line(box, "名称", title)
+	var description := str(def.get("description", ""))
+	if not description.is_empty():
+		_add_line(box, "说明", description)
+	_add_line(box, "进度", "%d/%d" % [int(task.get("progress", 0)), int(task.get("target", 0))])
+	_add_line(box, "奖励", "%d" % _reward_amount(task, def))
+	var ready := int(task.get("progress", 0)) >= int(task.get("target", 0))
+	var claimed := not str(task.get("claimedAt", "")).is_empty()
+	_add_line(box, "状态", _claim_status_label(ready and not claimed, claimed, int(task.get("progress", 0)), int(task.get("target", 0))))
+	var task_id := str(task.get("taskId", ""))
+	if ready and not claimed and not task_id.is_empty():
+		box.add_child(_action_button("领取奖励", _daily_action_from_modal.bind(task_id)))
+	_push_modal(modal["panel"])
+
+func _cosmetic_item(raw_item: Dictionary) -> Dictionary:
+	var nested: Dictionary = _dict(raw_item, "item")
+	if nested.is_empty():
+		return raw_item
+	var merged := nested.duplicate(true)
+	for key in ["catalogItemId", "owned", "equipped"]:
+		if raw_item.has(key) and not merged.has(key):
+			merged[key] = raw_item.get(key)
+	return merged
+
+func _cosmetic_catalog_id(raw_item: Dictionary) -> String:
+	var item: Dictionary = _cosmetic_item(raw_item)
+	return _fallback(str(item.get("id", "")), str(raw_item.get("catalogItemId", "")))
+
+func _cosmetic_display_name(raw_item: Dictionary) -> String:
+	var item: Dictionary = _cosmetic_item(raw_item)
+	return _fallback(str(item.get("name", "")), _cosmetic_catalog_id(raw_item))
+
+func _cosmetic_type(raw_item: Dictionary) -> String:
+	var item: Dictionary = _cosmetic_item(raw_item)
+	return str(item.get("type", item.get("cosmeticType", raw_item.get("type", raw_item.get("cosmeticType", "")))))
+
+func _cosmetic_status_label(raw_item: Dictionary) -> String:
+	var item: Dictionary = _cosmetic_item(raw_item)
+	if bool(item.get("equipped", raw_item.get("equipped", false))):
+		return "已装备"
+	if bool(item.get("owned", raw_item.get("owned", false))):
+		return "已拥有"
+	return "未拥有"
+
+func _cosmetic_type_label(cosmetic_type: String) -> String:
+	match cosmetic_type:
+		"TITLE":
+			return "称号"
+		"AVATAR":
+			return "头像"
+		"BACKGROUND":
+			return "主页背景"
+		"DOG_SKIN":
+			return "狗狗皮肤"
+		"BATTLE_EFFECT":
+			return "战斗特效"
+		_:
+			return _fallback(cosmetic_type, "外观")
+
+func _rarity_label(rarity: String) -> String:
+	match rarity:
+		"COMMON":
+			return "普通"
+		"RARE":
+			return "稀有"
+		"EPIC":
+			return "史诗"
+		"LEGENDARY":
+			return "传说"
+		_:
+			return _fallback(rarity, "普通")
+
+func _reward_amount(source: Dictionary, def: Dictionary) -> int:
+	return int(source.get("reward", def.get("reward", 0)))
+
+func _claim_status_label(claimable: bool, claimed: bool, progress: int, target: int) -> String:
+	if claimed:
+		return "已领取"
+	if claimable:
+		return "可领取"
+	if progress >= target and target > 0:
+		return "可领取"
+	return "未完成"
+
+func _cosmetic_action_from_modal(action: String, catalog_item_id: String) -> void:
+	_close_top_modal()
+	if action == "purchase":
+		await _purchase_shop_item(catalog_item_id)
+	else:
+		await _equip_cosmetic(catalog_item_id)
+
+func _achievement_action_from_modal(achievement_id: String) -> void:
+	_close_top_modal()
+	await _claim_achievement(achievement_id)
+
+func _daily_action_from_modal(task_id: String) -> void:
+	_close_top_modal()
+	await _claim_daily(task_id)
 
 func _show_offer_modal(offer: Dictionary) -> void:
 	var def: Dictionary = _dict(offer, "def")
