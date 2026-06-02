@@ -49,6 +49,8 @@ var selected_relic_id := ""
 var selected_relic: Dictionary = {}
 var selected_room_id := ""
 var active_room: Dictionary = {}
+var history_tab := "ALL"
+var selected_history_run_id := ""
 var dismissed_ceremonies: Dictionary = {}
 var nickname_setup_modal_open := false
 var tutorial_modal_open := false
@@ -1120,16 +1122,146 @@ func _push_ui_action_success(action: String) -> void:
 		toast_bus.push(message, "success")
 
 func _show_history_modal() -> void:
-	var modal := _modal_panel("个人战绩详情", Vector2(560, 480))
+	var runs := _history_runs_for_tab(history_tab)
+	if selected_history_run_id.is_empty() and not runs.is_empty() and runs[0] is Dictionary:
+		selected_history_run_id = str((runs[0] as Dictionary).get("id", ""))
+	var selected_run := _selected_history_run(runs)
+	var modal := _modal_panel("个人战绩详情", Vector2(760, 560))
 	if modal.is_empty():
 		return
 	var box: VBoxContainer = modal["box"]
-	_add_line(box, "总局数", "%d 局 · 完成 %d · 放弃 %d" % [int(history_data.get("totalRuns", 0)), int(history_data.get("completedRuns", 0)), int(history_data.get("abandonedRuns", 0))])
+	_add_line(box, "总局数", "%d 局 · 进行中 %d · 完成 %d · 放弃 %d" % [
+		int(history_data.get("totalRuns", 0)),
+		int(history_data.get("activeRuns", 0)),
+		int(history_data.get("completedRuns", 0)),
+		int(history_data.get("abandonedRuns", 0)),
+	])
 	_add_line(box, "总胜负", "%d 胜 / %d 负" % [int(history_data.get("totalWins", 0)), int(history_data.get("totalLosses", 0))])
-	for run in _array(history_data, "recentRuns").slice(0, 12):
+	var best_run: Dictionary = _dict(history_data, "bestRun")
+	if not best_run.is_empty():
+		_add_line(box, "最佳成绩", "%s · %d胜 %d败 · 第%d回合" % [_dog_name(str(best_run.get("dogType", ""))), int(best_run.get("wins", 0)), int(best_run.get("losses", 0)), int(best_run.get("round", 0))])
+	var tabs := HBoxContainer.new()
+	tabs.add_theme_constant_override("separation", 6)
+	box.add_child(tabs)
+	for tab in _history_mode_tabs():
+		if tab is Dictionary:
+			var tab_id := str(tab.get("id", "ALL"))
+			var count := _history_tab_count(tab_id)
+			var button := _button("%s %d" % [str(tab.get("label", tab_id)), count], 108)
+			button.toggle_mode = true
+			button.button_pressed = history_tab == tab_id
+			button.pressed.connect(_select_history_tab.bind(tab_id))
+			tabs.add_child(button)
+	var layout := HBoxContainer.new()
+	layout.add_theme_constant_override("separation", 10)
+	box.add_child(layout)
+	var browser := VBoxContainer.new()
+	browser.custom_minimum_size = Vector2(280, 0)
+	browser.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	browser.add_theme_constant_override("separation", 6)
+	layout.add_child(browser)
+	_add_line(browser, "历史对局列表", "%s · %d 条记录" % [_history_tab_label(history_tab), runs.size()])
+	if runs.is_empty():
+		_add_line(browser, "空状态", "%s暂无记录" % _history_tab_label(history_tab))
+	for run in runs.slice(0, 16):
 		if run is Dictionary:
-			box.add_child(_action_button("%s  %s  %d-%d  第%d回合" % [str(run.get("mode", "")), str(run.get("dogType", "")), int(run.get("wins", 0)), int(run.get("losses", 0)), int(run.get("round", 0))], _show_snapshot_modal.bind(run, "历史对局配置")))
+			var run_id := str(run.get("id", ""))
+			var row_text := "%s  %d胜 %d败  第%d回合" % [
+				_dog_name(str(run.get("dogType", ""))),
+				int(run.get("wins", 0)),
+				int(run.get("losses", 0)),
+				int(run.get("round", 0)),
+			]
+			var row := _button(("%s  " % _run_status_label(str(run.get("status", "")))) + row_text, 260)
+			row.toggle_mode = true
+			row.button_pressed = run_id == selected_history_run_id
+			row.pressed.connect(_select_history_run.bind(run_id))
+			browser.add_child(row)
+	var detail := VBoxContainer.new()
+	detail.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	detail.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	detail.add_theme_constant_override("separation", 6)
+	layout.add_child(detail)
+	_render_history_run_details(detail, selected_run)
 	_push_modal(modal["panel"])
+
+func _history_mode_tabs() -> Array:
+	return [
+		{"id": "ALL", "label": "全部"},
+		{"id": "CASUAL", "label": "休闲"},
+		{"id": "DOGFIGHT", "label": "斗狗"},
+		{"id": "PEAK", "label": "巅峰"},
+		{"id": "LADDER", "label": "天梯"},
+	]
+
+func _history_tab_label(tab_id: String) -> String:
+	for tab in _history_mode_tabs():
+		if tab is Dictionary and str(tab.get("id", "")) == tab_id:
+			return str(tab.get("label", tab_id))
+	return tab_id
+
+func _history_tab_count(tab_id: String) -> int:
+	return _history_runs_for_tab(tab_id).size()
+
+func _history_runs_for_tab(tab_id: String) -> Array:
+	var runs := _array(history_data, "recentRuns")
+	if tab_id == "ALL":
+		return runs
+	var filtered: Array = []
+	for run in runs:
+		if run is Dictionary and str(run.get("mode", "")) == tab_id:
+			filtered.append(run)
+	return filtered
+
+func _selected_history_run(runs: Array) -> Dictionary:
+	for run in runs:
+		if run is Dictionary and str(run.get("id", "")) == selected_history_run_id:
+			return run
+	if not runs.is_empty() and runs[0] is Dictionary:
+		var first: Dictionary = runs[0]
+		selected_history_run_id = str(first.get("id", ""))
+		return first
+	selected_history_run_id = ""
+	return {}
+
+func _select_history_tab(tab_id: String) -> void:
+	history_tab = tab_id
+	selected_history_run_id = ""
+	_close_top_modal()
+	_show_history_modal()
+
+func _select_history_run(run_id: String) -> void:
+	selected_history_run_id = run_id
+	_close_top_modal()
+	_show_history_modal()
+
+func _render_history_run_details(parent: VBoxContainer, run: Dictionary) -> void:
+	_add_line(parent, "对局详情", "")
+	if run.is_empty():
+		_add_line(parent, "没有可查看的对局", "开始或完成一局后，会在这里显示装备和遗物详情。")
+		return
+	_add_line(parent, _history_tab_label(str(run.get("mode", ""))), "%s · %d胜 %d败" % [_dog_name(str(run.get("dogType", ""))), int(run.get("wins", 0)), int(run.get("losses", 0))])
+	_add_line(parent, "状态", "%s · 第%d回合 · %s" % [_run_status_label(str(run.get("status", ""))), int(run.get("round", 0)), str(run.get("updatedAt", ""))])
+	_render_snapshot_items(parent, "历史装备栏", _filter_area(_array(run, "items"), "EQUIPMENT"))
+	var relics := _array(run, "relics")
+	var bag := _filter_area(_array(run, "items"), "BAG")
+	_add_line(parent, "遗物 / 背包", "遗物 %d 个 · 背包物品 %d 个" % [relics.size(), bag.size()])
+	for relic in relics.slice(0, 6):
+		if relic is Dictionary:
+			var relic_def: Dictionary = _dict(relic, "def")
+			var relic_title := _fallback(str(relic_def.get("name", "")), str(relic.get("relicId", "")))
+			parent.add_child(_action_button("%s  %s" % [relic_title, str(relic.get("quality", ""))], _show_snapshot_relic_modal.bind(relic)))
+
+func _run_status_label(status: String) -> String:
+	match status:
+		"ACTIVE":
+			return "进行中"
+		"COMPLETE":
+			return "已完成"
+		"ABANDONED":
+			return "已换狗"
+		_:
+			return "已记录"
 
 func _show_snapshot_modal(snapshot: Dictionary, title: String) -> void:
 	var modal := _modal_panel(title, Vector2(620, 520))

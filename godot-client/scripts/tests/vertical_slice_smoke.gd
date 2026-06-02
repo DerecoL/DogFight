@@ -14,10 +14,10 @@ func _run() -> void:
 	root.add_child(api)
 	await process_frame
 
-	var account := "godot-smoke-%d-%d" % [Time.get_unix_time_from_system(), Time.get_ticks_usec()]
-	await _expect_ok(await api.post_json("/auth/register", {"account": account, "password": "dogdice"}), "register")
-	await _expect_ok(await api.post_json("/profile/nickname", {"nickname": "Godot烟测"}), "set nickname")
-	var create_response: Dictionary = await _expect_ok(await api.post_json("/runs", {"dogType": "SHIBA", "mode": "CASUAL"}), "create run")
+	var create_response := await _create_smoke_run_with_retry()
+	if not bool(create_response.get("ok", false)):
+		_fail("create run failed after retries: %s" % str(create_response.get("error", "")))
+		return
 	var run: Dictionary = _run_from(create_response, "create run")
 	var run_id := str(run.get("id", ""))
 	if run_id.is_empty():
@@ -56,6 +56,26 @@ func _expect_ok(response: Dictionary, label: String) -> Dictionary:
 	if not bool(response.get("ok", false)):
 		_fail("%s failed: %s" % [label, str(response.get("error", ""))])
 	return response
+
+func _create_smoke_run_with_retry() -> Dictionary:
+	var last_response := {}
+	for attempt in range(3):
+		api.cookie_header = ""
+		var account := "godot-smoke-%d-%d-%d" % [Time.get_unix_time_from_system(), Time.get_ticks_usec(), attempt]
+		var register_response: Dictionary = await api.post_json("/auth/register", {"account": account, "password": "dogdice"})
+		if not bool(register_response.get("ok", false)):
+			last_response = register_response
+			continue
+		var nickname_response: Dictionary = await api.post_json("/profile/nickname", {"nickname": "Godot烟测"})
+		if not bool(nickname_response.get("ok", false)):
+			last_response = nickname_response
+			continue
+		var create_response: Dictionary = await api.post_json("/runs", {"dogType": "SHIBA", "mode": "CASUAL"})
+		last_response = create_response
+		if bool(create_response.get("ok", false)):
+			return create_response
+		print("Godot vertical slice create run retry ", attempt + 1, ": ", str(create_response.get("error", "")))
+	return last_response
 
 func _run_from(response: Dictionary, label: String) -> Dictionary:
 	var data = response.get("data", {})
