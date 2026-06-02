@@ -14,6 +14,24 @@ const TAB_SEASON := "赛季"
 const TAB_ROOMS := "房间"
 const TAB_SETTINGS := "设置"
 
+const DOG_TYPES := ["SHIBA", "SAMOYED", "MUTT", "BULLY", "EMPEROR", "FROG"]
+const DOG_NAMES := {
+	"SHIBA": "柴犬",
+	"SAMOYED": "萨摩耶",
+	"MUTT": "土狗",
+	"BULLY": "恶霸",
+	"EMPEROR": "狗皇帝",
+	"FROG": "祖灵",
+}
+const DOG_TRAITS := {
+	"SHIBA": "20% 概率改掷为小点 1/2/3",
+	"SAMOYED": "20% 概率改掷为大点 4/5/6",
+	"MUTT": "20% 概率额外投掷一次",
+	"BULLY": "大型物品触发时有概率翻倍",
+	"EMPEROR": "指定天命数字，命中时有爆发上限",
+	"FROG": "围绕蓄水池和雨季构筑持续收益",
+}
+
 var session: Node
 var current_tab := TAB_LOBBY
 var action_in_progress := false
@@ -117,7 +135,7 @@ func _build_layout() -> void:
 
 	dog_type_select = OptionButton.new()
 	dog_type_select.custom_minimum_size = Vector2(132, 36)
-	for dog_type in ["SHIBA", "MUTT", "HUSKY", "CORGI", "EMPEROR"]:
+	for dog_type in DOG_TYPES:
 		dog_type_select.add_item(dog_type)
 	header.add_child(dog_type_select)
 
@@ -281,6 +299,7 @@ func _render_lobby_tab() -> void:
 	shortcuts.add_child(_action_button("战绩详情", _show_history_modal))
 
 	var modes := _section("竞技方式")
+	_render_dog_picker(modes)
 	var casual_label: String = "继续休闲模式" if _current_run_mode() == "CASUAL" else "开始休闲模式"
 	var ladder_label: String = "继续天梯模式" if _current_run_mode() == "LADDER" else "进入天梯模式"
 	modes.add_child(_mode_button("休闲模式", "标准跑局，完成后的狗可提交巅峰竞技场。", casual_label, _start_mode.bind("CASUAL")))
@@ -515,7 +534,7 @@ func _render_rooms_tab() -> void:
 		detail.add_child(_action_button("离开房间", _leave_active_room))
 		detail.add_child(_action_button("开始房间", _room_action.bind("start", {})))
 		detail.add_child(_action_button("准备 / 完成本回合", _room_action.bind("ready", {})))
-		detail.add_child(_action_button("选择柴犬", _room_action.bind("dog-choice", {"dogType": "SHIBA"})))
+		detail.add_child(_action_button("选择当前狗狗", _choose_room_dog))
 		for member in _array(active_room, "members"):
 			if member is Dictionary:
 				_add_line(detail, str(member.get("nickname", member.get("kind", ""))), "%s  %d-%d  %s" % [str(member.get("kind", "")), int(member.get("wins", 0)), int(member.get("losses", 0)), "淘汰" if bool(member.get("eliminated", false)) else "存活"])
@@ -551,7 +570,9 @@ func _on_create_run_pressed() -> void:
 	var dog_type := dog_type_select.get_item_text(dog_type_select.selected)
 	var mode := mode_select.get_item_text(mode_select.selected)
 	var lucky: Variant = null
-	if lucky_select.selected > 0:
+	if dog_type == "EMPEROR":
+		if lucky_select.selected <= 0:
+			lucky_select.select(1)
 		lucky = lucky_select.selected
 	await _call_session("create_run", [dog_type, mode, lucky])
 
@@ -587,6 +608,45 @@ func _start_mode(mode: String) -> void:
 		_render_shell()
 		return
 	await _on_create_run_pressed()
+
+func _render_dog_picker(parent: VBoxContainer) -> void:
+	_add_line(parent, "选择狗狗", "与网页版一致的 6 个犬种；狗皇帝需要天命数字")
+	var grid := GridContainer.new()
+	grid.columns = 3
+	grid.add_theme_constant_override("h_separation", 8)
+	grid.add_theme_constant_override("v_separation", 8)
+	parent.add_child(grid)
+	for dog_type in DOG_TYPES:
+		grid.add_child(_dog_card_button(dog_type))
+
+func _dog_card_button(dog_type: String) -> Button:
+	var selected: bool = dog_type_select.get_item_text(dog_type_select.selected) == dog_type
+	var label := "%s\n%s\n%s" % [_dog_name(dog_type), dog_type, str(DOG_TRAITS.get(dog_type, ""))]
+	var button := _button(label, 0)
+	button.custom_minimum_size = Vector2(180, 98)
+	button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	button.toggle_mode = true
+	button.button_pressed = selected
+	_apply_button_icon(button, _dog_texture(dog_type))
+	button.pressed.connect(_select_dog_type.bind(dog_type))
+	return button
+
+func _select_dog_type(dog_type: String) -> void:
+	for index in range(dog_type_select.item_count):
+		if dog_type_select.get_item_text(index) == dog_type:
+			dog_type_select.select(index)
+			break
+	if dog_type == "EMPEROR" and lucky_select.selected <= 0:
+		lucky_select.select(1)
+	_render_shell()
+
+func _dog_name(dog_type: String) -> String:
+	return str(DOG_NAMES.get(dog_type, dog_type))
+
+func _dog_texture(dog_type: String) -> Texture2D:
+	if dog_type == "FROG":
+		return _texture("res://assets/dogs/zuling.jpg")
+	return _texture("res://assets/dogs/%s.webp" % dog_type.to_lower())
 
 func _on_run_changed(_run: Dictionary) -> void:
 	_render_current_tab()
@@ -711,6 +771,15 @@ func _room_action(action: String, body: Dictionary) -> void:
 		return
 	var response: Dictionary = await _api_post(path, body)
 	await _apply_room_response(response)
+
+func _choose_room_dog() -> void:
+	var dog_type := dog_type_select.get_item_text(dog_type_select.selected)
+	var body := {"dogType": dog_type}
+	if dog_type == "EMPEROR":
+		if lucky_select.selected <= 0:
+			lucky_select.select(1)
+		body["luckyNumber"] = lucky_select.selected
+	await _room_action("dog-choice", body)
 
 func _load_room_battle(battle_id: String) -> void:
 	var response: Dictionary = await _api_get(ApiRoutes.dogfight_battle(battle_id))

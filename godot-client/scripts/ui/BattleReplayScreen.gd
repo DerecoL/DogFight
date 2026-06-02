@@ -31,6 +31,8 @@ var player_equipment_grid: GridContainer
 var opponent_equipment_grid: GridContainer
 var player_relic_row: HBoxContainer
 var opponent_relic_row: HBoxContainer
+var player_avatar: TextureRect
+var opponent_avatar: TextureRect
 var log_toggle_button: Button
 var log_filter_row: HBoxContainer
 
@@ -149,6 +151,7 @@ func _build_battle_layout() -> void:
 
 	var opponent_panel := _snapshot_panel("对手装备栏")
 	opponent_name_label = opponent_panel["name"]
+	opponent_avatar = opponent_panel["avatar"]
 	opponent_equipment_grid = opponent_panel["grid"]
 	opponent_relic_row = opponent_panel["relics"]
 	root.add_child(opponent_panel["panel"])
@@ -156,6 +159,7 @@ func _build_battle_layout() -> void:
 
 	var player_panel := _snapshot_panel("你的装备栏")
 	player_name_label = player_panel["name"]
+	player_avatar = player_panel["avatar"]
 	player_equipment_grid = player_panel["grid"]
 	player_relic_row = player_panel["relics"]
 	root.add_child(player_panel["panel"])
@@ -188,11 +192,20 @@ func _snapshot_panel(title: String) -> Dictionary:
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 6)
 	panel.add_child(box)
+	var header := HBoxContainer.new()
+	header.add_theme_constant_override("separation", 8)
+	box.add_child(header)
+	var avatar := TextureRect.new()
+	avatar.custom_minimum_size = Vector2(58, 58)
+	avatar.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	header.add_child(avatar)
 	var name_label := Label.new()
 	name_label.text = title
 	name_label.custom_minimum_size = Vector2(0, 26)
+	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	name_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	box.add_child(name_label)
+	name_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	header.add_child(name_label)
 	var grid := GridContainer.new()
 	grid.columns = 12
 	grid.add_theme_constant_override("h_separation", 4)
@@ -201,24 +214,27 @@ func _snapshot_panel(title: String) -> Dictionary:
 	var relics := HBoxContainer.new()
 	relics.add_theme_constant_override("separation", 4)
 	box.add_child(relics)
-	return {"panel": panel, "name": name_label, "grid": grid, "relics": relics}
+	return {"panel": panel, "name": name_label, "avatar": avatar, "grid": grid, "relics": relics}
 
 func _render_snapshots() -> void:
 	var player: Dictionary = _dict(battle, "playerSnapshot")
 	var opponent: Dictionary = _dict(battle, "opponentSnapshot")
-	_render_snapshot(player_name_label, player_equipment_grid, player_relic_row, player, "你的狗狗")
-	_render_snapshot(opponent_name_label, opponent_equipment_grid, opponent_relic_row, opponent, "离线狗狗")
+	_render_snapshot(player_name_label, player_avatar, player_equipment_grid, player_relic_row, player, "你的狗狗")
+	_render_snapshot(opponent_name_label, opponent_avatar, opponent_equipment_grid, opponent_relic_row, opponent, "离线狗狗")
 
-func _render_snapshot(name_label: Label, grid: GridContainer, relic_row: HBoxContainer, snapshot: Dictionary, fallback_name: String) -> void:
+func _render_snapshot(name_label: Label, avatar: TextureRect, grid: GridContainer, relic_row: HBoxContainer, snapshot: Dictionary, fallback_name: String) -> void:
 	if name_label == null or grid == null or relic_row == null:
 		return
+	var dog_type := str(snapshot.get("dogType", ""))
 	name_label.text = "%s · %s · %d胜 %d负 · 第%d回合" % [
 		str(snapshot.get("name", fallback_name)),
-		str(snapshot.get("dogType", "")),
+		dog_type,
 		int(snapshot.get("wins", 0)),
 		int(snapshot.get("losses", 0)),
 		int(snapshot.get("round", 0)),
 	]
+	if avatar != null:
+		avatar.texture = _dog_texture(dog_type)
 	_clear_children(grid)
 	var items: Array = _array(snapshot, "items")
 	for x in range(_battle_slot_count(snapshot)):
@@ -365,6 +381,11 @@ func _battle_sticker_texture(asset_id: String) -> Texture2D:
 		return null
 	var texture := _texture("res://assets/sticker-icons/%s.webp" % asset_id)
 	return texture if texture != null else _texture("res://assets/sticker-icons/starter-1.webp")
+
+func _dog_texture(dog_type: String) -> Texture2D:
+	if dog_type == "FROG":
+		return _texture("res://assets/dogs/zuling.jpg")
+	return _texture("res://assets/dogs/%s.webp" % dog_type.to_lower())
 
 func _texture(path: String) -> Texture2D:
 	var imported := ResourceLoader.load(path)

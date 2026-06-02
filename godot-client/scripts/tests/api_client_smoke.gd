@@ -98,6 +98,10 @@ func _init() -> void:
 		push_error("LoginScreen must expose RegisterButton")
 		quit(1)
 		return
+	if login_screen.get_node_or_null("%QuickStartButton") == null:
+		push_error("LoginScreen must expose QuickStartButton")
+		quit(1)
+		return
 	if login_screen.get_node_or_null("%TapTapButton") == null or login_screen.get_node_or_null("%TapTapCodeInput") == null:
 		push_error("LoginScreen must expose TapTap login controls")
 		quit(1)
@@ -125,6 +129,10 @@ func _init() -> void:
 		push_error("RunScreen must expose visual inventory and map route views")
 		quit(1)
 		return
+	if not run_screen.has_method("_render_dog_picker") or not run_screen.has_method("_dog_texture") or not run_screen.has_method("_choose_room_dog"):
+		push_error("RunScreen must expose dog selection cards and room dog choice")
+		quit(1)
+		return
 	run_screen.free()
 	var battle_scene := load("res://scenes/BattleReplayScreen.tscn")
 	if battle_scene == null:
@@ -134,6 +142,10 @@ func _init() -> void:
 	var battle_screen = battle_scene.instantiate()
 	if not battle_screen.has_method("start_replay") or not battle_screen.has_method("_render_snapshots") or not battle_screen.has_method("_set_log_filter") or not battle_screen.has_method("_set_speed"):
 		push_error("BattleReplayScreen must expose replay snapshots, filters, and speed controls")
+		quit(1)
+		return
+	if not battle_screen.has_method("_dog_texture"):
+		push_error("BattleReplayScreen must expose dog avatar texture mapping")
 		quit(1)
 		return
 	battle_screen.free()
