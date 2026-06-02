@@ -409,7 +409,7 @@ func _render_run_tab() -> void:
 	_render_settlement_summary(run)
 	_render_reward_choices(run)
 	_render_inventory(run)
-	_render_map_or_shop(run)
+	_render_map_or_shop_detail(run)
 	_maybe_show_reward_ceremony(run)
 
 func _render_run_actions(run: Dictionary, card: VBoxContainer) -> void:
@@ -660,6 +660,59 @@ func _render_inventory(run: Dictionary) -> void:
 	if not selected_relic_id.is_empty():
 		card.add_child(_action_button("出售选中遗物", _call_session.bind("sell_relic", [selected_relic_id])))
 
+func _render_map_or_shop_detail(run: Dictionary) -> void:
+	if str(run.get("phase", "")) == "MAP":
+		_render_map_or_shop(run)
+		return
+	var shop_card := _section("跑局商店")
+	var shop_type := str(run.get("shopType", "GENERAL"))
+	_add_line(shop_card, _shop_name(shop_type), _shop_description(shop_type))
+	shop_card.add_child(_action_button("刷新 %d 金币" % int(run.get("refreshCost", 0)), _call_session.bind("reroll_shop", [])))
+	_add_line(shop_card, "提示", "点击商品查看详情，确认后再购买。")
+	for offer in _array(run, "shopItems"):
+		if offer is Dictionary:
+			_render_shop_offer_card(shop_card, run, offer)
+
+func _render_shop_offer_card(parent: VBoxContainer, run: Dictionary, offer: Dictionary) -> void:
+	var def: Dictionary = _dict(offer, "def")
+	var box := VBoxContainer.new()
+	box.custom_minimum_size = Vector2(0, 118)
+	box.add_theme_constant_override("separation", 4)
+	parent.add_child(box)
+	var header := _action_button("%s  %s  %s格" % [_offer_label(offer), str(offer.get("quality", "")), _detail_size_text(def)], _show_offer_modal.bind(offer))
+	_apply_button_icon(header, _offer_texture(offer))
+	box.add_child(header)
+	var owned_count := _shop_offer_owned_count(run, offer)
+	if owned_count > 0:
+		_add_plain_line(box, "已拥有 x%d" % owned_count)
+	_add_plain_line(box, "价格 %s" % _shop_offer_price_text(offer))
+	var missing_gold := int(offer.get("price", 0)) - int(run.get("gold", 0))
+	if missing_gold > 0:
+		_add_plain_line(box, "金币不足，还差 %d 金币" % missing_gold)
+	var trigger := _map_preview_trigger_text(offer)
+	if not trigger.is_empty():
+		_add_line(box, "触发点数", trigger)
+	var description := _fallback(str(def.get("description", "")), str(offer.get("description", "")))
+	if not description.is_empty():
+		_add_line(box, "效果", description)
+
+func _shop_offer_owned_count(run: Dictionary, offer: Dictionary) -> int:
+	var def_id := str(offer.get("defId", ""))
+	if def_id.is_empty():
+		return 0
+	var count := 0
+	for item in _array(run, "items"):
+		if item is Dictionary and str(item.get("defId", "")) == def_id:
+			count += 1
+	return count
+
+func _shop_offer_price_text(offer: Dictionary) -> String:
+	var text := "%d" % int(offer.get("price", 0))
+	var discount := float(offer.get("discount", 1.0))
+	if discount > 0.0 and discount < 1.0:
+		text += " · %d折" % int(round(discount * 10.0))
+	return text
+
 func _render_map_or_shop(run: Dictionary) -> void:
 	var phase := str(run.get("phase", ""))
 	if phase == "MAP":
@@ -814,7 +867,7 @@ func _render_room_current_run(run: Dictionary) -> void:
 	_add_line(card, "犬种", "%s  幸运号 %s" % [_dog_name(str(run.get("dogType", ""))), str(run.get("luckyNumber", "-"))])
 	_add_line(card, "进度", "第 %d 回合 · %d 胜 %d 负 · 金币 %d" % [int(run.get("round", 0)), int(run.get("wins", 0)), int(run.get("losses", 0)), int(run.get("gold", 0))])
 	_render_inventory(run)
-	_render_map_or_shop(run)
+	_render_map_or_shop_detail(run)
 
 func _render_settings_tab() -> void:
 	var card := _section("个人设置 / 时装展示")
@@ -2545,6 +2598,15 @@ func _add_line(parent: VBoxContainer, label: String, value: String) -> void:
 	row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	row.text = "%s：%s" % [label, value] if not label.is_empty() else value
+	row.add_theme_color_override("font_color", UiTokens.ink_color())
+	parent.add_child(row)
+
+func _add_plain_line(parent: VBoxContainer, text: String) -> void:
+	var row := Label.new()
+	row.custom_minimum_size = Vector2(0, 24)
+	row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	row.text = text
 	row.add_theme_color_override("font_color", UiTokens.ink_color())
 	parent.add_child(row)
 
