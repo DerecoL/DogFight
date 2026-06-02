@@ -69,6 +69,7 @@ Godot CLI 可用时运行：
 ```powershell
 godot --headless --path E:\AI-GPT\DogFight\godot-client --script res://scripts/tests/api_client_smoke.gd
 godot --headless --path E:\AI-GPT\DogFight\godot-client --script res://scripts/tests/run_store_smoke.gd
+godot --headless --path E:\AI-GPT\DogFight\godot-client --script res://scripts/tests/router_smoke.gd
 ```
 
 本地 API 服务运行时，还可以跑完整竖切烟测：
