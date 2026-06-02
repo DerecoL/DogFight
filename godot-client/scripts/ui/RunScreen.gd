@@ -2184,6 +2184,10 @@ func _select_relic(relic: Dictionary, label: String) -> void:
 	status_label.text = "已选中：%s" % label
 	_render_current_tab()
 
+func _open_relic_from_rail(relic: Dictionary, label: String) -> void:
+	_select_relic(relic, label)
+	_show_relic_detail_modal(relic)
+
 func _call_selected_item(method: String) -> void:
 	if selected_item_id.is_empty():
 		_show_error("请先选中装备或背包道具")
@@ -2288,21 +2292,26 @@ func _render_item_grid(parent: VBoxContainer, title: String, area: String, run: 
 
 func _render_relic_rail(parent: VBoxContainer, run: Dictionary) -> void:
 	var relics: Array = _array(run, "relics")
-	_add_line(parent, "遗物", "%d 个" % relics.size())
-	if relics.is_empty():
-		return
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 6)
-	parent.add_child(row)
-	for relic in relics:
-		if relic is Dictionary:
+	_add_line(parent, "遗物", "6槽，重复获得升级 · 已拥有 %d 个" % relics.size())
+	var grid := GridContainer.new()
+	grid.columns = 6
+	grid.add_theme_constant_override("h_separation", 4)
+	grid.add_theme_constant_override("v_separation", 4)
+	parent.add_child(grid)
+	for slot in range(6):
+		var relic: Dictionary = _relic_at_slot(relics, slot)
+		var button := _button(_relic_slot_label(relic, slot), 82)
+		button.custom_minimum_size = Vector2(82, 68)
+		button.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+		if relic.is_empty():
+			button.disabled = true
+		else:
 			var relic_def: Dictionary = _dict(relic, "def")
-			var label := "遗物：%s  %s" % [_fallback(str(relic_def.get("name", "")), str(relic.get("relicId", ""))), str(relic.get("quality", ""))]
-			var button := _button(_fallback(str(relic_def.get("name", "")), str(relic.get("relicId", ""))), 96)
-			button.custom_minimum_size = Vector2(96, 54)
+			var name := _fallback(str(relic_def.get("name", "")), str(relic.get("relicId", "")))
+			var label := "遗物：%s  %s" % [name, str(relic.get("quality", ""))]
 			_apply_button_icon(button, _relic_texture(relic))
-			button.pressed.connect(_select_relic.bind(relic, label))
-			row.add_child(button)
+			button.pressed.connect(_open_relic_from_rail.bind(relic, label))
+		grid.add_child(button)
 
 func _render_map_route(parent: VBoxContainer, map_state: Dictionary) -> void:
 	var nodes: Array = _array(map_state, "nodes")
@@ -2472,12 +2481,27 @@ func _item_at_slot(items: Array, area: String, x: int) -> Dictionary:
 			return item
 	return {}
 
+func _relic_at_slot(relics: Array, slot: int) -> Dictionary:
+	for relic in relics:
+		if relic is Dictionary and (relic as Dictionary).has("slot") and int((relic as Dictionary).get("slot", -1)) == slot:
+			return relic
+	if slot < relics.size() and relics[slot] is Dictionary and not (relics[slot] as Dictionary).has("slot"):
+		return relics[slot]
+	return {}
+
 func _slot_label(item: Dictionary, x: int) -> String:
 	if item.is_empty():
 		return str(x + 1)
 	var def: Dictionary = _dict(item, "def")
 	var name := _fallback(str(def.get("name", "")), str(item.get("defId", item.get("id", ""))))
 	return "%d\n%s\n%s" % [x + 1, str(item.get("quality", "")), name]
+
+func _relic_slot_label(relic: Dictionary, slot: int) -> String:
+	if relic.is_empty():
+		return "遗物槽 %d\n空遗物槽 %d" % [slot + 1, slot + 1]
+	var def: Dictionary = _dict(relic, "def")
+	var name := _fallback(str(def.get("name", "")), str(relic.get("relicId", relic.get("id", ""))))
+	return "遗物槽 %d\n%s\n%s" % [slot + 1, name, str(relic.get("quality", ""))]
 
 func _equipment_slot_count(run: Dictionary) -> int:
 	for relic in _array(run, "relics"):
