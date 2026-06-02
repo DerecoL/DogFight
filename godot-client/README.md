@@ -57,6 +57,12 @@ godot --headless --path E:\AI-GPT\DogFight\godot-client --script res://scripts/t
 godot --headless --path E:\AI-GPT\DogFight\godot-client --script res://scripts/tests/run_store_smoke.gd
 ```
 
+本地 API 服务运行时，还可以跑完整竖切烟测：
+
+```powershell
+godot --headless --quit-after 120 --path E:\AI-GPT\DogFight\godot-client --script res://scripts/tests/vertical_slice_smoke.gd
+```
+
 仓库交付前仍需运行现有 Web/服务构建：
 
 ```powershell

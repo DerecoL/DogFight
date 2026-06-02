@@ -75,7 +75,7 @@ func _render() -> void:
 		_render_shop([])
 		_update_action_controls_disabled()
 		return
-	var phase := store.phase()
+	var phase = store.phase()
 	run_label.text = "阶段: %s  回合: %d  金币: %d  胜: %d  负: %d" % [
 		phase,
 		store.round_number(),
@@ -85,7 +85,10 @@ func _render() -> void:
 	]
 	_render_items(equipment_list, store.items_in_area("EQUIPMENT"), "EQUIPMENT")
 	_render_items(bag_list, store.items_in_area("BAG"), "BAG")
-	_render_shop(store.shop_offers())
+	if phase == "MAP":
+		_render_map_nodes(store.map_available_nodes())
+	else:
+		_render_shop(store.shop_offers())
 	action_button.text = _action_label(phase)
 	_update_action_controls_disabled()
 
@@ -138,6 +141,27 @@ func _render_shop(offers: Array) -> void:
 		row.pressed.connect(_on_shop_offer_pressed.bind(str(offer.get("offerId", ""))))
 		shop_list.add_child(row)
 
+func _render_map_nodes(nodes: Array) -> void:
+	_clear_children(shop_list)
+	for node in nodes:
+		if not node is Dictionary:
+			continue
+		var node_id := str(node.get("id", ""))
+		if node_id.is_empty():
+			continue
+		var kind := str(node.get("kind", "UNKNOWN"))
+		var layer := int(node.get("layer", 0))
+		var column := int(node.get("column", 0))
+		var row := Button.new()
+		row.custom_minimum_size = Vector2(0, 44)
+		row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.disabled = action_in_progress
+		row.clip_text = true
+		row.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+		row.text = "地图 %s  L%d-%d" % [kind, layer, column]
+		row.pressed.connect(_on_map_node_pressed.bind(node_id))
+		shop_list.add_child(row)
+
 func _connect_button_once(button: Button, handler: Callable) -> void:
 	if not button.pressed.is_connected(handler):
 		button.pressed.connect(handler)
@@ -183,6 +207,18 @@ func _on_shop_offer_pressed(offer_id: String) -> void:
 	await session.buy_offer(offer_id, "BAG")
 	_finish_run_action()
 
+func _on_map_node_pressed(node_id: String) -> void:
+	if node_id.is_empty():
+		error_label.text = "地图节点无效"
+		return
+	if session == null or not session.has_method("select_map_node"):
+		error_label.text = "璺戝眬浼氳瘽鏈垵濮嬪寲"
+		return
+	if not _begin_run_action():
+		return
+	await session.select_map_node(node_id)
+	_finish_run_action()
+
 func _on_sell_selected_pressed() -> void:
 	if not _has_selected_item():
 		return
@@ -215,7 +251,7 @@ func _on_action_pressed() -> void:
 		return
 	if not _begin_run_action():
 		return
-	var phase := store.phase()
+	var phase = store.phase()
 	if phase == "PREP" and session.has_method("match_battle"):
 		await session.match_battle()
 	elif phase == "MATCH" and session.has_method("start_battle"):

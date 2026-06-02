@@ -31,4 +31,6 @@ func _init() -> void:
 		push_error("ApiTypes.string_value returned wrong value")
 		quit(1)
 		return
+	api.free()
+	node.free()
 	quit(0)

@@ -16,7 +16,7 @@ func request_json(method: int, path: String, body: Dictionary = {}) -> Dictionar
 	var headers := PackedStringArray(["Content-Type: application/json"])
 	if cookie_header.length() > 0:
 		headers.append("Cookie: %s" % cookie_header)
-	var payload := "" if body.is_empty() else JSON.stringify(body)
+	var payload := "" if method == HTTPClient.METHOD_GET and body.is_empty() else JSON.stringify(body)
 	var url := "%s%s" % [base_url, path]
 	request_started.emit(path)
 	var start_error := http.request(url, headers, method, payload)
@@ -31,7 +31,7 @@ func request_json(method: int, path: String, body: Dictionary = {}) -> Dictionar
 	var bytes: PackedByteArray = response[3]
 	_capture_cookie(response_headers)
 	var text := bytes.get_string_from_utf8()
-	var parsed := JSON.parse_string(text)
+	var parsed = JSON.parse_string(text)
 	var data: Dictionary = parsed if parsed is Dictionary else {}
 	var ok := status >= 200 and status < 300
 	var result := {

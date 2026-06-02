@@ -53,7 +53,7 @@ func refresh_me() -> bool:
 		return false
 	current_user = response.data.get("user", current_user)
 	user_changed.emit(current_user)
-	var active_run := response.data.get("activeRun", null)
+	var active_run = response.data.get("activeRun", null)
 	if active_run is Dictionary:
 		set_current_run(active_run)
 	return true
@@ -66,12 +66,15 @@ func create_run(dog_type := "SHIBA", mode := "CASUAL", lucky_number: Variant = n
 	if not response.ok:
 		error_raised.emit(str(response.error))
 		return false
-	var run := response.data.get("run", {})
+	var run = response.data.get("run", {})
 	if run is Dictionary and str(run.get("id", "")).length() > 0:
 		set_current_run(run)
 		return true
 	error_raised.emit("创建跑局失败")
 	return false
+
+func select_map_node(node_id: String) -> bool:
+	return await _post_run_action("/map/select", {"nodeId": node_id})
 
 func move_item(item_id: String, area: String, x: int, y: int) -> bool:
 	return await _post_run_action("/items/move", {"itemId": item_id, "area": area, "x": x, "y": y})
@@ -96,10 +99,10 @@ func start_battle() -> bool:
 	if not response.ok:
 		error_raised.emit(str(response.error))
 		return false
-	var run := response.data.get("run", {})
+	var run = response.data.get("run", {})
 	if run is Dictionary and str(run.get("id", "")).length() > 0:
 		set_current_run(run)
-	var battle := response.data.get("battle", {})
+	var battle = response.data.get("battle", {})
 	if battle is Dictionary:
 		battle_started.emit(battle)
 		return true
@@ -117,7 +120,7 @@ func _post_run_action(suffix: String, body: Dictionary) -> bool:
 	if not response.ok:
 		error_raised.emit(str(response.error))
 		return false
-	var run := response.data.get("run", {})
+	var run = response.data.get("run", {})
 	if run is Dictionary and str(run.get("id", "")).length() > 0:
 		set_current_run(run)
 		return true

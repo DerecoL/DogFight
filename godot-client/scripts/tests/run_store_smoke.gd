@@ -29,7 +29,14 @@ func _init() -> void:
 			{"id": "eq-1", "area": "EQUIPMENT", "x": 0, "y": 0}
 		],
 		"shopItems": [{"offerId": "offer-1"}],
-		"lastBattle": {"id": "battle-1", "result": "WIN"}
+		"lastBattle": {"id": "battle-1", "result": "WIN"},
+		"mapState": {
+			"availableNodeIds": ["map-a"],
+			"nodes": [
+				{"id": "map-a", "kind": "SHOP_FIXED", "layer": 0, "column": 0},
+				{"id": "map-b", "kind": "EVENT", "layer": 0, "column": 1}
+			]
+		}
 	}
 	store.set_run(source_run)
 	source_run["gold"] = 99
@@ -66,6 +73,16 @@ func _init() -> void:
 	last_battle["id"] = "mutated-returned-battle"
 	if str(store.last_battle().get("id", "")) != "battle-1":
 		push_error("RunStore last battle defensive copy failed")
+		quit(1)
+		return
+	var map_nodes: Array[Dictionary] = store.map_available_nodes()
+	if map_nodes.size() != 1 or str(map_nodes[0].get("id", "")) != "map-a":
+		push_error("RunStore map available nodes failed")
+		quit(1)
+		return
+	map_nodes[0]["id"] = "mutated-map-node"
+	if str(store.map_available_nodes()[0].get("id", "")) != "map-a":
+		push_error("RunStore map node defensive copy failed")
 		quit(1)
 		return
 	quit(0)

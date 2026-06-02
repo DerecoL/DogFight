@@ -49,6 +49,25 @@ func shop_offers() -> Array[Dictionary]:
 			result.append(offer.duplicate(true))
 	return result
 
+func map_available_nodes() -> Array[Dictionary]:
+	var map_state = run.get("mapState", {})
+	if not map_state is Dictionary:
+		return []
+	var available_ids: Array = map_state.get("availableNodeIds", [])
+	var nodes: Array = map_state.get("nodes", [])
+	var result: Array[Dictionary] = []
+	for node in nodes:
+		if node is Dictionary and available_ids.has(str(node.get("id", ""))):
+			result.append(node.duplicate(true))
+	result.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		var layer_a := int(a.get("layer", 0))
+		var layer_b := int(b.get("layer", 0))
+		if layer_a != layer_b:
+			return layer_a < layer_b
+		return int(a.get("column", 0)) < int(b.get("column", 0))
+	)
+	return result
+
 func last_battle() -> Dictionary:
-	var battle := run.get("lastBattle", {})
+	var battle = run.get("lastBattle", {})
 	return battle.duplicate(true) if battle is Dictionary else {}
