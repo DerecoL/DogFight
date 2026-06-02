@@ -518,10 +518,10 @@ func _render_season_tab() -> void:
 	_add_line(card, "我的天梯", "%s  %d分  胜负 %d/%d" % [str(profile.get("tier", "")), int(profile.get("score", 0)), int(profile.get("wins", 0)), int(profile.get("losses", 0))])
 	for settlement in _array(ladder_data, "recentSettlements"):
 		if settlement is Dictionary:
-			_add_line(card, "结算", "%s -> %s  %+d" % [str(settlement.get("beforeTier", "")), str(settlement.get("afterTier", "")), int(settlement.get("delta", 0))])
+			card.add_child(_action_button("结算 %s -> %s  %+d" % [_tier_label(str(settlement.get("beforeTier", ""))), _tier_label(str(settlement.get("afterTier", ""))), int(settlement.get("delta", 0))], _show_ladder_settlement_modal.bind(settlement)))
 	for summary in _array(history_data, "seasonSummaries"):
 		if summary is Dictionary:
-			_add_line(card, "赛季记录", "%s  %d-%d" % [str(summary.get("seasonName", summary.get("seasonId", ""))), int(summary.get("wins", 0)), int(summary.get("losses", 0))])
+			card.add_child(_action_button("赛季记录 %s  %d-%d" % [str(summary.get("seasonName", summary.get("seasonId", ""))), int(summary.get("ladderTotalWins", summary.get("wins", 0))), int(summary.get("ladderTotalLosses", summary.get("losses", 0)))], _show_season_summary_modal.bind(summary)))
 
 func _render_rooms_tab() -> void:
 	var card := _section("多人房间")
@@ -540,10 +540,11 @@ func _render_rooms_tab() -> void:
 		detail.add_child(_action_button("选择当前狗狗", _choose_room_dog))
 		for member in _array(active_room, "members"):
 			if member is Dictionary:
-				_add_line(detail, str(member.get("nickname", member.get("kind", ""))), "%s  %d-%d  %s" % [str(member.get("kind", "")), int(member.get("wins", 0)), int(member.get("losses", 0)), "淘汰" if bool(member.get("eliminated", false)) else "存活"])
+				var member_name := str(member.get("nickname", member.get("kind", "")))
+				detail.add_child(_action_button("%s  %s  %d-%d  %s" % [member_name, str(member.get("kind", "")), int(member.get("wins", 0)), int(member.get("losses", 0)), "淘汰" if bool(member.get("eliminated", false)) else "存活"], _show_room_member_modal.bind(member)))
 		for battle in _array(active_room, "battles"):
 			if battle is Dictionary:
-				detail.add_child(_action_button("查看战报 第%d回合 %s" % [int(battle.get("round", 0)), str(battle.get("id", ""))], _load_room_battle.bind(str(battle.get("id", "")))))
+				detail.add_child(_action_button("战报摘要 第%d回合 %s" % [int(battle.get("round", 0)), str(battle.get("id", ""))], _show_room_battle_modal.bind(battle)))
 	for room in _array(rooms_data, "rooms"):
 		if room is Dictionary:
 			var room_id := str(room.get("id", ""))
@@ -860,6 +861,80 @@ func _render_snapshot_items(parent: VBoxContainer, title: String, items: Array) 
 			var def: Dictionary = _dict(item, "def")
 			_add_line(parent, "", "%s  %s  (%d,%d)" % [_fallback(str(def.get("name", "")), str(item.get("defId", item.get("id", "")))), str(item.get("quality", "")), int(item.get("x", 0)), int(item.get("y", 0))])
 
+func _show_room_member_modal(member: Dictionary) -> void:
+	var modal := _modal_panel("房间成员详情", Vector2(520, 460))
+	if modal.is_empty():
+		return
+	var box: VBoxContainer = modal["box"]
+	var name := str(member.get("nickname", member.get("kind", "")))
+	_add_line(box, "昵称", name)
+	_add_line(box, "席位", "%s%s" % [str(member.get("kind", "")), " · 房主" if bool(member.get("isHost", false)) else ""])
+	_add_line(box, "犬种", _dog_name(str(member.get("dogType", ""))))
+	_add_line(box, "战绩", "%d胜 / %d负 · 第%d回合" % [int(member.get("wins", 0)), int(member.get("losses", 0)), int(member.get("round", 0))])
+	_add_line(box, "经济", "金币 %d" % int(member.get("gold", 0)))
+	_add_line(box, "阶段", "%s / %s" % [str(member.get("phase", "")), str(member.get("status", ""))])
+	_add_line(box, "状态", _room_member_status(member))
+	var battle_id := str(member.get("currentBattleId", ""))
+	if not battle_id.is_empty():
+		box.add_child(_action_button("载入当前战报", _load_room_battle_from_modal.bind(battle_id)))
+	_push_modal(modal["panel"])
+
+func _show_room_battle_modal(battle: Dictionary) -> void:
+	var modal := _modal_panel("房间战报摘要", Vector2(520, 420))
+	if modal.is_empty():
+		return
+	var box: VBoxContainer = modal["box"]
+	var battle_id := str(battle.get("id", ""))
+	_add_line(box, "战报", battle_id)
+	_add_line(box, "回合", "第 %d 回合" % int(battle.get("round", 0)))
+	_add_line(box, "对手", str(battle.get("opponentKind", "")))
+	_add_line(box, "胜者", "%s / winnerParticipantId %s" % [str(battle.get("winnerSide", "")), str(battle.get("winnerParticipantId", ""))])
+	var created_at := str(battle.get("createdAt", ""))
+	if not created_at.is_empty():
+		_add_line(box, "时间", created_at)
+	if not battle_id.is_empty():
+		box.add_child(_action_button("载入战报", _load_room_battle_from_modal.bind(battle_id)))
+	_push_modal(modal["panel"])
+
+func _show_ladder_settlement_modal(settlement: Dictionary) -> void:
+	var modal := _modal_panel("天梯结算详情", Vector2(560, 480))
+	if modal.is_empty():
+		return
+	var box: VBoxContainer = modal["box"]
+	_add_line(box, "段位", "%s %d -> %s %d" % [_tier_label(str(settlement.get("beforeTier", ""))), int(settlement.get("beforeScore", 0)), _tier_label(str(settlement.get("afterTier", ""))), int(settlement.get("afterScore", 0))])
+	_add_line(box, "变化", _signed_int(int(settlement.get("delta", 0))))
+	_add_line(box, "胜负", "%d胜 / %d负" % [int(settlement.get("wins", 0)), int(settlement.get("losses", 0))])
+	_add_line(box, "原始变化", str(int(settlement.get("rawDelta", 0))))
+	_add_line(box, "基础分", str(int(settlement.get("baseScore", 0))))
+	_add_line(box, "段位税", _signed_int(int(settlement.get("tierTax", 0))))
+	_add_line(box, "失败惩罚", _signed_int(int(settlement.get("lossPenalty", 0))))
+	_add_line(box, "完美奖励", str(int(settlement.get("perfectBonus", 0))))
+	_add_line(box, "新手保护", str(int(settlement.get("newbieProtection", 0))))
+	var created_at := str(settlement.get("createdAt", ""))
+	if not created_at.is_empty():
+		_add_line(box, "时间", created_at)
+	_push_modal(modal["panel"])
+
+func _show_season_summary_modal(summary: Dictionary) -> void:
+	var modal := _modal_panel("赛季记录详情", Vector2(560, 500))
+	if modal.is_empty():
+		return
+	var box: VBoxContainer = modal["box"]
+	_add_line(box, "赛季", str(summary.get("seasonName", summary.get("seasonId", ""))))
+	_add_line(box, "天梯", "%s %s" % [_fallback(str(summary.get("ladderTierLabel", "")), "未参赛"), str(summary.get("ladderScore", ""))])
+	_add_line(box, "最高段位", _fallback(str(summary.get("ladderHighestTierLabel", "")), "无"))
+	_add_line(box, "天梯战绩", "%d 局 · %d胜 / %d负" % [int(summary.get("ladderGamesPlayed", 0)), int(summary.get("ladderTotalWins", 0)), int(summary.get("ladderTotalLosses", 0))])
+	var dog_king_rank := int(summary.get("dogKingRank", 0))
+	if dog_king_rank > 0:
+		_add_line(box, "犬王", "犬王第 %d 名" % dog_king_rank)
+	var apex_rank := int(summary.get("apexRank", 0))
+	if apex_rank > 0:
+		_add_line(box, "巅峰", "巅峰第 %d 名 · %s · %d胜 / %d负 · 第%d回合 · 防守连胜 %d" % [apex_rank, _dog_name(str(summary.get("apexDogType", ""))), int(summary.get("apexWins", 0)), int(summary.get("apexLosses", 0)), int(summary.get("apexRound", 0)), int(summary.get("apexChallengeWins", 0))])
+	var snapshot: Dictionary = _dict(summary, "apexSnapshot")
+	if not snapshot.is_empty():
+		box.add_child(_action_button("查看巅峰快照", _show_snapshot_modal.bind(snapshot, "赛季巅峰快照")))
+	_push_modal(modal["panel"])
+
 func _show_cosmetic_modal(raw_item: Dictionary) -> void:
 	var item: Dictionary = _cosmetic_item(raw_item)
 	var title := _cosmetic_display_name(raw_item)
@@ -985,6 +1060,36 @@ func _rarity_label(rarity: String) -> String:
 		_:
 			return _fallback(rarity, "普通")
 
+func _tier_label(tier: String) -> String:
+	match tier:
+		"BRONZE":
+			return "青铜"
+		"SILVER":
+			return "白银"
+		"GOLD":
+			return "黄金"
+		"PLATINUM":
+			return "铂金"
+		"DIAMOND":
+			return "钻石"
+		"MASTER":
+			return "大师"
+		"DOG_KING":
+			return "犬王"
+		_:
+			return _fallback(tier, "未定级")
+
+func _room_member_status(member: Dictionary) -> String:
+	if bool(member.get("eliminated", false)):
+		var round_text := str(member.get("eliminatedRound", ""))
+		return "淘汰" if round_text.is_empty() else "第 %s 回合淘汰" % round_text
+	if bool(member.get("ready", false)):
+		return "已准备"
+	return "存活"
+
+func _signed_int(value: int) -> String:
+	return "%+d" % value
+
 func _reward_amount(source: Dictionary, def: Dictionary) -> int:
 	return int(source.get("reward", def.get("reward", 0)))
 
@@ -1011,6 +1116,10 @@ func _achievement_action_from_modal(achievement_id: String) -> void:
 func _daily_action_from_modal(task_id: String) -> void:
 	_close_top_modal()
 	await _claim_daily(task_id)
+
+func _load_room_battle_from_modal(battle_id: String) -> void:
+	_close_top_modal()
+	await _load_room_battle(battle_id)
 
 func _show_offer_modal(offer: Dictionary) -> void:
 	var def: Dictionary = _dict(offer, "def")
