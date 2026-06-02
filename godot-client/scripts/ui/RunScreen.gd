@@ -830,13 +830,20 @@ func _render_season_tab() -> void:
 	var season: Dictionary = _dict(ladder_data, "season")
 	var profile: Dictionary = _dict(ladder_data, "profile")
 	_add_line(card, "当前赛季", "%s  %s - %s" % [str(season.get("name", season.get("id", ""))), str(season.get("startsAt", "")), str(season.get("endsAt", ""))])
-	_add_line(card, "我的天梯", "%s  %d分  胜负 %d/%d" % [str(profile.get("tier", "")), int(profile.get("score", 0)), int(profile.get("wins", 0)), int(profile.get("losses", 0))])
+	_add_line(card, "我的天梯", "%s  %d分  胜负 %d/%d" % [_tier_display_label(profile), int(profile.get("score", 0)), int(profile.get("wins", 0)), int(profile.get("losses", 0))])
 	for settlement in _array(ladder_data, "recentSettlements"):
 		if settlement is Dictionary:
 			card.add_child(_action_button("结算 %s -> %s  %+d" % [_tier_label(str(settlement.get("beforeTier", ""))), _tier_label(str(settlement.get("afterTier", ""))), int(settlement.get("delta", 0))], _show_ladder_settlement_modal.bind(settlement)))
-	for summary in _array(history_data, "seasonSummaries"):
+	var summaries := _array(history_data, "seasonSummaries")
+	_add_line(card, "赛季历史", "%d 个已结束赛季" % summaries.size() if summaries.size() > 0 else "赛季结束后会保存在这里")
+	if summaries.is_empty():
+		_add_line(card, "暂无赛季历史", "")
+	for summary in summaries:
 		if summary is Dictionary:
-			card.add_child(_action_button("赛季记录 %s  %d-%d" % [str(summary.get("seasonName", summary.get("seasonId", ""))), int(summary.get("ladderTotalWins", summary.get("wins", 0))), int(summary.get("ladderTotalLosses", summary.get("losses", 0)))], _show_season_summary_modal.bind(summary)))
+			card.add_child(_action_button(_season_summary_button_label(summary), _show_season_summary_modal.bind(summary)))
+			var snapshot: Dictionary = _dict(summary, "apexSnapshot")
+			if not snapshot.is_empty():
+				card.add_child(_action_button("巅峰配置快照", _show_snapshot_modal.bind(snapshot, "赛季巅峰快照")))
 
 func _render_rooms_tab() -> void:
 	var card := _section("多人房间")
@@ -1870,6 +1877,20 @@ func _ladder_score_text(profile: Dictionary) -> String:
 	if tier == "DOG_KING":
 		return "%d 分 · 犬王积分" % score
 	return "%d 分 / 100 LP" % score
+
+func _season_summary_button_label(summary: Dictionary) -> String:
+	var name := str(summary.get("seasonName", summary.get("seasonId", "")))
+	var tier := _fallback(str(summary.get("ladderTierLabel", "")), "未参赛")
+	var score_text := ""
+	if summary.has("ladderScore") and str(summary.get("ladderScore", "")).length() > 0:
+		score_text = " · %d 分" % int(summary.get("ladderScore", 0))
+	var dog_king := ""
+	if int(summary.get("dogKingRank", 0)) > 0:
+		dog_king = " · 犬王第 %d 名" % int(summary.get("dogKingRank", 0))
+	var apex_text := "巅峰未入榜"
+	if int(summary.get("apexRank", 0)) > 0:
+		apex_text = "巅峰第 %d 名 · %d胜%d败" % [int(summary.get("apexRank", 0)), int(summary.get("apexWins", 0)), int(summary.get("apexLosses", 0))]
+	return "%s  天梯 %s%s%s  %s" % [name, tier, score_text, dog_king, apex_text]
 
 func _room_member_status(member: Dictionary) -> String:
 	if bool(member.get("eliminated", false)):
