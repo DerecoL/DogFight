@@ -41,6 +41,11 @@ var player_reservoir_label: Label
 var opponent_reservoir_label: Label
 var player_item_buttons := {}
 var opponent_item_buttons := {}
+var review_panel: PanelContainer
+var review_title_label: Label
+var player_review_label: Label
+var opponent_review_label: Label
+var system_review_label: Label
 var log_toggle_button: Button
 var log_filter_row: HBoxContainer
 
@@ -73,6 +78,8 @@ func start_replay(next_battle: Dictionary) -> void:
 	skip_button.disabled = false
 	log_view.visible = false
 	log_view.text = ""
+	if review_panel != null:
+		review_panel.visible = false
 	_render_initial_hp()
 	_render_snapshots()
 	_render_event_stage({})
@@ -142,6 +149,7 @@ func _mark_replay_complete() -> void:
 	play_button.disabled = true
 	skip_button.disabled = true
 	finish_button.disabled = false
+	_render_battle_review()
 	replay_finished.emit()
 
 func _update_playback_controls() -> void:
@@ -182,6 +190,15 @@ func _build_battle_layout() -> void:
 	root.add_child(player_panel["panel"])
 	root.move_child(player_panel["panel"], 3)
 
+	var review := _build_review_panel()
+	review_panel = review["panel"]
+	review_title_label = review["title"]
+	player_review_label = review["player"]
+	opponent_review_label = review["opponent"]
+	system_review_label = review["system"]
+	root.add_child(review_panel)
+	root.move_child(review_panel, 4)
+
 	var speed_label := Label.new()
 	speed_label.text = "速度"
 	speed_label.custom_minimum_size = Vector2(42, 44)
@@ -202,6 +219,40 @@ func _build_battle_layout() -> void:
 	log_filter_row.add_theme_constant_override("separation", 6)
 	root.add_child(log_filter_row)
 	root.move_child(log_filter_row, root.get_child_count() - 2)
+
+func _build_review_panel() -> Dictionary:
+	var panel := PanelContainer.new()
+	panel.visible = false
+	panel.custom_minimum_size = Vector2(0, 118)
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 6)
+	panel.add_child(box)
+	var title := Label.new()
+	title.text = "战斗数据看板"
+	title.custom_minimum_size = Vector2(0, 26)
+	title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	box.add_child(title)
+	var rows := HBoxContainer.new()
+	rows.add_theme_constant_override("separation", 8)
+	box.add_child(rows)
+	var player_label := _review_side_label("我方")
+	rows.add_child(player_label)
+	var opponent_label := _review_side_label("对手")
+	rows.add_child(opponent_label)
+	var system_label := Label.new()
+	system_label.custom_minimum_size = Vector2(160, 64)
+	system_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	system_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	rows.add_child(system_label)
+	return {"panel": panel, "title": title, "player": player_label, "opponent": opponent_label, "system": system_label}
+
+func _review_side_label(title: String) -> Label:
+	var label := Label.new()
+	label.text = title
+	label.custom_minimum_size = Vector2(0, 64)
+	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	return label
 
 func _snapshot_panel(title: String) -> Dictionary:
 	var panel := PanelContainer.new()
@@ -448,6 +499,169 @@ func _highlight_item_button(button_map: Dictionary, item_id: String, color: Colo
 	var button = button_map.get(item_id, null)
 	if button is Button:
 		button.modulate = color
+
+func _render_battle_review() -> void:
+	if review_panel == null:
+		return
+	var review := _build_battle_review()
+	var player: Dictionary = _dict(review, "player")
+	var opponent: Dictionary = _dict(review, "opponent")
+	review_panel.visible = true
+	if review_title_label != null:
+		review_title_label.text = "战斗数据看板"
+	if player_review_label != null:
+		player_review_label.text = _review_side_text("我方", player)
+	if opponent_review_label != null:
+		opponent_review_label.text = _review_side_text("对手", opponent)
+	if system_review_label != null:
+		system_review_label.text = "胜者：%s\n系统伤害 %d" % [str(review.get("winner", "")), int(review.get("systemDamage", 0))]
+
+func _review_side_text(title: String, stats: Dictionary) -> String:
+	var top_item: Dictionary = _dict(stats, "topItem")
+	var top_text := "暂无明确装备贡献"
+	if not top_item.is_empty():
+		top_text = "%s · %d" % [str(top_item.get("name", top_item.get("itemId", ""))), int(top_item.get("contribution", 0))]
+	return "%s\n总伤害 %d  治疗 %d  护盾 %d\n毒伤 %d  状态 %d\n最高贡献 %s" % [
+		title,
+		int(stats.get("damage", 0)),
+		int(stats.get("healing", 0)),
+		int(stats.get("shield", 0)),
+		int(stats.get("poisonDamage", 0)),
+		int(stats.get("statusEvents", 0)),
+		top_text,
+	]
+
+func _build_battle_review() -> Dictionary:
+	var player := _create_review_side("player", _dict(battle, "playerSnapshot"))
+	var opponent := _create_review_side("opponent", _dict(battle, "opponentSnapshot"))
+	var system_damage := 0
+	for raw_event in events:
+		if not raw_event is Dictionary:
+			continue
+		var event: Dictionary = raw_event
+		var actor := _review_side(str(event.get("actor", "")))
+		var kind := str(event.get("kind", ""))
+		var effect_type := str(event.get("effectType", ""))
+		if kind == "POISON" or effect_type == "POISON":
+			if kind == "POISON":
+				var target := str(event.get("target", ""))
+				if target == "both":
+					system_damage += abs(min(0, _hp_delta_for_side(event, "player")))
+					system_damage += abs(min(0, _hp_delta_for_side(event, "opponent")))
+				elif target == "player":
+					opponent["poisonDamage"] = int(opponent.get("poisonDamage", 0)) + abs(min(0, _hp_delta_for_side(event, "player")))
+				elif target == "opponent":
+					player["poisonDamage"] = int(player.get("poisonDamage", 0)) + abs(min(0, _hp_delta_for_side(event, "opponent")))
+			elif not actor.is_empty():
+				var poison_stats: Dictionary = _stats_for_side(actor, player, opponent)
+				poison_stats["statusEvents"] = int(poison_stats.get("statusEvents", 0)) + 1
+			continue
+		if actor.is_empty():
+			continue
+		var actor_stats: Dictionary = _stats_for_side(actor, player, opponent)
+		var actor_delta: int = _hp_delta_for_side(event, actor)
+		var target_side := str(event.get("target", ""))
+		if target_side != "player" and target_side != "opponent":
+			target_side = _opposite_side(actor)
+		var target_delta: int = _hp_delta_for_side(event, target_side)
+		if effect_type == "DAMAGE":
+			var damage: int = abs(min(0, target_delta))
+			actor_stats["damage"] = int(actor_stats.get("damage", 0)) + damage
+			_add_review_item_contribution(actor_stats, event, damage)
+			continue
+		if effect_type == "HEAL":
+			var healing: int = max(0, actor_delta)
+			actor_stats["healing"] = int(actor_stats.get("healing", 0)) + healing
+			_add_review_item_contribution(actor_stats, event, healing)
+			continue
+		if _is_shield_event(event):
+			var shield: int = max(0, int(event.get("amount", 0)))
+			actor_stats["shield"] = int(actor_stats.get("shield", 0)) + shield
+			_add_review_item_contribution(actor_stats, event, shield)
+			continue
+		if _is_status_event(event):
+			actor_stats["statusEvents"] = int(actor_stats.get("statusEvents", 0)) + 1
+	return {
+		"winner": str(battle.get("winner", "")),
+		"systemDamage": system_damage,
+		"player": _finalize_review_side(player),
+		"opponent": _finalize_review_side(opponent),
+	}
+
+func _create_review_side(side: String, snapshot: Dictionary) -> Dictionary:
+	var item_names := {}
+	for item in _array(snapshot, "items"):
+		if item is Dictionary:
+			var item_def: Dictionary = _dict(item, "def")
+			item_names[str(item.get("id", ""))] = _fallback(str(item_def.get("name", "")), str(item.get("defId", item.get("id", ""))))
+	return {
+		"side": side,
+		"label": str(snapshot.get("name", "我方" if side == "player" else "对手")),
+		"damage": 0,
+		"healing": 0,
+		"shield": 0,
+		"poisonDamage": 0,
+		"statusEvents": 0,
+		"topItem": {},
+		"itemContribution": {},
+		"itemNames": item_names,
+	}
+
+func _finalize_review_side(stats: Dictionary) -> Dictionary:
+	var top_item := {}
+	var contributions: Dictionary = _dict(stats, "itemContribution")
+	var item_names: Dictionary = _dict(stats, "itemNames")
+	for item_id in contributions.keys():
+		var contribution := int(contributions.get(item_id, 0))
+		if top_item.is_empty() or contribution > int(top_item.get("contribution", 0)):
+			top_item = {
+				"itemId": str(item_id),
+				"name": str(item_names.get(item_id, item_id)),
+				"contribution": contribution,
+			}
+	stats["topItem"] = top_item
+	return stats
+
+func _stats_for_side(side: String, player: Dictionary, opponent: Dictionary) -> Dictionary:
+	return player if side == "player" else opponent
+
+func _add_review_item_contribution(stats: Dictionary, event: Dictionary, amount: int) -> void:
+	var item_id := str(event.get("itemId", ""))
+	if item_id.is_empty() or amount <= 0:
+		return
+	var contributions: Dictionary = _dict(stats, "itemContribution")
+	contributions[item_id] = int(contributions.get(item_id, 0)) + amount
+	stats["itemContribution"] = contributions
+
+func _hp_delta_for_side(event: Dictionary, side: String) -> int:
+	if str(event.get("target", "")) == "both":
+		return int(event.get("sourceHpDelta", 0)) if side == "player" else int(event.get("targetHpDelta", 0))
+	if str(event.get("actor", "")) == "system":
+		if str(event.get("target", "")) == side:
+			return int(event.get("sourceHpDelta", 0)) if side == "player" else int(event.get("targetHpDelta", 0))
+		return 0
+	if str(event.get("actor", "")) == side:
+		return int(event.get("sourceHpDelta", 0))
+	if str(event.get("target", "")) == side:
+		return int(event.get("targetHpDelta", 0))
+	return 0
+
+func _is_shield_event(event: Dictionary) -> bool:
+	var text := str(event.get("text", "")).to_lower()
+	return str(event.get("effectType", "")) == "UTILITY" and (_variant_array(event.get("statusChanged", [])).has("shield") or text.contains("护盾") or text.contains("shield"))
+
+func _is_status_event(event: Dictionary) -> bool:
+	var text := str(event.get("text", "")).to_lower()
+	return not _variant_array(event.get("statusChanged", [])).is_empty() or str(event.get("effectType", "")) == "POISON" or text.contains("中毒") or text.contains("虚弱") or text.contains("冻结") or text.contains("poison") or text.contains("weak") or text.contains("freeze")
+
+func _review_side(side: String) -> String:
+	return side if side == "player" or side == "opponent" else ""
+
+func _opposite_side(side: String) -> String:
+	return "opponent" if side == "player" else "player"
+
+func _variant_array(value: Variant) -> Array:
+	return value if value is Array else []
 
 func _dict(source: Dictionary, key: String) -> Dictionary:
 	var value: Variant = source.get(key, {})

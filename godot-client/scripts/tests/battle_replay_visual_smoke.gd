@@ -16,6 +16,10 @@ func _run() -> void:
 		"actor": "player",
 		"kind": "ITEM",
 		"text": "1点牙咬造成 5 点伤害",
+		"effectType": "DAMAGE",
+		"target": "opponent",
+		"sourceHpDelta": 0,
+		"targetHpDelta": -5,
 		"roll": 1,
 		"itemId": "player-bite",
 		"playerHp": 92,
@@ -28,10 +32,38 @@ func _run() -> void:
 		"opponentStatuses": {"positive": [], "negative": [{"type": "weak", "label": "虚弱", "remaining": 2}]},
 		"reservoirs": {"player": [{"itemId": "frog-pool", "duration": 10, "progress": 5, "nextAt": 6, "speedMultiplier": 1}], "opponent": []},
 	}
+	var shield_event := {
+		"time": 1.6,
+		"actor": "player",
+		"kind": "ITEM",
+		"text": "1点牙咬获得 4 点护盾",
+		"effectType": "UTILITY",
+		"amount": 4,
+		"itemId": "player-bite",
+		"statusChanged": ["shield"],
+		"playerHp": 92,
+		"opponentHp": 80,
+		"playerMaxHp": 100,
+		"opponentMaxHp": 100,
+	}
+	var poison_event := {
+		"time": 2.0,
+		"actor": "system",
+		"kind": "POISON",
+		"text": "中毒造成 3 点伤害",
+		"target": "opponent",
+		"sourceHpDelta": 0,
+		"targetHpDelta": -3,
+		"playerHp": 92,
+		"opponentHp": 77,
+		"playerMaxHp": 100,
+		"opponentMaxHp": 100,
+	}
 	screen.start_replay({
 		"playerMaxHp": 100,
 		"opponentMaxHp": 100,
-		"events": [event],
+		"winner": "player",
+		"events": [event, shield_event, poison_event],
 		"playerSnapshot": _snapshot("你的狗狗", "SHIBA", "player-bite"),
 		"opponentSnapshot": _snapshot("离线狗狗", "MUTT", "opponent-bite"),
 	})
@@ -45,6 +77,12 @@ func _run() -> void:
 	var button = buttons.get("player-bite", null)
 	if not button is Button or (button as Button).modulate == Color.WHITE:
 		_fail("BattleReplayScreen did not highlight active equipment")
+		return
+	screen.call("_mark_replay_complete")
+	await process_frame
+	text = _collect_text(screen)
+	if not text.contains("战斗数据看板") or not text.contains("总伤害 5") or not text.contains("护盾 4") or not text.contains("毒伤 3") or not text.contains("最高贡献 1点牙咬 · 9"):
+		_fail("BattleReplayScreen did not render battle review metrics")
 		return
 	screen.queue_free()
 	for _frame in range(5):
