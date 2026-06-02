@@ -69,6 +69,13 @@ func _ready() -> void:
 
 func login(account: String, password: String) -> bool:
 	var response := await api.post_json(ApiRoutes.login(), {"account": account, "password": password})
+	return await _apply_auth_response(response)
+
+func register(account: String, password: String) -> bool:
+	var response := await api.post_json(ApiRoutes.register(), {"account": account, "password": password})
+	return await _apply_auth_response(response)
+
+func _apply_auth_response(response: Dictionary) -> bool:
 	if not response.ok:
 		_raise_error(str(response.error))
 		return false

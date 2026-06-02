@@ -17,6 +17,10 @@ func _init() -> void:
 		push_error("ApiRoutes.login returned wrong path")
 		quit(1)
 		return
+	if routes_script.register() != "/auth/register":
+		push_error("ApiRoutes.register returned wrong path")
+		quit(1)
+		return
 	if routes_script.run_battle_start("run-1") != "/runs/run-1/battle/start":
 		push_error("ApiRoutes.run_battle_start returned wrong path")
 		quit(1)
@@ -64,6 +68,17 @@ func _init() -> void:
 		push_error("ApiTypes.string_value returned wrong value")
 		quit(1)
 		return
+	var login_scene := load("res://scenes/LoginScreen.tscn")
+	if login_scene == null:
+		push_error("LoginScreen scene failed to load")
+		quit(1)
+		return
+	var login_screen = login_scene.instantiate()
+	if login_screen.get_node_or_null("%RegisterButton") == null:
+		push_error("LoginScreen must expose RegisterButton")
+		quit(1)
+		return
+	login_screen.free()
 	api.free()
 	node.free()
 	quit(0)

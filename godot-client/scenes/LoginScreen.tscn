@@ -43,10 +43,23 @@ layout_mode = 2
 placeholder_text = "密码"
 secret = true
 
-[node name="LoginButton" type="Button" parent="Margin/Form"]
-unique_name_in_owner = true
+[node name="AuthButtons" type="HBoxContainer" parent="Margin/Form"]
 layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="LoginButton" type="Button" parent="Margin/Form/AuthButtons"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 32)
+layout_mode = 2
+size_flags_horizontal = 3
 text = "登录"
+
+[node name="RegisterButton" type="Button" parent="Margin/Form/AuthButtons"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 32)
+layout_mode = 2
+size_flags_horizontal = 3
+text = "注册"
 
 [node name="ErrorScroll" type="ScrollContainer" parent="Margin/Form"]
 custom_minimum_size = Vector2(0, 58)
