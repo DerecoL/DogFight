@@ -52,7 +52,7 @@ func _run() -> void:
 		"createdAt": "2026-06-02T06:00:00.000Z",
 	})
 	await process_frame
-	_assert_modal_text(modal_layer, ["房间战报摘要", "第 2 回合", "PLAYER", "winnerParticipantId", "battle-1", "载入战报"])
+	_assert_modal_text(modal_layer, ["房间战报摘要", "第 2 回合", "玩家", "胜者成员 member-1", "battle-1", "载入战报"])
 	run_screen.call("_close_top_modal")
 	await process_frame
 	run_screen.call("_show_ladder_settlement_modal", {

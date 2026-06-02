@@ -1541,7 +1541,7 @@ func _show_snapshot_item_modal(item: Dictionary) -> void:
 	_render_detail_header(box, _item_texture(item), title, "快照装备 · %s" % _quality_label(str(item.get("quality", ""))))
 	_add_item_def_details(box, def, str(item.get("quality", "")), str(item.get("defId", item.get("id", ""))))
 	_add_line(box, "触发点数", _map_preview_trigger_text(item))
-	_add_line(box, "位置", "%s  (%d,%d)" % [str(item.get("area", "")), int(item.get("x", 0)), int(item.get("y", 0))])
+	_add_line(box, "位置", "%s  (%d,%d)" % [_area_label(str(item.get("area", ""))), int(item.get("x", 0)), int(item.get("y", 0))])
 	_push_modal(modal["panel"])
 
 func _show_snapshot_relic_modal(relic: Dictionary) -> void:
@@ -1660,8 +1660,8 @@ func _show_room_battle_modal(battle: Dictionary) -> void:
 	var battle_id := str(battle.get("id", ""))
 	_add_line(box, "战报", battle_id)
 	_add_line(box, "回合", "第 %d 回合" % int(battle.get("round", 0)))
-	_add_line(box, "对手", str(battle.get("opponentKind", "")))
-	_add_line(box, "胜者", "%s / winnerParticipantId %s" % [str(battle.get("winnerSide", "")), str(battle.get("winnerParticipantId", ""))])
+	_add_line(box, "对手", _opponent_kind_label(str(battle.get("opponentKind", ""))))
+	_add_line(box, "胜者", "%s / 胜者成员 %s" % [_battle_side_label(str(battle.get("winnerSide", ""))), str(battle.get("winnerParticipantId", ""))])
 	var created_at := str(battle.get("createdAt", ""))
 	if not created_at.is_empty():
 		_add_line(box, "时间", created_at)
@@ -2010,6 +2010,30 @@ func _room_phase_label(phase: String) -> String:
 			return "房间结束"
 		_:
 			return _fallback(phase, "未知阶段")
+
+func _opponent_kind_label(kind: String) -> String:
+	match kind:
+		"PLAYER":
+			return "玩家"
+		"BOT":
+			return "机器人"
+		"SEED":
+			return "种子"
+		_:
+			return _fallback(kind, "未知对手")
+
+func _battle_side_label(side: String) -> String:
+	match side.to_lower():
+		"player":
+			return "我方"
+		"opponent":
+			return "对手"
+		"draw":
+			return "平局"
+		"system":
+			return "系统"
+		_:
+			return _fallback(side, "未知")
 
 func _signed_int(value: int) -> String:
 	return "%+d" % value
@@ -2755,7 +2779,7 @@ func _item_label(item: Dictionary) -> String:
 	return "%s  %s  %s (%d,%d)" % [
 		_fallback(str(def.get("name", "")), str(item.get("defId", item.get("id", "")))),
 		_quality_label(str(item.get("quality", ""))),
-		str(item.get("area", "")),
+		_area_label(str(item.get("area", ""))),
 		int(item.get("x", 0)),
 		int(item.get("y", 0)),
 	]
