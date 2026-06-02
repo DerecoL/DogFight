@@ -33,6 +33,12 @@ const DOG_TRAITS := {
 	"FROG": "围绕蓄水池和雨季构筑持续收益",
 }
 
+const TUTORIAL_STATUS_PATH := "user://dogfight_tutorial.cfg"
+const TUTORIAL_SECTION := "casual_tutorial"
+const SETTINGS_PATH := "user://dogfight_settings.cfg"
+const SETTINGS_SECTION := "settings"
+const MUSIC_ENABLED_KEY := "background_music_enabled"
+
 var session: Node
 var current_tab := TAB_LOBBY
 var action_in_progress := false
@@ -44,6 +50,9 @@ var selected_relic: Dictionary = {}
 var selected_room_id := ""
 var active_room: Dictionary = {}
 var dismissed_ceremonies: Dictionary = {}
+var nickname_setup_modal_open := false
+var tutorial_modal_open := false
+var tutorial_auto_checked_for_user := ""
 
 var root: VBoxContainer
 var background_rect: TextureRect
@@ -127,7 +136,7 @@ func _build_layout() -> void:
 			music_player.stream = audio
 	music_player.volume_db = -18.0
 	add_child(music_player)
-	if music_player.stream != null:
+	if music_player.stream != null and _music_enabled_preference():
 		music_player.play()
 
 	root = VBoxContainer.new()
@@ -264,6 +273,7 @@ func _refresh_all() -> void:
 	action_in_progress = false
 	_update_controls()
 	_render_shell()
+	_maybe_auto_show_tutorial()
 
 func _fetch_into(key: String, path: String) -> void:
 	var response: Dictionary = await _api_get(path)
@@ -810,6 +820,7 @@ func _on_run_changed(_run: Dictionary) -> void:
 	_render_current_tab()
 
 func _on_user_changed(_user: Dictionary) -> void:
+	tutorial_auto_checked_for_user = ""
 	call_deferred("_refresh_all")
 
 func _on_error_raised(message: String) -> void:
@@ -849,6 +860,62 @@ func _claim_daily(task_id: String) -> void:
 func _save_nickname(input: LineEdit) -> void:
 	await _call_session("update_nickname", [input.text])
 
+func _show_nickname_setup_modal() -> void:
+	if nickname_setup_modal_open:
+		return
+	var modal := _modal_panel("设置昵称", Vector2(500, 340), false)
+	if modal.is_empty():
+		return
+	nickname_setup_modal_open = true
+	var panel: PanelContainer = modal["panel"]
+	panel.tree_exited.connect(func() -> void:
+		nickname_setup_modal_open = false
+	)
+	var box: VBoxContainer = modal["box"]
+	var intro := Label.new()
+	intro.text = "第一次进入需要设置 2-16 字昵称"
+	intro.custom_minimum_size = Vector2(0, 40)
+	intro.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(intro)
+	var input := LineEdit.new()
+	input.placeholder_text = "输入 2-16 字昵称"
+	input.max_length = 16
+	input.custom_minimum_size = Vector2(300, 42)
+	input.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_apply_input_style(input)
+	box.add_child(input)
+	var hint := Label.new()
+	hint.text = "昵称会显示在排行榜、多人房间和战报中。"
+	hint.custom_minimum_size = Vector2(0, 48)
+	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(hint)
+	var actions := HBoxContainer.new()
+	actions.add_theme_constant_override("separation", 8)
+	box.add_child(actions)
+	var save := _action_button("保存昵称", _submit_nickname_setup.bind(input))
+	save.custom_minimum_size = Vector2(160, 42)
+	actions.add_child(save)
+	var logout := _action_button("退出登录", _logout_from_nickname_setup)
+	logout.custom_minimum_size = Vector2(130, 42)
+	actions.add_child(logout)
+	input.text_submitted.connect(func(_text: String) -> void:
+		_submit_nickname_setup(input)
+	)
+	_push_modal(panel)
+	input.call_deferred("grab_focus")
+
+func _submit_nickname_setup(input: LineEdit) -> void:
+	var trimmed := input.text.strip_edges()
+	if trimmed.length() < 2 or trimmed.length() > 16:
+		_show_error("昵称需要 2-16 个字符")
+		return
+	_close_top_modal()
+	await _call_session("update_nickname", [input.text])
+
+func _logout_from_nickname_setup() -> void:
+	_close_top_modal()
+	await _call_session("logout", [])
+
 func _purchase_shop_item(catalog_item_id: String) -> void:
 	await _post_and_store(ApiRoutes.shop_purchase(), {"catalogItemId": catalog_item_id}, "shop", "purchase_shop_item")
 	await _fetch_into("cosmetics", ApiRoutes.cosmetics_me())
@@ -869,14 +936,28 @@ func _refresh_cosmetics() -> void:
 	await _fetch_into("cosmetics", ApiRoutes.cosmetics_me())
 	_render_shell()
 
+func _music_enabled_preference() -> bool:
+	var config := ConfigFile.new()
+	if config.load(SETTINGS_PATH) != OK:
+		return true
+	return bool(config.get_value(SETTINGS_SECTION, MUSIC_ENABLED_KEY, true))
+
+func _set_music_enabled_preference(enabled: bool) -> void:
+	var config := ConfigFile.new()
+	config.load(SETTINGS_PATH)
+	config.set_value(SETTINGS_SECTION, MUSIC_ENABLED_KEY, enabled)
+	config.save(SETTINGS_PATH)
+
 func _toggle_music() -> void:
 	if music_player == null or music_player.stream == null:
 		status_label.text = "当前环境没有可播放音乐"
 		return
 	if music_player.playing:
 		music_player.stop()
+		_set_music_enabled_preference(false)
 	else:
 		music_player.play()
+		_set_music_enabled_preference(true)
 	_render_shell()
 
 func _refresh_rooms() -> void:
@@ -1077,10 +1158,54 @@ func _render_snapshot_items(parent: VBoxContainer, title: String, items: Array) 
 			var def: Dictionary = _dict(item, "def")
 			_add_line(parent, "", "%s  %s  (%d,%d)" % [_fallback(str(def.get("name", "")), str(item.get("defId", item.get("id", "")))), str(item.get("quality", "")), int(item.get("x", 0)), int(item.get("y", 0))])
 
-func _show_tutorial_modal() -> void:
-	var modal := _modal_panel("新手引导", Vector2(600, 520))
+func _current_user_id() -> String:
+	var user: Dictionary = _dict(me_data, "user")
+	var user_id := str(user.get("id", ""))
+	if user_id.is_empty() and session != null:
+		var current = session.get("current_user")
+		if current is Dictionary:
+			user_id = str((current as Dictionary).get("id", ""))
+	return user_id
+
+func _tutorial_status_for_user(user_id: String) -> String:
+	if user_id.is_empty():
+		return "idle"
+	var config := ConfigFile.new()
+	if config.load(TUTORIAL_STATUS_PATH) != OK:
+		return "idle"
+	return str(config.get_value(TUTORIAL_SECTION, user_id, "idle"))
+
+func _set_tutorial_status_for_user(user_id: String, status: String) -> void:
+	if user_id.is_empty():
+		return
+	var config := ConfigFile.new()
+	config.load(TUTORIAL_STATUS_PATH)
+	config.set_value(TUTORIAL_SECTION, user_id, status)
+	config.save(TUTORIAL_STATUS_PATH)
+
+func _maybe_auto_show_tutorial() -> void:
+	var user_id := _current_user_id()
+	if user_id.is_empty() or user_id == tutorial_auto_checked_for_user:
+		return
+	tutorial_auto_checked_for_user = user_id
+	if current_tab != TAB_LOBBY:
+		return
+	if _tutorial_status_for_user(user_id) != "idle":
+		return
+	_set_tutorial_status_for_user(user_id, "active")
+	call_deferred("_show_tutorial_modal", true)
+
+func _show_tutorial_modal(auto_started := false) -> void:
+	if tutorial_modal_open:
+		return
+	var modal := _modal_panel("新手引导", Vector2(600, 540), not auto_started)
 	if modal.is_empty():
 		return
+	tutorial_modal_open = true
+	var panel: PanelContainer = modal["panel"]
+	panel.tree_exited.connect(func() -> void:
+		tutorial_modal_open = false
+	)
 	var box: VBoxContainer = modal["box"]
 	_add_line(box, "大厅", "先选择休闲、天梯、多人房间或巅峰竞技场。")
 	_add_line(box, "选择狗狗", "每种狗有独立特性；狗皇帝需要选择幸运数字。")
@@ -1091,13 +1216,20 @@ func _show_tutorial_modal() -> void:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 8)
 	row.add_child(_action_button("进入跑局页", _tutorial_go_run_tab))
-	row.add_child(_action_button("关闭", _close_top_modal))
+	if auto_started:
+		row.add_child(_action_button("跳过引导", _tutorial_skip_for_current_user))
+	else:
+		row.add_child(_action_button("关闭", _close_top_modal))
 	box.add_child(row)
 	_push_modal(modal["panel"])
 
 func _tutorial_go_run_tab() -> void:
 	_close_top_modal()
 	_switch_tab(TAB_RUN)
+
+func _tutorial_skip_for_current_user() -> void:
+	_set_tutorial_status_for_user(_current_user_id(), "skipped")
+	_close_top_modal()
 
 func _show_room_member_modal(member: Dictionary) -> void:
 	var modal := _modal_panel("房间成员详情", Vector2(520, 460))
@@ -1662,7 +1794,7 @@ func _filter_area(items: Array, area: String) -> Array:
 			result.append(item)
 	return result
 
-func _modal_panel(title: String, size: Vector2) -> Dictionary:
+func _modal_panel(title: String, size: Vector2, closable := true) -> Dictionary:
 	if _modal_stack() == null:
 		_show_error("弹窗层未初始化")
 		return {}
@@ -1688,7 +1820,8 @@ func _modal_panel(title: String, size: Vector2) -> Dictionary:
 	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	header.add_child(label)
-	header.add_child(_action_button("关闭", _close_top_modal))
+	if closable:
+		header.add_child(_action_button("关闭", _close_top_modal))
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL

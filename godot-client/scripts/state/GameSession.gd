@@ -23,6 +23,7 @@ var toast_bus: ToastBus
 var feedback_sound_bus: FeedbackSoundBus
 var toast_layer: Control
 var current_user: Dictionary = {}
+var needs_nickname_setup := false
 var store: AppStore = AppStore.new()
 var run_store: RunStore = store.run
 
@@ -101,6 +102,7 @@ func update_nickname(nickname: String) -> bool:
 		_raise_error(str(response.error))
 		return false
 	current_user = response.data.get("user", current_user)
+	_update_needs_nickname(response.data)
 	store.set_user(current_user)
 	user_changed.emit(current_user)
 	if toast_bus != null:
@@ -113,6 +115,7 @@ func logout() -> bool:
 		_raise_error(str(response.error))
 		return false
 	current_user = {}
+	needs_nickname_setup = false
 	api.cookie_header = ""
 	store.set_user({})
 	store.set_current_run({})
@@ -128,6 +131,7 @@ func _apply_auth_response(response: Dictionary) -> bool:
 		_raise_error(str(response.error))
 		return false
 	current_user = response.data.get("user", {})
+	_update_needs_nickname(response.data)
 	store.set_user(current_user)
 	return await refresh_me()
 
@@ -137,12 +141,21 @@ func refresh_me() -> bool:
 		_raise_error(str(response.error))
 		return false
 	current_user = response.data.get("user", current_user)
+	_update_needs_nickname(response.data)
 	store.set_user(current_user)
 	user_changed.emit(current_user)
 	var active_run = response.data.get("activeRun", null)
 	if active_run is Dictionary:
 		set_current_run(active_run)
 	return true
+
+func _update_needs_nickname(payload: Dictionary) -> void:
+	if payload.has("needsNickname"):
+		needs_nickname_setup = bool(payload.get("needsNickname", false))
+		return
+	var user = payload.get("user", current_user)
+	if user is Dictionary and not (user as Dictionary).is_empty():
+		needs_nickname_setup = str((user as Dictionary).get("nickname", "")).strip_edges().is_empty()
 
 func create_run(dog_type := "SHIBA", mode := "CASUAL", lucky_number: Variant = null) -> bool:
 	var body := {"dogType": dog_type, "mode": mode}
@@ -500,6 +513,8 @@ func _show_run_screen() -> void:
 	var run_screen := get_node_or_null("ScreenRoot/RunScreen")
 	if run_screen != null and run_screen.has_method("clear_error"):
 		run_screen.call("clear_error")
+	if needs_nickname_setup and run_screen != null and run_screen.has_method("_show_nickname_setup_modal"):
+		run_screen.call_deferred("_show_nickname_setup_modal")
 
 func _show_battle_screen(battle: Dictionary) -> void:
 	if router != null:
