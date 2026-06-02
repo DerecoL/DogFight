@@ -158,70 +158,70 @@ func load_run(run_id: String) -> bool:
 	return _apply_run_response(response, "服务端没有返回跑局")
 
 func select_map_node(node_id: String) -> bool:
-	return await _post_run_action(ApiRoutes.run_map_select(run_store.run_id()), {"nodeId": node_id})
+	return await _post_run_action(ApiRoutes.run_map_select(run_store.run_id()), {"nodeId": node_id}, "select_map_node")
 
 func resolve_map_event(choice_id := "") -> bool:
 	var body := {}
 	if not choice_id.is_empty():
 		body["choiceId"] = choice_id
-	return await _post_run_action(ApiRoutes.run_map_event(run_store.run_id()), body)
+	return await _post_run_action(ApiRoutes.run_map_event(run_store.run_id()), body, "resolve_map_event")
 
 func complete_map_node() -> bool:
-	return await _post_run_action(ApiRoutes.run_map_complete_node(run_store.run_id()), {})
+	return await _post_run_action(ApiRoutes.run_map_complete_node(run_store.run_id()), {}, "complete_map_node")
 
 func claim_monster_reward() -> bool:
-	return await _post_run_action(ApiRoutes.run_monster_reward_claim(run_store.run_id()), {})
+	return await _post_run_action(ApiRoutes.run_monster_reward_claim(run_store.run_id()), {}, "claim_monster_reward")
 
 func skip_monster_reward() -> bool:
-	return await _post_run_action(ApiRoutes.run_monster_reward_skip(run_store.run_id()), {})
+	return await _post_run_action(ApiRoutes.run_monster_reward_skip(run_store.run_id()), {}, "skip_monster_reward")
 
 func move_item(item_id: String, area: String, x: int, y: int) -> bool:
-	return await _post_run_action(ApiRoutes.run_item_move(run_store.run_id()), {"itemId": item_id, "area": area, "x": x, "y": y})
+	return await _post_run_action(ApiRoutes.run_item_move(run_store.run_id()), {"itemId": item_id, "area": area, "x": x, "y": y}, "move_item")
 
 func upgrade_item(item_id: String, target_item_id := "") -> bool:
 	var body := {"itemId": item_id}
 	if not target_item_id.is_empty():
 		body["targetItemId"] = target_item_id
-	return await _post_run_action(ApiRoutes.run_item_upgrade(run_store.run_id()), body)
+	return await _post_run_action(ApiRoutes.run_item_upgrade(run_store.run_id()), body, "upgrade_item")
 
 func buy_offer(offer_id: String, area := "BAG") -> bool:
-	return await _post_run_action(ApiRoutes.run_shop_buy(run_store.run_id()), {"offerId": offer_id, "area": area})
+	return await _post_run_action(ApiRoutes.run_shop_buy(run_store.run_id()), {"offerId": offer_id, "area": area}, "buy_offer")
 
 func sell_item(item_id: String) -> bool:
-	return await _post_run_action(ApiRoutes.run_shop_sell(run_store.run_id()), {"itemId": item_id})
+	return await _post_run_action(ApiRoutes.run_shop_sell(run_store.run_id()), {"itemId": item_id}, "sell_item")
 
 func reroll_shop() -> bool:
-	return await _post_run_action(ApiRoutes.run_shop_reroll(run_store.run_id()), {})
+	return await _post_run_action(ApiRoutes.run_shop_reroll(run_store.run_id()), {}, "reroll_shop")
 
 func match_battle() -> bool:
-	return await _post_run_action(ApiRoutes.run_battle_match(run_store.run_id()), {})
+	return await _post_run_action(ApiRoutes.run_battle_match(run_store.run_id()), {}, "match_battle")
 
 func select_shop_choice(shop_type: String) -> bool:
-	return await _post_run_action(ApiRoutes.run_choice_select(run_store.run_id()), {"shopType": shop_type})
+	return await _post_run_action(ApiRoutes.run_choice_select(run_store.run_id()), {"shopType": shop_type}, "select_shop_choice")
 
 func select_upgrade_item(item_id: String) -> bool:
-	return await _post_run_action(ApiRoutes.run_upgrade_select(run_store.run_id()), {"itemId": item_id})
+	return await _post_run_action(ApiRoutes.run_upgrade_select(run_store.run_id()), {"itemId": item_id}, "select_upgrade_item")
 
 func skip_upgrade_choice() -> bool:
-	return await _post_run_action(ApiRoutes.run_upgrade_skip(run_store.run_id()), {})
+	return await _post_run_action(ApiRoutes.run_upgrade_skip(run_store.run_id()), {}, "skip_upgrade_choice")
 
 func select_potion(potion_id: String, item_id: String) -> bool:
-	return await _post_run_action(ApiRoutes.run_potion_select(run_store.run_id()), {"potionId": potion_id, "itemId": item_id})
+	return await _post_run_action(ApiRoutes.run_potion_select(run_store.run_id()), {"potionId": potion_id, "itemId": item_id}, "select_potion")
 
 func select_class_reward(def_id: String) -> bool:
-	return await _post_run_action(ApiRoutes.run_class_reward_select(run_store.run_id()), {"defId": def_id})
+	return await _post_run_action(ApiRoutes.run_class_reward_select(run_store.run_id()), {"defId": def_id}, "select_class_reward")
 
 func select_enchant(enchant_id: String, item_id: String) -> bool:
-	return await _post_run_action(ApiRoutes.run_enchant_select(run_store.run_id()), {"enchantId": enchant_id, "itemId": item_id})
+	return await _post_run_action(ApiRoutes.run_enchant_select(run_store.run_id()), {"enchantId": enchant_id, "itemId": item_id}, "select_enchant")
 
 func select_relic(relic_id: String) -> bool:
-	return await _post_run_action(ApiRoutes.run_relic_select(run_store.run_id()), {"relicId": relic_id})
+	return await _post_run_action(ApiRoutes.run_relic_select(run_store.run_id()), {"relicId": relic_id}, "select_relic")
 
 func sell_relic(relic_id: String) -> bool:
-	return await _post_run_action(ApiRoutes.run_relic_sell(run_store.run_id()), {"relicId": relic_id})
+	return await _post_run_action(ApiRoutes.run_relic_sell(run_store.run_id()), {"relicId": relic_id}, "sell_relic")
 
 func settle_run() -> bool:
-	return await _post_run_action(ApiRoutes.run_settle(run_store.run_id()), {})
+	return await _post_run_action(ApiRoutes.run_settle(run_store.run_id()), {}, "settle_run")
 
 func start_battle() -> bool:
 	if not run_store.has_run():
@@ -240,9 +240,9 @@ func start_battle() -> bool:
 	return false
 
 func finish_battle() -> bool:
-	return await _post_run_action(ApiRoutes.run_battle_finish(run_store.run_id()), {})
+	return await _post_run_action(ApiRoutes.run_battle_finish(run_store.run_id()), {}, "finish_battle")
 
-func _post_run_action(path: String, body: Dictionary) -> bool:
+func _post_run_action(path: String, body: Dictionary, success_action := "") -> bool:
 	if not run_store.has_run():
 		_raise_error("没有当前跑局")
 		return false
@@ -255,7 +255,63 @@ func _post_run_action(path: String, body: Dictionary) -> bool:
 		var summary: Variant = response.data.get("rewardSummary", {})
 		if summary is Dictionary and not summary.is_empty():
 			_show_reward_summary(summary)
+		_push_run_action_success(success_action)
 	return ok
+
+func _run_action_success_message(action: String) -> String:
+	match action:
+		"select_map_node":
+			return "路线已选择"
+		"resolve_map_event":
+			return "事件已处理"
+		"complete_map_node":
+			return "节点已完成"
+		"claim_monster_reward":
+			return "奖励已领取"
+		"skip_monster_reward":
+			return "奖励已跳过"
+		"move_item":
+			return "装备已放置"
+		"upgrade_item":
+			return "装备已升级"
+		"buy_offer":
+			return "购买成功"
+		"sell_item":
+			return "出售成功"
+		"reroll_shop":
+			return "商店已刷新"
+		"match_battle":
+			return "对手已匹配"
+		"select_shop_choice":
+			return "商店已开启"
+		"select_upgrade_item":
+			return "升级已确认"
+		"skip_upgrade_choice":
+			return "升级已跳过"
+		"select_potion":
+			return "药水已应用"
+		"select_class_reward":
+			return "职业奖励已领取"
+		"select_enchant":
+			return "附魔已应用"
+		"select_relic":
+			return "遗物已领取"
+		"sell_relic":
+			return "遗物已出售"
+		"settle_run":
+			return "跑局已结算"
+		"finish_battle":
+			return "战斗已完成"
+		_:
+			return ""
+
+func _push_run_action_success(action: String) -> void:
+	if toast_bus == null:
+		return
+	var message := _run_action_success_message(action)
+	if message.strip_edges().is_empty():
+		return
+	toast_bus.push(message, "success")
 
 func _apply_run_response(response: Dictionary, fallback_error: String) -> bool:
 	var run = response.data.get("run", {})
