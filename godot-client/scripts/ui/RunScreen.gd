@@ -318,7 +318,7 @@ func _render_lobby_tab() -> void:
 	modes.add_child(_mode_button("天梯模式", "进入独立匹配池，整局结算赛季积分。", ladder_label, _start_mode.bind("LADDER")))
 	modes.add_child(_mode_button("多人房间", "创建、匹配、加入房间并查看多人战报。", "进入斗狗模式", _switch_tab.bind(TAB_ROOMS)))
 	modes.add_child(_mode_button("巅峰竞技场", "提交完成局并查看总榜/当日榜配置。", "进入巅峰模式", _switch_tab.bind(TAB_LEADERBOARDS)))
-	modes.add_child(_mode_button("新手引导", "保留网页版的新手路径入口，当前 Godot 以流程提示方式呈现。", "查看跑局操作", _switch_tab.bind(TAB_RUN)))
+	modes.add_child(_mode_button("新手引导", "按网页版教学顺序说明大厅、选狗、商店、放置、战斗和继续跑局。", "重播新手引导", _show_tutorial_modal))
 
 func _render_account_tab() -> void:
 	var card := _section("账号面板")
@@ -900,6 +900,28 @@ func _render_snapshot_items(parent: VBoxContainer, title: String, items: Array) 
 		if item is Dictionary:
 			var def: Dictionary = _dict(item, "def")
 			_add_line(parent, "", "%s  %s  (%d,%d)" % [_fallback(str(def.get("name", "")), str(item.get("defId", item.get("id", "")))), str(item.get("quality", "")), int(item.get("x", 0)), int(item.get("y", 0))])
+
+func _show_tutorial_modal() -> void:
+	var modal := _modal_panel("新手引导", Vector2(600, 520))
+	if modal.is_empty():
+		return
+	var box: VBoxContainer = modal["box"]
+	_add_line(box, "大厅", "先选择休闲、天梯、多人房间或巅峰竞技场。")
+	_add_line(box, "选择狗狗", "每种狗有独立特性；狗皇帝需要选择幸运数字。")
+	_add_line(box, "查看商店", "点击商品先看详情、触发点数和效果，再确认购买。")
+	_add_line(box, "放置装备", "选中装备后点击装备栏或背包格子移动；详情弹窗可出售或升级。")
+	_add_line(box, "观看战斗", "战斗回放会显示血量、护盾、状态、蓄水池、触发装备和结算看板。")
+	_add_line(box, "继续跑局", "战斗后领取奖励、处理地图节点，再进入下一轮商店或战斗。")
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 8)
+	row.add_child(_action_button("进入跑局页", _tutorial_go_run_tab))
+	row.add_child(_action_button("关闭", _close_top_modal))
+	box.add_child(row)
+	_push_modal(modal["panel"])
+
+func _tutorial_go_run_tab() -> void:
+	_close_top_modal()
+	_switch_tab(TAB_RUN)
 
 func _show_room_member_modal(member: Dictionary) -> void:
 	var modal := _modal_panel("房间成员详情", Vector2(520, 460))
