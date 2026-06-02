@@ -556,11 +556,22 @@ func _render_rooms_tab() -> void:
 		for battle in _array(active_room, "battles"):
 			if battle is Dictionary:
 				detail.add_child(_action_button("战报摘要 第%d回合 %s" % [int(battle.get("round", 0)), str(battle.get("id", ""))], _show_room_battle_modal.bind(battle)))
+		var room_run: Dictionary = _dict(active_room, "currentRun")
+		if not room_run.is_empty():
+			_render_room_current_run(room_run)
 	for room in _array(rooms_data, "rooms"):
 		if room is Dictionary:
 			var room_id := str(room.get("id", ""))
 			var text := "%s 的房间  %s/%s  真人 %d/%d  存活 %d/%d" % [str(room.get("hostName", "")), str(room.get("status", "")), str(room.get("phase", "")), int(room.get("memberCount", 0)), int(room.get("maxPlayers", 0)), int(room.get("aliveCount", 0)), int(room.get("targetPlayerCount", 0))]
 			card.add_child(_action_button(text, _enter_or_view_room.bind(room_id, str(room.get("status", "")))))
+
+func _render_room_current_run(run: Dictionary) -> void:
+	var card := _section("房间当前跑局")
+	_add_line(card, "阶段", "%s / %s" % [str(run.get("phase", "")), str(run.get("status", ""))])
+	_add_line(card, "犬种", "%s  幸运号 %s" % [_dog_name(str(run.get("dogType", ""))), str(run.get("luckyNumber", "-"))])
+	_add_line(card, "进度", "第 %d 回合 · %d 胜 %d 负 · 金币 %d" % [int(run.get("round", 0)), int(run.get("wins", 0)), int(run.get("losses", 0)), int(run.get("gold", 0))])
+	_render_inventory(run)
+	_render_map_or_shop(run)
 
 func _render_settings_tab() -> void:
 	var card := _section("个人设置 / 时装展示")
@@ -691,7 +702,7 @@ func _refresh_after_action() -> void:
 	elif current_tab == TAB_DAILY:
 		await _fetch_into("daily", ApiRoutes.daily_tasks())
 	elif current_tab == TAB_ROOMS:
-		await _fetch_into("rooms", ApiRoutes.dogfight_rooms())
+		await _refresh_active_room()
 	_render_shell()
 
 func _claim_achievement(achievement_id: String) -> void:
@@ -739,6 +750,18 @@ func _toggle_music() -> void:
 func _refresh_rooms() -> void:
 	await _fetch_into("rooms", ApiRoutes.dogfight_rooms())
 	_render_shell()
+
+func _refresh_active_room() -> void:
+	var room_id := str(active_room.get("id", ""))
+	if room_id.is_empty():
+		await _fetch_into("rooms", ApiRoutes.dogfight_rooms())
+		return
+	var response: Dictionary = await _api_get(ApiRoutes.dogfight_room(room_id))
+	if bool(response.get("ok", false)):
+		var data: Dictionary = _data(response)
+		active_room = _dict(data, "room")
+		_sync_room_run(active_room)
+	await _fetch_into("rooms", ApiRoutes.dogfight_rooms())
 
 func _create_room() -> void:
 	var response: Dictionary = await _api_post(ApiRoutes.dogfight_rooms(), {})
@@ -812,8 +835,14 @@ func _apply_room_response(response: Dictionary) -> void:
 		return
 	var data: Dictionary = _data(response)
 	active_room = _dict(data, "room")
+	_sync_room_run(active_room)
 	current_tab = TAB_ROOMS
 	await _refresh_rooms()
+
+func _sync_room_run(room: Dictionary) -> void:
+	var room_run: Dictionary = _dict(room, "currentRun")
+	if not room_run.is_empty() and session != null and session.has_method("set_current_run"):
+		session.set_current_run(room_run)
 
 func _post_and_store(path: String, body: Dictionary, target: String) -> void:
 	var response: Dictionary = await _api_post(path, body)
