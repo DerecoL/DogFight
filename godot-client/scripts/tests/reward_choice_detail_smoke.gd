@@ -48,7 +48,7 @@ func _run() -> void:
 		"enchant": {"kind": "BUFF_NEIGHBOR_EFFECT", "target": "ADJACENT", "effect": "DAMAGE", "amount": 2, "label": "邻近伤害"},
 	})
 	await process_frame
-	_assert_modal_text(modal_layer, ["附魔选择", "相邻装备伤害 +2", "邻近伤害", "附魔到选中装备"])
+	_assert_modal_text(modal_layer, ["附魔选择", "相邻装备伤害 +2", "邻近伤害", "强化相邻装备", "相邻", "攻击", "附魔到选中装备"])
 	run_screen.call("_close_top_modal")
 	await process_frame
 	run_screen.call("_show_potion_choice_modal", {
@@ -58,7 +58,7 @@ func _run() -> void:
 		"description": "增加 1、3 点触发",
 	})
 	await process_frame
-	_assert_modal_text(modal_layer, ["药水选择", "ADD_ONE", "1, 3", "增加 1、3 点触发", "药水给选中装备"])
+	_assert_modal_text(modal_layer, ["药水选择", "增加一个点数", "1, 3", "增加 1、3 点触发", "药水给选中装备"])
 	main.queue_free()
 	for _frame in range(5):
 		await process_frame

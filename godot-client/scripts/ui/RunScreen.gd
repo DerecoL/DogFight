@@ -878,7 +878,9 @@ func _render_rooms_tab() -> void:
 		for member in _array(active_room, "members"):
 			if member is Dictionary:
 				var member_name := str(member.get("nickname", member.get("kind", "")))
-				detail.add_child(_action_button("%s  %s  %d-%d  %s" % [member_name, str(member.get("kind", "")), int(member.get("wins", 0)), int(member.get("losses", 0)), "淘汰" if bool(member.get("eliminated", false)) else "存活"], _show_room_member_modal.bind(member)))
+				var member_kind := _room_member_kind_label(str(member.get("kind", "")))
+				var host_mark := " · 房主" if bool(member.get("isHost", false)) else ""
+				detail.add_child(_action_button("%s  %s%s  %d-%d  %s" % [member_name, member_kind, host_mark, int(member.get("wins", 0)), int(member.get("losses", 0)), _room_member_status(member)], _show_room_member_modal.bind(member)))
 		for battle in _array(active_room, "battles"):
 			if battle is Dictionary:
 				detail.add_child(_action_button("战报摘要 第%d回合 %s" % [int(battle.get("round", 0)), str(battle.get("id", ""))], _show_room_battle_modal.bind(battle)))
@@ -1641,7 +1643,7 @@ func _show_room_member_modal(member: Dictionary) -> void:
 	var box: VBoxContainer = modal["box"]
 	var name := str(member.get("nickname", member.get("kind", "")))
 	_add_line(box, "昵称", name)
-	_add_line(box, "席位", "%s%s" % [str(member.get("kind", "")), " · 房主" if bool(member.get("isHost", false)) else ""])
+	_add_line(box, "席位", "%s%s" % [_room_member_kind_label(str(member.get("kind", ""))), " · 房主" if bool(member.get("isHost", false)) else ""])
 	_add_line(box, "犬种", _dog_name(str(member.get("dogType", ""))))
 	_add_line(box, "战绩", "%d胜 / %d负 · 第%d回合" % [int(member.get("wins", 0)), int(member.get("losses", 0)), int(member.get("round", 0))])
 	_add_line(box, "经济", "金币 %d" % int(member.get("gold", 0)))
@@ -2022,6 +2024,17 @@ func _opponent_kind_label(kind: String) -> String:
 		_:
 			return _fallback(kind, "未知对手")
 
+func _room_member_kind_label(kind: String) -> String:
+	match kind:
+		"PLAYER":
+			return "玩家"
+		"BOT":
+			return "机器人"
+		"SEED":
+			return "种子"
+		_:
+			return _fallback(kind, "未知席位")
+
 func _battle_side_label(side: String) -> String:
 	match side.to_lower():
 		"player":
@@ -2164,11 +2177,11 @@ func _show_enchant_choice_modal(choice: Dictionary) -> void:
 	_add_line(box, "名称", _enchant_choice_label(choice))
 	_add_line(box, "说明", str(choice.get("description", "")))
 	if not enchant.is_empty():
-		_add_line(box, "类型", str(enchant.get("kind", "")))
+		_add_line(box, "类型", _enchant_kind_label(str(enchant.get("kind", ""))))
 		if enchant.has("target"):
-			_add_line(box, "目标", str(enchant.get("target", "")))
+			_add_line(box, "目标", _enchant_target_label(str(enchant.get("target", ""))))
 		if enchant.has("effect"):
-			_add_line(box, "效果", str(enchant.get("effect", "")))
+			_add_line(box, "效果", _enchant_effect_label(str(enchant.get("effect", ""))))
 		if enchant.has("amount"):
 			_add_line(box, "数值", str(enchant.get("amount", "")))
 	box.add_child(_action_button("附魔到选中装备", _enchant_from_modal.bind(str(choice.get("id", "")))))
@@ -2179,7 +2192,7 @@ func _show_potion_choice_modal(choice: Dictionary) -> void:
 	if modal.is_empty():
 		return
 	var box: VBoxContainer = modal["box"]
-	_add_line(box, "类型", str(choice.get("category", "")))
+	_add_line(box, "类型", _potion_category_label(str(choice.get("category", ""))))
 	_add_line(box, "点数", _detail_array_text(choice.get("dice", [])))
 	_add_line(box, "说明", str(choice.get("description", "")))
 	box.add_child(_action_button("药水给选中装备", _potion_from_modal.bind(str(choice.get("id", "")))))
@@ -2315,6 +2328,72 @@ func _enchant_choice_label(choice: Dictionary) -> String:
 
 func _potion_choice_label(choice: Dictionary) -> String:
 	return _fallback(str(choice.get("description", "")), _fallback(str(choice.get("category", "")), str(choice.get("id", ""))))
+
+func _enchant_kind_label(kind: String) -> String:
+	match kind:
+		"EXTRA_DICE":
+			return "额外触发点数"
+		"BASE_EFFECT":
+			return "基础效果"
+		"SPECIAL":
+			return "特殊状态"
+		"TRIGGER_NEIGHBOR":
+			return "触发相邻装备"
+		"BUFF_NEIGHBOR_EFFECT":
+			return "强化相邻装备"
+		"GRANT_NEIGHBOR_EFFECT":
+			return "赋予相邻效果"
+		_:
+			return _fallback(kind, "未知附魔")
+
+func _enchant_target_label(target: String) -> String:
+	match target:
+		"LEFT":
+			return "左侧"
+		"RIGHT":
+			return "右侧"
+		"ADJACENT":
+			return "相邻"
+		_:
+			return _fallback(target, "未知目标")
+
+func _enchant_effect_label(effect: String) -> String:
+	match effect:
+		"DAMAGE":
+			return "攻击"
+		"HEAL":
+			return "恢复生命"
+		"SHIELD":
+			return "增加护盾"
+		"THORNS":
+			return "荆棘"
+		"FURY":
+			return "激昂"
+		"POISON":
+			return "中毒"
+		"WEAK":
+			return "虚弱"
+		"LIFESTEAL":
+			return "吸血"
+		"CLEANSE":
+			return "净化"
+		_:
+			return _fallback(effect, "未知效果")
+
+func _potion_category_label(category: String) -> String:
+	match category:
+		"ADD_ONE":
+			return "增加一个点数"
+		"ADD_TWO":
+			return "增加两个点数"
+		"EXTRA_ONE":
+			return "额外增加点数"
+		"REPLACE_RANGE":
+			return "改为指定范围"
+		"REPLACE_ALL":
+			return "改为全点数"
+		_:
+			return _fallback(category, "未知药水")
 
 func _buy_offer_from_modal(offer_id: String) -> void:
 	_close_top_modal()
