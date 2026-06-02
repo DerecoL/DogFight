@@ -1,0 +1,158 @@
+[gd_scene load_steps=2 format=3 uid="uid://dogfight_run_screen"]
+
+[ext_resource type="Script" path="res://scripts/ui/RunScreen.gd" id="1_run"]
+
+[node name="RunScreen" type="Control"]
+visible = false
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_run")
+
+[node name="Root" type="VBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 12
+
+[node name="Header" type="HBoxContainer" parent="Root"]
+custom_minimum_size = Vector2(0, 56)
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="RunLabel" type="Label" parent="Root/Header"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 56)
+layout_mode = 2
+size_flags_horizontal = 3
+text = "暂无跑局"
+vertical_alignment = 1
+
+[node name="CreateRunButton" type="Button" parent="Root/Header"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(180, 44)
+layout_mode = 2
+text = "创建柴犬跑局"
+
+[node name="Body" type="HBoxContainer" parent="Root"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 12
+
+[node name="EquipmentPanel" type="PanelContainer" parent="Root/Body"]
+custom_minimum_size = Vector2(420, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="EquipmentScroll" type="ScrollContainer" parent="Root/Body/EquipmentPanel"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+
+[node name="EquipmentList" type="VBoxContainer" parent="Root/Body/EquipmentPanel/EquipmentScroll"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_constants/separation = 8
+
+[node name="BagPanel" type="PanelContainer" parent="Root/Body"]
+custom_minimum_size = Vector2(360, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="BagScroll" type="ScrollContainer" parent="Root/Body/BagPanel"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+
+[node name="BagList" type="VBoxContainer" parent="Root/Body/BagPanel/BagScroll"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_constants/separation = 8
+
+[node name="ShopPanel" type="PanelContainer" parent="Root/Body"]
+custom_minimum_size = Vector2(420, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="ShopScroll" type="ScrollContainer" parent="Root/Body/ShopPanel"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+
+[node name="ShopList" type="VBoxContainer" parent="Root/Body/ShopPanel/ShopScroll"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_constants/separation = 8
+
+[node name="Footer" type="HBoxContainer" parent="Root"]
+custom_minimum_size = Vector2(0, 56)
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="ActionButton" type="Button" parent="Root/Footer"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(160, 44)
+layout_mode = 2
+text = "等待阶段操作"
+
+[node name="SellSelectedButton" type="Button" parent="Root/Footer"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(132, 44)
+layout_mode = 2
+size_flags_horizontal = 4
+text = "出售选中"
+clip_text = true
+text_overrun_behavior = 3
+
+[node name="RerollShopButton" type="Button" parent="Root/Footer"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(132, 44)
+layout_mode = 2
+size_flags_horizontal = 4
+text = "刷新商店"
+clip_text = true
+text_overrun_behavior = 3
+
+[node name="MoveBagButton" type="Button" parent="Root/Footer"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(132, 44)
+layout_mode = 2
+size_flags_horizontal = 4
+text = "移到背包0,0"
+clip_text = true
+text_overrun_behavior = 3
+
+[node name="MoveEquipmentButton" type="Button" parent="Root/Footer"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(132, 44)
+layout_mode = 2
+size_flags_horizontal = 4
+text = "移到装备0,0"
+clip_text = true
+text_overrun_behavior = 3
+
+[node name="ErrorLabel" type="Label" parent="Root/Footer"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 44)
+layout_mode = 2
+size_flags_horizontal = 3
+vertical_alignment = 1
+autowrap_mode = 3

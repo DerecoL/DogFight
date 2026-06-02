@@ -1,0 +1,60 @@
+[gd_scene load_steps=2 format=3 uid="uid://dogfight_login_screen"]
+
+[ext_resource type="Script" path="res://scripts/ui/LoginScreen.gd" id="1_login"]
+
+[node name="LoginScreen" type="PanelContainer"]
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -210.0
+offset_top = -140.0
+offset_right = 210.0
+offset_bottom = 140.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_login")
+
+[node name="Margin" type="MarginContainer" parent="."]
+layout_mode = 2
+theme_override_constants/margin_left = 24
+theme_override_constants/margin_top = 24
+theme_override_constants/margin_right = 24
+theme_override_constants/margin_bottom = 24
+
+[node name="Form" type="VBoxContainer" parent="Margin"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="Title" type="Label" parent="Margin/Form"]
+layout_mode = 2
+text = "狗骰乱斗 Godot Demo"
+horizontal_alignment = 1
+
+[node name="AccountInput" type="LineEdit" parent="Margin/Form"]
+unique_name_in_owner = true
+layout_mode = 2
+placeholder_text = "账号"
+
+[node name="PasswordInput" type="LineEdit" parent="Margin/Form"]
+unique_name_in_owner = true
+layout_mode = 2
+placeholder_text = "密码"
+secret = true
+
+[node name="LoginButton" type="Button" parent="Margin/Form"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "登录"
+
+[node name="ErrorScroll" type="ScrollContainer" parent="Margin/Form"]
+custom_minimum_size = Vector2(0, 58)
+layout_mode = 2
+horizontal_scroll_mode = 0
+
+[node name="ErrorLabel" type="Label" parent="Margin/Form/ErrorScroll"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+autowrap_mode = 3
