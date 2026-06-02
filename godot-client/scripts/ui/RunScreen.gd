@@ -34,6 +34,7 @@ func bind_session(next_session: Node) -> void:
 func _ready() -> void:
 	if not create_run_button.pressed.is_connected(_on_create_run_pressed):
 		create_run_button.pressed.connect(_on_create_run_pressed)
+	_connect_button_once(action_button, _on_action_pressed)
 	_connect_button_once(sell_selected_button, _on_sell_selected_pressed)
 	_connect_button_once(reroll_shop_button, _on_reroll_shop_pressed)
 	_connect_button_once(move_bag_button, _on_move_to_bag_pressed)
@@ -50,9 +51,10 @@ func _on_create_run_pressed() -> void:
 	if session == null or not session.has_method("create_run"):
 		error_label.text = "跑局会话未初始化"
 		return
-	create_run_button.disabled = true
+	if not _begin_run_action():
+		return
 	await session.create_run("SHIBA", "CASUAL")
-	create_run_button.disabled = false
+	_finish_run_action()
 
 func _on_run_changed(_run: Dictionary) -> void:
 	_clear_stale_selection()
@@ -158,6 +160,8 @@ func _update_action_controls_disabled() -> void:
 	reroll_shop_button.disabled = action_in_progress
 	move_bag_button.disabled = action_in_progress
 	move_equipment_button.disabled = action_in_progress
+	create_run_button.disabled = action_in_progress
+	action_button.disabled = action_in_progress
 	for row in shop_list.get_children():
 		if row is Button:
 			row.disabled = action_in_progress
@@ -199,6 +203,27 @@ func _on_reroll_shop_pressed() -> void:
 	if not _begin_run_action():
 		return
 	await session.reroll_shop()
+	_finish_run_action()
+
+func _on_action_pressed() -> void:
+	if session == null:
+		error_label.text = "璺戝眬浼氳瘽鏈垵濮嬪寲"
+		return
+	var store = session.get("run_store")
+	if store == null or not store.has_run():
+		error_label.text = "没有当前跑局"
+		return
+	if not _begin_run_action():
+		return
+	var phase := store.phase()
+	if phase == "PREP" and session.has_method("match_battle"):
+		await session.match_battle()
+	elif phase == "MATCH" and session.has_method("start_battle"):
+		await session.start_battle()
+	elif phase == "BATTLE" and session.has_method("finish_battle"):
+		await session.finish_battle()
+	else:
+		error_label.text = "当前阶段不能执行战斗操作"
 	_finish_run_action()
 
 func _on_move_to_bag_pressed() -> void:

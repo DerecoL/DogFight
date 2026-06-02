@@ -3,6 +3,7 @@ extends Control
 signal user_changed(user: Dictionary)
 signal run_changed(run: Dictionary)
 signal error_raised(message: String)
+signal battle_started(battle: Dictionary)
 
 const ApiClient := preload("res://scripts/api/ApiClient.gd")
 const RunStore := preload("res://scripts/state/RunStore.gd")
@@ -28,6 +29,13 @@ func _ready() -> void:
 	var run_screen := get_node_or_null("ScreenRoot/RunScreen")
 	if run_screen != null and run_screen.has_method("bind_session"):
 		run_screen.bind_session(self)
+	var battle_screen := get_node_or_null("ScreenRoot/BattleReplayScreen")
+	if battle_screen != null and battle_screen.has_method("bind_session"):
+		battle_screen.bind_session(self)
+	if not battle_started.is_connected(_show_battle_screen):
+		battle_started.connect(_show_battle_screen)
+	if not run_changed.is_connected(_on_run_changed_for_screen):
+		run_changed.connect(_on_run_changed_for_screen)
 
 func login(account: String, password: String) -> bool:
 	var response := await api.post_json("/auth/login", {"account": account, "password": password})
@@ -77,6 +85,30 @@ func sell_item(item_id: String) -> bool:
 func reroll_shop() -> bool:
 	return await _post_run_action("/shop/reroll", {})
 
+func match_battle() -> bool:
+	return await _post_run_action("/battle/match", {})
+
+func start_battle() -> bool:
+	if not run_store.has_run():
+		error_raised.emit("没有当前跑局")
+		return false
+	var response := await api.post_json("/runs/%s/battle/start" % run_store.run_id(), {})
+	if not response.ok:
+		error_raised.emit(str(response.error))
+		return false
+	var run := response.data.get("run", {})
+	if run is Dictionary and str(run.get("id", "")).length() > 0:
+		set_current_run(run)
+	var battle := response.data.get("battle", {})
+	if battle is Dictionary:
+		battle_started.emit(battle)
+		return true
+	error_raised.emit("服务器没有返回战斗结果")
+	return false
+
+func finish_battle() -> bool:
+	return await _post_run_action("/battle/finish", {})
+
 func _post_run_action(suffix: String, body: Dictionary) -> bool:
 	if not run_store.has_run():
 		error_raised.emit("没有当前跑局")
@@ -99,10 +131,31 @@ func set_current_run(run: Dictionary) -> void:
 func _show_run_screen() -> void:
 	var login_screen := get_node_or_null("ScreenRoot/LoginScreen")
 	var run_screen := get_node_or_null("ScreenRoot/RunScreen")
+	var battle_screen := get_node_or_null("ScreenRoot/BattleReplayScreen")
 	if run_screen == null:
 		return
 	if login_screen != null:
 		login_screen.visible = false
+	if battle_screen != null:
+		battle_screen.visible = false
 	if run_screen.has_method("clear_error"):
 		run_screen.call("clear_error")
 	run_screen.visible = true
+
+func _show_battle_screen(battle: Dictionary) -> void:
+	var login_screen := get_node_or_null("ScreenRoot/LoginScreen")
+	var run_screen := get_node_or_null("ScreenRoot/RunScreen")
+	var battle_screen := get_node_or_null("ScreenRoot/BattleReplayScreen")
+	if battle_screen == null:
+		return
+	if login_screen != null:
+		login_screen.visible = false
+	if run_screen != null:
+		run_screen.visible = false
+	battle_screen.visible = true
+	if battle_screen.has_method("start_replay"):
+		battle_screen.start_replay(battle)
+
+func _on_run_changed_for_screen(_run: Dictionary) -> void:
+	if run_store.phase() != "BATTLE":
+		_show_run_screen()
