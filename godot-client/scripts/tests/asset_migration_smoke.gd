@@ -2,6 +2,18 @@ extends SceneTree
 
 const REQUIRED_ASSETS := [
 	"res://assets/map/exploration-parchment-scroll.webp",
+	"res://assets/dogs/shiba.webp",
+	"res://assets/dogs/samoyed.webp",
+	"res://assets/dogs/mutt.webp",
+	"res://assets/dogs/bully.webp",
+	"res://assets/dogs/emperor.webp",
+	"res://assets/dogs/zuling.jpg",
+	"res://assets/backgrounds/storybook-dog-park.webp",
+	"res://assets/backgrounds/storybook-back-alley.webp",
+	"res://assets/backgrounds/storybook-royal-kennel.webp",
+	"res://assets/backgrounds/dog-brawl-town.jpg",
+	"res://assets/audio/the-final-inventory.mp3",
+	"res://assets/ui/battle-dice-base.webp",
 	"res://assets/item-card-art/v4-growing-chew-sword.webp",
 	"res://assets/item-card-art/v4-boom-counter.webp",
 	"res://assets/item-card-art/v3-wooden-shield.webp",
