@@ -750,15 +750,22 @@ func _render_daily_tab() -> void:
 	var card := _section("每日任务")
 	var wallet: Dictionary = _dict(daily_data, "wallet")
 	_add_line(card, "日期 / 钱包", "%s · 余额 %d" % [str(daily_data.get("dateKey", "")), int(wallet.get("balance", 0))])
-	card.add_child(_action_button("刷新每日任务", _refresh_daily))
+	var refresh_used := bool(daily_data.get("refreshUsed", false))
+	var refresh_button := _action_button("今日已刷新" if refresh_used else "刷新每日任务", _refresh_daily)
+	refresh_button.disabled = refresh_button.disabled or refresh_used
+	card.add_child(refresh_button)
 	for task in _array(daily_data, "tasks"):
 		if task is Dictionary:
 			var def: Dictionary = _dict(task, "def")
 			var text := "%s  %d/%d  奖励 %d" % [_fallback(str(def.get("title", "")), str(task.get("taskId", ""))), int(task.get("progress", 0)), int(task.get("target", 0)), _reward_amount(task, def)]
-			if int(task.get("progress", 0)) >= int(task.get("target", 0)) and str(task.get("claimedAt", "")).is_empty():
+			var ready := int(task.get("progress", 0)) >= int(task.get("target", 0))
+			var claimed := not str(task.get("claimedAt", "")).is_empty()
+			if claimed:
+				card.add_child(_action_button("已领取 " + text, _show_daily_task_modal.bind(task)))
+			elif ready:
 				card.add_child(_action_button("可领取 " + text, _show_daily_task_modal.bind(task)))
 			else:
-				card.add_child(_action_button("查看 " + text, _show_daily_task_modal.bind(task)))
+				card.add_child(_action_button("未完成 " + text, _show_daily_task_modal.bind(task)))
 
 func _render_shop_tab() -> void:
 	var card := _section("账号商城 / 外观")
