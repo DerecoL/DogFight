@@ -397,6 +397,12 @@ func _render_settlement_summary(run: Dictionary) -> void:
 func _run_score(run: Dictionary) -> int:
 	return int(run.get("wins", 0)) * 100 - int(run.get("losses", 0)) * 20 + int(run.get("round", 0)) * 5 + int(run.get("gold", 0))
 
+func _apex_rank_text(rank_value) -> String:
+	if rank_value == null:
+		return "未上榜"
+	var rank := int(rank_value)
+	return "未上榜" if rank <= 0 else "第 %d 名" % rank
+
 func _render_reward_choices(run: Dictionary) -> void:
 	var choices: Array = _array(run, "choices")
 	var relics: Array = _array(run, "relicChoices")
@@ -523,6 +529,12 @@ func _render_leaderboards_tab() -> void:
 			_add_line(ladder_card, "#%d" % int(entry.get("rank", 0)), "%s  %s" % [str(entry.get("name", "")), str(entry.get("title", ""))])
 	var apex_card := _section("巅峰榜")
 	var leaderboards: Dictionary = _dict(apex_data, "leaderboards")
+	var reports: Dictionary = _dict(apex_data, "reports")
+	var submitted_entries: Dictionary = _dict(apex_data, "entries")
+	var submitted_overall: Dictionary = _dict(submitted_entries, "overall")
+	if not submitted_overall.is_empty() and not reports.is_empty():
+		_add_line(apex_card, "提交结果", "%s 已投入巅峰榜" % str(submitted_overall.get("name", "巅峰记录")))
+		_add_line(apex_card, "排名", "总榜%s，当日榜%s。新记录防守连胜从 %d 开始" % [_apex_rank_text(_dict(reports, "overall").get("placementRank", null)), _apex_rank_text(_dict(reports, "daily").get("placementRank", null)), int(submitted_overall.get("challengeWins", 0))])
 	var candidates := _array(apex_data, "candidates")
 	_add_line(apex_card, "可提交完成局", str(candidates.size()))
 	for candidate in candidates:
@@ -531,10 +543,14 @@ func _render_leaderboards_tab() -> void:
 			var candidate_text := "%s  %d-%d  第%d回合" % [str(candidate.get("dogType", candidate.get("mode", ""))), int(candidate.get("wins", 0)), int(candidate.get("losses", 0)), int(candidate.get("round", 0))]
 			apex_card.add_child(_action_button("提交巅峰 " + candidate_text, _submit_apex_candidate.bind(run_id)))
 	for board_name in ["overall", "daily"]:
-		_add_line(apex_card, board_name, "")
+		if board_name == "daily":
+			_add_line(apex_card, "当日榜", "每日 %02d:00 更新 · %s" % [int(apex_data.get("dailyResetHour", 5)), str(apex_data.get("dailyBoardKey", ""))])
+		else:
+			_add_line(apex_card, "总榜", "初始种子会随玩家提交逐步下移")
 		for entry in _array(leaderboards, board_name).slice(0, 20):
 			if entry is Dictionary:
-				var entry_label := "#%s  %s  %d-%d  第%d回合" % [str(entry.get("rank", "-")), str(entry.get("name", "")), int(entry.get("wins", 0)), int(entry.get("losses", 0)), int(entry.get("round", 0))]
+				var marker := "我的记录" if bool(entry.get("isMine", false)) else ("种子" if bool(entry.get("isSeed", false)) else "防守连胜 %d" % int(entry.get("challengeWins", 0)))
+				var entry_label := "查看配置  #%s  %s  %d-%d  第%d回合  %s" % [str(entry.get("rank", "-")), str(entry.get("name", "")), int(entry.get("wins", 0)), int(entry.get("losses", 0)), int(entry.get("round", 0)), marker]
 				apex_card.add_child(_action_button(entry_label, _show_snapshot_modal.bind(entry, "巅峰配置详情")))
 
 func _render_season_tab() -> void:
