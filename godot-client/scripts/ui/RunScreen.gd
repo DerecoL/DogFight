@@ -834,9 +834,10 @@ func _render_rooms_tab() -> void:
 	room_toolbar.add_child(_action_button("创建房间", _create_room))
 	room_toolbar.add_child(_action_button("随机匹配", _match_room))
 	room_toolbar.add_child(_action_button("刷新房间", _refresh_rooms))
+	_add_line(card, "说明", "玩家席位先进入房间，开局后统一选择斗狗；不足 8 人由机器人补齐。")
 	if not active_room.is_empty():
 		var detail := _section("当前房间")
-		_add_line(detail, "状态", "%s / %s / 第%d回合" % [str(active_room.get("status", "")), str(active_room.get("phase", "")), int(active_room.get("currentRound", 0))])
+		_add_line(detail, "状态", _room_summary_label(active_room))
 		detail.add_child(_action_button("离开房间", _leave_active_room))
 		detail.add_child(_action_button("开始房间", _room_action.bind("start", {})))
 		detail.add_child(_action_button("准备 / 完成本回合", _room_action.bind("ready", {})))
@@ -851,15 +852,16 @@ func _render_rooms_tab() -> void:
 		var room_run: Dictionary = _dict(active_room, "currentRun")
 		if not room_run.is_empty():
 			_render_room_current_run(room_run)
+	_add_line(card, "房间列表", "")
 	for room in _array(rooms_data, "rooms"):
 		if room is Dictionary:
 			var room_id := str(room.get("id", ""))
-			var text := "%s 的房间  %s/%s  真人 %d/%d  存活 %d/%d" % [str(room.get("hostName", "")), str(room.get("status", "")), str(room.get("phase", "")), int(room.get("memberCount", 0)), int(room.get("maxPlayers", 0)), int(room.get("aliveCount", 0)), int(room.get("targetPlayerCount", 0))]
+			var text := "%s 的房间  %s  真人 %d/%d  存活 %d/%d  %s" % [str(room.get("hostName", "")), _room_summary_label(room), int(room.get("memberCount", 0)), int(room.get("maxPlayers", 0)), int(room.get("aliveCount", 0)), int(room.get("targetPlayerCount", 0)), _room_list_action_label(room)]
 			card.add_child(_action_button(text, _enter_or_view_room.bind(room_id, str(room.get("status", "")))))
 
 func _render_room_current_run(run: Dictionary) -> void:
 	var card := _section("房间当前跑局")
-	_add_line(card, "阶段", "%s / %s" % [str(run.get("phase", "")), str(run.get("status", ""))])
+	_add_line(card, "阶段", "%s / %s" % [_room_phase_label(str(run.get("phase", ""))), _room_status_label(str(run.get("status", "")))])
 	_add_line(card, "犬种", "%s  幸运号 %s" % [_dog_name(str(run.get("dogType", ""))), str(run.get("luckyNumber", "-"))])
 	_add_line(card, "进度", "第 %d 回合 · %d 胜 %d 负 · 金币 %d" % [int(run.get("round", 0)), int(run.get("wins", 0)), int(run.get("losses", 0)), int(run.get("gold", 0))])
 	_render_inventory(run)
@@ -1847,6 +1849,47 @@ func _room_member_status(member: Dictionary) -> String:
 	if bool(member.get("ready", false)):
 		return "已准备"
 	return "存活"
+
+func _room_summary_label(room: Dictionary) -> String:
+	var status := str(room.get("status", ""))
+	if status == "WAITING":
+		return "等待中"
+	if status == "COMPLETE":
+		return "已结束"
+	var phase_text := _room_phase_label(str(room.get("phase", "")))
+	var round_value := int(room.get("currentRound", room.get("round", 0)))
+	if round_value > 0:
+		return "%s · 第 %d 回合" % [phase_text, round_value]
+	return phase_text
+
+func _room_list_action_label(room: Dictionary) -> String:
+	return "加入房间" if str(room.get("status", "")) == "WAITING" else "观战"
+
+func _room_status_label(status: String) -> String:
+	match status:
+		"WAITING":
+			return "等待中"
+		"ACTIVE":
+			return "进行中"
+		"COMPLETE":
+			return "已结束"
+		_:
+			return _fallback(status, "未知")
+
+func _room_phase_label(phase: String) -> String:
+	match phase:
+		"LOBBY":
+			return "大厅阶段"
+		"DOG_SELECT":
+			return "选狗阶段"
+		"SHOP":
+			return "商店阶段"
+		"BATTLE":
+			return "战斗阶段"
+		"COMPLETE":
+			return "房间结束"
+		_:
+			return _fallback(phase, "未知阶段")
 
 func _signed_int(value: int) -> String:
 	return "%+d" % value
