@@ -12,6 +12,11 @@ func _init() -> void:
 		push_error("Overlay foundation scripts failed to load")
 		quit(1)
 		return
+	var overlay_scene := load("res://scenes/overlays/OverlayRoot.tscn")
+	if overlay_scene == null:
+		push_error("OverlayRoot scene failed to load")
+		quit(1)
+		return
 	var root := Control.new()
 	root.name = "ScreenRoot"
 	var login := Control.new()
@@ -86,10 +91,13 @@ func _init() -> void:
 		quit(1)
 		return
 	var modal_stack = modal_script.new()
+	var modal_root := Control.new()
+	modal_root.name = "ModalRoot"
+	modal_stack.configure(modal_root)
 	var modal := Control.new()
 	modal.name = "ConfirmModal"
 	modal_stack.push_modal(modal, true)
-	if modal_stack.depth() != 1 or not modal_stack.is_blocking():
+	if modal_stack.depth() != 1 or not modal_stack.is_blocking() or modal.get_parent() != modal_root:
 		push_error("ModalStack failed to push blocking modal")
 		quit(1)
 		return
@@ -98,6 +106,36 @@ func _init() -> void:
 		push_error("ModalStack failed to pop modal")
 		quit(1)
 		return
+	var orphan_stack = modal_script.new()
+	var orphan_modal := Control.new()
+	orphan_stack.push_modal(orphan_modal, true)
+	if orphan_stack.depth() != 0 or orphan_stack.is_blocking():
+		push_error("ModalStack accepted modal without configured root")
+		quit(1)
+		return
+	orphan_modal.free()
+	var parented_stack = modal_script.new()
+	var other_modal_root := Control.new()
+	parented_stack.configure(other_modal_root)
+	var existing_parent := Control.new()
+	var parented_modal := Control.new()
+	existing_parent.add_child(parented_modal)
+	parented_stack.push_modal(parented_modal, true)
+	if parented_stack.depth() != 0 or parented_stack.is_blocking() or parented_modal.get_parent() != existing_parent or not existing_parent.get_children().has(parented_modal):
+		push_error("ModalStack accepted modal from unrelated parent")
+		quit(1)
+		return
+	var overlay_root = overlay_scene.instantiate()
+	var blocking_layer = overlay_root.get_node_or_null("BlockingLayer")
+	var modal_layer = overlay_root.get_node_or_null("ModalLayer")
+	if blocking_layer == null or modal_layer == null or blocking_layer.get_index() >= modal_layer.get_index():
+		push_error("OverlayRoot BlockingLayer must render below ModalLayer")
+		quit(1)
+		return
+	overlay_root.free()
+	modal_root.free()
+	other_modal_root.free()
+	existing_parent.free()
 	var toast_bus = toast_script.new()
 	toast_bus.push("保存成功", "success")
 	var toast := toast_bus.pop_next()
