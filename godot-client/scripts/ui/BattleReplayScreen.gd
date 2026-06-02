@@ -757,7 +757,17 @@ func _battle_item_label(item: Dictionary) -> String:
 func _battle_item_texture(item: Dictionary) -> Texture2D:
 	if item.is_empty():
 		return null
-	return _battle_sticker_texture(str(item.get("defId", "")))
+	var def_id := str(item.get("defId", ""))
+	var art := _battle_item_art_texture(def_id)
+	return art if art != null else _battle_sticker_texture(def_id)
+
+func _battle_item_art_texture(def_id: String) -> Texture2D:
+	if def_id.is_empty():
+		return null
+	var path := "res://assets/item-card-art/%s.webp" % def_id
+	if not ResourceLoader.exists(path) and not FileAccess.file_exists(path):
+		return null
+	return _texture(path)
 
 func _battle_sticker_texture(asset_id: String) -> Texture2D:
 	if asset_id.is_empty():
