@@ -4,8 +4,21 @@ func _init() -> void:
 	var session_script := load("res://scripts/state/GameSession.gd")
 	var api_script := load("res://scripts/api/ApiClient.gd")
 	var types_script := load("res://scripts/api/ApiTypes.gd")
+	var routes_script := load("res://scripts/api/ApiRoutes.gd")
 	if session_script == null or api_script == null or types_script == null:
 		push_error("Core Godot client scripts failed to load")
+		quit(1)
+		return
+	if routes_script == null:
+		push_error("ApiRoutes.gd failed to load")
+		quit(1)
+		return
+	if routes_script.login() != "/auth/login":
+		push_error("ApiRoutes.login returned wrong path")
+		quit(1)
+		return
+	if routes_script.run_battle_start("run-1") != "/runs/run-1/battle/start":
+		push_error("ApiRoutes.run_battle_start returned wrong path")
 		quit(1)
 		return
 	var node := Control.new()
@@ -24,6 +37,14 @@ func _init() -> void:
 	api.configure("http://example.test/api/")
 	if api.base_url != "http://example.test/api":
 		push_error("ApiClient.configure did not normalize base_url")
+		quit(1)
+		return
+	if api.is_loading():
+		push_error("ApiClient should not be loading before requests")
+		quit(1)
+		return
+	if api.timeout_seconds <= 0:
+		push_error("ApiClient timeout_seconds must be positive")
 		quit(1)
 		return
 	var value = types_script.string_value({"phase": "SHOP"}, "phase", "MAP")
