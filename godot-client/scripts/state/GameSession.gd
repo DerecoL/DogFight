@@ -19,6 +19,7 @@ var api: ApiClient
 var router: ScreenRouter
 var modal_stack: ModalStack
 var toast_bus: ToastBus
+var toast_layer: Control
 var current_user: Dictionary = {}
 var store: AppStore = AppStore.new()
 var run_store: RunStore = store.run
@@ -46,6 +47,9 @@ func _ready() -> void:
 		add_child(modal_stack)
 		add_child(toast_bus)
 		modal_stack.configure(overlay_root.get_node_or_null("ModalLayer"))
+		toast_layer = overlay_root.get_node_or_null("ToastLayer")
+		if not toast_bus.toast_queued.is_connected(_show_toast):
+			toast_bus.toast_queued.connect(_show_toast)
 		modal_stack.stack_changed.connect(func(_depth: int, blocking: bool) -> void:
 			var blocking_layer := overlay_root.get_node_or_null("BlockingLayer")
 			if blocking_layer != null:
@@ -226,6 +230,41 @@ func _raise_error(message: String) -> void:
 	if toast_bus != null:
 		toast_bus.push(message, "error")
 	error_raised.emit(message)
+
+func _show_toast(toast: Dictionary) -> void:
+	if toast_layer == null:
+		return
+	var panel := PanelContainer.new()
+	panel.custom_minimum_size = Vector2(320, 44)
+	panel.anchor_left = 1.0
+	panel.anchor_right = 1.0
+	panel.offset_left = -344.0
+	panel.offset_right = -24.0
+	panel.offset_top = 24.0 + toast_layer.get_child_count() * 52.0
+	panel.offset_bottom = panel.offset_top + 44.0
+	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	panel.modulate = _toast_color(str(toast.get("kind", "info")))
+	var label := Label.new()
+	label.text = str(toast.get("message", ""))
+	label.custom_minimum_size = Vector2(0, 44)
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	panel.add_child(label)
+	toast_layer.add_child(panel)
+	var duration := float(toast.get("durationSeconds", 2.5))
+	var tween := create_tween()
+	tween.tween_interval(max(0.5, duration))
+	tween.tween_property(panel, "modulate:a", 0.0, 0.24)
+	tween.tween_callback(panel.queue_free)
+
+func _toast_color(kind: String) -> Color:
+	match kind:
+		"error":
+			return Color(1.0, 0.38, 0.34, 0.96)
+		"success":
+			return Color(0.42, 0.86, 0.48, 0.96)
+		_:
+			return Color(0.92, 0.82, 0.48, 0.96)
 
 func _show_run_screen() -> void:
 	if router != null:
