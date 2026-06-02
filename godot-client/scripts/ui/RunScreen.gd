@@ -1867,9 +1867,23 @@ func _render_map_route(parent: VBoxContainer, map_state: Dictionary) -> void:
 	var available: Array = _variant_array(map_state.get("availableNodeIds", []))
 	var completed: Array = _variant_array(map_state.get("completedNodeIds", []))
 	var current_node_id := str(map_state.get("currentNodeId", ""))
+	var board := TextureRect.new()
+	board.name = "ParchmentMapBoard"
+	board.custom_minimum_size = Vector2(0, 360)
+	board.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	board.texture = _texture("res://assets/map/exploration-parchment-scroll.webp")
+	board.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	board.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	parent.add_child(board)
 	var route := VBoxContainer.new()
+	route.name = "MapRouteContent"
+	route.set_anchors_preset(Control.PRESET_FULL_RECT)
+	route.offset_left = 18.0
+	route.offset_right = -18.0
+	route.offset_top = 18.0
+	route.offset_bottom = -18.0
 	route.add_theme_constant_override("separation", 6)
-	parent.add_child(route)
+	board.add_child(route)
 	var active_layer := -999
 	var row: HBoxContainer = null
 	for node in nodes:
