@@ -12,8 +12,11 @@ func _init() -> void:
 	login.name = "LoginScreen"
 	var run := Control.new()
 	run.name = "RunScreen"
+	var plain := Node.new()
+	plain.name = "PlainNode"
 	root.add_child(login)
 	root.add_child(run)
+	root.add_child(plain)
 	var router = router_script.new()
 	router.configure(root)
 	router.register_screen("login", "LoginScreen")
@@ -30,6 +33,22 @@ func _init() -> void:
 		return
 	if not router.go_back() or router.current_screen_id != "login":
 		push_error("ScreenRouter failed to go back")
+		quit(1)
+		return
+	router.register_screen("plain", "PlainNode")
+	if router.screens.has("plain"):
+		push_error("ScreenRouter registered a non-CanvasItem node")
+		quit(1)
+		return
+	router.show_screen("login")
+	router.show_screen("login")
+	if not router.back_stack.is_empty():
+		push_error("ScreenRouter added same screen to back stack")
+		quit(1)
+		return
+	router.show_screen("run", false)
+	if not router.back_stack.is_empty():
+		push_error("ScreenRouter added run transition to back stack when disabled")
 		quit(1)
 		return
 	root.free()

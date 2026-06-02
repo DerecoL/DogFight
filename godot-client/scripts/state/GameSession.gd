@@ -153,7 +153,7 @@ func _raise_error(message: String) -> void:
 
 func _show_run_screen() -> void:
 	if router != null:
-		router.show_screen("run")
+		router.show_screen("run", false)
 	var run_screen := get_node_or_null("ScreenRoot/RunScreen")
 	if run_screen != null and run_screen.has_method("clear_error"):
 		run_screen.call("clear_error")

@@ -19,8 +19,12 @@ func register_screen(screen_id: String, node_name: String) -> void:
 	if node == null:
 		push_error("Screen not found: %s" % node_name)
 		return
-	screens[screen_id] = node
-	node.visible = false
+	var screen := node as CanvasItem
+	if screen == null:
+		push_error("Screen must be a CanvasItem: %s" % node_name)
+		return
+	screens[screen_id] = screen
+	screen.visible = false
 
 func show_screen(screen_id: String, add_to_back_stack := true) -> void:
 	if not screens.has(screen_id):
