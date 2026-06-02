@@ -455,8 +455,8 @@ func _render_reward_choices(run: Dictionary) -> void:
 	if choices.is_empty() and relics.is_empty() and classes.is_empty() and enchants.is_empty() and potions.is_empty() and str(run.get("phase", "")) != "UPGRADE_CHOICE":
 		return
 	var card := _section("奖励 / 选择")
-	for choice in choices:
-		card.add_child(_action_button("选择商店：%s" % str(choice), _call_session.bind("select_shop_choice", [str(choice)])))
+	if not choices.is_empty():
+		_render_shop_choice_panel(card, choices)
 	for relic in relics:
 		if relic is Dictionary:
 			var def: Dictionary = _dict(relic, "def")
@@ -476,6 +476,105 @@ func _render_reward_choices(run: Dictionary) -> void:
 	if str(run.get("phase", "")) == "UPGRADE_CHOICE":
 		card.add_child(_action_button("升级选中装备", _select_upgrade_item))
 		card.add_child(_action_button("跳过升级", _call_session.bind("skip_upgrade_choice", [])))
+
+func _render_shop_choice_panel(parent: VBoxContainer, choices: Array) -> void:
+	_add_line(parent, "选择本回合要访问的商店", "不同商店提供不同类型的道具，选择适合你战术的商店")
+	var grid := GridContainer.new()
+	grid.columns = 3
+	grid.add_theme_constant_override("h_separation", 8)
+	grid.add_theme_constant_override("v_separation", 8)
+	parent.add_child(grid)
+	for index in range(9):
+		if index < choices.size():
+			var shop_type := str(choices[index])
+			var box := VBoxContainer.new()
+			box.custom_minimum_size = Vector2(176, 126)
+			box.add_theme_constant_override("separation", 4)
+			grid.add_child(box)
+			_add_line(box, _shop_choice_icon(shop_type) + " " + _shop_name(shop_type), _shop_description(shop_type))
+			box.add_child(_action_button("进入 %s" % _shop_name(shop_type), _call_session.bind("select_shop_choice", [shop_type])))
+		else:
+			var placeholder := Label.new()
+			placeholder.text = "空商店位 %d" % (index + 1)
+			placeholder.custom_minimum_size = Vector2(176, 126)
+			placeholder.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+			placeholder.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			grid.add_child(placeholder)
+
+func _shop_name(shop_type: String) -> String:
+	match shop_type:
+		"GENERAL":
+			return "装备店"
+		"LARGE":
+			return "大型装备店"
+		"MEDIUM":
+			return "中型装备店"
+		"SMALL":
+			return "小型装备店"
+		"SMALL_DICE":
+			return "小点数装备店"
+		"BIG_DICE":
+			return "大点数装备店"
+		"RELIC":
+			return "遗物店"
+		"UPGRADE", "UPGRADE_SILVER":
+			return "白银升级店"
+		"UPGRADE_GOLD":
+			return "黄金升级店"
+		"UPGRADE_DIAMOND":
+			return "钻石升级店"
+		"POTION":
+			return "药水店"
+		_:
+			return _fallback(shop_type, "商店")
+
+func _shop_description(shop_type: String) -> String:
+	match shop_type:
+		"GENERAL":
+			return "提供常规装备，适合补齐触发点和基础伤害。"
+		"LARGE":
+			return "更容易出现大型装备，适合围绕多格核心构筑。"
+		"MEDIUM":
+			return "偏向中型装备，兼顾站位和稳定收益。"
+		"SMALL":
+			return "偏向小型装备，方便填补空格和连锁触发。"
+		"SMALL_DICE":
+			return "偏向小点数触发装备，适合柴犬和低点连动。"
+		"BIG_DICE":
+			return "偏向大点数触发装备，适合萨摩耶和高点爆发。"
+		"RELIC":
+			return "选择一个遗物，改变长期构筑规则。"
+		"UPGRADE", "UPGRADE_SILVER":
+			return "免费升级至白银，适合强化早期核心装备。"
+		"UPGRADE_GOLD":
+			return "免费升级至黄金，适合把主力装备推到中后期强度。"
+		"UPGRADE_DIAMOND":
+			return "免费升级至钻石，让关键装备获得终阶收益。"
+		"POTION":
+			return "获得药水，给选中装备调整点数或强化触发。"
+		_:
+			return "进入该商店查看本回合可用内容。"
+
+func _shop_choice_icon(shop_type: String) -> String:
+	match shop_type:
+		"RELIC":
+			return "[遗]"
+		"UPGRADE", "UPGRADE_SILVER", "UPGRADE_GOLD", "UPGRADE_DIAMOND":
+			return "[升]"
+		"POTION":
+			return "[药]"
+		"LARGE":
+			return "[大]"
+		"MEDIUM":
+			return "[中]"
+		"SMALL":
+			return "[小]"
+		"SMALL_DICE":
+			return "[小点]"
+		"BIG_DICE":
+			return "[大点]"
+		_:
+			return "[装]"
 
 func _ceremony_key(run: Dictionary) -> String:
 	var phase := str(run.get("phase", ""))
