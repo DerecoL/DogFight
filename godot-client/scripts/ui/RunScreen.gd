@@ -411,7 +411,7 @@ func _render_run_actions(run: Dictionary, card: VBoxContainer) -> void:
 		row.add_child(_action_button("开始战斗", _call_session.bind("start_battle", [])))
 	elif phase == "BATTLE":
 		row.add_child(_action_button("完成结算", _call_session.bind("finish_battle", [])))
-	row.add_child(_action_button("放弃并结算", _call_session.bind("settle_run", [])))
+	row.add_child(_action_button("放弃并结算", _show_forfeit_modal.bind(run)))
 
 func _render_settlement_summary(run: Dictionary) -> void:
 	if str(run.get("phase", "")) != "COMPLETE" and str(run.get("status", "")) != "COMPLETE":
@@ -1354,6 +1354,27 @@ func _daily_action_from_modal(task_id: String) -> void:
 func _load_room_battle_from_modal(battle_id: String) -> void:
 	_close_top_modal()
 	await _load_room_battle(battle_id)
+
+func _show_forfeit_modal(run: Dictionary) -> void:
+	var modal := _modal_panel("放弃并结算当前跑局", Vector2(540, 360))
+	if modal.is_empty():
+		return
+	var box: VBoxContainer = modal["box"]
+	var dog_type := str(run.get("dogType", ""))
+	_render_detail_header(box, _dog_texture(dog_type), "确认放弃", "%s 路 第 %d 回合" % [_dog_name(dog_type), int(run.get("round", 0))])
+	_add_line(box, "当前战绩", "%d 胜 / %d 败" % [int(run.get("wins", 0)), int(run.get("losses", 0))])
+	_add_line(box, "资源", "金币 %d 路 阶段 %s" % [int(run.get("gold", 0)), str(run.get("phase", ""))])
+	_add_line(box, "提示", "放弃后立即按当前记录结算，不会额外增加失败。")
+	var actions := HBoxContainer.new()
+	actions.add_theme_constant_override("separation", 8)
+	box.add_child(actions)
+	actions.add_child(_action_button("确认放弃并结算", _confirm_forfeit_from_modal))
+	actions.add_child(_action_button("继续跑局", _close_top_modal))
+	_push_modal(modal["panel"])
+
+func _confirm_forfeit_from_modal() -> void:
+	_close_top_modal()
+	await _call_session("settle_run", [])
 
 func _show_offer_modal(offer: Dictionary) -> void:
 	var def: Dictionary = _dict(offer, "def")
