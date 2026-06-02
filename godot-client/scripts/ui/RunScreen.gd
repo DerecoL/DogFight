@@ -37,7 +37,9 @@ var current_tab := TAB_LOBBY
 var action_in_progress := false
 var selected_item_id := ""
 var selected_item_label := ""
+var selected_item: Dictionary = {}
 var selected_relic_id := ""
+var selected_relic: Dictionary = {}
 var selected_room_id := ""
 var active_room: Dictionary = {}
 
@@ -404,6 +406,7 @@ func _render_inventory(run: Dictionary) -> void:
 	var toolbar := HBoxContainer.new()
 	toolbar.add_theme_constant_override("separation", 8)
 	card.add_child(toolbar)
+	toolbar.add_child(_action_button("查看选中详情", _show_selected_detail_modal))
 	toolbar.add_child(_action_button("出售选中装备", _call_selected_item.bind("sell_item")))
 	toolbar.add_child(_action_button("合成升级选中", _call_selected_item.bind("upgrade_item")))
 	_add_line(card, "当前选中", _fallback(selected_item_label, "无"))
@@ -430,7 +433,7 @@ func _render_map_or_shop(run: Dictionary) -> void:
 		shop_card.add_child(_action_button("刷新跑局商店", _call_session.bind("reroll_shop", [])))
 		for offer in _array(run, "shopItems"):
 			if offer is Dictionary:
-				var offer_button := _action_button("%s  价格 %d" % [_offer_label(offer), int(offer.get("price", 0))], _call_session.bind("buy_offer", [str(offer.get("offerId", "")), "BAG"]))
+				var offer_button := _action_button("%s  价格 %d" % [_offer_label(offer), int(offer.get("price", 0))], _show_offer_modal.bind(offer))
 				_apply_button_icon(offer_button, _offer_texture(offer))
 				shop_card.add_child(offer_button)
 
@@ -857,6 +860,158 @@ func _render_snapshot_items(parent: VBoxContainer, title: String, items: Array) 
 			var def: Dictionary = _dict(item, "def")
 			_add_line(parent, "", "%s  %s  (%d,%d)" % [_fallback(str(def.get("name", "")), str(item.get("defId", item.get("id", "")))), str(item.get("quality", "")), int(item.get("x", 0)), int(item.get("y", 0))])
 
+func _show_offer_modal(offer: Dictionary) -> void:
+	var def: Dictionary = _dict(offer, "def")
+	var title := _fallback(str(def.get("name", "")), str(offer.get("defId", offer.get("offerId", ""))))
+	var modal := _modal_panel("商店报价", Vector2(560, 500))
+	if modal.is_empty():
+		return
+	var box: VBoxContainer = modal["box"]
+	_render_detail_header(box, _offer_texture(offer), title, "商店报价 · %s" % str(offer.get("quality", "")))
+	_add_item_def_details(box, def, str(offer.get("quality", "")), str(offer.get("defId", offer.get("offerId", ""))))
+	_add_line(box, "价格", "%d 金币" % int(offer.get("price", 0)))
+	var discount := int(offer.get("discount", 0))
+	if discount > 0:
+		_add_line(box, "折扣", "-%d 金币" % discount)
+	box.add_child(_action_button("购买到背包", _buy_offer_from_modal.bind(str(offer.get("offerId", "")))))
+	_push_modal(modal["panel"])
+
+func _show_item_detail_modal(item: Dictionary) -> void:
+	var def: Dictionary = _dict(item, "def")
+	var title := _fallback(str(def.get("name", "")), str(item.get("defId", item.get("id", ""))))
+	var modal := _modal_panel("装备详情", Vector2(560, 520))
+	if modal.is_empty():
+		return
+	var box: VBoxContainer = modal["box"]
+	_render_detail_header(box, _item_texture(item), title, "装备详情 · %s" % str(item.get("quality", "")))
+	_add_item_def_details(box, def, str(item.get("quality", "")), str(item.get("defId", item.get("id", ""))))
+	_add_line(box, "位置", "%s  (%d,%d)" % [_area_label(str(item.get("area", ""))), int(item.get("x", 0)), int(item.get("y", 0))])
+	var id := str(item.get("id", ""))
+	if not id.is_empty():
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 8)
+		row.add_child(_action_button("出售装备", _item_action_from_modal.bind("sell_item", id)))
+		row.add_child(_action_button("合成升级", _item_action_from_modal.bind("upgrade_item", id)))
+		box.add_child(row)
+	_push_modal(modal["panel"])
+
+func _show_relic_detail_modal(relic: Dictionary) -> void:
+	var def: Dictionary = _dict(relic, "def")
+	var title := _fallback(str(def.get("name", "")), str(relic.get("relicId", relic.get("id", ""))))
+	var modal := _modal_panel("遗物详情", Vector2(520, 420))
+	if modal.is_empty():
+		return
+	var box: VBoxContainer = modal["box"]
+	_render_detail_header(box, _relic_texture(relic), title, "遗物详情 · %s" % str(relic.get("quality", "")))
+	_add_line(box, "品质", str(relic.get("quality", "")))
+	var description := _detail_description(def)
+	if not description.is_empty():
+		_add_line(box, "说明", description)
+	var effect := str(def.get("effect", ""))
+	if not effect.is_empty():
+		_add_line(box, "效果", effect)
+	var relic_id := str(relic.get("id", relic.get("relicId", "")))
+	if not relic_id.is_empty():
+		box.add_child(_action_button("出售遗物", _relic_action_from_modal.bind(relic_id)))
+	_push_modal(modal["panel"])
+
+func _show_selected_detail_modal() -> void:
+	if not selected_item.is_empty():
+		_show_item_detail_modal(selected_item)
+		return
+	if not selected_relic.is_empty():
+		_show_relic_detail_modal(selected_relic)
+		return
+	_show_error("请先选中装备、背包道具或遗物")
+
+func _render_detail_header(parent: VBoxContainer, texture: Texture2D, title: String, subtitle: String) -> void:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 10)
+	parent.add_child(row)
+	var icon := TextureRect.new()
+	icon.custom_minimum_size = Vector2(68, 68)
+	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	icon.texture = texture
+	row.add_child(icon)
+	var labels := VBoxContainer.new()
+	labels.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(labels)
+	var title_label := Label.new()
+	title_label.text = title
+	title_label.custom_minimum_size = Vector2(0, 30)
+	title_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	labels.add_child(title_label)
+	var subtitle_label := Label.new()
+	subtitle_label.text = subtitle
+	subtitle_label.custom_minimum_size = Vector2(0, 24)
+	subtitle_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	labels.add_child(subtitle_label)
+
+func _add_item_def_details(parent: VBoxContainer, def: Dictionary, quality: String, fallback_id: String) -> void:
+	_add_line(parent, "品质", quality)
+	if not fallback_id.is_empty():
+		_add_line(parent, "资源", fallback_id)
+	var dice_text := _detail_array_text(def.get("triggerDice", def.get("dice", [])))
+	if not dice_text.is_empty():
+		_add_line(parent, "触发点数", dice_text)
+	var size_text := _detail_size_text(def)
+	if not size_text.is_empty():
+		_add_line(parent, "尺寸", size_text)
+	var tag_text := _detail_array_text(def.get("tags", []))
+	if not tag_text.is_empty():
+		_add_line(parent, "标签", tag_text)
+	var description := _detail_description(def)
+	if not description.is_empty():
+		_add_line(parent, "说明", description)
+	var effect := str(def.get("effect", ""))
+	if not effect.is_empty():
+		_add_line(parent, "效果", effect)
+
+func _detail_description(def: Dictionary) -> String:
+	for key in ["description", "effectText", "advancedEffect", "summary"]:
+		var value := str(def.get(key, ""))
+		if not value.is_empty():
+			return value
+	return ""
+
+func _detail_array_text(value: Variant) -> String:
+	var values := _variant_array(value)
+	if values.is_empty():
+		return ""
+	var parts := PackedStringArray()
+	for entry in values:
+		parts.append(str(entry))
+	return ", ".join(parts)
+
+func _detail_size_text(def: Dictionary) -> String:
+	if def.has("size"):
+		return str(def.get("size", ""))
+	if def.has("width") or def.has("height"):
+		return "%d x %d" % [int(def.get("width", 1)), int(def.get("height", 1))]
+	return ""
+
+func _area_label(area: String) -> String:
+	match area:
+		"EQUIPMENT":
+			return "装备栏"
+		"BAG":
+			return "背包"
+		_:
+			return _fallback(area, "未知区域")
+
+func _buy_offer_from_modal(offer_id: String) -> void:
+	_close_top_modal()
+	await _call_session("buy_offer", [offer_id, "BAG"])
+
+func _item_action_from_modal(method: String, item_id: String) -> void:
+	_close_top_modal()
+	await _call_session(method, [item_id])
+
+func _relic_action_from_modal(relic_id: String) -> void:
+	_close_top_modal()
+	await _call_session("sell_relic", [relic_id])
+
 func _filter_area(items: Array, area: String) -> Array:
 	var result: Array = []
 	for item in items:
@@ -915,17 +1070,21 @@ func _modal_stack() -> Object:
 		return null
 	return session.get("modal_stack")
 
-func _select_item(item_id: String, label: String) -> void:
-	selected_item_id = item_id
+func _select_item(item: Dictionary, label: String) -> void:
+	selected_item = item.duplicate(true)
+	selected_item_id = str(item.get("id", ""))
 	selected_item_label = label
 	selected_relic_id = ""
+	selected_relic = {}
 	status_label.text = "已选中：%s" % label
 	_render_current_tab()
 
-func _select_relic(relic_id: String, label: String) -> void:
-	selected_relic_id = relic_id
+func _select_relic(relic: Dictionary, label: String) -> void:
+	selected_relic = relic.duplicate(true)
+	selected_relic_id = str(relic.get("id", relic.get("relicId", "")))
 	selected_item_id = ""
 	selected_item_label = ""
+	selected_item = {}
 	status_label.text = "已选中：%s" % label
 	_render_current_tab()
 
@@ -1028,7 +1187,7 @@ func _render_item_grid(parent: VBoxContainer, title: String, area: String, run: 
 		else:
 			var label := _item_label(item)
 			_apply_button_icon(button, _item_texture(item))
-			button.pressed.connect(_select_item.bind(str(item.get("id", "")), label))
+			button.pressed.connect(_select_item.bind(item, label))
 		grid.add_child(button)
 
 func _render_relic_rail(parent: VBoxContainer, run: Dictionary) -> void:
@@ -1046,7 +1205,7 @@ func _render_relic_rail(parent: VBoxContainer, run: Dictionary) -> void:
 			var button := _button(_fallback(str(relic_def.get("name", "")), str(relic.get("relicId", ""))), 96)
 			button.custom_minimum_size = Vector2(96, 54)
 			_apply_button_icon(button, _relic_texture(relic))
-			button.pressed.connect(_select_relic.bind(str(relic.get("id", relic.get("relicId", ""))), label))
+			button.pressed.connect(_select_relic.bind(relic, label))
 			row.add_child(button)
 
 func _render_map_route(parent: VBoxContainer, map_state: Dictionary) -> void:
