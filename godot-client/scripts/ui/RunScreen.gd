@@ -1963,7 +1963,7 @@ func _render_map_reward_preview(parent: VBoxContainer, rewards: Array) -> void:
 			button.custom_minimum_size = Vector2(82, 62)
 			button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 			button.disabled = true
-			_apply_button_icon(button, _sticker_texture(str(reward.get("defId", ""))))
+			_apply_button_icon(button, _item_reward_texture(reward))
 			row.add_child(button)
 
 func _item_at_slot(items: Array, area: String, x: int) -> Dictionary:
@@ -2024,13 +2024,27 @@ func _offer_label(offer: Dictionary) -> String:
 	return "%s  %s" % [_fallback(str(def.get("name", "")), str(offer.get("defId", offer.get("offerId", "")))), str(offer.get("quality", ""))]
 
 func _item_texture(item: Dictionary) -> Texture2D:
-	return _sticker_texture(str(item.get("defId", "")))
+	var def_id := str(item.get("defId", ""))
+	var art := _item_art_texture(def_id)
+	return art if art != null else _sticker_texture(def_id)
 
 func _offer_texture(offer: Dictionary) -> Texture2D:
-	return _sticker_texture(str(offer.get("defId", "")))
+	var def_id := str(offer.get("defId", ""))
+	var art := _item_art_texture(def_id)
+	return art if art != null else _sticker_texture(def_id)
+
+func _item_reward_texture(reward: Dictionary) -> Texture2D:
+	var def_id := str(reward.get("defId", ""))
+	var art := _item_art_texture(def_id)
+	return art if art != null else _sticker_texture(def_id)
 
 func _relic_texture(relic: Dictionary) -> Texture2D:
 	return _sticker_texture(str(relic.get("relicId", "")))
+
+func _item_art_texture(def_id: String) -> Texture2D:
+	if def_id.is_empty():
+		return null
+	return _texture("res://assets/item-card-art/%s.webp" % def_id)
 
 func _sticker_texture(asset_id: String) -> Texture2D:
 	if asset_id.is_empty():
@@ -2045,9 +2059,10 @@ func _map_texture(kind: String) -> Texture2D:
 	return texture if texture != null else _texture("res://assets/map-icons/event.webp")
 
 func _texture(path: String) -> Texture2D:
-	var imported := ResourceLoader.load(path)
-	if imported is Texture2D:
-		return imported
+	if ResourceLoader.exists(path):
+		var imported := ResourceLoader.load(path)
+		if imported is Texture2D:
+			return imported
 	if not FileAccess.file_exists(path):
 		return null
 	var image := Image.new()
