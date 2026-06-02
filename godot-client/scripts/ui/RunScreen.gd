@@ -787,10 +787,18 @@ func _render_shop_tab() -> void:
 func _render_leaderboards_tab() -> void:
 	var ladder_card := _section("天梯排行榜")
 	var player_profile: Dictionary = _dict(leaderboard_data, "playerProfile")
-	_add_line(ladder_card, "我的段位", "%s  %d分  排名 %s" % [str(player_profile.get("tier", "")), int(player_profile.get("score", 0)), str(leaderboard_data.get("playerRank", "-"))])
-	for entry in _array(leaderboard_data, "leaderboard"):
+	_add_line(ladder_card, "当前段位", "%d 局 · %d胜 %d负" % [int(player_profile.get("gamesPlayed", 0)), int(player_profile.get("totalWins", 0)), int(player_profile.get("totalLosses", 0))])
+	_add_line(ladder_card, _tier_display_label(player_profile), "%d分" % int(player_profile.get("score", 0)))
+	_add_line(ladder_card, "积分进度", _ladder_score_text(player_profile))
+	var player_rank = leaderboard_data.get("playerRank", null)
+	_add_line(ladder_card, "犬王积分榜", "你的犬王排名：第 %d 名" % int(player_rank) if player_rank != null else "进入犬王后参与排名")
+	var leaderboard := _array(leaderboard_data, "leaderboard")
+	if leaderboard.is_empty():
+		_add_line(ladder_card, "榜单", "还没有犬王，先冲上大师 500 分。")
+	for entry in leaderboard:
 		if entry is Dictionary:
-			_add_line(ladder_card, "#%d" % int(entry.get("rank", 0)), "%s  %s" % [str(entry.get("name", "")), str(entry.get("title", ""))])
+			var entry_profile: Dictionary = _dict(entry, "profile")
+			_add_line(ladder_card, "#%d" % int(entry.get("rank", 0)), "%s  %s  %d" % [str(entry.get("title", "")), str(entry.get("name", "")), int(entry_profile.get("score", 0))])
 	var apex_card := _section("巅峰榜")
 	var leaderboards: Dictionary = _dict(apex_data, "leaderboards")
 	var reports: Dictionary = _dict(apex_data, "reports")
@@ -1850,6 +1858,18 @@ func _tier_label(tier: String) -> String:
 			return "犬王"
 		_:
 			return _fallback(tier, "未定级")
+
+func _tier_display_label(profile: Dictionary) -> String:
+	return _fallback(str(profile.get("tierLabel", "")), _tier_label(str(profile.get("tier", ""))))
+
+func _ladder_score_text(profile: Dictionary) -> String:
+	var tier := str(profile.get("tier", ""))
+	var score := int(profile.get("score", 0))
+	if tier == "MASTER":
+		return "%d 分 / 500 晋级犬王" % score
+	if tier == "DOG_KING":
+		return "%d 分 · 犬王积分" % score
+	return "%d 分 / 100 LP" % score
 
 func _room_member_status(member: Dictionary) -> String:
 	if bool(member.get("eliminated", false)):
