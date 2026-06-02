@@ -94,7 +94,7 @@ func create_run(dog_type := "SHIBA", mode := "CASUAL", lucky_number: Variant = n
 	var body := {"dogType": dog_type, "mode": mode}
 	if lucky_number != null:
 		body["luckyNumber"] = int(lucky_number)
-	var response := await api.post_json("/runs", body)
+	var response := await api.post_json(ApiRoutes.runs(), body)
 	if not response.ok:
 		_raise_error(str(response.error))
 		return false
@@ -106,28 +106,28 @@ func create_run(dog_type := "SHIBA", mode := "CASUAL", lucky_number: Variant = n
 	return false
 
 func select_map_node(node_id: String) -> bool:
-	return await _post_run_action("/map/select", {"nodeId": node_id})
+	return await _post_run_action(ApiRoutes.run_map_select(run_store.run_id()), {"nodeId": node_id})
 
 func move_item(item_id: String, area: String, x: int, y: int) -> bool:
-	return await _post_run_action("/items/move", {"itemId": item_id, "area": area, "x": x, "y": y})
+	return await _post_run_action(ApiRoutes.run_item_move(run_store.run_id()), {"itemId": item_id, "area": area, "x": x, "y": y})
 
 func buy_offer(offer_id: String, area := "BAG") -> bool:
-	return await _post_run_action("/shop/buy", {"offerId": offer_id, "area": area})
+	return await _post_run_action(ApiRoutes.run_shop_buy(run_store.run_id()), {"offerId": offer_id, "area": area})
 
 func sell_item(item_id: String) -> bool:
-	return await _post_run_action("/shop/sell", {"itemId": item_id})
+	return await _post_run_action(ApiRoutes.run_shop_sell(run_store.run_id()), {"itemId": item_id})
 
 func reroll_shop() -> bool:
-	return await _post_run_action("/shop/reroll", {})
+	return await _post_run_action(ApiRoutes.run_shop_reroll(run_store.run_id()), {})
 
 func match_battle() -> bool:
-	return await _post_run_action("/battle/match", {})
+	return await _post_run_action(ApiRoutes.run_battle_match(run_store.run_id()), {})
 
 func start_battle() -> bool:
 	if not run_store.has_run():
 		_raise_error("没有当前跑局")
 		return false
-	var response := await api.post_json("/runs/%s/battle/start" % run_store.run_id(), {})
+	var response := await api.post_json(ApiRoutes.run_battle_start(run_store.run_id()), {})
 	if not response.ok:
 		_raise_error(str(response.error))
 		return false
@@ -142,13 +142,13 @@ func start_battle() -> bool:
 	return false
 
 func finish_battle() -> bool:
-	return await _post_run_action("/battle/finish", {})
+	return await _post_run_action(ApiRoutes.run_battle_finish(run_store.run_id()), {})
 
-func _post_run_action(suffix: String, body: Dictionary) -> bool:
+func _post_run_action(path: String, body: Dictionary) -> bool:
 	if not run_store.has_run():
 		_raise_error("没有当前跑局")
 		return false
-	var response := await api.post_json("/runs/%s%s" % [run_store.run_id(), suffix], body)
+	var response := await api.post_json(path, body)
 	if not response.ok:
 		_raise_error(str(response.error))
 		return false

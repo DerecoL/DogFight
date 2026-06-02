@@ -146,8 +146,17 @@ func _init() -> void:
 	var overlay_root = overlay_scene.instantiate()
 	var blocking_layer = overlay_root.get_node_or_null("BlockingLayer")
 	var modal_layer = overlay_root.get_node_or_null("ModalLayer")
-	if blocking_layer == null or modal_layer == null or blocking_layer.get_index() >= modal_layer.get_index():
+	var toast_layer = overlay_root.get_node_or_null("ToastLayer")
+	if blocking_layer == null or modal_layer == null or toast_layer == null:
+		push_error("OverlayRoot must include blocking, modal, and toast layers")
+		quit(1)
+		return
+	if blocking_layer.get_index() >= modal_layer.get_index():
 		push_error("OverlayRoot BlockingLayer must render below ModalLayer")
+		quit(1)
+		return
+	if toast_layer.get_index() <= modal_layer.get_index():
+		push_error("OverlayRoot ToastLayer must render above ModalLayer")
 		quit(1)
 		return
 	overlay_root.free()
