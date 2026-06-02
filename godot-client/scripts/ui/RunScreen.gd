@@ -43,6 +43,7 @@ var selected_relic_id := ""
 var selected_relic: Dictionary = {}
 var selected_room_id := ""
 var active_room: Dictionary = {}
+var dismissed_ceremonies: Dictionary = {}
 
 var root: VBoxContainer
 var background_rect: TextureRect
@@ -397,6 +398,7 @@ func _render_run_tab() -> void:
 	_render_reward_choices(run)
 	_render_inventory(run)
 	_render_map_or_shop(run)
+	_maybe_show_reward_ceremony(run)
 
 func _render_run_actions(run: Dictionary, card: VBoxContainer) -> void:
 	var phase := str(run.get("phase", ""))
@@ -462,6 +464,75 @@ func _render_reward_choices(run: Dictionary) -> void:
 	if str(run.get("phase", "")) == "UPGRADE_CHOICE":
 		card.add_child(_action_button("升级选中装备", _select_upgrade_item))
 		card.add_child(_action_button("跳过升级", _call_session.bind("skip_upgrade_choice", [])))
+
+func _ceremony_key(run: Dictionary) -> String:
+	var phase := str(run.get("phase", ""))
+	if phase != "CLASS_REWARD" and phase != "ENCHANT_CHOICE":
+		return ""
+	var run_id := str(run.get("id", ""))
+	if run_id.is_empty():
+		run_id = str(run.get("mode", "run"))
+	return "%s:%s:%d" % [run_id, phase, int(run.get("round", 0))]
+
+func _maybe_show_reward_ceremony(run: Dictionary) -> void:
+	var key := _ceremony_key(run)
+	if key.is_empty() or dismissed_ceremonies.has(key):
+		return
+	if _modal_stack() == null:
+		return
+	var phase := str(run.get("phase", ""))
+	if phase == "CLASS_REWARD" and _array(run, "classRewardChoices").is_empty():
+		return
+	if phase == "ENCHANT_CHOICE" and _array(run, "enchantChoices").is_empty():
+		return
+	dismissed_ceremonies[key] = true
+	_show_reward_ceremony(run)
+
+func _show_reward_ceremony(run: Dictionary) -> void:
+	var phase := str(run.get("phase", ""))
+	var is_enchant := phase == "ENCHANT_CHOICE"
+	var round := int(run.get("round", 0))
+	var title := "免费附魔" if is_enchant else ("终阶觉醒" if round >= 6 else "职业觉醒")
+	var modal := _modal_panel(title, Vector2(620, 520))
+	if modal.is_empty():
+		return
+	var box: VBoxContainer = modal["box"]
+	if is_enchant:
+		_render_detail_header(box, _texture("res://assets/map-icons/event.webp"), "神秘附魔商店", "第 %d 回合 路 免费附魔" % round)
+		_add_line(box, "说明", "选择一种附魔，再点击任意装备施加；升级后会保留目标装备上的附魔。")
+		_add_ceremony_enchant_preview(box, _array(run, "enchantChoices"))
+	else:
+		var dog_type := str(run.get("dogType", ""))
+		var dog_label := _dog_name(dog_type)
+		_render_detail_header(box, _dog_texture(dog_type), title, "第 %d 回合 路 %s 专属装备授予" % [round, dog_label])
+		if round >= 6:
+			_add_line(box, "说明", "终阶职业装备已经解锁，构筑的核心能力将在这一回合定型。")
+		else:
+			_add_line(box, "说明", "职业路线开始成型，选择一件专属装备改变接下来的战斗节奏。")
+		_add_ceremony_class_preview(box, _array(run, "classRewardChoices"))
+	box.add_child(_action_button("点击继续", _close_top_modal))
+	_push_modal(modal["panel"])
+
+func _add_ceremony_class_preview(parent: VBoxContainer, choices: Array) -> void:
+	_add_line(parent, "本次可选职业装备", "")
+	for choice in choices:
+		if choice is Dictionary:
+			var def: Dictionary = _dict(choice, "def")
+			var name := _fallback(str(def.get("name", "")), str(choice.get("defId", "")))
+			var size_text := _detail_size_text(def)
+			var dice_text := _detail_array_text(def.get("triggerDice", def.get("dice", [])))
+			var detail := "%s格" % size_text if not size_text.is_empty() else "尺寸待同步"
+			if not dice_text.is_empty():
+				detail += " 路 触发 %s" % dice_text
+			_add_line(parent, name, detail)
+
+func _add_ceremony_enchant_preview(parent: VBoxContainer, choices: Array) -> void:
+	_add_line(parent, "本次可选附魔", "")
+	for choice in choices:
+		if choice is Dictionary:
+			var enchant: Dictionary = _dict(choice, "enchant")
+			var label := _fallback(str(enchant.get("label", "")), str(choice.get("id", "")))
+			_add_line(parent, label, str(choice.get("description", "")))
 
 func _render_inventory(run: Dictionary) -> void:
 	var card := _section("装备 / 背包 / 遗物")
