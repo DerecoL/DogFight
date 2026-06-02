@@ -10,6 +10,7 @@ const ApiRoutes := preload("res://scripts/api/ApiRoutes.gd")
 const ScreenRouter := preload("res://scripts/router/ScreenRouter.gd")
 const ModalStack := preload("res://scripts/router/ModalStack.gd")
 const ToastBus := preload("res://scripts/router/ToastBus.gd")
+const FeedbackSoundBus := preload("res://scripts/router/FeedbackSoundBus.gd")
 const AppStore := preload("res://scripts/state/AppStore.gd")
 const RunStore := preload("res://scripts/state/RunStore.gd")
 const DEFAULT_API_BASE_URL := "http://127.0.0.1:4000/api"
@@ -19,6 +20,7 @@ var api: ApiClient
 var router: ScreenRouter
 var modal_stack: ModalStack
 var toast_bus: ToastBus
+var feedback_sound_bus: FeedbackSoundBus
 var toast_layer: Control
 var current_user: Dictionary = {}
 var store: AppStore = AppStore.new()
@@ -31,6 +33,8 @@ func _ready() -> void:
 	api = ApiClient.new()
 	api.configure(api_base_url)
 	add_child(api)
+	feedback_sound_bus = FeedbackSoundBus.new()
+	add_child(feedback_sound_bus)
 	var screen_root := get_node_or_null("ScreenRoot")
 	if screen_root != null:
 		router = ScreenRouter.new()
@@ -332,6 +336,8 @@ func _raise_error(message: String) -> void:
 	error_raised.emit(message)
 
 func _show_toast(toast: Dictionary) -> void:
+	if feedback_sound_bus != null:
+		feedback_sound_bus.play_toast(toast)
 	if toast_layer == null:
 		return
 	var panel := PanelContainer.new()
