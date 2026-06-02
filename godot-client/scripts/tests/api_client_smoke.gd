@@ -126,6 +126,17 @@ func _init() -> void:
 		quit(1)
 		return
 	run_screen.free()
+	var battle_scene := load("res://scenes/BattleReplayScreen.tscn")
+	if battle_scene == null:
+		push_error("BattleReplayScreen scene failed to load")
+		quit(1)
+		return
+	var battle_screen = battle_scene.instantiate()
+	if not battle_screen.has_method("start_replay") or not battle_screen.has_method("_render_snapshots") or not battle_screen.has_method("_set_log_filter") or not battle_screen.has_method("_set_speed"):
+		push_error("BattleReplayScreen must expose replay snapshots, filters, and speed controls")
+		quit(1)
+		return
+	battle_screen.free()
 	api.free()
 	node.free()
 	quit(0)

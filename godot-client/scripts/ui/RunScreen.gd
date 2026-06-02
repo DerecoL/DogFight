@@ -85,9 +85,13 @@ func _build_layout() -> void:
 	music_player = AudioStreamPlayer.new()
 	music_player.name = "BackgroundMusic"
 	if DisplayServer.get_name() != "headless" and FileAccess.file_exists("res://assets/audio/the-final-inventory.mp3"):
-		var audio := AudioStreamMP3.new()
-		audio.data = FileAccess.get_file_as_bytes("res://assets/audio/the-final-inventory.mp3")
-		music_player.stream = audio
+		var imported_audio := ResourceLoader.load("res://assets/audio/the-final-inventory.mp3")
+		if imported_audio is AudioStream:
+			music_player.stream = imported_audio
+		else:
+			var audio := AudioStreamMP3.new()
+			audio.data = FileAccess.get_file_as_bytes("res://assets/audio/the-final-inventory.mp3")
+			music_player.stream = audio
 	music_player.volume_db = -18.0
 	add_child(music_player)
 	if music_player.stream != null:
@@ -1123,6 +1127,9 @@ func _map_texture(kind: String) -> Texture2D:
 	return texture if texture != null else _texture("res://assets/map-icons/event.webp")
 
 func _texture(path: String) -> Texture2D:
+	var imported := ResourceLoader.load(path)
+	if imported is Texture2D:
+		return imported
 	if not FileAccess.file_exists(path):
 		return null
 	var image := Image.new()
