@@ -42,11 +42,13 @@ var player_reservoir_label: Label
 var opponent_reservoir_label: Label
 var player_item_buttons := {}
 var opponent_item_buttons := {}
+var speed_buttons := {}
 var review_panel: PanelContainer
 var review_title_label: Label
 var player_review_label: Label
 var opponent_review_label: Label
 var system_review_label: Label
+var restart_button: Button
 var log_toggle_button: Button
 var log_filter_row: HBoxContainer
 
@@ -76,10 +78,13 @@ func start_replay(next_battle: Dictionary) -> void:
 	replay_complete = false
 	finish_in_progress = false
 	log_filter = "all"
+	playback_speed = 1.0
 	error_label.text = ""
 	finish_button.disabled = true
 	play_button.disabled = false
 	skip_button.disabled = false
+	if restart_button != null:
+		restart_button.disabled = true
 	log_view.visible = false
 	log_view.text = ""
 	if review_panel != null:
@@ -88,6 +93,7 @@ func start_replay(next_battle: Dictionary) -> void:
 	_render_snapshots()
 	_render_event_stage({})
 	_update_log_filters()
+	_update_speed_buttons()
 
 func _render_initial_hp() -> void:
 	player_hp.max_value = int(battle.get("playerMaxHp", 100))
@@ -132,6 +138,28 @@ func _on_finish_pressed() -> void:
 	if not ok:
 		finish_button.disabled = false
 
+func _on_restart_pressed() -> void:
+	playing = false
+	displayed_events = []
+	event_index = 0
+	replay_complete = false
+	finish_in_progress = false
+	error_label.text = ""
+	finish_button.disabled = true
+	play_button.disabled = false
+	skip_button.disabled = false
+	if restart_button != null:
+		restart_button.disabled = true
+	log_view.text = ""
+	log_view.visible = false
+	if review_panel != null:
+		review_panel.visible = false
+	_render_initial_hp()
+	_render_snapshots()
+	_render_event_stage({})
+	_update_log_filters()
+	_update_speed_buttons()
+
 func _apply_event(event: Dictionary) -> void:
 	player_hp.max_value = int(event.get("playerMaxHp", player_hp.max_value))
 	opponent_hp.max_value = int(event.get("opponentMaxHp", opponent_hp.max_value))
@@ -154,6 +182,8 @@ func _mark_replay_complete() -> void:
 	play_button.disabled = true
 	skip_button.disabled = true
 	finish_button.disabled = false
+	if restart_button != null:
+		restart_button.disabled = false
 	_render_battle_review()
 	replay_finished.emit()
 
@@ -213,8 +243,17 @@ func _build_battle_layout() -> void:
 		var button := Button.new()
 		button.text = "%dx" % speed
 		button.custom_minimum_size = Vector2(52, 44)
+		button.toggle_mode = true
 		button.pressed.connect(_set_speed.bind(float(speed)))
 		footer.add_child(button)
+		speed_buttons[speed] = button
+	_update_speed_buttons()
+	restart_button = Button.new()
+	restart_button.text = "重播"
+	restart_button.custom_minimum_size = Vector2(82, 44)
+	restart_button.disabled = true
+	restart_button.pressed.connect(_on_restart_pressed)
+	footer.add_child(restart_button)
 	log_toggle_button = Button.new()
 	log_toggle_button.text = "日志"
 	log_toggle_button.custom_minimum_size = Vector2(72, 44)
@@ -367,7 +406,14 @@ func _render_event_stage(event: Dictionary) -> void:
 
 func _set_speed(speed: float) -> void:
 	playback_speed = speed
+	_update_speed_buttons()
 	error_label.text = "战斗速度 %.0fx" % playback_speed
+
+func _update_speed_buttons() -> void:
+	for speed in speed_buttons.keys():
+		var button = speed_buttons[speed]
+		if button is Button:
+			(button as Button).button_pressed = int(speed) == int(playback_speed)
 
 func _toggle_log() -> void:
 	log_view.visible = not log_view.visible
