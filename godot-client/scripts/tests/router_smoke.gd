@@ -12,15 +12,19 @@ func _init() -> void:
 	login.name = "LoginScreen"
 	var run := Control.new()
 	run.name = "RunScreen"
+	var battle := Control.new()
+	battle.name = "BattleReplayScreen"
 	var plain := Node.new()
 	plain.name = "PlainNode"
 	root.add_child(login)
 	root.add_child(run)
+	root.add_child(battle)
 	root.add_child(plain)
 	var router = router_script.new()
 	router.configure(root)
 	router.register_screen("login", "LoginScreen")
 	router.register_screen("run", "RunScreen")
+	router.register_screen("battle", "BattleReplayScreen")
 	router.show_screen("login")
 	if not login.visible or run.visible:
 		push_error("ScreenRouter failed to show login")
@@ -49,6 +53,18 @@ func _init() -> void:
 	router.show_screen("run", false)
 	if not router.back_stack.is_empty():
 		push_error("ScreenRouter added run transition to back stack when disabled")
+		quit(1)
+		return
+	router.show_screen("login")
+	router.show_screen("run")
+	router.show_screen("battle")
+	router.show_screen("run", false)
+	if router.current_screen_id != "run":
+		push_error("ScreenRouter failed to return to run without history")
+		quit(1)
+		return
+	if router.go_back():
+		push_error("ScreenRouter kept stale run history after battle return")
 		quit(1)
 		return
 	root.free()
