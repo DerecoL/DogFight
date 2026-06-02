@@ -24,6 +24,8 @@ var replay_complete := false
 var finish_in_progress := false
 var playback_speed := 1.0
 var log_filter := "all"
+var current_player_statuses: Dictionary = {}
+var current_opponent_statuses: Dictionary = {}
 
 var stage_label: Label
 var player_name_label: Label
@@ -38,6 +40,8 @@ var player_shield_label: Label
 var opponent_shield_label: Label
 var player_status_label: Label
 var opponent_status_label: Label
+var player_status_button: Button
+var opponent_status_button: Button
 var player_reservoir_label: Label
 var opponent_reservoir_label: Label
 var player_item_buttons := {}
@@ -101,6 +105,8 @@ func _render_initial_hp() -> void:
 	player_hp.value = player_hp.max_value
 	opponent_hp.value = opponent_hp.max_value
 	dice_label.text = "骰点 -%s" % _battle_effect_suffix()
+	current_player_statuses = {}
+	current_opponent_statuses = {}
 	_update_battle_meta({})
 
 func _on_play_pressed() -> void:
@@ -208,6 +214,9 @@ func _build_battle_layout() -> void:
 	opponent_avatar = opponent_panel["avatar"]
 	opponent_shield_label = opponent_panel["shield"]
 	opponent_status_label = opponent_panel["statuses"]
+	opponent_status_button = opponent_panel["status_button"]
+	opponent_status_button.text = "对手状态详情"
+	opponent_status_button.pressed.connect(_show_battle_status_modal.bind("opponent"))
 	opponent_reservoir_label = opponent_panel["reservoirs"]
 	opponent_equipment_grid = opponent_panel["grid"]
 	opponent_relic_row = opponent_panel["relics"]
@@ -219,6 +228,9 @@ func _build_battle_layout() -> void:
 	player_avatar = player_panel["avatar"]
 	player_shield_label = player_panel["shield"]
 	player_status_label = player_panel["statuses"]
+	player_status_button = player_panel["status_button"]
+	player_status_button.text = "我方状态详情"
+	player_status_button.pressed.connect(_show_battle_status_modal.bind("player"))
 	player_reservoir_label = player_panel["reservoirs"]
 	player_equipment_grid = player_panel["grid"]
 	player_relic_row = player_panel["relics"]
@@ -328,6 +340,11 @@ func _snapshot_panel(title: String) -> Dictionary:
 	statuses.custom_minimum_size = Vector2(0, 34)
 	statuses.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(statuses)
+	var status_button := Button.new()
+	status_button.text = "状态详情"
+	status_button.custom_minimum_size = Vector2(132, 32)
+	status_button.disabled = true
+	box.add_child(status_button)
 	var reservoirs := Label.new()
 	reservoirs.text = "蓄水池：无"
 	reservoirs.custom_minimum_size = Vector2(0, 28)
@@ -341,7 +358,7 @@ func _snapshot_panel(title: String) -> Dictionary:
 	var relics := HBoxContainer.new()
 	relics.add_theme_constant_override("separation", 4)
 	box.add_child(relics)
-	return {"panel": panel, "name": name_label, "avatar": avatar, "shield": shield_label, "statuses": statuses, "reservoirs": reservoirs, "grid": grid, "relics": relics}
+	return {"panel": panel, "name": name_label, "avatar": avatar, "shield": shield_label, "statuses": statuses, "status_button": status_button, "reservoirs": reservoirs, "grid": grid, "relics": relics}
 
 func _render_snapshots() -> void:
 	var player: Dictionary = _dict(battle, "playerSnapshot")
@@ -479,6 +496,8 @@ func _log_filter_label(filter: String) -> String:
 			return "全部"
 
 func _update_battle_meta(event: Dictionary) -> void:
+	current_player_statuses = _dict(event, "playerStatuses")
+	current_opponent_statuses = _dict(event, "opponentStatuses")
 	if player_shield_label != null:
 		player_shield_label.text = "护盾 %d" % int(event.get("playerShield", 0))
 	if opponent_shield_label != null:
@@ -492,6 +511,24 @@ func _update_battle_meta(event: Dictionary) -> void:
 		player_reservoir_label.text = "蓄水池：%s" % _format_reservoirs(_array(reservoirs, "player"))
 	if opponent_reservoir_label != null:
 		opponent_reservoir_label.text = "蓄水池：%s" % _format_reservoirs(_array(reservoirs, "opponent"))
+
+	_update_status_buttons()
+
+func _update_status_buttons() -> void:
+	if player_status_button != null:
+		player_status_button.disabled = _status_entries(current_player_statuses).is_empty()
+	if opponent_status_button != null:
+		opponent_status_button.disabled = _status_entries(current_opponent_statuses).is_empty()
+
+func _status_entries(rows: Dictionary) -> Array:
+	var entries: Array = []
+	for status in _array(rows, "positive"):
+		if status is Dictionary:
+			entries.append(status)
+	for status in _array(rows, "negative"):
+		if status is Dictionary:
+			entries.append(status)
+	return entries
 
 func _format_status_rows(rows: Dictionary) -> String:
 	var parts: Array[String] = []
@@ -676,6 +713,72 @@ func _finalize_review_side(stats: Dictionary) -> Dictionary:
 			}
 	stats["topItem"] = top_item
 	return stats
+
+func _show_battle_status_modal(side: String) -> void:
+	var stack := _modal_stack()
+	if stack == null:
+		error_label.text = "弹窗层未初始化"
+		return
+	var statuses: Dictionary = current_player_statuses if side == "player" else current_opponent_statuses
+	var entries: Array = _status_entries(statuses)
+	var panel := PanelContainer.new()
+	panel.custom_minimum_size = Vector2(500, 380)
+	panel.set_anchors_preset(Control.PRESET_CENTER)
+	panel.offset_left = -250.0
+	panel.offset_right = 250.0
+	panel.offset_top = -190.0
+	panel.offset_bottom = 190.0
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 8)
+	panel.add_child(box)
+	var header := HBoxContainer.new()
+	header.add_theme_constant_override("separation", 8)
+	box.add_child(header)
+	var title := Label.new()
+	title.text = "战斗状态详情"
+	title.custom_minimum_size = Vector2(0, 36)
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	header.add_child(title)
+	var close_button := Button.new()
+	close_button.text = "关闭"
+	close_button.custom_minimum_size = Vector2(84, 36)
+	close_button.pressed.connect(func() -> void:
+		stack.call("pop_modal")
+	)
+	header.add_child(close_button)
+	var lines := VBoxContainer.new()
+	lines.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	lines.add_theme_constant_override("separation", 6)
+	box.add_child(lines)
+	_add_modal_line(lines, "归属", "我方" if side == "player" else "对手")
+	if entries.is_empty():
+		_add_modal_line(lines, "状态", "无")
+	for raw_status in entries:
+		if not raw_status is Dictionary:
+			continue
+		var status: Dictionary = raw_status
+		var label := _fallback(str(status.get("label", "")), str(status.get("type", "状态")))
+		_add_modal_line(lines, label, _status_detail_text(status))
+	stack.call("push_modal", panel, true)
+
+func _status_detail_text(status: Dictionary) -> String:
+	var parts: Array[String] = []
+	var amount := int(status.get("amount", 0))
+	var stacks := int(status.get("stacks", 0))
+	var remaining := int(status.get("remaining", 0))
+	var type_name := str(status.get("type", ""))
+	if amount > 0:
+		parts.append("数值 %d" % amount)
+	if stacks > 0:
+		parts.append("层数 x%d" % stacks)
+	if remaining > 0:
+		parts.append("剩余 %d" % remaining)
+	if not type_name.is_empty():
+		parts.append("类型 %s" % type_name)
+	if parts.is_empty():
+		return "持续生效"
+	return "；".join(parts)
 
 func _show_battle_item_modal(item: Dictionary, side: String) -> void:
 	var stack := _modal_stack()
