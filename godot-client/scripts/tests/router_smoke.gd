@@ -6,6 +6,12 @@ func _init() -> void:
 		push_error("ScreenRouter.gd failed to load")
 		quit(1)
 		return
+	var modal_script := load("res://scripts/router/ModalStack.gd")
+	var toast_script := load("res://scripts/router/ToastBus.gd")
+	if modal_script == null or toast_script == null:
+		push_error("Overlay foundation scripts failed to load")
+		quit(1)
+		return
 	var root := Control.new()
 	root.name = "ScreenRoot"
 	var login := Control.new()
@@ -77,6 +83,26 @@ func _init() -> void:
 		return
 	if router.go_back():
 		push_error("ScreenRouter kept stale run history after battle return")
+		quit(1)
+		return
+	var modal_stack = modal_script.new()
+	var modal := Control.new()
+	modal.name = "ConfirmModal"
+	modal_stack.push_modal(modal, true)
+	if modal_stack.depth() != 1 or not modal_stack.is_blocking():
+		push_error("ModalStack failed to push blocking modal")
+		quit(1)
+		return
+	modal_stack.pop_modal()
+	if modal_stack.depth() != 0 or modal_stack.is_blocking():
+		push_error("ModalStack failed to pop modal")
+		quit(1)
+		return
+	var toast_bus = toast_script.new()
+	toast_bus.push("保存成功", "success")
+	var toast := toast_bus.pop_next()
+	if str(toast.get("message", "")) != "保存成功" or str(toast.get("kind", "")) != "success":
+		push_error("ToastBus failed to pop queued toast")
 		quit(1)
 		return
 	root.free()

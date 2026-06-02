@@ -8,6 +8,8 @@ signal battle_started(battle: Dictionary)
 const ApiClient := preload("res://scripts/api/ApiClient.gd")
 const ApiRoutes := preload("res://scripts/api/ApiRoutes.gd")
 const ScreenRouter := preload("res://scripts/router/ScreenRouter.gd")
+const ModalStack := preload("res://scripts/router/ModalStack.gd")
+const ToastBus := preload("res://scripts/router/ToastBus.gd")
 const AppStore := preload("res://scripts/state/AppStore.gd")
 const RunStore := preload("res://scripts/state/RunStore.gd")
 const DEFAULT_API_BASE_URL := "http://127.0.0.1:4000/api"
@@ -15,6 +17,8 @@ const DEFAULT_API_BASE_URL := "http://127.0.0.1:4000/api"
 var api_base_url: String = DEFAULT_API_BASE_URL
 var api: ApiClient
 var router: ScreenRouter
+var modal_stack: ModalStack
+var toast_bus: ToastBus
 var current_user: Dictionary = {}
 var store: AppStore = AppStore.new()
 var run_store: RunStore = store.run
@@ -35,6 +39,18 @@ func _ready() -> void:
 		router.register_screen("run", "RunScreen")
 		router.register_screen("battle", "BattleReplayScreen")
 		router.show_screen("login", false)
+	var overlay_root := get_node_or_null("OverlayRoot")
+	if overlay_root != null:
+		modal_stack = ModalStack.new()
+		toast_bus = ToastBus.new()
+		add_child(modal_stack)
+		add_child(toast_bus)
+		modal_stack.configure(overlay_root.get_node_or_null("ModalLayer"))
+		modal_stack.stack_changed.connect(func(_depth: int, blocking: bool) -> void:
+			var blocking_layer := overlay_root.get_node_or_null("BlockingLayer")
+			if blocking_layer != null:
+				blocking_layer.visible = blocking
+		)
 	var login_screen := get_node_or_null("ScreenRoot/LoginScreen")
 	if login_screen != null and login_screen.has_method("bind_session"):
 		login_screen.bind_session(self)
@@ -149,6 +165,8 @@ func set_current_run(run: Dictionary) -> void:
 
 func _raise_error(message: String) -> void:
 	store.raise_error(message)
+	if toast_bus != null:
+		toast_bus.push(message, "error")
 	error_raised.emit(message)
 
 func _show_run_screen() -> void:
