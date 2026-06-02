@@ -54,6 +54,11 @@ function evaluateMockScript(script) {
   return { window, localStorage, storageKey }
 }
 
+function dailyApexBoardKey(date = new Date()) {
+  const shifted = new Date(date.getTime() + 3 * 60 * 60 * 1000)
+  return `${shifted.getUTCFullYear()}-${String(shifted.getUTCMonth() + 1).padStart(2, '0')}-${String(shifted.getUTCDate()).padStart(2, '0')}`
+}
+
 async function readJson(response) {
   return JSON.parse(await response.text())
 }
@@ -181,6 +186,7 @@ describe('buildStandaloneIndex', () => {
       const html = await readFile(outputFile, 'utf8')
       const { window, localStorage, storageKey } = evaluateMockScript(extractMockScript(html))
       await window.fetch('/api/auth/register', { method: 'POST', body: JSON.stringify({ email: 'limits@dog.test', password: 'dogdice' }) })
+      const currentDailyBoardKey = dailyApexBoardKey()
       const state = JSON.parse(localStorage.getItem(storageKey))
       state.apexEntries = [
         ...Array.from({ length: 205 }, (_, index) => ({
@@ -205,7 +211,7 @@ describe('buildStandaloneIndex', () => {
           id: `daily-${index + 1}`,
           sourceRunId: `daily-run-${index + 1}`,
           boardType: 'DAILY',
-          boardKey: '2026-05-31',
+          boardKey: currentDailyBoardKey,
           name: `Daily ${index + 1}`,
           dogType: 'MUTT',
           luckyNumber: null,
