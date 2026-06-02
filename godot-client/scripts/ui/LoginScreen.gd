@@ -96,7 +96,10 @@ func _set_busy(busy: bool) -> void:
 	taptap_button.disabled = busy
 
 func _on_error_raised(message: String) -> void:
-	error_label.text = message
+	if message.contains("账号") and message.contains("密码"):
+		error_label.text = "%s。新玩家请注册，或点击快速开始直接进入。" % message
+	else:
+		error_label.text = message
 
 func _apply_visual_style() -> void:
 	add_theme_stylebox_override("panel", UiTokens.modal_panel_style())
