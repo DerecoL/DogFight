@@ -397,7 +397,7 @@ func _render_account_tab() -> void:
 	_add_line(history_card, "胜负", "%d 胜 / %d 负" % [int(history_data.get("totalWins", 0)), int(history_data.get("totalLosses", 0))])
 	for run in _array(history_data, "recentRuns").slice(0, 8):
 		if run is Dictionary:
-			var row := _button("%s  %s  %d-%d  第%d回合" % [str(run.get("mode", "")), str(run.get("status", "")), int(run.get("wins", 0)), int(run.get("losses", 0)), int(run.get("round", 0))], 0)
+			var row := _button("%s  %s  %d-%d  第%d回合" % [_mode_name(str(run.get("mode", ""))), _run_status_label(str(run.get("status", ""))), int(run.get("wins", 0)), int(run.get("losses", 0)), int(run.get("round", 0))], 0)
 			row.pressed.connect(_on_history_run_pressed.bind(str(run.get("id", ""))))
 			history_card.add_child(row)
 			history_card.add_child(_action_button("查看配置：" + str(run.get("id", "")), _show_snapshot_modal.bind(run, "历史对局配置")))
@@ -410,7 +410,7 @@ func _render_run_tab() -> void:
 		return
 	var run: Dictionary = store.get("run")
 	var summary := _section("当前跑局")
-	_add_line(summary, "阶段", "%s / %s" % [str(run.get("phase", "")), str(run.get("status", ""))])
+	_add_line(summary, "阶段", "%s / %s" % [_run_phase_label(str(run.get("phase", ""))), _run_status_label(str(run.get("status", "")))])
 	_add_line(summary, "犬种", "%s  幸运号 %s" % [_dog_name(str(run.get("dogType", ""))), str(run.get("luckyNumber", "-"))])
 	_add_line(summary, "进度", "第 %d 回合 · %d 胜 %d 负 · 金币 %d" % [int(run.get("round", 0)), int(run.get("wins", 0)), int(run.get("losses", 0)), int(run.get("gold", 0))])
 	_render_run_actions(run, summary)
@@ -734,7 +734,7 @@ func _render_map_or_shop(run: Dictionary) -> void:
 		card.add_child(_action_button("跳过怪物奖励", _call_session.bind("skip_monster_reward", [])))
 	else:
 		var shop_card := _section("跑局商店")
-		_add_line(shop_card, "类型 / 刷新费", "%s / %d" % [str(run.get("shopType", "")), int(run.get("refreshCost", 0))])
+		_add_line(shop_card, "类型 / 刷新费", "%s / %d" % [_shop_name(str(run.get("shopType", ""))), int(run.get("refreshCost", 0))])
 		shop_card.add_child(_action_button("刷新跑局商店", _call_session.bind("reroll_shop", [])))
 		for offer in _array(run, "shopItems"):
 			if offer is Dictionary:
@@ -1461,6 +1461,35 @@ func _run_status_label(status: String) -> String:
 		_:
 			return "已记录"
 
+func _run_phase_label(phase: String) -> String:
+	match phase:
+		"MAP":
+			return "探索地图"
+		"SHOP":
+			return "跑局商店"
+		"CHOICE":
+			return "选择商店"
+		"CLASS_REWARD":
+			return "职业奖励"
+		"ENCHANT_CHOICE":
+			return "选择附魔"
+		"RELIC_CHOICE":
+			return "选择遗物"
+		"UPGRADE_CHOICE":
+			return "选择升级"
+		"POTION_CHOICE":
+			return "选择药水"
+		"PREP":
+			return "备战"
+		"MATCH":
+			return "匹配完成"
+		"BATTLE":
+			return "战斗中"
+		"COMPLETE":
+			return "结算完成"
+		_:
+			return _fallback(phase, "未知阶段")
+
 func _show_snapshot_modal(snapshot: Dictionary, title: String) -> void:
 	var modal := _modal_panel(title, Vector2(620, 520))
 	if modal.is_empty():
@@ -1607,7 +1636,7 @@ func _show_room_member_modal(member: Dictionary) -> void:
 	_add_line(box, "犬种", _dog_name(str(member.get("dogType", ""))))
 	_add_line(box, "战绩", "%d胜 / %d负 · 第%d回合" % [int(member.get("wins", 0)), int(member.get("losses", 0)), int(member.get("round", 0))])
 	_add_line(box, "经济", "金币 %d" % int(member.get("gold", 0)))
-	_add_line(box, "阶段", "%s / %s" % [str(member.get("phase", "")), str(member.get("status", ""))])
+	_add_line(box, "阶段", "%s / %s" % [_room_phase_label(str(member.get("phase", ""))), _room_status_label(str(member.get("status", "")))])
 	_add_line(box, "状态", _room_member_status(member))
 	var battle_id := str(member.get("currentBattleId", ""))
 	if not battle_id.is_empty():
@@ -2034,7 +2063,7 @@ func _show_forfeit_modal(run: Dictionary) -> void:
 	var dog_type := str(run.get("dogType", ""))
 	_render_detail_header(box, _dog_texture(dog_type), "确认放弃", "%s 路 第 %d 回合" % [_dog_name(dog_type), int(run.get("round", 0))])
 	_add_line(box, "当前战绩", "%d 胜 / %d 败" % [int(run.get("wins", 0)), int(run.get("losses", 0))])
-	_add_line(box, "资源", "金币 %d 路 阶段 %s" % [int(run.get("gold", 0)), str(run.get("phase", ""))])
+	_add_line(box, "资源", "金币 %d 路 阶段 %s" % [int(run.get("gold", 0)), _run_phase_label(str(run.get("phase", "")))])
 	_add_line(box, "提示", "放弃后立即按当前记录结算，不会额外增加失败。")
 	var actions := HBoxContainer.new()
 	actions.add_theme_constant_override("separation", 8)
@@ -2560,7 +2589,10 @@ func _show_map_node_modal(node: Dictionary) -> void:
 		return
 	var box: VBoxContainer = modal["box"]
 	_add_line(box, "层级", "第 %d 层 · 第 %d 列" % [int(node.get("layer", 0)) + 1, int(node.get("column", 0)) + 1])
-	_add_line(box, "类型", str(node.get("kind", "")))
+	_add_line(box, "类型", _map_node_title(node))
+	var shop_type := str(node.get("shopType", ""))
+	if not shop_type.is_empty():
+		_add_line(box, "商店", _shop_name(shop_type))
 	var event: Dictionary = _dict(node, "event")
 	if not event.is_empty():
 		_add_line(box, "事件", _fallback(str(event.get("title", "")), str(event.get("type", ""))))
@@ -2697,11 +2729,11 @@ func _map_node_title(node: Dictionary) -> String:
 		"MONSTER_BATTLE":
 			return "野怪"
 		"SHOP_FIXED":
-			return "固定店"
+			return "固定商店"
 		"SHOP_UNKNOWN":
-			return "未知店"
+			return "未知商店"
 		"SHOP_EQUIPMENT":
-			return "装备店"
+			return "装备商店"
 		"REST":
 			return "休整"
 		"EVENT":
