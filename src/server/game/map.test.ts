@@ -68,6 +68,36 @@ describe('exploration map generation', () => {
     expect(counts.get(5)).toBeLessThanOrEqual(20)
   })
 
+  it('occasionally creates reward branches that skip one player battle and rejoin merged player battle routes', () => {
+    let foundUnevenPlayerBattleRoutes = false
+    let foundMergedPlayerBattleNode = false
+
+    for (let index = 0; index < 400; index += 1) {
+      const map = createExplorationMapState(`run-branch-merge-${index}`, index % 2, index % 7, index % 3)
+      const paths = enumerateMapPaths(map)
+      const battleCounts = paths.map((path) => path.filter((node) => node.kind === 'PLAYER_BATTLE').length)
+      const uniqueBattleCounts = new Set(battleCounts)
+      if (uniqueBattleCounts.size > 1) {
+        foundUnevenPlayerBattleRoutes = true
+        expect(Math.min(...battleCounts)).toBeGreaterThanOrEqual(3)
+        expect(Math.max(...battleCounts)).toBeLessThanOrEqual(5)
+      }
+
+      const incomingCounts = new Map<string, number>()
+      for (const node of map.nodes) {
+        for (const nextId of node.nextNodeIds) {
+          incomingCounts.set(nextId, (incomingCounts.get(nextId) ?? 0) + 1)
+        }
+      }
+      if (map.nodes.some((node) => node.kind === 'PLAYER_BATTLE' && [2, 3].includes(incomingCounts.get(node.id) ?? 0))) {
+        foundMergedPlayerBattleNode = true
+      }
+    }
+
+    expect(foundUnevenPlayerBattleRoutes).toBe(true)
+    expect(foundMergedPlayerBattleNode).toBe(true)
+  })
+
   it('keeps the first map rest-free with only one early shop and softer monsters', () => {
     for (let index = 0; index < 80; index += 1) {
       const map = createExplorationMapState(`first-map-pacing-${index}`, 0, index % 4, index % 2)

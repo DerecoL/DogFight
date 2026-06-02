@@ -62,18 +62,31 @@ export const EQUIPMENT_SHOP_TYPES = ['GENERAL', 'LARGE', 'MEDIUM', 'SMALL', 'SMA
 const FIXED_SHOP_TYPES = ['GENERAL', 'LARGE', 'MEDIUM', 'SMALL', 'SMALL_DICE', 'BIG_DICE', 'RELIC', 'UPGRADE_SILVER', 'UPGRADE_GOLD', 'POTION'] as const satisfies readonly ShopType[]
 const DOG_TYPES = ['SHIBA', 'SAMOYED', 'MUTT', 'BULLY', 'EMPEROR', 'FROG'] as const satisfies readonly DogType[]
 const EVENT_TYPES = ['GOLD_CACHE', 'RESTORE_TOLERANCE', 'FREE_EQUIPMENT', 'FREE_UPGRADE', 'RELIC_GIFT', 'RISKY_COMMISSION'] as const satisfies readonly ExplorationEventType[]
+const REWARD_BRANCH_KINDS = ['EVENT', 'SHOP_EQUIPMENT', 'REST'] as const satisfies readonly ExplorationMapNodeKind[]
+
+type RewardBranchPlan = {
+  layer: number
+  column: number
+  kind: ExplorationMapNodeKind
+}
 
 export function createExplorationMapState(runId: string, mapIndex: number, wins: number, losses: number): ExplorationMapState {
   const seed = `${runId}-map-${mapIndex}-${wins}-${losses}`
   const nodes: ExplorationMapNode[] = []
   const playerBattleLayers = playerBattleLayerSet(seed)
-  for (let layer = 0; layer < MAP_LAYER_COUNT; layer += 1) {
+  const layerNodeCounts = Array.from({ length: MAP_LAYER_COUNT }, (_, layer) => {
     const layerRng = createRng(`${seed}-layer-${layer}`)
-    const nodeCount = layer === 0 ? 3 : 2 + Math.floor(layerRng() * 3)
+    return layer === 0 ? 3 : 2 + Math.floor(layerRng() * 3)
+  })
+  const rewardBranch = rewardBranchPlan(seed, mapIndex, playerBattleLayers, layerNodeCounts)
+  for (let layer = 0; layer < MAP_LAYER_COUNT; layer += 1) {
+    const nodeCount = layerNodeCounts[layer]
     for (let column = 0; column < nodeCount; column += 1) {
       const id = mapNodeId(mapIndex, layer, column)
       const x = layerNodeX(column, nodeCount, createRng(`${seed}-x-${layer}-${column}`))
-      const kind = playerBattleLayers.has(layer) ? 'PLAYER_BATTLE' : layerNodeKind(mapIndex, layer, column, nodeCount, seed)
+      const kind = playerBattleLayers.has(layer)
+        ? playerBattleLayerNodeKind(layer, column, rewardBranch)
+        : layerNodeKind(mapIndex, layer, column, nodeCount, seed)
       nodes.push(createMapNode({ id, layer, column, x, kind, seed, mapIndex, wins, losses }))
     }
   }
@@ -126,6 +139,28 @@ function playerBattleLayerSet(seed: string) {
   return new Set(candidates.slice(0, count))
 }
 
+function rewardBranchPlan(seed: string, mapIndex: number, playerBattleLayers: Set<number>, layerNodeCounts: number[]): RewardBranchPlan | null {
+  if (playerBattleLayers.size < 4) return null
+  const rng = createRng(`${seed}-reward-branch`)
+  if (rng() >= 0.18) return null
+  const eligibleLayers = [...playerBattleLayers]
+    .filter((layer) => layer > 0 && layer < MAP_LAYER_COUNT - 1 && layerNodeCounts[layer] >= 2)
+    .sort((a, b) => a - b)
+  if (eligibleLayers.length === 0) return null
+  const layer = pick(rng, eligibleLayers)
+  const nodeCount = layerNodeCounts[layer]
+  const column = Math.min(nodeCount - 1, Math.max(0, Math.floor(rng() * nodeCount)))
+  const branchKinds = mapIndex === 0
+    ? REWARD_BRANCH_KINDS.filter((kind) => kind !== 'REST')
+    : [...REWARD_BRANCH_KINDS]
+  return { layer, column, kind: pick(rng, branchKinds) }
+}
+
+function playerBattleLayerNodeKind(layer: number, column: number, rewardBranch: RewardBranchPlan | null): ExplorationMapNodeKind {
+  if (rewardBranch && rewardBranch.layer === layer && rewardBranch.column === column) return rewardBranch.kind
+  return 'PLAYER_BATTLE'
+}
+
 function layerNodeX(column: number, count: number, rng: () => number) {
   if (count <= 1) return 0.5
   const margin = 0.12
@@ -153,9 +188,15 @@ function connectMapLayers(nodes: ExplorationMapNode[], mapIndex: number) {
     const currentLayer = byLayer[layer]
     const nextLayer = byLayer[layer + 1]
     const incoming = new Map(nextLayer.map((node) => [node.id, 0]))
+    const mergeTarget = preferredPlayerBattleMergeTarget(currentLayer, nextLayer, mapIndex, layer)
+    const mergeSources = mergeTarget
+      ? preferredPlayerBattleMergeSources(currentLayer, mergeTarget).slice(0, Math.min(3, currentLayer.length))
+      : []
 
     for (const node of currentLayer) {
-      const nearest = nearestNextNodes(node, nextLayer).slice(0, 1)
+      const nearest = mergeTarget && mergeSources.includes(node)
+        ? [mergeTarget]
+        : nearestNextNodes(node, nextLayer).slice(0, 1)
       nextIdsByNodeId.set(node.id, nearest.map((next) => next.id))
       for (const next of nearest) incoming.set(next.id, (incoming.get(next.id) ?? 0) + 1)
     }
@@ -177,6 +218,18 @@ function connectMapLayers(nodes: ExplorationMapNode[], mapIndex: number) {
       ? []
       : (nextIdsByNodeId.get(node.id) ?? [mapNodeId(mapIndex, node.layer + 1, 0)]),
   }))
+}
+
+function preferredPlayerBattleMergeTarget(currentLayer: ExplorationMapNode[], nextLayer: ExplorationMapNode[], mapIndex: number, layer: number) {
+  const playerBattleNodes = nextLayer.filter((node) => node.kind === 'PLAYER_BATTLE')
+  if (playerBattleNodes.length === 0 || currentLayer.length < 2) return null
+  if (nextLayer.length > currentLayer.length + 1) return null
+  const rng = createRng(`map-${mapIndex}-merge-${layer}-${currentLayer.length}-${nextLayer.length}`)
+  return pick(rng, playerBattleNodes)
+}
+
+function preferredPlayerBattleMergeSources(currentLayer: ExplorationMapNode[], target: ExplorationMapNode) {
+  return nearestNextSources(target, currentLayer)
 }
 
 function nearestNextNodes(node: ExplorationMapNode, nextLayer: ExplorationMapNode[]) {
