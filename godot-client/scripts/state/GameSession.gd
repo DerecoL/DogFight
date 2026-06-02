@@ -7,12 +7,14 @@ signal battle_started(battle: Dictionary)
 
 const ApiClient := preload("res://scripts/api/ApiClient.gd")
 const ApiRoutes := preload("res://scripts/api/ApiRoutes.gd")
+const ScreenRouter := preload("res://scripts/router/ScreenRouter.gd")
 const AppStore := preload("res://scripts/state/AppStore.gd")
 const RunStore := preload("res://scripts/state/RunStore.gd")
 const DEFAULT_API_BASE_URL := "http://127.0.0.1:4000/api"
 
 var api_base_url: String = DEFAULT_API_BASE_URL
 var api: ApiClient
+var router: ScreenRouter
 var current_user: Dictionary = {}
 var store: AppStore = AppStore.new()
 var run_store: RunStore = store.run
@@ -24,6 +26,15 @@ func _ready() -> void:
 	api = ApiClient.new()
 	api.configure(api_base_url)
 	add_child(api)
+	var screen_root := get_node_or_null("ScreenRoot")
+	if screen_root != null:
+		router = ScreenRouter.new()
+		add_child(router)
+		router.configure(screen_root)
+		router.register_screen("login", "LoginScreen")
+		router.register_screen("run", "RunScreen")
+		router.register_screen("battle", "BattleReplayScreen")
+		router.show_screen("login", false)
 	var login_screen := get_node_or_null("ScreenRoot/LoginScreen")
 	if login_screen != null and login_screen.has_method("bind_session"):
 		login_screen.bind_session(self)
@@ -141,31 +152,17 @@ func _raise_error(message: String) -> void:
 	error_raised.emit(message)
 
 func _show_run_screen() -> void:
-	var login_screen := get_node_or_null("ScreenRoot/LoginScreen")
+	if router != null:
+		router.show_screen("run")
 	var run_screen := get_node_or_null("ScreenRoot/RunScreen")
-	var battle_screen := get_node_or_null("ScreenRoot/BattleReplayScreen")
-	if run_screen == null:
-		return
-	if login_screen != null:
-		login_screen.visible = false
-	if battle_screen != null:
-		battle_screen.visible = false
-	if run_screen.has_method("clear_error"):
+	if run_screen != null and run_screen.has_method("clear_error"):
 		run_screen.call("clear_error")
-	run_screen.visible = true
 
 func _show_battle_screen(battle: Dictionary) -> void:
-	var login_screen := get_node_or_null("ScreenRoot/LoginScreen")
-	var run_screen := get_node_or_null("ScreenRoot/RunScreen")
+	if router != null:
+		router.show_screen("battle")
 	var battle_screen := get_node_or_null("ScreenRoot/BattleReplayScreen")
-	if battle_screen == null:
-		return
-	if login_screen != null:
-		login_screen.visible = false
-	if run_screen != null:
-		run_screen.visible = false
-	battle_screen.visible = true
-	if battle_screen.has_method("start_replay"):
+	if battle_screen != null and battle_screen.has_method("start_replay"):
 		battle_screen.start_replay(battle)
 
 func _on_run_changed_for_screen(_run: Dictionary) -> void:
