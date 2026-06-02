@@ -145,6 +145,7 @@ func _apply_event(event: Dictionary) -> void:
 	_highlight_event_items(event)
 	_refresh_log_view()
 	_play_event_effect(event)
+	_play_battle_sound(event)
 
 func _mark_replay_complete() -> void:
 	if replay_complete:
@@ -806,6 +807,13 @@ func _play_event_effect(event: Dictionary) -> void:
 	target_bar.modulate = Color(1.0, 0.55, 0.48, 1.0)
 	var hp_tween := create_tween()
 	hp_tween.tween_property(target_bar, "modulate", Color.WHITE, 0.22)
+
+func _play_battle_sound(event: Dictionary) -> void:
+	if session == null:
+		return
+	var feedback_sound_bus: Object = session.get("feedback_sound_bus") as Object
+	if feedback_sound_bus != null and feedback_sound_bus.has_method("play_battle_event"):
+		feedback_sound_bus.play_battle_event(event)
 
 func _on_error_raised(message: String) -> void:
 	if visible:

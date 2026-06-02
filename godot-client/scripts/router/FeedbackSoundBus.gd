@@ -25,6 +25,33 @@ func cue_for_toast_kind(kind: String) -> Dictionary:
 func play_toast(toast: Dictionary) -> bool:
 	return play_cue(cue_for_toast_kind(str(toast.get("kind", "info"))))
 
+func cue_for_battle_event(event: Dictionary) -> Dictionary:
+	var effect_type: String = str(event.get("effectType", event.get("kind", ""))).to_upper()
+	var text: String = str(event.get("text", "")).to_lower()
+	var statuses: String = str(event.get("statusChanged", "")).to_lower()
+	if effect_type == "DAMAGE":
+		return _battle_cue("damage")
+	if effect_type == "HEAL":
+		return _battle_cue("heal")
+	if effect_type == "POISON" or text.contains("poison") or text.contains("中毒"):
+		return _battle_cue("poison")
+	if text.contains("freeze") or text.contains("冻结") or statuses.contains("freeze"):
+		return _battle_cue("freeze")
+	if text.contains("weak") or text.contains("虚弱") or statuses.contains("weak"):
+		return _battle_cue("weak")
+	if text.contains("miss") or text.contains("闪避") or text.contains("未命中"):
+		return _battle_cue("miss")
+	if effect_type == "THORNS" or text.contains("反伤") or text.contains("thorns"):
+		return _battle_cue("thorns")
+	if effect_type == "UTILITY" and (text.contains("shield") or text.contains("护盾") or statuses.contains("shield")):
+		return _battle_cue("shield")
+	if event.has("roll"):
+		return _battle_cue("roll")
+	return _battle_cue("utility")
+
+func play_battle_event(event: Dictionary) -> bool:
+	return play_cue(cue_for_battle_event(event))
+
 func play_cue(cue: Dictionary) -> bool:
 	if not enabled or cue.is_empty() or DisplayServer.get_name() == "headless":
 		return false
@@ -73,6 +100,29 @@ func _cue(id: String, wave: String, frequency: float, end_frequency: float, dura
 		"durationSeconds": duration,
 		"volume": volume,
 	}
+
+func _battle_cue(kind: String) -> Dictionary:
+	match kind:
+		"roll":
+			return _cue("battle-roll", "triangle", 280.0, 520.0, 0.13, 0.06)
+		"damage":
+			return _cue("battle-damage", "square", 170.0, 90.0, 0.12, 0.07)
+		"heal":
+			return _cue("battle-heal", "sine", 520.0, 760.0, 0.18, 0.055)
+		"shield":
+			return _cue("battle-shield", "triangle", 420.0, 620.0, 0.16, 0.055)
+		"poison":
+			return _cue("battle-poison", "sawtooth", 190.0, 150.0, 0.17, 0.045)
+		"weak":
+			return _cue("battle-weak", "sawtooth", 230.0, 140.0, 0.15, 0.045)
+		"freeze":
+			return _cue("battle-freeze", "sine", 700.0, 460.0, 0.18, 0.05)
+		"thorns":
+			return _cue("battle-thorns", "square", 360.0, 210.0, 0.11, 0.055)
+		"miss":
+			return _cue("battle-miss", "triangle", 120.0, 80.0, 0.12, 0.045)
+		_:
+			return _cue("battle-utility", "triangle", 340.0, 440.0, 0.12, 0.045)
 
 func _wave_sample(wave: String, phase: float) -> float:
 	match wave:
