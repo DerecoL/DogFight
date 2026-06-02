@@ -381,28 +381,12 @@ func _render_inventory(run: Dictionary) -> void:
 	var toolbar := HBoxContainer.new()
 	toolbar.add_theme_constant_override("separation", 8)
 	card.add_child(toolbar)
-	toolbar.add_child(_action_button("移到背包 0,0", _move_selected.bind("BAG")))
-	toolbar.add_child(_action_button("移到装备 0,0", _move_selected.bind("EQUIPMENT")))
 	toolbar.add_child(_action_button("出售选中装备", _call_selected_item.bind("sell_item")))
 	toolbar.add_child(_action_button("合成升级选中", _call_selected_item.bind("upgrade_item")))
 	_add_line(card, "当前选中", _fallback(selected_item_label, "无"))
-	for area in ["EQUIPMENT", "BAG"]:
-		_add_line(card, area, "")
-		for item in _array(run, "items"):
-			if item is Dictionary and str(item.get("area", "")) == area:
-				var item_label := _item_label(item)
-				var button := _button(item_label, 0)
-				_apply_button_icon(button, _item_texture(item))
-				button.pressed.connect(_select_item.bind(str(item.get("id", "")), item_label))
-				card.add_child(button)
-	for relic in _array(run, "relics"):
-		if relic is Dictionary:
-			var relic_def: Dictionary = _dict(relic, "def")
-			var label := "遗物：%s  %s" % [_fallback(str(relic_def.get("name", "")), str(relic.get("relicId", ""))), str(relic.get("quality", ""))]
-			var button := _button(label, 0)
-			_apply_button_icon(button, _relic_texture(relic))
-			button.pressed.connect(_select_relic.bind(str(relic.get("id", relic.get("relicId", ""))), label))
-			card.add_child(button)
+	_render_item_grid(card, "装备栏", "EQUIPMENT", run, _equipment_slot_count(run))
+	_render_relic_rail(card, run)
+	_render_item_grid(card, "背包", "BAG", run, 12)
 	if not selected_relic_id.is_empty():
 		card.add_child(_action_button("出售选中遗物", _call_session.bind("sell_relic", [selected_relic_id])))
 
@@ -412,10 +396,7 @@ func _render_map_or_shop(run: Dictionary) -> void:
 		var card := _section("探索地图")
 		var map_state: Dictionary = _dict(run, "mapState")
 		_add_line(card, "当前节点", str(map_state.get("currentNodeId", "无")))
-		for node in _available_map_nodes(map_state):
-			var node_button := _action_button("前往 %s L%d-%d" % [str(node.get("kind", "UNKNOWN")), int(node.get("layer", 0)), int(node.get("column", 0))], _call_session.bind("select_map_node", [str(node.get("id", ""))]))
-			_apply_button_icon(node_button, _map_texture(str(node.get("kind", ""))))
-			card.add_child(node_button)
+		_render_map_route(card, map_state)
 		card.add_child(_action_button("处理事件", _call_session.bind("resolve_map_event", [])))
 		card.add_child(_action_button("完成节点", _call_session.bind("complete_map_node", [])))
 		card.add_child(_action_button("领取怪物奖励", _call_session.bind("claim_monster_reward", [])))
@@ -887,6 +868,12 @@ func _move_selected(area: String) -> void:
 		return
 	await _call_session("move_item", [selected_item_id, area, 0, 0])
 
+func _move_selected_to(area: String, x: int, y: int) -> void:
+	if selected_item_id.is_empty():
+		_show_error("请先选中装备或背包道具")
+		return
+	await _call_session("move_item", [selected_item_id, area, x, y])
+
 func _select_upgrade_item() -> void:
 	if selected_item_id.is_empty():
 		_show_error("请先选中要升级的装备")
@@ -949,6 +936,156 @@ func _available_map_nodes(map_state: Dictionary) -> Array:
 		if node is Dictionary and available.has(str(node.get("id", ""))):
 			result.append(node)
 	return result
+
+func _render_item_grid(parent: VBoxContainer, title: String, area: String, run: Dictionary, slot_count: int) -> void:
+	_add_line(parent, title, "%d 格固定槽位，从左向右触发" % slot_count)
+	var grid := GridContainer.new()
+	grid.columns = min(12, slot_count)
+	grid.add_theme_constant_override("h_separation", 4)
+	grid.add_theme_constant_override("v_separation", 4)
+	parent.add_child(grid)
+	var items: Array = _array(run, "items")
+	for x in range(slot_count):
+		var item: Dictionary = _item_at_slot(items, area, x)
+		var button := _button(_slot_label(item, x), 58)
+		button.custom_minimum_size = Vector2(58, 64)
+		button.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+		if item.is_empty():
+			button.pressed.connect(_move_selected_to.bind(area, x, 0))
+		else:
+			var label := _item_label(item)
+			_apply_button_icon(button, _item_texture(item))
+			button.pressed.connect(_select_item.bind(str(item.get("id", "")), label))
+		grid.add_child(button)
+
+func _render_relic_rail(parent: VBoxContainer, run: Dictionary) -> void:
+	var relics: Array = _array(run, "relics")
+	_add_line(parent, "遗物", "%d 个" % relics.size())
+	if relics.is_empty():
+		return
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 6)
+	parent.add_child(row)
+	for relic in relics:
+		if relic is Dictionary:
+			var relic_def: Dictionary = _dict(relic, "def")
+			var label := "遗物：%s  %s" % [_fallback(str(relic_def.get("name", "")), str(relic.get("relicId", ""))), str(relic.get("quality", ""))]
+			var button := _button(_fallback(str(relic_def.get("name", "")), str(relic.get("relicId", ""))), 96)
+			button.custom_minimum_size = Vector2(96, 54)
+			_apply_button_icon(button, _relic_texture(relic))
+			button.pressed.connect(_select_relic.bind(str(relic.get("id", relic.get("relicId", ""))), label))
+			row.add_child(button)
+
+func _render_map_route(parent: VBoxContainer, map_state: Dictionary) -> void:
+	var nodes: Array = _array(map_state, "nodes")
+	if nodes.is_empty():
+		_add_line(parent, "路线", "暂无地图节点")
+		return
+	nodes.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		var left_layer := int(a.get("layer", 0))
+		var right_layer := int(b.get("layer", 0))
+		if left_layer == right_layer:
+			return int(a.get("column", 0)) < int(b.get("column", 0))
+		return left_layer < right_layer
+	)
+	var available: Array = _variant_array(map_state.get("availableNodeIds", []))
+	var completed: Array = _variant_array(map_state.get("completedNodeIds", []))
+	var current_node_id := str(map_state.get("currentNodeId", ""))
+	var route := VBoxContainer.new()
+	route.add_theme_constant_override("separation", 6)
+	parent.add_child(route)
+	var active_layer := -999
+	var row: HBoxContainer = null
+	for node in nodes:
+		if not node is Dictionary:
+			continue
+		var layer := int(node.get("layer", 0))
+		if layer != active_layer:
+			active_layer = layer
+			_add_line(route, "第 %d 层" % (layer + 1), "")
+			row = HBoxContainer.new()
+			row.add_theme_constant_override("separation", 6)
+			route.add_child(row)
+		if row != null:
+			row.add_child(_map_node_button(node, available, completed, current_node_id))
+
+func _map_node_button(node: Dictionary, available: Array, completed: Array, current_node_id: String) -> Button:
+	var node_id := str(node.get("id", ""))
+	var available_state := available.has(node_id)
+	var completed_state := completed.has(node_id)
+	var current_state := node_id == current_node_id
+	var state := "可进入" if available_state else ("当前" if current_state else ("已完成" if completed_state else "未解锁"))
+	var text := "%s\n%s" % [_map_node_title(node), state]
+	var button := _button(text, 86)
+	button.custom_minimum_size = Vector2(86, 74)
+	button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_apply_button_icon(button, _map_texture(str(node.get("kind", ""))))
+	if available_state:
+		button.pressed.connect(_call_session.bind("select_map_node", [node_id]))
+	else:
+		button.pressed.connect(_show_map_node_modal.bind(node))
+	button.disabled = action_in_progress
+	return button
+
+func _show_map_node_modal(node: Dictionary) -> void:
+	var modal := _modal_panel(_map_node_title(node), Vector2(500, 380))
+	if modal.is_empty():
+		return
+	var box: VBoxContainer = modal["box"]
+	_add_line(box, "层级", "第 %d 层 · 第 %d 列" % [int(node.get("layer", 0)) + 1, int(node.get("column", 0)) + 1])
+	_add_line(box, "类型", str(node.get("kind", "")))
+	var monster: Dictionary = _dict(node, "monster")
+	if not monster.is_empty():
+		_add_line(box, "怪物", "%s · %s" % [str(monster.get("name", "")), str(monster.get("dogType", ""))])
+		for reward in _variant_array(monster.get("possibleRewards", [])).slice(0, 8):
+			if reward is Dictionary:
+				_add_line(box, "预期掉落", "%s  %s" % [str(reward.get("defId", "")), str(reward.get("quality", ""))])
+	if bool(node.get("hidden", false)):
+		_add_line(box, "状态", "隐藏事件")
+	_push_modal(modal["panel"])
+
+func _item_at_slot(items: Array, area: String, x: int) -> Dictionary:
+	for item in items:
+		if item is Dictionary and str(item.get("area", "")) == area and int(item.get("x", 0)) == x:
+			return item
+	return {}
+
+func _slot_label(item: Dictionary, x: int) -> String:
+	if item.is_empty():
+		return str(x + 1)
+	var def: Dictionary = _dict(item, "def")
+	var name := _fallback(str(def.get("name", "")), str(item.get("defId", item.get("id", ""))))
+	return "%d\n%s\n%s" % [x + 1, str(item.get("quality", "")), name]
+
+func _equipment_slot_count(run: Dictionary) -> int:
+	for relic in _array(run, "relics"):
+		if relic is Dictionary:
+			var def: Dictionary = _dict(relic, "def")
+			if str(def.get("effect", "")) == "EXTRA_EQUIPMENT_REDUCED_EFFECT":
+				return 18
+	return 12
+
+func _variant_array(value: Variant) -> Array:
+	return value if value is Array else []
+
+func _map_node_title(node: Dictionary) -> String:
+	match str(node.get("kind", "")):
+		"PLAYER_BATTLE":
+			return "玩家战"
+		"MONSTER_BATTLE":
+			return "野怪"
+		"SHOP_FIXED":
+			return "固定店"
+		"SHOP_UNKNOWN":
+			return "未知店"
+		"SHOP_EQUIPMENT":
+			return "装备店"
+		"REST":
+			return "休整"
+		"EVENT":
+			return "事件"
+		_:
+			return str(node.get("kind", "节点"))
 
 func _item_label(item: Dictionary) -> String:
 	var def: Dictionary = _dict(item, "def")

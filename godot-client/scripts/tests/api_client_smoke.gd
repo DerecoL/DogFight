@@ -121,6 +121,10 @@ func _init() -> void:
 		push_error("RunScreen must expose lobby, settings, history, and snapshot panels")
 		quit(1)
 		return
+	if not run_screen.has_method("_render_item_grid") or not run_screen.has_method("_render_map_route") or not run_screen.has_method("_show_map_node_modal"):
+		push_error("RunScreen must expose visual inventory and map route views")
+		quit(1)
+		return
 	run_screen.free()
 	api.free()
 	node.free()
