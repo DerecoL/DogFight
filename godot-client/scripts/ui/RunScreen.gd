@@ -838,32 +838,32 @@ func _refresh_after_action() -> void:
 	_render_shell()
 
 func _claim_achievement(achievement_id: String) -> void:
-	await _post_and_store(ApiRoutes.achievement_claim(achievement_id), {}, "achievements")
+	await _post_and_store(ApiRoutes.achievement_claim(achievement_id), {}, "achievements", "claim_achievement")
 
 func _refresh_daily() -> void:
-	await _post_and_store(ApiRoutes.daily_tasks_refresh(), {}, "daily")
+	await _post_and_store(ApiRoutes.daily_tasks_refresh(), {}, "daily", "refresh_daily")
 
 func _claim_daily(task_id: String) -> void:
-	await _post_and_store(ApiRoutes.daily_task_claim(task_id), {}, "daily")
+	await _post_and_store(ApiRoutes.daily_task_claim(task_id), {}, "daily", "claim_daily")
 
 func _save_nickname(input: LineEdit) -> void:
 	await _call_session("update_nickname", [input.text])
 
 func _purchase_shop_item(catalog_item_id: String) -> void:
-	await _post_and_store(ApiRoutes.shop_purchase(), {"catalogItemId": catalog_item_id}, "shop")
+	await _post_and_store(ApiRoutes.shop_purchase(), {"catalogItemId": catalog_item_id}, "shop", "purchase_shop_item")
 	await _fetch_into("cosmetics", ApiRoutes.cosmetics_me())
 	_render_shell()
 
 func _equip_cosmetic(catalog_item_id: String) -> void:
-	await _post_and_store(ApiRoutes.cosmetics_equip(), {"catalogItemId": catalog_item_id}, "cosmetics")
+	await _post_and_store(ApiRoutes.cosmetics_equip(), {"catalogItemId": catalog_item_id}, "cosmetics", "equip_cosmetic")
 
 func _unequip_cosmetic(cosmetic_type: String) -> void:
-	await _post_and_store(ApiRoutes.cosmetics_equip(), {"catalogItemId": null, "cosmeticType": cosmetic_type}, "cosmetics")
+	await _post_and_store(ApiRoutes.cosmetics_equip(), {"catalogItemId": null, "cosmeticType": cosmetic_type}, "cosmetics", "unequip_cosmetic")
 
 func _submit_apex_candidate(run_id: String) -> void:
 	if run_id.is_empty():
 		return
-	await _post_and_store(ApiRoutes.apex_submit(), {"runId": run_id}, "apex")
+	await _post_and_store(ApiRoutes.apex_submit(), {"runId": run_id}, "apex", "submit_apex")
 
 func _refresh_cosmetics() -> void:
 	await _fetch_into("cosmetics", ApiRoutes.cosmetics_me())
@@ -897,11 +897,11 @@ func _refresh_active_room() -> void:
 
 func _create_room() -> void:
 	var response: Dictionary = await _api_post(ApiRoutes.dogfight_rooms(), {})
-	await _apply_room_response(response)
+	await _apply_room_response(response, "create_room")
 
 func _match_room() -> void:
 	var response: Dictionary = await _api_post(ApiRoutes.dogfight_match(), {})
-	await _apply_room_response(response)
+	await _apply_room_response(response, "match_room")
 
 func _enter_or_view_room(room_id: String, status: String) -> void:
 	if room_id.is_empty():
@@ -912,7 +912,7 @@ func _enter_or_view_room(room_id: String, status: String) -> void:
 		response = await _api_post(ApiRoutes.dogfight_room_join(room_id), {})
 	else:
 		response = await _api_get(path)
-	await _apply_room_response(response)
+	await _apply_room_response(response, "enter_room" if status == "WAITING" else "")
 
 func _leave_active_room() -> void:
 	var room_id := str(active_room.get("id", ""))
@@ -921,6 +921,7 @@ func _leave_active_room() -> void:
 	var response: Dictionary = await _api_post(ApiRoutes.dogfight_room_leave(room_id), {})
 	if bool(response.get("ok", false)):
 		active_room = {}
+		_push_ui_action_success("leave_room")
 		await _refresh_rooms()
 	else:
 		_show_error(str(response.get("error", "")))
@@ -940,7 +941,7 @@ func _room_action(action: String, body: Dictionary) -> void:
 	if path.is_empty():
 		return
 	var response: Dictionary = await _api_post(path, body)
-	await _apply_room_response(response)
+	await _apply_room_response(response, "%s_room" % action)
 
 func _choose_room_dog() -> void:
 	var dog_type := dog_type_select.get_item_text(dog_type_select.selected)
@@ -961,7 +962,7 @@ func _load_room_battle(battle_id: String) -> void:
 	if session != null and session.has_signal("battle_started"):
 		session.battle_started.emit(_dict(battle, "result"))
 
-func _apply_room_response(response: Dictionary) -> void:
+func _apply_room_response(response: Dictionary, success_action := "") -> void:
 	if not bool(response.get("ok", false)):
 		_show_error(str(response.get("error", "")))
 		return
@@ -969,6 +970,7 @@ func _apply_room_response(response: Dictionary) -> void:
 	active_room = _dict(data, "room")
 	_sync_room_run(active_room)
 	current_tab = TAB_ROOMS
+	_push_ui_action_success(success_action)
 	await _refresh_rooms()
 
 func _sync_room_run(room: Dictionary) -> void:
@@ -976,7 +978,7 @@ func _sync_room_run(room: Dictionary) -> void:
 	if not room_run.is_empty() and session != null and session.has_method("set_current_run"):
 		session.set_current_run(room_run)
 
-func _post_and_store(path: String, body: Dictionary, target: String) -> void:
+func _post_and_store(path: String, body: Dictionary, target: String, success_action := "") -> void:
 	var response: Dictionary = await _api_post(path, body)
 	if not bool(response.get("ok", false)):
 		_show_error(str(response.get("error", "")))
@@ -992,7 +994,49 @@ func _post_and_store(path: String, body: Dictionary, target: String) -> void:
 			cosmetics_data = _data(response)
 		"apex":
 			apex_data = _data(response)
+	_push_ui_action_success(success_action)
 	_render_shell()
+
+func _ui_action_success_message(action: String) -> String:
+	match action:
+		"claim_achievement":
+			return "成就奖励已领取"
+		"refresh_daily":
+			return "每日任务已刷新"
+		"claim_daily":
+			return "每日奖励已领取"
+		"purchase_shop_item":
+			return "商城购买成功"
+		"equip_cosmetic":
+			return "外观已装备"
+		"unequip_cosmetic":
+			return "外观已恢复默认"
+		"submit_apex":
+			return "巅峰记录已提交"
+		"create_room":
+			return "房间已创建"
+		"match_room":
+			return "已匹配房间"
+		"enter_room":
+			return "已进入房间"
+		"leave_room":
+			return "已离开房间"
+		"start_room":
+			return "房间战斗已开始"
+		"ready_room":
+			return "房间状态已更新"
+		"dog-choice_room", "choose_room_dog":
+			return "房间狗狗已选择"
+		_:
+			return ""
+
+func _push_ui_action_success(action: String) -> void:
+	var message := _ui_action_success_message(action)
+	if message.strip_edges().is_empty() or session == null:
+		return
+	var toast_bus: Object = session.get("toast_bus") as Object
+	if toast_bus != null and toast_bus.has_method("push"):
+		toast_bus.push(message, "success")
 
 func _show_history_modal() -> void:
 	var modal := _modal_panel("个人战绩详情", Vector2(560, 480))
