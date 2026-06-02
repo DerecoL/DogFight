@@ -100,6 +100,7 @@ func _apply_event(event: Dictionary) -> void:
 		str(event.get("actor", "system")),
 		str(event.get("text", "")),
 	])
+	_play_event_effect(event)
 
 func _mark_replay_complete() -> void:
 	if replay_complete:
@@ -117,6 +118,20 @@ func _update_playback_controls() -> void:
 func _connect_button_once(button: Button, handler: Callable) -> void:
 	if not button.pressed.is_connected(handler):
 		button.pressed.connect(handler)
+
+func _play_event_effect(event: Dictionary) -> void:
+	var actor := str(event.get("actor", "system")).to_lower()
+	dice_label.pivot_offset = dice_label.size / 2.0
+	dice_label.scale = Vector2(1.12, 1.12)
+	dice_label.modulate = Color(1.0, 0.92, 0.42, 1.0)
+	var tween := create_tween()
+	tween.set_parallel(true)
+	tween.tween_property(dice_label, "scale", Vector2.ONE, 0.18)
+	tween.tween_property(dice_label, "modulate", Color.WHITE, 0.18)
+	var target_bar := player_hp if actor.contains("opponent") else opponent_hp
+	target_bar.modulate = Color(1.0, 0.55, 0.48, 1.0)
+	var hp_tween := create_tween()
+	hp_tween.tween_property(target_bar, "modulate", Color.WHITE, 0.22)
 
 func _on_error_raised(message: String) -> void:
 	if visible:

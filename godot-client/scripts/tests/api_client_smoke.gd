@@ -21,8 +21,20 @@ func _init() -> void:
 		push_error("ApiRoutes.register returned wrong path")
 		quit(1)
 		return
+	if routes_script.taptap_login() != "/auth/taptap":
+		push_error("ApiRoutes.taptap_login returned wrong path")
+		quit(1)
+		return
+	if routes_script.logout() != "/auth/logout" or routes_script.profile_nickname() != "/profile/nickname":
+		push_error("ApiRoutes auth profile paths are invalid")
+		quit(1)
+		return
 	if routes_script.achievements() != "/achievements" or routes_script.daily_tasks() != "/daily-tasks":
 		push_error("ApiRoutes account progression paths are invalid")
+		quit(1)
+		return
+	if routes_script.cosmetics_equip() != "/cosmetics/equip" or routes_script.apex_submit() != "/apex/submit":
+		push_error("ApiRoutes cosmetics or apex paths are invalid")
 		quit(1)
 		return
 	if routes_script.dogfight_rooms() != "/dogfight/rooms" or routes_script.dogfight_room_ready("room-1") != "/dogfight/rooms/room-1/ready":
@@ -86,6 +98,10 @@ func _init() -> void:
 		push_error("LoginScreen must expose RegisterButton")
 		quit(1)
 		return
+	if login_screen.get_node_or_null("%TapTapButton") == null or login_screen.get_node_or_null("%TapTapCodeInput") == null:
+		push_error("LoginScreen must expose TapTap login controls")
+		quit(1)
+		return
 	login_screen.free()
 	var run_scene := load("res://scenes/RunScreen.tscn")
 	if run_scene == null:
@@ -95,6 +111,10 @@ func _init() -> void:
 	var run_screen = run_scene.instantiate()
 	if not run_screen.has_method("bind_session"):
 		push_error("RunScreen must expose bind_session")
+		quit(1)
+		return
+	if not run_screen.has_method("_save_nickname") or not run_screen.has_method("_unequip_cosmetic") or not run_screen.has_method("_submit_apex_candidate"):
+		push_error("RunScreen must expose account, cosmetics, and apex actions")
 		quit(1)
 		return
 	run_screen.free()

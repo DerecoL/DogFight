@@ -79,6 +79,46 @@ func register(account: String, password: String) -> bool:
 	var response := await api.post_json(ApiRoutes.register(), {"account": account, "password": password})
 	return await _apply_auth_response(response)
 
+func login_taptap(code: String) -> bool:
+	var trimmed := code.strip_edges()
+	if trimmed.is_empty():
+		_raise_error("请输入 TapTap 授权码")
+		return false
+	var response := await api.post_json(ApiRoutes.taptap_login(), {"code": trimmed})
+	return await _apply_auth_response(response)
+
+func update_nickname(nickname: String) -> bool:
+	var trimmed := nickname.strip_edges()
+	if trimmed.length() < 2 or trimmed.length() > 16:
+		_raise_error("昵称需要 2-16 个字符")
+		return false
+	var response := await api.post_json(ApiRoutes.profile_nickname(), {"nickname": trimmed})
+	if not response.ok:
+		_raise_error(str(response.error))
+		return false
+	current_user = response.data.get("user", current_user)
+	store.set_user(current_user)
+	user_changed.emit(current_user)
+	if toast_bus != null:
+		toast_bus.push("昵称已保存", "success")
+	return true
+
+func logout() -> bool:
+	var response := await api.post_json(ApiRoutes.logout(), {})
+	if not response.ok:
+		_raise_error(str(response.error))
+		return false
+	current_user = {}
+	api.cookie_header = ""
+	store.set_user({})
+	store.set_current_run({})
+	if router != null:
+		router.show_screen("login", false)
+	run_changed.emit({})
+	if toast_bus != null:
+		toast_bus.push("已退出登录", "success")
+	return true
+
 func _apply_auth_response(response: Dictionary) -> bool:
 	if not response.ok:
 		_raise_error(str(response.error))
@@ -211,7 +251,12 @@ func _post_run_action(path: String, body: Dictionary) -> bool:
 	if not response.ok:
 		_raise_error(str(response.error))
 		return false
-	return _apply_run_response(response, "服务端没有返回跑局")
+	var ok := _apply_run_response(response, "服务端没有返回跑局")
+	if ok:
+		var summary: Variant = response.data.get("rewardSummary", {})
+		if summary is Dictionary and not summary.is_empty():
+			_show_reward_summary(summary)
+	return ok
 
 func _apply_run_response(response: Dictionary, fallback_error: String) -> bool:
 	var run = response.data.get("run", {})
@@ -256,6 +301,60 @@ func _show_toast(toast: Dictionary) -> void:
 	tween.tween_interval(max(0.5, duration))
 	tween.tween_property(panel, "modulate:a", 0.0, 0.24)
 	tween.tween_callback(panel.queue_free)
+
+func _show_reward_summary(summary: Dictionary) -> void:
+	if modal_stack == null:
+		if toast_bus != null:
+			toast_bus.push(str(summary.get("title", "获得奖励")), "success")
+		return
+	var panel := PanelContainer.new()
+	panel.custom_minimum_size = Vector2(440, 320)
+	panel.set_anchors_preset(Control.PRESET_CENTER)
+	panel.offset_left = -220.0
+	panel.offset_right = 220.0
+	panel.offset_top = -170.0
+	panel.offset_bottom = 170.0
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 10)
+	panel.add_child(box)
+	var eyebrow := Label.new()
+	eyebrow.text = "野怪结算" if str(summary.get("source", "")) == "MONSTER_BATTLE" else "事件完成"
+	eyebrow.custom_minimum_size = Vector2(0, 26)
+	box.add_child(eyebrow)
+	var title := Label.new()
+	title.text = str(summary.get("title", "获得奖励"))
+	title.custom_minimum_size = Vector2(0, 34)
+	title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(title)
+	var entries_box := VBoxContainer.new()
+	entries_box.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	entries_box.add_theme_constant_override("separation", 6)
+	box.add_child(entries_box)
+	var raw_entries: Variant = summary.get("entries", [])
+	var entries: Array = raw_entries if raw_entries is Array else []
+	if entries.is_empty():
+		_add_reward_summary_line(entries_box, "没有获得奖励", "本次没有新的奖励")
+	for entry in entries:
+		if entry is Dictionary:
+			_add_reward_summary_line(entries_box, str(entry.get("label", "奖励")), str(entry.get("detail", "")))
+	var close_button := Button.new()
+	close_button.text = "知道了"
+	close_button.custom_minimum_size = Vector2(0, 42)
+	close_button.pressed.connect(_close_top_modal)
+	box.add_child(close_button)
+	modal_stack.push_modal(panel, true)
+
+func _add_reward_summary_line(parent: VBoxContainer, label: String, detail: String) -> void:
+	var row := Label.new()
+	row.custom_minimum_size = Vector2(0, 34)
+	row.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	row.text = "%s：%s" % [label, detail]
+	parent.add_child(row)
+
+func _close_top_modal() -> void:
+	if modal_stack != null:
+		modal_stack.pop_modal()
 
 func _toast_color(kind: String) -> Color:
 	match kind:

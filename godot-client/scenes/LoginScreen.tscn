@@ -9,9 +9,9 @@ anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
 offset_left = -210.0
-offset_top = -140.0
+offset_top = -178.0
 offset_right = 210.0
-offset_bottom = 140.0
+offset_bottom = 178.0
 grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_login")
@@ -60,6 +60,17 @@ custom_minimum_size = Vector2(0, 32)
 layout_mode = 2
 size_flags_horizontal = 3
 text = "注册"
+
+[node name="TapTapCodeInput" type="LineEdit" parent="Margin/Form"]
+unique_name_in_owner = true
+layout_mode = 2
+placeholder_text = "TapTap 授权码"
+
+[node name="TapTapButton" type="Button" parent="Margin/Form"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 32)
+layout_mode = 2
+text = "TapTap 授权码登录"
 
 [node name="ErrorScroll" type="ScrollContainer" parent="Margin/Form"]
 custom_minimum_size = Vector2(0, 58)

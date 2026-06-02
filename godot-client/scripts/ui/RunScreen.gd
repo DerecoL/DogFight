@@ -259,6 +259,18 @@ func _render_account_tab() -> void:
 	_add_line(card, "账号", _fallback(str(user.get("account", "")), "未登录"))
 	_add_line(card, "昵称", _fallback(str(user.get("nickname", "")), "未设置"))
 	_add_line(card, "钱包", "余额 %d / 今日获得 %d" % [int(wallet.get("balance", 0)), int(wallet.get("dailyEarned", 0))])
+	var profile_row := HBoxContainer.new()
+	profile_row.add_theme_constant_override("separation", 8)
+	card.add_child(profile_row)
+	var nickname_input := LineEdit.new()
+	nickname_input.placeholder_text = "输入 2-16 字昵称"
+	nickname_input.text = str(user.get("nickname", ""))
+	nickname_input.max_length = 16
+	nickname_input.custom_minimum_size = Vector2(220, 38)
+	nickname_input.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	profile_row.add_child(nickname_input)
+	profile_row.add_child(_action_button("保存昵称", _save_nickname.bind(nickname_input)))
+	card.add_child(_action_button("退出登录", _call_session.bind("logout", [])))
 	var history_card := _section("跑局记录")
 	_add_line(history_card, "总跑局", str(int(history_data.get("totalRuns", 0))))
 	_add_line(history_card, "完成 / 放弃", "%d / %d" % [int(history_data.get("completedRuns", 0)), int(history_data.get("abandonedRuns", 0))])
@@ -424,6 +436,11 @@ func _render_shop_tab() -> void:
 				else:
 					card.add_child(_action_button("购买 " + text, _purchase_shop_item.bind(str(item.get("id", "")))))
 	var cosmetic_card := _section("已拥有外观")
+	var default_row := HBoxContainer.new()
+	default_row.add_theme_constant_override("separation", 8)
+	cosmetic_card.add_child(default_row)
+	for cosmetic_type in ["TITLE", "AVATAR", "BACKGROUND", "DOG_SKIN", "BATTLE_EFFECT"]:
+		default_row.add_child(_action_button("默认 " + cosmetic_type, _unequip_cosmetic.bind(cosmetic_type)))
 	for item in _array(cosmetics_data, "inventory"):
 		if item is Dictionary:
 			cosmetic_card.add_child(_action_button("装备 %s" % str(item.get("name", item.get("catalogItemId", ""))), _equip_cosmetic.bind(str(item.get("catalogItemId", item.get("id", ""))))))
@@ -437,6 +454,13 @@ func _render_leaderboards_tab() -> void:
 			_add_line(ladder_card, "#%d" % int(entry.get("rank", 0)), "%s  %s" % [str(entry.get("name", "")), str(entry.get("title", ""))])
 	var apex_card := _section("巅峰榜")
 	var leaderboards: Dictionary = _dict(apex_data, "leaderboards")
+	var candidates := _array(apex_data, "candidates")
+	_add_line(apex_card, "可提交完成局", str(candidates.size()))
+	for candidate in candidates:
+		if candidate is Dictionary:
+			var run_id := str(candidate.get("id", ""))
+			var candidate_text := "%s  %d-%d  第%d回合" % [str(candidate.get("dogType", candidate.get("mode", ""))), int(candidate.get("wins", 0)), int(candidate.get("losses", 0)), int(candidate.get("round", 0))]
+			apex_card.add_child(_action_button("提交巅峰 " + candidate_text, _submit_apex_candidate.bind(run_id)))
 	for board_name in ["overall", "daily"]:
 		_add_line(apex_card, board_name, "")
 		for entry in _array(leaderboards, board_name).slice(0, 20):
@@ -519,7 +543,7 @@ func _call_session(method: String, args: Array) -> void:
 	var ok: bool = await session.callv(method, args)
 	action_in_progress = false
 	_update_controls()
-	if ok:
+	if ok and method != "logout":
 		await _refresh_after_action()
 
 func _refresh_after_action() -> void:
@@ -542,6 +566,9 @@ func _refresh_daily() -> void:
 func _claim_daily(task_id: String) -> void:
 	await _post_and_store(ApiRoutes.daily_task_claim(task_id), {}, "daily")
 
+func _save_nickname(input: LineEdit) -> void:
+	await _call_session("update_nickname", [input.text])
+
 func _purchase_shop_item(catalog_item_id: String) -> void:
 	await _post_and_store(ApiRoutes.shop_purchase(), {"catalogItemId": catalog_item_id}, "shop")
 	await _fetch_into("cosmetics", ApiRoutes.cosmetics_me())
@@ -549,6 +576,14 @@ func _purchase_shop_item(catalog_item_id: String) -> void:
 
 func _equip_cosmetic(catalog_item_id: String) -> void:
 	await _post_and_store(ApiRoutes.cosmetics_equip(), {"catalogItemId": catalog_item_id}, "cosmetics")
+
+func _unequip_cosmetic(cosmetic_type: String) -> void:
+	await _post_and_store(ApiRoutes.cosmetics_equip(), {"catalogItemId": null, "cosmeticType": cosmetic_type}, "cosmetics")
+
+func _submit_apex_candidate(run_id: String) -> void:
+	if run_id.is_empty():
+		return
+	await _post_and_store(ApiRoutes.apex_submit(), {"runId": run_id}, "apex")
 
 func _refresh_rooms() -> void:
 	await _fetch_into("rooms", ApiRoutes.dogfight_rooms())
@@ -634,6 +669,8 @@ func _post_and_store(path: String, body: Dictionary, target: String) -> void:
 			meta_shop_data = _data(response)
 		"cosmetics":
 			cosmetics_data = _data(response)
+		"apex":
+			apex_data = _data(response)
 	_render_shell()
 
 func _select_item(item_id: String, label: String) -> void:

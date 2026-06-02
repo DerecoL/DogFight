@@ -10,6 +10,9 @@ static func login() -> String:
 static func register() -> String:
 	return "/auth/register"
 
+static func taptap_login() -> String:
+	return "/auth/taptap"
+
 static func logout() -> String:
 	return "/auth/logout"
 
