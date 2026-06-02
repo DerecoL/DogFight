@@ -10,22 +10,25 @@ var blocking_flags: Array[bool] = []
 func configure(root: Node) -> void:
 	modal_root = root
 
-func push_modal(modal: Node, blocking := false) -> void:
+func push_modal(modal: Node, blocking := false, report_errors := true) -> bool:
 	if modal_root == null:
-		push_error("ModalStack.configure must be called before push_modal")
-		return
+		if report_errors:
+			push_error("ModalStack.configure must be called before push_modal")
+		return false
 	if modal.get_parent() != null:
-		push_error("ModalStack only accepts unparented modal nodes")
-		return
+		if report_errors:
+			push_error("ModalStack only accepts unparented modal nodes")
+		return false
 	modal_root.add_child(modal)
 	stack.append(modal)
 	blocking_flags.append(blocking)
 	_emit_change()
+	return true
 
 func pop_modal() -> Node:
 	if stack.is_empty():
 		return null
-	var modal := stack.pop_back()
+	var modal := stack.pop_back() as Node
 	blocking_flags.pop_back()
 	if modal != null and modal.get_parent() == modal_root:
 		modal_root.remove_child(modal)

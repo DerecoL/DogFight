@@ -68,8 +68,7 @@ func _init() -> void:
 		push_error("ScreenRouter failed to go back")
 		quit(1)
 		return
-	router.register_screen("plain", "PlainNode")
-	if router.screens.has("plain"):
+	if router.register_screen("plain", "PlainNode", false) or router.screens.has("plain"):
 		push_error("ScreenRouter registered a non-CanvasItem node")
 		quit(1)
 		return
@@ -126,8 +125,7 @@ func _init() -> void:
 		return
 	var orphan_stack = modal_script.new()
 	var orphan_modal := Control.new()
-	orphan_stack.push_modal(orphan_modal, true)
-	if orphan_stack.depth() != 0 or orphan_stack.is_blocking():
+	if orphan_stack.push_modal(orphan_modal, true, false) or orphan_stack.depth() != 0 or orphan_stack.is_blocking():
 		push_error("ModalStack accepted modal without configured root")
 		quit(1)
 		return
@@ -138,8 +136,7 @@ func _init() -> void:
 	var existing_parent := Control.new()
 	var parented_modal := Control.new()
 	existing_parent.add_child(parented_modal)
-	parented_stack.push_modal(parented_modal, true)
-	if parented_stack.depth() != 0 or parented_stack.is_blocking() or parented_modal.get_parent() != existing_parent or not existing_parent.get_children().has(parented_modal):
+	if parented_stack.push_modal(parented_modal, true, false) or parented_stack.depth() != 0 or parented_stack.is_blocking() or parented_modal.get_parent() != existing_parent or not existing_parent.get_children().has(parented_modal):
 		push_error("ModalStack accepted modal from unrelated parent")
 		quit(1)
 		return
@@ -165,11 +162,15 @@ func _init() -> void:
 	existing_parent.free()
 	var toast_bus = toast_script.new()
 	toast_bus.push("保存成功", "success")
-	var toast := toast_bus.pop_next()
+	var toast: Dictionary = toast_bus.pop_next()
 	if str(toast.get("message", "")) != "保存成功" or str(toast.get("kind", "")) != "success":
 		push_error("ToastBus failed to pop queued toast")
 		quit(1)
 		return
 	root.free()
 	router.free()
+	modal_stack.free()
+	orphan_stack.free()
+	parented_stack.free()
+	toast_bus.free()
 	quit(0)

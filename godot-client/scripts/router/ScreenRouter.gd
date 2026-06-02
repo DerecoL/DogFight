@@ -11,20 +11,24 @@ var back_stack: Array[String] = []
 func configure(root: Node) -> void:
 	screen_root = root
 
-func register_screen(screen_id: String, node_name: String) -> void:
+func register_screen(screen_id: String, node_name: String, report_errors := true) -> bool:
 	if screen_root == null:
-		push_error("ScreenRouter.configure must be called before register_screen")
-		return
+		if report_errors:
+			push_error("ScreenRouter.configure must be called before register_screen")
+		return false
 	var node := screen_root.get_node_or_null(node_name)
 	if node == null:
-		push_error("Screen not found: %s" % node_name)
-		return
+		if report_errors:
+			push_error("Screen not found: %s" % node_name)
+		return false
 	var screen := node as CanvasItem
 	if screen == null:
-		push_error("Screen must be a CanvasItem: %s" % node_name)
-		return
+		if report_errors:
+			push_error("Screen must be a CanvasItem: %s" % node_name)
+		return false
 	screens[screen_id] = screen
 	screen.visible = false
+	return true
 
 func show_screen(screen_id: String, add_to_back_stack := true) -> void:
 	if not screens.has(screen_id):
@@ -46,7 +50,7 @@ func _display_screen(screen_id: String) -> void:
 func go_back() -> bool:
 	if back_stack.is_empty():
 		return false
-	var previous := back_stack.pop_back()
+	var previous := str(back_stack.pop_back())
 	_display_screen(previous)
 	return true
 
