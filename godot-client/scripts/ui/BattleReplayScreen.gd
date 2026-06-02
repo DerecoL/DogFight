@@ -389,6 +389,7 @@ func _render_snapshot(name_label: Label, avatar: TextureRect, grid: GridContaine
 			relic_button.clip_text = true
 			relic_button.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 			_apply_button_icon(relic_button, _battle_sticker_texture(str(relic.get("relicId", ""))))
+			relic_button.pressed.connect(_show_battle_relic_modal.bind(relic, side))
 			relic_row.add_child(relic_button)
 
 func _render_event_stage(event: Dictionary) -> void:
@@ -782,6 +783,62 @@ func _modal_stack() -> Object:
 		return stack
 	return null
 
+func _show_battle_relic_modal(relic: Dictionary, side: String) -> void:
+	var stack := _modal_stack()
+	if stack == null:
+		error_label.text = "弹窗层未初始化"
+		return
+	var panel := PanelContainer.new()
+	panel.custom_minimum_size = Vector2(500, 380)
+	panel.set_anchors_preset(Control.PRESET_CENTER)
+	panel.offset_left = -250.0
+	panel.offset_right = 250.0
+	panel.offset_top = -190.0
+	panel.offset_bottom = 190.0
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 8)
+	panel.add_child(box)
+	var header := HBoxContainer.new()
+	header.add_theme_constant_override("separation", 8)
+	box.add_child(header)
+	var title := Label.new()
+	title.text = "战斗遗物详情"
+	title.custom_minimum_size = Vector2(0, 36)
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	header.add_child(title)
+	var close_button := Button.new()
+	close_button.text = "关闭"
+	close_button.custom_minimum_size = Vector2(84, 36)
+	close_button.pressed.connect(func() -> void:
+		stack.call("pop_modal")
+	)
+	header.add_child(close_button)
+	var body := HBoxContainer.new()
+	body.add_theme_constant_override("separation", 10)
+	box.add_child(body)
+	var icon := TextureRect.new()
+	icon.custom_minimum_size = Vector2(82, 82)
+	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	icon.texture = _battle_sticker_texture(str(relic.get("relicId", "")))
+	body.add_child(icon)
+	var lines := VBoxContainer.new()
+	lines.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	lines.add_theme_constant_override("separation", 6)
+	body.add_child(lines)
+	var def: Dictionary = _dict(relic, "def")
+	var relic_name := _fallback(str(def.get("name", "")), str(relic.get("relicId", relic.get("id", ""))))
+	_add_modal_line(lines, "归属", "我方" if side == "player" else "对手")
+	_add_modal_line(lines, "名称", relic_name)
+	_add_modal_line(lines, "品质", str(relic.get("quality", "")))
+	var description := str(def.get("description", ""))
+	if not description.is_empty():
+		_add_modal_line(lines, "说明", description)
+	var effect := str(def.get("effect", ""))
+	if not effect.is_empty():
+		_add_modal_line(lines, "效果", effect)
+	stack.call("push_modal", panel, true)
+
 func _stats_for_side(side: String, player: Dictionary, opponent: Dictionary) -> Dictionary:
 	return player if side == "player" else opponent
 
@@ -925,7 +982,10 @@ func _battle_item_art_texture(def_id: String) -> Texture2D:
 func _battle_sticker_texture(asset_id: String) -> Texture2D:
 	if asset_id.is_empty():
 		return null
-	var texture := _texture("res://assets/sticker-icons/%s.webp" % asset_id)
+	var path := "res://assets/sticker-icons/%s.webp" % asset_id
+	if not ResourceLoader.exists(path) and not FileAccess.file_exists(path):
+		return _texture("res://assets/sticker-icons/starter-1.webp")
+	var texture := _texture(path)
 	return texture if texture != null else _texture("res://assets/sticker-icons/starter-1.webp")
 
 func _dog_texture(dog_type: String) -> Texture2D:
