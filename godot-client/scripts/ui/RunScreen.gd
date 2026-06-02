@@ -364,6 +364,7 @@ func _render_run_tab() -> void:
 	_add_line(summary, "犬种", "%s  幸运号 %s" % [str(run.get("dogType", "")), str(run.get("luckyNumber", "-"))])
 	_add_line(summary, "进度", "第 %d 回合 · %d 胜 %d 负 · 金币 %d" % [int(run.get("round", 0)), int(run.get("wins", 0)), int(run.get("losses", 0)), int(run.get("gold", 0))])
 	_render_run_actions(run, summary)
+	_render_settlement_summary(run)
 	_render_reward_choices(run)
 	_render_inventory(run)
 	_render_map_or_shop(run)
@@ -380,6 +381,21 @@ func _render_run_actions(run: Dictionary, card: VBoxContainer) -> void:
 	elif phase == "BATTLE":
 		row.add_child(_action_button("完成结算", _call_session.bind("finish_battle", [])))
 	row.add_child(_action_button("放弃并结算", _call_session.bind("settle_run", [])))
+
+func _render_settlement_summary(run: Dictionary) -> void:
+	if str(run.get("phase", "")) != "COMPLETE" and str(run.get("status", "")) != "COMPLETE":
+		return
+	var card := _section("跑局结算")
+	_add_line(card, "最终战绩", "%d 胜 / %d 负 · 第 %d 回合" % [int(run.get("wins", 0)), int(run.get("losses", 0)), int(run.get("round", 0))])
+	_add_line(card, "最终分数", str(int(run.get("score", _run_score(run)))))
+	_add_line(card, "资源", "金币 %d · 装备 %d · 遗物 %d" % [int(run.get("gold", 0)), _array(run, "items").size(), _array(run, "relics").size()])
+	var settlement: Dictionary = _dict(run, "ladderSettlement")
+	if not settlement.is_empty():
+		_add_line(card, "天梯结算", "%s %d -> %s %d  %s" % [_tier_label(str(settlement.get("beforeTier", ""))), int(settlement.get("beforeScore", 0)), _tier_label(str(settlement.get("afterTier", ""))), int(settlement.get("afterScore", 0)), _signed_int(int(settlement.get("delta", 0)))])
+		card.add_child(_action_button("查看天梯结算详情", _show_ladder_settlement_modal.bind(settlement)))
+
+func _run_score(run: Dictionary) -> int:
+	return int(run.get("wins", 0)) * 100 - int(run.get("losses", 0)) * 20 + int(run.get("round", 0)) * 5 + int(run.get("gold", 0))
 
 func _render_reward_choices(run: Dictionary) -> void:
 	var choices: Array = _array(run, "choices")
