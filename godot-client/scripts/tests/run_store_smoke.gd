@@ -6,7 +6,7 @@ func _init() -> void:
 		push_error("RunStore.gd failed to load")
 		quit(1)
 		return
-	var store := script.new()
+	var store = script.new()
 	store.set_run({"id": ""})
 	if store.has_run():
 		push_error("RunStore must reject empty run ids")

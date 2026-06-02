@@ -20,13 +20,13 @@ func _init() -> void:
 		push_error("Unexpected normalized api_base_url after _ready")
 		quit(1)
 		return
-	var api := api_script.new()
+	var api = api_script.new()
 	api.configure("http://example.test/api/")
 	if api.base_url != "http://example.test/api":
 		push_error("ApiClient.configure did not normalize base_url")
 		quit(1)
 		return
-	var value := types_script.string_value({"phase": "SHOP"}, "phase", "MAP")
+	var value = types_script.string_value({"phase": "SHOP"}, "phase", "MAP")
 	if value != "SHOP":
 		push_error("ApiTypes.string_value returned wrong value")
 		quit(1)
