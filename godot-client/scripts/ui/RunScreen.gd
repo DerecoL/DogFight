@@ -32,6 +32,7 @@ var create_run_button: Button
 var nav_list: VBoxContainer
 var content_scroll: ScrollContainer
 var content: VBoxContainer
+var music_player: AudioStreamPlayer
 
 var me_data: Dictionary = {}
 var achievements_data: Dictionary = {}
@@ -70,6 +71,26 @@ func clear_error() -> void:
 		status_label.text = ""
 
 func _build_layout() -> void:
+	var background := TextureRect.new()
+	background.name = "Background"
+	background.set_anchors_preset(Control.PRESET_FULL_RECT)
+	background.texture = _texture("res://assets/backgrounds/storybook-dog-park.webp")
+	background.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	background.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	background.modulate = Color(0.55, 0.55, 0.55, 1.0)
+	add_child(background)
+
+	music_player = AudioStreamPlayer.new()
+	music_player.name = "BackgroundMusic"
+	if DisplayServer.get_name() != "headless" and FileAccess.file_exists("res://assets/audio/the-final-inventory.mp3"):
+		var audio := AudioStreamMP3.new()
+		audio.data = FileAccess.get_file_as_bytes("res://assets/audio/the-final-inventory.mp3")
+		music_player.stream = audio
+	music_player.volume_db = -18.0
+	add_child(music_player)
+	if music_player.stream != null:
+		music_player.play()
+
 	root = VBoxContainer.new()
 	root.name = "HubRoot"
 	root.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -324,6 +345,7 @@ func _render_inventory(run: Dictionary) -> void:
 			if item is Dictionary and str(item.get("area", "")) == area:
 				var item_label := _item_label(item)
 				var button := _button(item_label, 0)
+				_apply_button_icon(button, _item_texture(item))
 				button.pressed.connect(_select_item.bind(str(item.get("id", "")), item_label))
 				card.add_child(button)
 	for relic in _array(run, "relics"):
@@ -331,6 +353,7 @@ func _render_inventory(run: Dictionary) -> void:
 			var relic_def: Dictionary = _dict(relic, "def")
 			var label := "遗物：%s  %s" % [_fallback(str(relic_def.get("name", "")), str(relic.get("relicId", ""))), str(relic.get("quality", ""))]
 			var button := _button(label, 0)
+			_apply_button_icon(button, _relic_texture(relic))
 			button.pressed.connect(_select_relic.bind(str(relic.get("id", relic.get("relicId", ""))), label))
 			card.add_child(button)
 	if not selected_relic_id.is_empty():
@@ -343,7 +366,9 @@ func _render_map_or_shop(run: Dictionary) -> void:
 		var map_state: Dictionary = _dict(run, "mapState")
 		_add_line(card, "当前节点", str(map_state.get("currentNodeId", "无")))
 		for node in _available_map_nodes(map_state):
-			card.add_child(_action_button("前往 %s L%d-%d" % [str(node.get("kind", "UNKNOWN")), int(node.get("layer", 0)), int(node.get("column", 0))], _call_session.bind("select_map_node", [str(node.get("id", ""))])))
+			var node_button := _action_button("前往 %s L%d-%d" % [str(node.get("kind", "UNKNOWN")), int(node.get("layer", 0)), int(node.get("column", 0))], _call_session.bind("select_map_node", [str(node.get("id", ""))]))
+			_apply_button_icon(node_button, _map_texture(str(node.get("kind", ""))))
+			card.add_child(node_button)
 		card.add_child(_action_button("处理事件", _call_session.bind("resolve_map_event", [])))
 		card.add_child(_action_button("完成节点", _call_session.bind("complete_map_node", [])))
 		card.add_child(_action_button("领取怪物奖励", _call_session.bind("claim_monster_reward", [])))
@@ -354,7 +379,9 @@ func _render_map_or_shop(run: Dictionary) -> void:
 		shop_card.add_child(_action_button("刷新跑局商店", _call_session.bind("reroll_shop", [])))
 		for offer in _array(run, "shopItems"):
 			if offer is Dictionary:
-				shop_card.add_child(_action_button("%s  价格 %d" % [_offer_label(offer), int(offer.get("price", 0))], _call_session.bind("buy_offer", [str(offer.get("offerId", "")), "BAG"])))
+				var offer_button := _action_button("%s  价格 %d" % [_offer_label(offer), int(offer.get("price", 0))], _call_session.bind("buy_offer", [str(offer.get("offerId", "")), "BAG"]))
+				_apply_button_icon(offer_button, _offer_texture(offer))
+				shop_card.add_child(offer_button)
 
 func _render_achievements_tab() -> void:
 	var card := _section("成就")
@@ -711,6 +738,41 @@ func _item_label(item: Dictionary) -> String:
 func _offer_label(offer: Dictionary) -> String:
 	var def: Dictionary = _dict(offer, "def")
 	return "%s  %s" % [_fallback(str(def.get("name", "")), str(offer.get("defId", offer.get("offerId", "")))), str(offer.get("quality", ""))]
+
+func _item_texture(item: Dictionary) -> Texture2D:
+	return _sticker_texture(str(item.get("defId", "")))
+
+func _offer_texture(offer: Dictionary) -> Texture2D:
+	return _sticker_texture(str(offer.get("defId", "")))
+
+func _relic_texture(relic: Dictionary) -> Texture2D:
+	return _sticker_texture(str(relic.get("relicId", "")))
+
+func _sticker_texture(asset_id: String) -> Texture2D:
+	if asset_id.is_empty():
+		return _texture("res://assets/sticker-icons/starter-1.webp")
+	var texture := _texture("res://assets/sticker-icons/%s.webp" % asset_id)
+	return texture if texture != null else _texture("res://assets/sticker-icons/starter-1.webp")
+
+func _map_texture(kind: String) -> Texture2D:
+	var key := kind.to_lower().replace("_", "-")
+	var path := "res://assets/map-icons/%s.webp" % key
+	var texture := _texture(path)
+	return texture if texture != null else _texture("res://assets/map-icons/event.webp")
+
+func _texture(path: String) -> Texture2D:
+	if not FileAccess.file_exists(path):
+		return null
+	var image := Image.new()
+	if image.load(path) != OK:
+		return null
+	return ImageTexture.create_from_image(image)
+
+func _apply_button_icon(button: Button, texture: Texture2D) -> void:
+	if texture == null:
+		return
+	button.icon = texture
+	button.expand_icon = true
 
 func _section(title: String) -> VBoxContainer:
 	var panel := PanelContainer.new()
