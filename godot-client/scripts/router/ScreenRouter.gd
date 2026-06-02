@@ -33,8 +33,10 @@ func show_screen(screen_id: String, add_to_back_stack := true) -> void:
 	if add_to_back_stack and current_screen_id.length() > 0 and current_screen_id != screen_id:
 		back_stack.append(current_screen_id)
 	if not add_to_back_stack:
-		while not back_stack.is_empty() and back_stack.back() == screen_id:
-			back_stack.pop_back()
+		back_stack.clear()
+	_display_screen(screen_id)
+
+func _display_screen(screen_id: String) -> void:
 	for id in screens.keys():
 		var node: CanvasItem = screens[id]
 		node.visible = id == screen_id
@@ -45,7 +47,7 @@ func go_back() -> bool:
 	if back_stack.is_empty():
 		return false
 	var previous := back_stack.pop_back()
-	show_screen(previous, false)
+	_display_screen(previous)
 	return true
 
 func clear_history() -> void:

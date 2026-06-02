@@ -55,6 +55,18 @@ func _init() -> void:
 		push_error("ScreenRouter added run transition to back stack when disabled")
 		quit(1)
 		return
+	router.clear_history()
+	router.show_screen("login", false)
+	router.show_screen("run")
+	router.show_screen("battle")
+	if not router.go_back() or router.current_screen_id != "run":
+		push_error("ScreenRouter failed first multi-step back navigation")
+		quit(1)
+		return
+	if not router.go_back() or router.current_screen_id != "login":
+		push_error("ScreenRouter failed second multi-step back navigation")
+		quit(1)
+		return
 	router.show_screen("login")
 	router.show_screen("run")
 	router.show_screen("battle")
