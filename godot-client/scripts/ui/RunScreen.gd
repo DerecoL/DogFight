@@ -3,6 +3,7 @@ extends Control
 const ApiClient := preload("res://scripts/api/ApiClient.gd")
 const ApiRoutes := preload("res://scripts/api/ApiRoutes.gd")
 
+const TAB_LOBBY := "大厅"
 const TAB_RUN := "跑局"
 const TAB_ACCOUNT := "账号"
 const TAB_ACHIEVEMENTS := "成就"
@@ -11,9 +12,10 @@ const TAB_SHOP := "商城"
 const TAB_LEADERBOARDS := "排行"
 const TAB_SEASON := "赛季"
 const TAB_ROOMS := "房间"
+const TAB_SETTINGS := "设置"
 
 var session: Node
-var current_tab := TAB_RUN
+var current_tab := TAB_LOBBY
 var action_in_progress := false
 var selected_item_id := ""
 var selected_item_label := ""
@@ -168,7 +170,7 @@ func _build_layout() -> void:
 
 func _render_shell() -> void:
 	_clear_children(nav_list)
-	for tab in [TAB_RUN, TAB_ACCOUNT, TAB_ACHIEVEMENTS, TAB_DAILY, TAB_SHOP, TAB_LEADERBOARDS, TAB_SEASON, TAB_ROOMS]:
+	for tab in [TAB_LOBBY, TAB_RUN, TAB_ACCOUNT, TAB_ACHIEVEMENTS, TAB_DAILY, TAB_SHOP, TAB_LEADERBOARDS, TAB_SEASON, TAB_ROOMS, TAB_SETTINGS]:
 		var button := _button(tab, 0)
 		button.custom_minimum_size = Vector2(0, 42)
 		button.disabled = action_in_progress
@@ -234,6 +236,8 @@ func _render_current_tab() -> void:
 		return
 	_clear_children(content)
 	match current_tab:
+		TAB_LOBBY:
+			_render_lobby_tab()
 		TAB_RUN:
 			_render_run_tab()
 		TAB_ACCOUNT:
@@ -250,6 +254,36 @@ func _render_current_tab() -> void:
 			_render_season_tab()
 		TAB_ROOMS:
 			_render_rooms_tab()
+		TAB_SETTINGS:
+			_render_settings_tab()
+
+func _render_lobby_tab() -> void:
+	var history := _section("模式大厅")
+	var best_run: Dictionary = _dict(history_data, "bestRun")
+	var total_wins := int(history_data.get("totalWins", 0))
+	var total_losses := int(history_data.get("totalLosses", 0))
+	var total_battles: int = max(1, total_wins + total_losses)
+	_add_line(history, "个人战绩", "%d 胜 / %d 负 · 共 %d 局 · 胜率 %d%%" % [total_wins, total_losses, int(history_data.get("totalRuns", 0)), int(round(float(total_wins) / float(total_battles) * 100.0))])
+	if best_run.is_empty():
+		_add_line(history, "最佳成绩", "暂无对局")
+	else:
+		_add_line(history, "最佳成绩", "%s · %d胜 %d负 · 第%d回合" % [str(best_run.get("dogType", "")), int(best_run.get("wins", 0)), int(best_run.get("losses", 0)), int(best_run.get("round", 0))])
+	var shortcuts := HBoxContainer.new()
+	shortcuts.add_theme_constant_override("separation", 8)
+	history.add_child(shortcuts)
+	shortcuts.add_child(_action_button("商城", _switch_tab.bind(TAB_SHOP)))
+	shortcuts.add_child(_action_button("成就", _switch_tab.bind(TAB_ACHIEVEMENTS)))
+	shortcuts.add_child(_action_button("个人设置", _switch_tab.bind(TAB_SETTINGS)))
+	shortcuts.add_child(_action_button("战绩详情", _show_history_modal))
+
+	var modes := _section("竞技方式")
+	var casual_label: String = "继续休闲模式" if _current_run_mode() == "CASUAL" else "开始休闲模式"
+	var ladder_label: String = "继续天梯模式" if _current_run_mode() == "LADDER" else "进入天梯模式"
+	modes.add_child(_mode_button("休闲模式", "标准跑局，完成后的狗可提交巅峰竞技场。", casual_label, _start_mode.bind("CASUAL")))
+	modes.add_child(_mode_button("天梯模式", "进入独立匹配池，整局结算赛季积分。", ladder_label, _start_mode.bind("LADDER")))
+	modes.add_child(_mode_button("多人房间", "创建、匹配、加入房间并查看多人战报。", "进入斗狗模式", _switch_tab.bind(TAB_ROOMS)))
+	modes.add_child(_mode_button("巅峰竞技场", "提交完成局并查看总榜/当日榜配置。", "进入巅峰模式", _switch_tab.bind(TAB_LEADERBOARDS)))
+	modes.add_child(_mode_button("新手引导", "保留网页版的新手路径入口，当前 Godot 以流程提示方式呈现。", "查看跑局操作", _switch_tab.bind(TAB_RUN)))
 
 func _render_account_tab() -> void:
 	var card := _section("账号面板")
@@ -280,6 +314,7 @@ func _render_account_tab() -> void:
 			var row := _button("%s  %s  %d-%d  第%d回合" % [str(run.get("mode", "")), str(run.get("status", "")), int(run.get("wins", 0)), int(run.get("losses", 0)), int(run.get("round", 0))], 0)
 			row.pressed.connect(_on_history_run_pressed.bind(str(run.get("id", ""))))
 			history_card.add_child(row)
+			history_card.add_child(_action_button("查看配置：" + str(run.get("id", "")), _show_snapshot_modal.bind(run, "历史对局配置")))
 
 func _render_run_tab() -> void:
 	var store: Object = _run_store()
@@ -465,7 +500,8 @@ func _render_leaderboards_tab() -> void:
 		_add_line(apex_card, board_name, "")
 		for entry in _array(leaderboards, board_name).slice(0, 20):
 			if entry is Dictionary:
-				_add_line(apex_card, "#%s" % str(entry.get("rank", "-")), "%s  %d-%d  第%d回合" % [str(entry.get("name", "")), int(entry.get("wins", 0)), int(entry.get("losses", 0)), int(entry.get("round", 0))])
+				var entry_label := "#%s  %s  %d-%d  第%d回合" % [str(entry.get("rank", "-")), str(entry.get("name", "")), int(entry.get("wins", 0)), int(entry.get("losses", 0)), int(entry.get("round", 0))]
+				apex_card.add_child(_action_button(entry_label, _show_snapshot_modal.bind(entry, "巅峰配置详情")))
 
 func _render_season_tab() -> void:
 	var card := _section("赛季")
@@ -507,6 +543,25 @@ func _render_rooms_tab() -> void:
 			var text := "%s 的房间  %s/%s  真人 %d/%d  存活 %d/%d" % [str(room.get("hostName", "")), str(room.get("status", "")), str(room.get("phase", "")), int(room.get("memberCount", 0)), int(room.get("maxPlayers", 0)), int(room.get("aliveCount", 0)), int(room.get("targetPlayerCount", 0))]
 			card.add_child(_action_button(text, _enter_or_view_room.bind(room_id, str(room.get("status", "")))))
 
+func _render_settings_tab() -> void:
+	var card := _section("个人设置 / 时装展示")
+	var equipped := _array(cosmetics_data, "equipped")
+	if equipped.is_empty():
+		_add_line(card, "当前外观", "全部使用默认外观")
+	else:
+		for item in equipped:
+			if item is Dictionary:
+				_add_line(card, str(item.get("slot", item.get("cosmeticType", ""))), str(item.get("name", item.get("catalogItemId", ""))))
+	card.add_child(_action_button("音乐：" + ("开" if music_player != null and music_player.playing else "关"), _toggle_music))
+	card.add_child(_action_button("刷新个人外观", _refresh_cosmetics))
+	var groups := _section("按类型选择外观")
+	for cosmetic_type in ["TITLE", "AVATAR", "BACKGROUND", "DOG_SKIN", "BATTLE_EFFECT"]:
+		_add_line(groups, cosmetic_type, "默认外观可直接恢复")
+		groups.add_child(_action_button("选择默认 " + cosmetic_type, _unequip_cosmetic.bind(cosmetic_type)))
+		for item in _array(cosmetics_data, "inventory"):
+			if item is Dictionary and str(item.get("type", item.get("cosmeticType", ""))) == cosmetic_type:
+				groups.add_child(_action_button("装备 %s" % str(item.get("name", item.get("catalogItemId", ""))), _equip_cosmetic.bind(str(item.get("catalogItemId", item.get("id", ""))))))
+
 func _on_create_run_pressed() -> void:
 	var dog_type := dog_type_select.get_item_text(dog_type_select.selected)
 	var mode := mode_select.get_item_text(mode_select.selected)
@@ -525,6 +580,28 @@ func _on_history_run_pressed(run_id: String) -> void:
 func _on_tab_pressed(tab: String) -> void:
 	current_tab = tab
 	_render_shell()
+
+func _switch_tab(tab: String) -> void:
+	current_tab = tab
+	_render_shell()
+
+func _current_run_mode() -> String:
+	var store: Object = _run_store()
+	if store == null or not store.has_method("has_run") or not store.has_run():
+		return ""
+	var run: Dictionary = store.get("run")
+	return str(run.get("mode", ""))
+
+func _start_mode(mode: String) -> void:
+	for index in range(mode_select.item_count):
+		if mode_select.get_item_text(index) == mode:
+			mode_select.select(index)
+			break
+	current_tab = TAB_RUN
+	if _current_run_mode() == mode:
+		_render_shell()
+		return
+	await _on_create_run_pressed()
 
 func _on_run_changed(_run: Dictionary) -> void:
 	_render_current_tab()
@@ -584,6 +661,20 @@ func _submit_apex_candidate(run_id: String) -> void:
 	if run_id.is_empty():
 		return
 	await _post_and_store(ApiRoutes.apex_submit(), {"runId": run_id}, "apex")
+
+func _refresh_cosmetics() -> void:
+	await _fetch_into("cosmetics", ApiRoutes.cosmetics_me())
+	_render_shell()
+
+func _toggle_music() -> void:
+	if music_player == null or music_player.stream == null:
+		status_label.text = "当前环境没有可播放音乐"
+		return
+	if music_player.playing:
+		music_player.stop()
+	else:
+		music_player.play()
+	_render_shell()
 
 func _refresh_rooms() -> void:
 	await _fetch_into("rooms", ApiRoutes.dogfight_rooms())
@@ -672,6 +763,103 @@ func _post_and_store(path: String, body: Dictionary, target: String) -> void:
 		"apex":
 			apex_data = _data(response)
 	_render_shell()
+
+func _show_history_modal() -> void:
+	var modal := _modal_panel("个人战绩详情", Vector2(560, 480))
+	if modal.is_empty():
+		return
+	var box: VBoxContainer = modal["box"]
+	_add_line(box, "总局数", "%d 局 · 完成 %d · 放弃 %d" % [int(history_data.get("totalRuns", 0)), int(history_data.get("completedRuns", 0)), int(history_data.get("abandonedRuns", 0))])
+	_add_line(box, "总胜负", "%d 胜 / %d 负" % [int(history_data.get("totalWins", 0)), int(history_data.get("totalLosses", 0))])
+	for run in _array(history_data, "recentRuns").slice(0, 12):
+		if run is Dictionary:
+			box.add_child(_action_button("%s  %s  %d-%d  第%d回合" % [str(run.get("mode", "")), str(run.get("dogType", "")), int(run.get("wins", 0)), int(run.get("losses", 0)), int(run.get("round", 0))], _show_snapshot_modal.bind(run, "历史对局配置")))
+	_push_modal(modal["panel"])
+
+func _show_snapshot_modal(snapshot: Dictionary, title: String) -> void:
+	var modal := _modal_panel(title, Vector2(620, 520))
+	if modal.is_empty():
+		return
+	var box: VBoxContainer = modal["box"]
+	_add_line(box, "战绩", "%s · %d胜 %d负 · 第%d回合" % [str(snapshot.get("dogType", snapshot.get("mode", ""))), int(snapshot.get("wins", 0)), int(snapshot.get("losses", 0)), int(snapshot.get("round", 0))])
+	if snapshot.has("name"):
+		_add_line(box, "名称", str(snapshot.get("name", "")))
+	if snapshot.has("rank"):
+		_add_line(box, "排名", "#%s · 防守连胜 %d" % [str(snapshot.get("rank", "-")), int(snapshot.get("challengeWins", 0))])
+	_render_snapshot_items(box, "装备栏", _filter_area(_array(snapshot, "items"), "EQUIPMENT"))
+	_render_snapshot_items(box, "背包", _filter_area(_array(snapshot, "items"), "BAG"))
+	var relics := _array(snapshot, "relics")
+	_add_line(box, "遗物", "%d 个" % relics.size())
+	for relic in relics.slice(0, 10):
+		if relic is Dictionary:
+			var relic_def: Dictionary = _dict(relic, "def")
+			_add_line(box, "", "%s  %s" % [_fallback(str(relic_def.get("name", "")), str(relic.get("relicId", ""))), str(relic.get("quality", ""))])
+	_push_modal(modal["panel"])
+
+func _render_snapshot_items(parent: VBoxContainer, title: String, items: Array) -> void:
+	_add_line(parent, title, "%d 件" % items.size())
+	for item in items.slice(0, 12):
+		if item is Dictionary:
+			var def: Dictionary = _dict(item, "def")
+			_add_line(parent, "", "%s  %s  (%d,%d)" % [_fallback(str(def.get("name", "")), str(item.get("defId", item.get("id", "")))), str(item.get("quality", "")), int(item.get("x", 0)), int(item.get("y", 0))])
+
+func _filter_area(items: Array, area: String) -> Array:
+	var result: Array = []
+	for item in items:
+		if item is Dictionary and str(item.get("area", "")) == area:
+			result.append(item)
+	return result
+
+func _modal_panel(title: String, size: Vector2) -> Dictionary:
+	if _modal_stack() == null:
+		_show_error("弹窗层未初始化")
+		return {}
+	var panel := PanelContainer.new()
+	panel.custom_minimum_size = size
+	panel.set_anchors_preset(Control.PRESET_CENTER)
+	panel.offset_left = -size.x / 2.0
+	panel.offset_right = size.x / 2.0
+	panel.offset_top = -size.y / 2.0
+	panel.offset_bottom = size.y / 2.0
+	var box := VBoxContainer.new()
+	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	box.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	box.add_theme_constant_override("separation", 8)
+	panel.add_child(box)
+	var header := HBoxContainer.new()
+	header.add_theme_constant_override("separation", 8)
+	box.add_child(header)
+	var label := Label.new()
+	label.text = title
+	label.custom_minimum_size = Vector2(0, 36)
+	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	header.add_child(label)
+	header.add_child(_action_button("关闭", _close_top_modal))
+	var scroll := ScrollContainer.new()
+	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	box.add_child(scroll)
+	var body := VBoxContainer.new()
+	body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	body.add_theme_constant_override("separation", 8)
+	scroll.add_child(body)
+	return {"panel": panel, "box": body}
+
+func _push_modal(panel: Node) -> void:
+	var stack: Object = _modal_stack()
+	if stack != null and stack.has_method("push_modal"):
+		stack.call("push_modal", panel, true)
+
+func _close_top_modal() -> void:
+	var stack: Object = _modal_stack()
+	if stack != null and stack.has_method("pop_modal"):
+		stack.call("pop_modal")
+
+func _modal_stack() -> Object:
+	if session == null:
+		return null
+	return session.get("modal_stack")
 
 func _select_item(item_id: String, label: String) -> void:
 	selected_item_id = item_id
@@ -847,6 +1035,14 @@ func _action_button(text: String, handler: Callable) -> Button:
 	var button := _button(text, 0)
 	button.disabled = action_in_progress
 	button.pressed.connect(handler)
+	return button
+
+func _mode_button(title: String, description: String, action_label: String, handler: Callable) -> Button:
+	var button := _button("%s\n%s\n%s" % [title, description, action_label], 0)
+	button.custom_minimum_size = Vector2(0, 78)
+	button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	button.pressed.connect(handler)
+	button.disabled = action_in_progress
 	return button
 
 func _update_controls() -> void:
