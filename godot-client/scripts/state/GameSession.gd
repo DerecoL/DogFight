@@ -444,6 +444,12 @@ func _show_battle_screen(battle: Dictionary) -> void:
 		router.show_screen("battle")
 	var battle_screen := get_node_or_null("ScreenRoot/BattleReplayScreen")
 	if battle_screen != null and battle_screen.has_method("start_replay"):
+		if battle_screen.has_method("configure_cosmetics"):
+			var run_screen := get_node_or_null("ScreenRoot/RunScreen")
+			if run_screen != null:
+				var cosmetics = run_screen.get("cosmetics_data")
+				if cosmetics is Dictionary:
+					battle_screen.configure_cosmetics(cosmetics)
 		battle_screen.start_replay(battle)
 
 func _on_run_changed_for_screen(_run: Dictionary) -> void:

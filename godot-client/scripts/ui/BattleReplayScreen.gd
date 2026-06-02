@@ -15,6 +15,7 @@ signal replay_finished
 
 var session: Node
 var battle: Dictionary = {}
+var cosmetics_data: Dictionary = {}
 var events: Array = []
 var displayed_events: Array = []
 var event_index := 0
@@ -56,6 +57,9 @@ func bind_session(next_session: Node) -> void:
 	if session != null and session.has_signal("error_raised") and not session.error_raised.is_connected(_on_error_raised):
 		session.error_raised.connect(_on_error_raised)
 
+func configure_cosmetics(next_cosmetics: Dictionary) -> void:
+	cosmetics_data = next_cosmetics.duplicate(true)
+
 func _ready() -> void:
 	_build_battle_layout()
 	_connect_button_once(play_button, _on_play_pressed)
@@ -90,7 +94,7 @@ func _render_initial_hp() -> void:
 	opponent_hp.max_value = int(battle.get("opponentMaxHp", 100))
 	player_hp.value = player_hp.max_value
 	opponent_hp.value = opponent_hp.max_value
-	dice_label.text = "骰点 -"
+	dice_label.text = "骰点 -%s" % _battle_effect_suffix()
 	_update_battle_meta({})
 
 func _on_play_pressed() -> void:
@@ -134,7 +138,7 @@ func _apply_event(event: Dictionary) -> void:
 	player_hp.value = int(event.get("playerHp", player_hp.value))
 	opponent_hp.value = int(event.get("opponentHp", opponent_hp.value))
 	if event.has("roll"):
-		dice_label.text = "骰点 %s" % str(event.get("roll"))
+		dice_label.text = "骰点 %s%s" % [str(event.get("roll")), _battle_effect_suffix()]
 	displayed_events.append(event.duplicate(true))
 	_render_event_stage(event)
 	_update_battle_meta(event)
@@ -302,10 +306,10 @@ func _snapshot_panel(title: String) -> Dictionary:
 func _render_snapshots() -> void:
 	var player: Dictionary = _dict(battle, "playerSnapshot")
 	var opponent: Dictionary = _dict(battle, "opponentSnapshot")
-	_render_snapshot(player_name_label, player_avatar, player_equipment_grid, player_relic_row, player, "你的狗狗", player_item_buttons)
-	_render_snapshot(opponent_name_label, opponent_avatar, opponent_equipment_grid, opponent_relic_row, opponent, "离线狗狗", opponent_item_buttons)
+	_render_snapshot(player_name_label, player_avatar, player_equipment_grid, player_relic_row, player, "你的狗狗", player_item_buttons, "player")
+	_render_snapshot(opponent_name_label, opponent_avatar, opponent_equipment_grid, opponent_relic_row, opponent, "离线狗狗", opponent_item_buttons, "opponent")
 
-func _render_snapshot(name_label: Label, avatar: TextureRect, grid: GridContainer, relic_row: HBoxContainer, snapshot: Dictionary, fallback_name: String, button_map: Dictionary) -> void:
+func _render_snapshot(name_label: Label, avatar: TextureRect, grid: GridContainer, relic_row: HBoxContainer, snapshot: Dictionary, fallback_name: String, button_map: Dictionary, side: String) -> void:
 	if name_label == null or grid == null or relic_row == null:
 		return
 	var dog_type := str(snapshot.get("dogType", ""))
@@ -318,6 +322,7 @@ func _render_snapshot(name_label: Label, avatar: TextureRect, grid: GridContaine
 	]
 	if avatar != null:
 		avatar.texture = _dog_texture(dog_type)
+		avatar.modulate = _dog_skin_tint(dog_type, side)
 	_clear_children(grid)
 	button_map.clear()
 	var items: Array = _array(snapshot, "items")
@@ -349,12 +354,13 @@ func _render_event_stage(event: Dictionary) -> void:
 	if stage_label == null:
 		return
 	if event.is_empty():
-		stage_label.text = "自动战斗\n准备播放战斗结果"
+		stage_label.text = "自动战斗%s\n准备播放战斗结果" % _battle_effect_suffix()
 		return
-	stage_label.text = "%ss · %s · %s\n%s" % [
+	stage_label.text = "%ss · %s · %s%s\n%s" % [
 		str(event.get("time", "0")),
 		str(event.get("actor", "system")),
 		str(event.get("kind", "")),
+		_battle_effect_suffix(),
 		str(event.get("text", "")),
 	]
 
@@ -671,6 +677,56 @@ func _array(source: Dictionary, key: String) -> Array:
 	var value: Variant = source.get(key, [])
 	return value if value is Array else []
 
+func _cosmetic_item(raw_item: Dictionary) -> Dictionary:
+	var nested: Dictionary = _dict(raw_item, "item")
+	if nested.is_empty():
+		return raw_item
+	var merged := nested.duplicate(true)
+	for key in ["catalogItemId", "owned", "equipped"]:
+		if raw_item.has(key) and not merged.has(key):
+			merged[key] = raw_item.get(key)
+	return merged
+
+func _cosmetic_catalog_id(raw_item: Dictionary) -> String:
+	var item := _cosmetic_item(raw_item)
+	return _fallback(str(item.get("id", "")), str(raw_item.get("catalogItemId", "")))
+
+func _cosmetic_display_name(raw_item: Dictionary) -> String:
+	var item := _cosmetic_item(raw_item)
+	return _fallback(str(item.get("name", "")), _cosmetic_catalog_id(raw_item))
+
+func _equipped_cosmetic(cosmetic_type: String) -> Dictionary:
+	for entry in _array(cosmetics_data, "equipped"):
+		if entry is Dictionary and str(entry.get("slot", entry.get("cosmeticType", ""))) == cosmetic_type:
+			return _cosmetic_item(entry)
+	return {}
+
+func _battle_effect_suffix() -> String:
+	var effect := _equipped_cosmetic("BATTLE_EFFECT")
+	if effect.is_empty():
+		return ""
+	return " · %s" % _cosmetic_display_name(effect)
+
+func _battle_effect_color() -> Color:
+	match _cosmetic_catalog_id(_equipped_cosmetic("BATTLE_EFFECT")):
+		"fx-aurora-roll":
+			return Color(0.58, 0.82, 1.0, 1.0)
+		"fx-gold-dice":
+			return Color(1.0, 0.82, 0.24, 1.0)
+		_:
+			return Color(1.0, 0.92, 0.42, 1.0)
+
+func _dog_skin_tint(dog_type: String, side: String) -> Color:
+	if side != "player":
+		return Color.WHITE
+	match _cosmetic_catalog_id(_equipped_cosmetic("DOG_SKIN")):
+		"skin-shiba-scarf":
+			return Color(1.0, 0.82, 0.66, 1.0) if dog_type == "SHIBA" else Color.WHITE
+		"skin-samoyed-snow":
+			return Color(0.74, 0.92, 1.0, 1.0) if dog_type == "SAMOYED" else Color.WHITE
+		_:
+			return Color.WHITE
+
 func _clear_children(container: Node) -> void:
 	for child in container.get_children():
 		container.remove_child(child)
@@ -741,7 +797,7 @@ func _play_event_effect(event: Dictionary) -> void:
 	var actor := str(event.get("actor", "system")).to_lower()
 	dice_label.pivot_offset = dice_label.size / 2.0
 	dice_label.scale = Vector2(1.12, 1.12)
-	dice_label.modulate = Color(1.0, 0.92, 0.42, 1.0)
+	dice_label.modulate = _battle_effect_color()
 	var tween := create_tween()
 	tween.set_parallel(true)
 	tween.tween_property(dice_label, "scale", Vector2.ONE, 0.18)
