@@ -46,6 +46,8 @@ var player_reservoir_label: Label
 var opponent_reservoir_label: Label
 var player_item_buttons := {}
 var opponent_item_buttons := {}
+var player_item_state_markers := {}
+var opponent_item_state_markers := {}
 var speed_buttons := {}
 var review_panel: PanelContainer
 var review_title_label: Label
@@ -107,6 +109,7 @@ func _render_initial_hp() -> void:
 	dice_label.text = "骰点 -%s" % _battle_effect_suffix()
 	current_player_statuses = {}
 	current_opponent_statuses = {}
+	_reset_battle_item_state_markers()
 	_update_battle_meta({})
 
 func _on_play_pressed() -> void:
@@ -394,6 +397,7 @@ func _render_snapshot(name_label: Label, avatar: TextureRect, grid: GridContaine
 		_apply_button_icon(button, _battle_item_texture(item))
 		if not item.is_empty():
 			button_map[str(item.get("id", ""))] = button
+			button.set_meta("base_text", button.text)
 			button.pressed.connect(_show_battle_item_modal.bind(item, side))
 		grid.add_child(button)
 	_clear_children(relic_row)
@@ -572,6 +576,8 @@ func _format_reservoirs(reservoirs: Array) -> String:
 func _highlight_event_items(event: Dictionary) -> void:
 	_reset_item_highlights(player_item_buttons)
 	_reset_item_highlights(opponent_item_buttons)
+	_update_event_item_state_markers(event)
+	_refresh_battle_item_state_labels()
 	var item_id := str(event.get("itemId", ""))
 	if item_id.is_empty():
 		return
@@ -591,6 +597,88 @@ func _highlight_item_button(button_map: Dictionary, item_id: String, color: Colo
 	var button = button_map.get(item_id, null)
 	if button is Button:
 		button.modulate = color
+
+func _reset_battle_item_state_markers() -> void:
+	player_item_state_markers.clear()
+	opponent_item_state_markers.clear()
+	_refresh_battle_item_state_labels()
+
+func _update_event_item_state_markers(event: Dictionary) -> void:
+	_clear_battle_item_marker_kind("reservoir")
+	var actor_side := _review_side(str(event.get("actor", "")))
+	var boom_item_id := str(event.get("boomCounterItemId", ""))
+	if not boom_item_id.is_empty():
+		_set_battle_item_marker(actor_side, boom_item_id, "boom", "爆鸣 %d/%d" % [
+			int(event.get("boomCounterValue", 0)),
+			int(event.get("boomCounterMax", 50)),
+		])
+	var freeze_item_id := str(event.get("freezeStackItemId", ""))
+	if not freeze_item_id.is_empty():
+		_set_battle_item_marker(actor_side, freeze_item_id, "freeze", "冻结 %d/%d" % [
+			int(event.get("freezeStackValue", 0)),
+			int(event.get("freezeStackMax", 10)),
+		])
+	var reservoirs: Dictionary = _dict(event, "reservoirs")
+	for side in ["player", "opponent"]:
+		for raw_reservoir in _array(reservoirs, side):
+			if not raw_reservoir is Dictionary:
+				continue
+			var reservoir: Dictionary = raw_reservoir
+			var reservoir_item_id := str(reservoir.get("itemId", ""))
+			if reservoir_item_id.is_empty():
+				continue
+			var progress := float(reservoir.get("progress", 0.0))
+			var duration := float(reservoir.get("duration", 1.0))
+			var ratio := progress
+			if progress > 1.0 and duration > 0.0:
+				ratio = progress / duration
+			_set_battle_item_marker(side, reservoir_item_id, "reservoir", "蓄水 %.0f%%" % (clamp(ratio, 0.0, 1.0) * 100.0))
+
+func _set_battle_item_marker(preferred_side: String, item_id: String, marker_key: String, marker_text: String) -> void:
+	var state_map := _battle_item_state_map_for(preferred_side, item_id)
+	if state_map == null:
+		return
+	var markers: Dictionary = state_map.get(item_id, {})
+	markers[marker_key] = marker_text
+	state_map[item_id] = markers
+
+func _clear_battle_item_marker_kind(marker_key: String) -> void:
+	for state_map in [player_item_state_markers, opponent_item_state_markers]:
+		for item_id in state_map.keys():
+			var markers: Dictionary = state_map.get(item_id, {})
+			if markers.has(marker_key):
+				markers.erase(marker_key)
+				if markers.is_empty():
+					state_map.erase(item_id)
+				else:
+					state_map[item_id] = markers
+
+func _battle_item_state_map_for(preferred_side: String, item_id: String) -> Dictionary:
+	if preferred_side == "player" and player_item_buttons.has(item_id):
+		return player_item_state_markers
+	if preferred_side == "opponent" and opponent_item_buttons.has(item_id):
+		return opponent_item_state_markers
+	if player_item_buttons.has(item_id):
+		return player_item_state_markers
+	if opponent_item_buttons.has(item_id):
+		return opponent_item_state_markers
+	return {}
+
+func _refresh_battle_item_state_labels() -> void:
+	for item_id in player_item_buttons.keys():
+		_refresh_battle_item_button_label(player_item_buttons[item_id], _dict(player_item_state_markers, str(item_id)))
+	for item_id in opponent_item_buttons.keys():
+		_refresh_battle_item_button_label(opponent_item_buttons[item_id], _dict(opponent_item_state_markers, str(item_id)))
+
+func _refresh_battle_item_button_label(button: Variant, markers: Dictionary) -> void:
+	if not button is Button:
+		return
+	var base_text := str((button as Button).get_meta("base_text", (button as Button).text))
+	var parts: Array[String] = [base_text]
+	for marker_key in ["boom", "freeze", "reservoir"]:
+		if markers.has(marker_key):
+			parts.append(str(markers.get(marker_key, "")))
+	(button as Button).text = "\n".join(parts)
 
 func _render_battle_review() -> void:
 	if review_panel == null:

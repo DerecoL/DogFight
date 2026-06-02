@@ -1,0 +1,123 @@
+extends SceneTree
+
+func _init() -> void:
+	_run()
+
+func _run() -> void:
+	var main_scene := load("res://scenes/Main.tscn")
+	if main_scene == null:
+		_fail("Main scene failed to load")
+		return
+	var main = main_scene.instantiate()
+	root.add_child(main)
+	await process_frame
+	await process_frame
+	var battle_screen = main.get_node_or_null("ScreenRoot/BattleReplayScreen")
+	if battle_screen == null:
+		_fail("BattleReplayScreen is missing")
+		return
+	battle_screen.start_replay({
+		"playerMaxHp": 100,
+		"opponentMaxHp": 100,
+		"winner": "player",
+		"events": [_boom_event(), _freeze_event(), _reservoir_event()],
+		"playerSnapshot": _snapshot("player"),
+		"opponentSnapshot": _snapshot("opponent"),
+	})
+	battle_screen.call("_apply_event", _boom_event())
+	battle_screen.call("_apply_event", _freeze_event())
+	battle_screen.call("_apply_event", _reservoir_event())
+	await process_frame
+	var text := _collect_text(battle_screen)
+	for part in ["爆鸣 25/50", "冻结 4/10", "蓄水 60%"]:
+		if not text.contains(part):
+			_fail("Battle item state marker missing: %s" % part)
+			return
+	main.queue_free()
+	for _frame in range(5):
+		await process_frame
+	print("Godot battle item state markers smoke passed")
+	quit(0)
+
+func _boom_event() -> Dictionary:
+	return _event({
+		"itemId": "boom-item",
+		"boomCounterItemId": "boom-item",
+		"boomCounterValue": 25,
+		"boomCounterMax": 50,
+		"boomCounterChanged": true,
+	})
+
+func _freeze_event() -> Dictionary:
+	return _event({
+		"itemId": "freeze-item",
+		"freezeStackItemId": "freeze-item",
+		"freezeStackValue": 4,
+		"freezeStackMax": 10,
+		"freezeStackChanged": true,
+	})
+
+func _reservoir_event() -> Dictionary:
+	return _event({
+		"itemId": "reservoir-item",
+		"reservoirs": {
+			"player": [{"itemId": "reservoir-item", "progress": 0.6, "duration": 1.0}],
+			"opponent": [],
+		},
+	})
+
+func _event(extra: Dictionary) -> Dictionary:
+	var event := {
+		"time": 1.0,
+		"actor": "player",
+		"kind": "ITEM",
+		"text": "装备状态测试",
+		"effectType": "UTILITY",
+		"playerHp": 100,
+		"opponentHp": 100,
+		"playerMaxHp": 100,
+		"opponentMaxHp": 100,
+	}
+	for key in extra.keys():
+		event[key] = extra[key]
+	return event
+
+func _snapshot(name: String) -> Dictionary:
+	return {
+		"name": name,
+		"dogType": "SHIBA",
+		"wins": 0,
+		"losses": 0,
+		"round": 1,
+		"items": [
+			_item("boom-item", "starter-1", 0, "爆鸣牙咬"),
+			_item("freeze-item", "starter-2", 1, "冻结冰牙"),
+			_item("reservoir-item", "starter-3", 2, "蓄水鼓"),
+		] if name == "player" else [],
+		"relics": [],
+	}
+
+func _item(id: String, def_id: String, x: int, name: String) -> Dictionary:
+	return {
+		"id": id,
+		"defId": def_id,
+		"quality": "BRONZE",
+		"area": "EQUIPMENT",
+		"x": x,
+		"y": 0,
+		"def": {"name": name, "size": 1},
+	}
+
+func _collect_text(node: Node) -> String:
+	var text := ""
+	if node is Label:
+		text += (node as Label).text + "\n"
+	if node is Button:
+		text += (node as Button).text + "\n"
+	for child in node.get_children():
+		text += _collect_text(child)
+	return text
+
+func _fail(message: String) -> void:
+	push_error(message)
+	quit(1)

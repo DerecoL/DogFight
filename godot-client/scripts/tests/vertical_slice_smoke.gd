@@ -14,7 +14,7 @@ func _run() -> void:
 	root.add_child(api)
 	await process_frame
 
-	var account := "godot-smoke-%d" % Time.get_unix_time_from_system()
+	var account := "godot-smoke-%d-%d" % [Time.get_unix_time_from_system(), Time.get_ticks_usec()]
 	await _expect_ok(await api.post_json("/auth/register", {"account": account, "password": "dogdice"}), "register")
 	await _expect_ok(await api.post_json("/profile/nickname", {"nickname": "Godot烟测"}), "set nickname")
 	var create_response: Dictionary = await _expect_ok(await api.post_json("/runs", {"dogType": "SHIBA", "mode": "CASUAL"}), "create run")
