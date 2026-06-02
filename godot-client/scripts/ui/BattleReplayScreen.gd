@@ -33,6 +33,14 @@ var player_relic_row: HBoxContainer
 var opponent_relic_row: HBoxContainer
 var player_avatar: TextureRect
 var opponent_avatar: TextureRect
+var player_shield_label: Label
+var opponent_shield_label: Label
+var player_status_label: Label
+var opponent_status_label: Label
+var player_reservoir_label: Label
+var opponent_reservoir_label: Label
+var player_item_buttons := {}
+var opponent_item_buttons := {}
 var log_toggle_button: Button
 var log_filter_row: HBoxContainer
 
@@ -76,6 +84,7 @@ func _render_initial_hp() -> void:
 	player_hp.value = player_hp.max_value
 	opponent_hp.value = opponent_hp.max_value
 	dice_label.text = "骰点 -"
+	_update_battle_meta({})
 
 func _on_play_pressed() -> void:
 	if playing:
@@ -121,6 +130,8 @@ func _apply_event(event: Dictionary) -> void:
 		dice_label.text = "骰点 %s" % str(event.get("roll"))
 	displayed_events.append(event.duplicate(true))
 	_render_event_stage(event)
+	_update_battle_meta(event)
+	_highlight_event_items(event)
 	_refresh_log_view()
 	_play_event_effect(event)
 
@@ -152,6 +163,9 @@ func _build_battle_layout() -> void:
 	var opponent_panel := _snapshot_panel("对手装备栏")
 	opponent_name_label = opponent_panel["name"]
 	opponent_avatar = opponent_panel["avatar"]
+	opponent_shield_label = opponent_panel["shield"]
+	opponent_status_label = opponent_panel["statuses"]
+	opponent_reservoir_label = opponent_panel["reservoirs"]
 	opponent_equipment_grid = opponent_panel["grid"]
 	opponent_relic_row = opponent_panel["relics"]
 	root.add_child(opponent_panel["panel"])
@@ -160,6 +174,9 @@ func _build_battle_layout() -> void:
 	var player_panel := _snapshot_panel("你的装备栏")
 	player_name_label = player_panel["name"]
 	player_avatar = player_panel["avatar"]
+	player_shield_label = player_panel["shield"]
+	player_status_label = player_panel["statuses"]
+	player_reservoir_label = player_panel["reservoirs"]
 	player_equipment_grid = player_panel["grid"]
 	player_relic_row = player_panel["relics"]
 	root.add_child(player_panel["panel"])
@@ -206,6 +223,21 @@ func _snapshot_panel(title: String) -> Dictionary:
 	name_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	name_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	header.add_child(name_label)
+	var shield_label := Label.new()
+	shield_label.text = "护盾 0"
+	shield_label.custom_minimum_size = Vector2(0, 24)
+	shield_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	box.add_child(shield_label)
+	var statuses := Label.new()
+	statuses.text = "状态：无"
+	statuses.custom_minimum_size = Vector2(0, 34)
+	statuses.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(statuses)
+	var reservoirs := Label.new()
+	reservoirs.text = "蓄水池：无"
+	reservoirs.custom_minimum_size = Vector2(0, 28)
+	reservoirs.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(reservoirs)
 	var grid := GridContainer.new()
 	grid.columns = 12
 	grid.add_theme_constant_override("h_separation", 4)
@@ -214,15 +246,15 @@ func _snapshot_panel(title: String) -> Dictionary:
 	var relics := HBoxContainer.new()
 	relics.add_theme_constant_override("separation", 4)
 	box.add_child(relics)
-	return {"panel": panel, "name": name_label, "avatar": avatar, "grid": grid, "relics": relics}
+	return {"panel": panel, "name": name_label, "avatar": avatar, "shield": shield_label, "statuses": statuses, "reservoirs": reservoirs, "grid": grid, "relics": relics}
 
 func _render_snapshots() -> void:
 	var player: Dictionary = _dict(battle, "playerSnapshot")
 	var opponent: Dictionary = _dict(battle, "opponentSnapshot")
-	_render_snapshot(player_name_label, player_avatar, player_equipment_grid, player_relic_row, player, "你的狗狗")
-	_render_snapshot(opponent_name_label, opponent_avatar, opponent_equipment_grid, opponent_relic_row, opponent, "离线狗狗")
+	_render_snapshot(player_name_label, player_avatar, player_equipment_grid, player_relic_row, player, "你的狗狗", player_item_buttons)
+	_render_snapshot(opponent_name_label, opponent_avatar, opponent_equipment_grid, opponent_relic_row, opponent, "离线狗狗", opponent_item_buttons)
 
-func _render_snapshot(name_label: Label, avatar: TextureRect, grid: GridContainer, relic_row: HBoxContainer, snapshot: Dictionary, fallback_name: String) -> void:
+func _render_snapshot(name_label: Label, avatar: TextureRect, grid: GridContainer, relic_row: HBoxContainer, snapshot: Dictionary, fallback_name: String, button_map: Dictionary) -> void:
 	if name_label == null or grid == null or relic_row == null:
 		return
 	var dog_type := str(snapshot.get("dogType", ""))
@@ -236,6 +268,7 @@ func _render_snapshot(name_label: Label, avatar: TextureRect, grid: GridContaine
 	if avatar != null:
 		avatar.texture = _dog_texture(dog_type)
 	_clear_children(grid)
+	button_map.clear()
 	var items: Array = _array(snapshot, "items")
 	for x in range(_battle_slot_count(snapshot)):
 		var item: Dictionary = _item_at_slot(items, "EQUIPMENT", x)
@@ -246,6 +279,8 @@ func _render_snapshot(name_label: Label, avatar: TextureRect, grid: GridContaine
 		button.text = str(x + 1) if item.is_empty() else _battle_item_label(item)
 		button.disabled = item.is_empty()
 		_apply_button_icon(button, _battle_item_texture(item))
+		if not item.is_empty():
+			button_map[str(item.get("id", ""))] = button
 		grid.add_child(button)
 	_clear_children(relic_row)
 	for relic in _array(snapshot, "relics").slice(0, 8):
@@ -336,6 +371,83 @@ func _log_filter_label(filter: String) -> String:
 			return "装备"
 		_:
 			return "全部"
+
+func _update_battle_meta(event: Dictionary) -> void:
+	if player_shield_label != null:
+		player_shield_label.text = "护盾 %d" % int(event.get("playerShield", 0))
+	if opponent_shield_label != null:
+		opponent_shield_label.text = "护盾 %d" % int(event.get("opponentShield", 0))
+	if player_status_label != null:
+		player_status_label.text = "状态：%s" % _format_status_rows(_dict(event, "playerStatuses"))
+	if opponent_status_label != null:
+		opponent_status_label.text = "状态：%s" % _format_status_rows(_dict(event, "opponentStatuses"))
+	var reservoirs: Dictionary = _dict(event, "reservoirs")
+	if player_reservoir_label != null:
+		player_reservoir_label.text = "蓄水池：%s" % _format_reservoirs(_array(reservoirs, "player"))
+	if opponent_reservoir_label != null:
+		opponent_reservoir_label.text = "蓄水池：%s" % _format_reservoirs(_array(reservoirs, "opponent"))
+
+func _format_status_rows(rows: Dictionary) -> String:
+	var parts: Array[String] = []
+	for status in _array(rows, "positive"):
+		if status is Dictionary:
+			parts.append(_format_status_entry(status))
+	for status in _array(rows, "negative"):
+		if status is Dictionary:
+			parts.append(_format_status_entry(status))
+	if parts.is_empty():
+		return "无"
+	return " · ".join(parts.slice(0, 5))
+
+func _format_status_entry(status: Dictionary) -> String:
+	var text := str(status.get("label", status.get("type", "状态")))
+	var amount := int(status.get("amount", 0))
+	var stacks := int(status.get("stacks", 0))
+	var remaining := int(status.get("remaining", 0))
+	if amount > 0:
+		text += " %d" % amount
+	if stacks > 0:
+		text += "x%d" % stacks
+	if remaining > 0:
+		text += "(%d)" % remaining
+	return text
+
+func _format_reservoirs(reservoirs: Array) -> String:
+	if reservoirs.is_empty():
+		return "无"
+	var parts: Array[String] = []
+	for reservoir in reservoirs.slice(0, 4):
+		if reservoir is Dictionary:
+			var progress := float(reservoir.get("progress", 0.0))
+			var duration := float(reservoir.get("duration", 1.0))
+			var ratio := progress
+			if progress > 1.0 and duration > 0.0:
+				ratio = progress / duration
+			parts.append("%s %.0f%%" % [str(reservoir.get("itemId", "蓄水池")), clamp(ratio, 0.0, 1.0) * 100.0])
+	return " · ".join(parts)
+
+func _highlight_event_items(event: Dictionary) -> void:
+	_reset_item_highlights(player_item_buttons)
+	_reset_item_highlights(opponent_item_buttons)
+	var item_id := str(event.get("itemId", ""))
+	if item_id.is_empty():
+		return
+	var actor := str(event.get("actor", "")).to_lower()
+	if actor == "player":
+		_highlight_item_button(player_item_buttons, item_id, Color(1.0, 0.92, 0.38, 1.0))
+	elif actor == "opponent":
+		_highlight_item_button(opponent_item_buttons, item_id, Color(1.0, 0.55, 0.48, 1.0))
+
+func _reset_item_highlights(button_map: Dictionary) -> void:
+	for key in button_map.keys():
+		var button = button_map[key]
+		if button is Button:
+			button.modulate = Color.WHITE
+
+func _highlight_item_button(button_map: Dictionary, item_id: String, color: Color) -> void:
+	var button = button_map.get(item_id, null)
+	if button is Button:
+		button.modulate = color
 
 func _dict(source: Dictionary, key: String) -> Dictionary:
 	var value: Variant = source.get(key, {})
