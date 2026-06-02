@@ -771,7 +771,7 @@ func _render_shop_tab() -> void:
 			if item is Dictionary:
 				var text := "%s  %s  %d" % [_cosmetic_display_name(item), _rarity_label(str(item.get("rarity", ""))), int(item.get("price", 0))]
 				if bool(item.get("owned", false)):
-					card.add_child(_action_button(("已装备 " if bool(item.get("equipped", false)) else "查看 ") + text, _show_cosmetic_modal.bind(item)))
+					card.add_child(_action_button(("已装备 " if _is_cosmetic_equipped(item) else "查看 ") + text, _show_cosmetic_modal.bind(item)))
 				else:
 					card.add_child(_action_button("查看 " + text, _show_cosmetic_modal.bind(item)))
 	var cosmetic_card := _section("已拥有外观")
@@ -875,18 +875,20 @@ func _render_settings_tab() -> void:
 	if equipped.is_empty():
 		_add_line(card, "当前外观", "全部使用默认外观")
 	else:
-		for item in equipped:
-			if item is Dictionary:
-				_add_line(card, str(item.get("slot", item.get("cosmeticType", ""))), str(item.get("name", item.get("catalogItemId", ""))))
+		for entry in equipped:
+			if entry is Dictionary:
+				var cosmetic_type := str(entry.get("slot", entry.get("cosmeticType", _cosmetic_type(entry))))
+				_add_line(card, _cosmetic_type_label(cosmetic_type), "%s · 已装备" % _cosmetic_display_name(entry))
 	card.add_child(_action_button("音乐：" + ("开" if music_player != null and music_player.playing else "关"), _toggle_music))
 	card.add_child(_action_button("刷新个人外观", _refresh_cosmetics))
 	var groups := _section("按类型选择外观")
 	for cosmetic_type in ["TITLE", "AVATAR", "BACKGROUND", "DOG_SKIN", "BATTLE_EFFECT"]:
-		_add_line(groups, cosmetic_type, "默认外观可直接恢复")
-		groups.add_child(_action_button("选择默认 " + cosmetic_type, _unequip_cosmetic.bind(cosmetic_type)))
+		var cosmetic_label := _cosmetic_type_label(cosmetic_type)
+		_add_line(groups, cosmetic_label, "默认外观可直接恢复")
+		groups.add_child(_action_button("选择默认 " + cosmetic_label, _unequip_cosmetic.bind(cosmetic_type)))
 		for item in _array(cosmetics_data, "inventory"):
 			if item is Dictionary and _cosmetic_type(item) == cosmetic_type:
-				groups.add_child(_action_button("查看 %s" % _cosmetic_display_name(item), _show_cosmetic_modal.bind(item)))
+				groups.add_child(_action_button(("%s %s" % ["已装备" if _is_cosmetic_equipped(item) else "查看", _cosmetic_display_name(item)]), _show_cosmetic_modal.bind(item)))
 
 func _on_create_run_pressed() -> void:
 	var dog_type := dog_type_select.get_item_text(dog_type_select.selected)
@@ -1627,6 +1629,7 @@ func _show_season_summary_modal(summary: Dictionary) -> void:
 func _show_cosmetic_modal(raw_item: Dictionary) -> void:
 	var item: Dictionary = _cosmetic_item(raw_item)
 	var title := _cosmetic_display_name(raw_item)
+	var is_equipped := _is_cosmetic_equipped(raw_item)
 	var modal := _modal_panel("外观详情", Vector2(520, 460))
 	if modal.is_empty():
 		return
@@ -1642,7 +1645,7 @@ func _show_cosmetic_modal(raw_item: Dictionary) -> void:
 	var catalog_item_id := _cosmetic_catalog_id(raw_item)
 	if not catalog_item_id.is_empty():
 		if bool(item.get("owned", raw_item.get("owned", false))):
-			if bool(item.get("equipped", raw_item.get("equipped", false))):
+			if is_equipped:
 				var equipped_button := _button("已装备", 120)
 				equipped_button.disabled = true
 				box.add_child(equipped_button)
@@ -1715,11 +1718,26 @@ func _cosmetic_type(raw_item: Dictionary) -> String:
 
 func _cosmetic_status_label(raw_item: Dictionary) -> String:
 	var item: Dictionary = _cosmetic_item(raw_item)
-	if bool(item.get("equipped", raw_item.get("equipped", false))):
+	if _is_cosmetic_equipped(raw_item):
 		return "已装备"
 	if bool(item.get("owned", raw_item.get("owned", false))):
 		return "已拥有"
 	return "未拥有"
+
+func _is_cosmetic_equipped(raw_item: Dictionary) -> bool:
+	var item: Dictionary = _cosmetic_item(raw_item)
+	if bool(item.get("equipped", raw_item.get("equipped", false))):
+		return true
+	var catalog_item_id := _cosmetic_catalog_id(raw_item)
+	if catalog_item_id.is_empty():
+		return false
+	for entry in _array(cosmetics_data, "equipped"):
+		if entry is Dictionary:
+			if str((entry as Dictionary).get("catalogItemId", "")) == catalog_item_id:
+				return true
+			if _cosmetic_catalog_id(entry) == catalog_item_id:
+				return true
+	return false
 
 func _cosmetic_type_label(cosmetic_type: String) -> String:
 	match cosmetic_type:
