@@ -861,7 +861,7 @@ func _show_battle_status_modal(side: String) -> void:
 		if not raw_status is Dictionary:
 			continue
 		var status: Dictionary = raw_status
-		var label := _fallback(str(status.get("label", "")), str(status.get("type", "状态")))
+		var label := _fallback(str(status.get("label", "")), _status_type_label(str(status.get("type", ""))))
 		_add_modal_line(lines, label, _status_detail_text(status))
 	stack.call("push_modal", panel, true)
 
@@ -870,7 +870,7 @@ func _status_detail_text(status: Dictionary) -> String:
 	var amount := int(status.get("amount", 0))
 	var stacks := int(status.get("stacks", 0))
 	var remaining := int(status.get("remaining", 0))
-	var type_name := str(status.get("type", ""))
+	var type_name := _status_type_label(str(status.get("type", "")))
 	if amount > 0:
 		parts.append("数值 %d" % amount)
 	if stacks > 0:
@@ -1194,6 +1194,27 @@ func _battle_kind_label(kind: String) -> String:
 			return "状态变化"
 		_:
 			return kind
+
+func _status_type_label(type_name: String) -> String:
+	match type_name.to_upper():
+		"SHIELD":
+			return "护盾"
+		"POISON":
+			return "中毒"
+		"WEAK":
+			return "虚弱"
+		"THORNS":
+			return "荆棘"
+		"FURY":
+			return "激昂"
+		"CLEANSE":
+			return "净化"
+		"LIFESTEAL":
+			return "吸血"
+		"STUN":
+			return "眩晕"
+		_:
+			return _fallback(type_name, "状态")
 
 func _battle_item_label(item: Dictionary) -> String:
 	var def: Dictionary = _dict(item, "def")
