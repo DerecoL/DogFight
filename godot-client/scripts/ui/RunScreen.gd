@@ -2089,6 +2089,7 @@ func _render_map_monster_equipment(parent: VBoxContainer, monster: Dictionary) -
 		button.disabled = item.is_empty()
 		if not item.is_empty():
 			_apply_button_icon(button, _item_texture(item))
+			button.pressed.connect(_show_map_monster_item_modal.bind(item))
 		grid.add_child(button)
 
 func _render_map_reward_preview(parent: VBoxContainer, rewards: Array) -> void:
@@ -2105,13 +2106,46 @@ func _render_map_reward_preview(parent: VBoxContainer, rewards: Array) -> void:
 		return
 	for reward in rewards.slice(0, 8):
 		if reward is Dictionary:
-			var text := "%s\n%s" % [str(reward.get("quality", "")), str(reward.get("defId", ""))]
+			var def: Dictionary = _dict(reward, "def")
+			var reward_name := _fallback(str(def.get("name", "")), str(reward.get("defId", "")))
+			var text := "%s\n%s" % [str(reward.get("quality", "")), reward_name]
 			var button := _button(text, 82)
 			button.custom_minimum_size = Vector2(82, 62)
 			button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-			button.disabled = true
 			_apply_button_icon(button, _item_reward_texture(reward))
+			button.pressed.connect(_show_map_reward_modal.bind(reward))
 			row.add_child(button)
+
+func _show_map_monster_item_modal(item: Dictionary) -> void:
+	var def: Dictionary = _dict(item, "def")
+	var title := _fallback(str(def.get("name", "")), str(item.get("defId", item.get("id", ""))))
+	var modal := _modal_panel("野怪装备详情", Vector2(560, 500))
+	if modal.is_empty():
+		return
+	var box: VBoxContainer = modal["box"]
+	_render_detail_header(box, _item_texture(item), title, "野怪装备预览 · %s" % str(item.get("quality", "")))
+	_add_item_def_details(box, def, str(item.get("quality", "")), str(item.get("defId", item.get("id", ""))))
+	_add_line(box, "触发点数", _map_preview_trigger_text(item))
+	_add_line(box, "位置", "%s  (%d,%d)" % [_area_label(str(item.get("area", ""))), int(item.get("x", 0)), int(item.get("y", 0))])
+	_push_modal(modal["panel"])
+
+func _show_map_reward_modal(reward: Dictionary) -> void:
+	var def: Dictionary = _dict(reward, "def")
+	var title := _fallback(str(def.get("name", "")), str(reward.get("defId", "")))
+	var modal := _modal_panel("地图掉落预览", Vector2(560, 480))
+	if modal.is_empty():
+		return
+	var box: VBoxContainer = modal["box"]
+	_render_detail_header(box, _item_reward_texture(reward), title, "可能掉落 · %s" % str(reward.get("quality", "")))
+	_add_item_def_details(box, def, str(reward.get("quality", "")), str(reward.get("defId", "")))
+	_add_line(box, "触发点数", _map_preview_trigger_text(reward))
+	_push_modal(modal["panel"])
+
+func _map_preview_trigger_text(source: Dictionary) -> String:
+	if source.has("triggerDice") or source.has("dice"):
+		return _detail_array_text(source.get("triggerDice", source.get("dice", [])))
+	var def: Dictionary = _dict(source, "def")
+	return _detail_array_text(def.get("triggerDice", def.get("dice", [])))
 
 func _item_at_slot(items: Array, area: String, x: int) -> Dictionary:
 	for item in items:
