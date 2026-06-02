@@ -40,6 +40,20 @@ godot --path E:\AI-GPT\DogFight\godot-client
 - 阶段推进：`PREP` 匹配、`MATCH` 开始战斗、`BATTLE` 结算。
 - 播放 `BattleResult.events`，显示日志、血条和骰点。
 
+## 正式客户端底座
+
+Godot 客户端正在从竖切 Demo 扩展为并行 Beta。底座模块包括：
+
+- `scripts/api/ApiRoutes.gd`：集中定义 API 路径。
+- `scripts/state/AppStore.gd`：集中持有账号与跑局 Store。
+- `scripts/router/ScreenRouter.gd`：管理屏幕切换和返回栈。
+- `scripts/router/ModalStack.gd`：管理弹窗栈和阻塞层。
+- `scripts/router/ToastBus.gd`：管理短提示队列。
+- `scripts/ui/kit/Responsive.gd`：提供桌面、平板、移动断点。
+- `scenes/overlays/OverlayRoot.tscn`：统一 Toast、弹窗和阻塞遮罩层。
+
+当前阶段仍不覆盖完整账号商城、成就、每日任务、排行榜、赛季和多人房间。这些功能会在后续阶段计划中接入同一套 API、Store、Router 和 Overlay 底座。
+
 ## 当前限制
 
 - 不替换现有 Web 客户端，网页版仍可继续使用。
