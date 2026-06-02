@@ -125,7 +125,6 @@ func _apply_auth_response(response: Dictionary) -> bool:
 		return false
 	current_user = response.data.get("user", {})
 	store.set_user(current_user)
-	user_changed.emit(current_user)
 	return await refresh_me()
 
 func refresh_me() -> bool:

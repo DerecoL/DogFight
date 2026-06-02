@@ -143,11 +143,9 @@ function publicAchievement(entry: AchievementProgress | undefined, def: typeof A
 }
 
 export async function accountSummary(userId: string) {
-  const [wallet, progress, daily] = await Promise.all([
-    ensureWallet(prisma, userId),
-    achievementProgress(prisma, userId),
-    getOrCreateDailySet(prisma, userId),
-  ])
+  const wallet = await ensureWallet(prisma, userId)
+  const daily = await getOrCreateDailySet(prisma, userId)
+  const progress = await achievementProgress(prisma, userId)
   const dailyState = dailyStateFromRow(daily)
   return {
     wallet: { balance: wallet.balance, dailyEarned: wallet.dailyEarned, dailyKey: wallet.dailyKey },
@@ -180,7 +178,8 @@ export async function claimAchievement(userId: string, achievementId: string) {
 }
 
 export async function getDailyTasks(userId: string) {
-  const [wallet, set] = await Promise.all([ensureWallet(prisma, userId), getOrCreateDailySet(prisma, userId)])
+  const wallet = await ensureWallet(prisma, userId)
+  const set = await getOrCreateDailySet(prisma, userId)
   const state = dailyStateFromRow(set)
   return {
     wallet: { balance: wallet.balance, dailyEarned: wallet.dailyEarned, dailyKey: wallet.dailyKey },

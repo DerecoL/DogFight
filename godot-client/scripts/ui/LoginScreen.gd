@@ -41,7 +41,9 @@ func _on_quick_start_pressed() -> void:
 	if session == null or not session.has_method("register"):
 		error_label.text = "登录会话未初始化"
 		return
-	var account := "godot-%d" % Time.get_unix_time_from_system()
+	var rng := RandomNumberGenerator.new()
+	rng.randomize()
+	var account := "godot-%d-%d-%d" % [Time.get_unix_time_from_system(), Time.get_ticks_msec(), rng.randi_range(100000, 999999)]
 	var password := "dogdice"
 	account_input.text = account
 	password_input.text = password
