@@ -1101,21 +1101,67 @@ func _map_node_button(node: Dictionary, available: Array, completed: Array, curr
 	return button
 
 func _show_map_node_modal(node: Dictionary) -> void:
-	var modal := _modal_panel(_map_node_title(node), Vector2(500, 380))
+	var modal := _modal_panel(_map_node_title(node), Vector2(560, 500))
 	if modal.is_empty():
 		return
 	var box: VBoxContainer = modal["box"]
 	_add_line(box, "层级", "第 %d 层 · 第 %d 列" % [int(node.get("layer", 0)) + 1, int(node.get("column", 0)) + 1])
 	_add_line(box, "类型", str(node.get("kind", "")))
+	var event: Dictionary = _dict(node, "event")
+	if not event.is_empty():
+		_add_line(box, "事件", _fallback(str(event.get("title", "")), str(event.get("type", ""))))
+		_add_line(box, "说明", str(event.get("description", "")))
 	var monster: Dictionary = _dict(node, "monster")
 	if not monster.is_empty():
-		_add_line(box, "怪物", "%s · %s" % [str(monster.get("name", "")), str(monster.get("dogType", ""))])
-		for reward in _variant_array(monster.get("possibleRewards", [])).slice(0, 8):
-			if reward is Dictionary:
-				_add_line(box, "预期掉落", "%s  %s" % [str(reward.get("defId", "")), str(reward.get("quality", ""))])
+		_add_line(box, "怪物", "%s · %s · 第%d回合" % [str(monster.get("name", "")), _dog_name(str(monster.get("dogType", ""))), int(monster.get("round", int(node.get("layer", 0)) + 1))])
+		_render_map_monster_equipment(box, monster)
+		_render_map_reward_preview(box, _variant_array(monster.get("possibleRewards", [])))
 	if bool(node.get("hidden", false)):
 		_add_line(box, "状态", "隐藏事件")
 	_push_modal(modal["panel"])
+
+func _render_map_monster_equipment(parent: VBoxContainer, monster: Dictionary) -> void:
+	var items := _variant_array(monster.get("equipment", []))
+	var label := Label.new()
+	label.text = "野怪装备栏"
+	label.custom_minimum_size = Vector2(0, 28)
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	parent.add_child(label)
+	var grid := GridContainer.new()
+	grid.columns = 12
+	grid.add_theme_constant_override("h_separation", 4)
+	grid.add_theme_constant_override("v_separation", 4)
+	parent.add_child(grid)
+	for x in range(12):
+		var item: Dictionary = _item_at_slot(items, "EQUIPMENT", x)
+		var button := _button(_slot_label(item, x), 52)
+		button.custom_minimum_size = Vector2(52, 48)
+		button.disabled = item.is_empty()
+		if not item.is_empty():
+			_apply_button_icon(button, _item_texture(item))
+		grid.add_child(button)
+
+func _render_map_reward_preview(parent: VBoxContainer, rewards: Array) -> void:
+	var label := Label.new()
+	label.text = "可能掉落"
+	label.custom_minimum_size = Vector2(0, 28)
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	parent.add_child(label)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 6)
+	parent.add_child(row)
+	if rewards.is_empty():
+		_add_line(parent, "", "暂无可预览掉落")
+		return
+	for reward in rewards.slice(0, 8):
+		if reward is Dictionary:
+			var text := "%s\n%s" % [str(reward.get("quality", "")), str(reward.get("defId", ""))]
+			var button := _button(text, 82)
+			button.custom_minimum_size = Vector2(82, 62)
+			button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			button.disabled = true
+			_apply_button_icon(button, _sticker_texture(str(reward.get("defId", ""))))
+			row.add_child(button)
 
 func _item_at_slot(items: Array, area: String, x: int) -> Dictionary:
 	for item in items:

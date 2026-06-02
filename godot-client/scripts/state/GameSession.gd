@@ -307,36 +307,51 @@ func _show_reward_summary(summary: Dictionary) -> void:
 			toast_bus.push(str(summary.get("title", "获得奖励")), "success")
 		return
 	var panel := PanelContainer.new()
-	panel.custom_minimum_size = Vector2(440, 320)
+	panel.custom_minimum_size = Vector2(520, 390)
 	panel.set_anchors_preset(Control.PRESET_CENTER)
-	panel.offset_left = -220.0
-	panel.offset_right = 220.0
-	panel.offset_top = -170.0
-	panel.offset_bottom = 170.0
+	panel.offset_left = -260.0
+	panel.offset_right = 260.0
+	panel.offset_top = -205.0
+	panel.offset_bottom = 205.0
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 10)
 	panel.add_child(box)
+	var header := HBoxContainer.new()
+	header.add_theme_constant_override("separation", 10)
+	box.add_child(header)
+	var emblem := TextureRect.new()
+	emblem.custom_minimum_size = Vector2(54, 54)
+	emblem.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	emblem.texture = _reward_summary_header_texture(str(summary.get("source", "")))
+	header.add_child(emblem)
+	var title_box := VBoxContainer.new()
+	title_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	header.add_child(title_box)
 	var eyebrow := Label.new()
 	eyebrow.text = "野怪结算" if str(summary.get("source", "")) == "MONSTER_BATTLE" else "事件完成"
 	eyebrow.custom_minimum_size = Vector2(0, 26)
-	box.add_child(eyebrow)
+	title_box.add_child(eyebrow)
 	var title := Label.new()
 	title.text = str(summary.get("title", "获得奖励"))
 	title.custom_minimum_size = Vector2(0, 34)
 	title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	box.add_child(title)
+	title_box.add_child(title)
+	var scroller := ScrollContainer.new()
+	scroller.custom_minimum_size = Vector2(0, 210)
+	scroller.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	box.add_child(scroller)
 	var entries_box := VBoxContainer.new()
 	entries_box.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	entries_box.add_theme_constant_override("separation", 6)
-	box.add_child(entries_box)
+	scroller.add_child(entries_box)
 	var raw_entries: Variant = summary.get("entries", [])
 	var entries: Array = raw_entries if raw_entries is Array else []
 	if entries.is_empty():
-		_add_reward_summary_line(entries_box, "没有获得奖励", "本次没有新的奖励")
+		_add_reward_summary_entry(entries_box, {"kind": "status", "label": "没有获得奖励", "detail": "本次没有新的奖励"})
 	for entry in entries:
 		if entry is Dictionary:
-			_add_reward_summary_line(entries_box, str(entry.get("label", "奖励")), str(entry.get("detail", "")))
+			_add_reward_summary_entry(entries_box, entry)
 	var close_button := Button.new()
 	close_button.text = "知道了"
 	close_button.custom_minimum_size = Vector2(0, 42)
@@ -344,12 +359,65 @@ func _show_reward_summary(summary: Dictionary) -> void:
 	box.add_child(close_button)
 	modal_stack.push_modal(panel, true)
 
-func _add_reward_summary_line(parent: VBoxContainer, label: String, detail: String) -> void:
-	var row := Label.new()
-	row.custom_minimum_size = Vector2(0, 34)
-	row.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	row.text = "%s：%s" % [label, detail]
+func _add_reward_summary_entry(parent: VBoxContainer, entry: Dictionary) -> void:
+	var row := HBoxContainer.new()
+	row.custom_minimum_size = Vector2(0, 62)
+	row.add_theme_constant_override("separation", 10)
+	var icon := TextureRect.new()
+	icon.custom_minimum_size = Vector2(48, 48)
+	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	icon.texture = _reward_summary_entry_texture(entry)
+	row.add_child(icon)
+	var text_box := VBoxContainer.new()
+	text_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(text_box)
+	var label := Label.new()
+	label.text = str(entry.get("label", "奖励"))
+	label.custom_minimum_size = Vector2(0, 24)
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	text_box.add_child(label)
+	var detail := Label.new()
+	detail.text = str(entry.get("detail", ""))
+	detail.custom_minimum_size = Vector2(0, 28)
+	detail.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	text_box.add_child(detail)
 	parent.add_child(row)
+
+func _reward_summary_header_texture(source: String) -> Texture2D:
+	if source == "MONSTER_BATTLE":
+		return _texture("res://assets/map-icons/monster-battle.webp")
+	return _texture("res://assets/map-icons/event.webp")
+
+func _reward_summary_entry_texture(entry: Dictionary) -> Texture2D:
+	var def_id := str(entry.get("defId", ""))
+	if not def_id.is_empty():
+		return _sticker_texture(def_id)
+	match str(entry.get("kind", "")):
+		"gold":
+			return _texture("res://assets/sticker-icons/dog-gold-ingot.webp")
+		"tolerance":
+			return _texture("res://assets/map-icons/rest.webp")
+		"choice", "upgrade":
+			return _texture("res://assets/map-icons/shop-equipment.webp")
+		_:
+			return _texture("res://assets/map-icons/event.webp")
+
+func _sticker_texture(asset_id: String) -> Texture2D:
+	if asset_id.is_empty():
+		return _texture("res://assets/sticker-icons/starter-1.webp")
+	var texture := _texture("res://assets/sticker-icons/%s.webp" % asset_id)
+	return texture if texture != null else _texture("res://assets/sticker-icons/starter-1.webp")
+
+func _texture(path: String) -> Texture2D:
+	var imported := ResourceLoader.load(path)
+	if imported is Texture2D:
+		return imported
+	if not FileAccess.file_exists(path):
+		return null
+	var image := Image.new()
+	if image.load(path) != OK:
+		return null
+	return ImageTexture.create_from_image(image)
 
 func _close_top_modal() -> void:
 	if modal_stack != null:
