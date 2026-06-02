@@ -765,21 +765,17 @@ func _render_shop_tab() -> void:
 	var wallet: Dictionary = _dict(meta_shop_data, "wallet")
 	_add_line(card, "钱包", "余额 %d / 今日获得 %d" % [int(wallet.get("balance", 0)), int(wallet.get("dailyEarned", 0))])
 	var sections: Dictionary = _dict(meta_shop_data, "sections")
-	for section_name in ["featured", "permanent"]:
-		_add_line(card, section_name, "")
+	for section_name in ["permanent", "featured"]:
+		_add_line(card, _shop_catalog_section_label(section_name), "")
 		for item in _array(sections, section_name):
 			if item is Dictionary:
-				var text := "%s  %s  %d" % [_cosmetic_display_name(item), _rarity_label(str(item.get("rarity", ""))), int(item.get("price", 0))]
-				if bool(item.get("owned", false)):
-					card.add_child(_action_button(("已装备 " if _is_cosmetic_equipped(item) else "查看 ") + text, _show_cosmetic_modal.bind(item)))
-				else:
-					card.add_child(_action_button("查看 " + text, _show_cosmetic_modal.bind(item)))
+				card.add_child(_action_button(_shop_catalog_button_label(item), _show_cosmetic_modal.bind(item)))
 	var cosmetic_card := _section("已拥有外观")
 	var default_row := HBoxContainer.new()
 	default_row.add_theme_constant_override("separation", 8)
 	cosmetic_card.add_child(default_row)
 	for cosmetic_type in ["TITLE", "AVATAR", "BACKGROUND", "DOG_SKIN", "BATTLE_EFFECT"]:
-		default_row.add_child(_action_button("默认 " + cosmetic_type, _unequip_cosmetic.bind(cosmetic_type)))
+		default_row.add_child(_action_button("默认 " + _cosmetic_type_label(cosmetic_type), _unequip_cosmetic.bind(cosmetic_type)))
 	for item in _array(cosmetics_data, "inventory"):
 		if item is Dictionary:
 			cosmetic_card.add_child(_action_button("查看 %s" % _cosmetic_display_name(item), _show_cosmetic_modal.bind(item)))
@@ -1738,6 +1734,24 @@ func _is_cosmetic_equipped(raw_item: Dictionary) -> bool:
 			if _cosmetic_catalog_id(entry) == catalog_item_id:
 				return true
 	return false
+
+func _shop_catalog_section_label(section_name: String) -> String:
+	match section_name:
+		"permanent":
+			return "常驻区"
+		"featured":
+			return "精选轮换区"
+		_:
+			return section_name
+
+func _shop_catalog_button_label(raw_item: Dictionary) -> String:
+	var item: Dictionary = _cosmetic_item(raw_item)
+	var action := "购买"
+	if _is_cosmetic_equipped(raw_item):
+		action = "已装备"
+	elif bool(item.get("owned", raw_item.get("owned", false))):
+		action = "装备"
+	return "%s %s  %s · %s  %d" % [action, _cosmetic_display_name(raw_item), _cosmetic_type_label(_cosmetic_type(raw_item)), _rarity_label(str(item.get("rarity", ""))), int(item.get("price", 0))]
 
 func _cosmetic_type_label(cosmetic_type: String) -> String:
 	match cosmetic_type:
