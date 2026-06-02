@@ -377,6 +377,7 @@ func _render_snapshot(name_label: Label, avatar: TextureRect, grid: GridContaine
 		_apply_button_icon(button, _battle_item_texture(item))
 		if not item.is_empty():
 			button_map[str(item.get("id", ""))] = button
+			button.pressed.connect(_show_battle_item_modal.bind(item, side))
 		grid.add_child(button)
 	_clear_children(relic_row)
 	for relic in _array(snapshot, "relics").slice(0, 8):
@@ -674,6 +675,112 @@ func _finalize_review_side(stats: Dictionary) -> Dictionary:
 			}
 	stats["topItem"] = top_item
 	return stats
+
+func _show_battle_item_modal(item: Dictionary, side: String) -> void:
+	var stack := _modal_stack()
+	if stack == null:
+		error_label.text = "弹窗层未初始化"
+		return
+	var panel := PanelContainer.new()
+	panel.custom_minimum_size = Vector2(540, 430)
+	panel.set_anchors_preset(Control.PRESET_CENTER)
+	panel.offset_left = -270.0
+	panel.offset_right = 270.0
+	panel.offset_top = -215.0
+	panel.offset_bottom = 215.0
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 8)
+	panel.add_child(box)
+	var header := HBoxContainer.new()
+	header.add_theme_constant_override("separation", 8)
+	box.add_child(header)
+	var title := Label.new()
+	title.text = "战斗装备详情"
+	title.custom_minimum_size = Vector2(0, 36)
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	header.add_child(title)
+	var close_button := Button.new()
+	close_button.text = "关闭"
+	close_button.custom_minimum_size = Vector2(84, 36)
+	close_button.pressed.connect(func() -> void:
+		stack.call("pop_modal")
+	)
+	header.add_child(close_button)
+	var body := HBoxContainer.new()
+	body.add_theme_constant_override("separation", 10)
+	box.add_child(body)
+	var icon := TextureRect.new()
+	icon.custom_minimum_size = Vector2(96, 96)
+	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	icon.texture = _battle_item_texture(item)
+	body.add_child(icon)
+	var lines := VBoxContainer.new()
+	lines.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	lines.add_theme_constant_override("separation", 6)
+	body.add_child(lines)
+	var item_def: Dictionary = _dict(item, "def")
+	var item_name := _fallback(str(item_def.get("name", "")), str(item.get("defId", item.get("id", ""))))
+	_add_modal_line(lines, "归属", "我方" if side == "player" else "对手")
+	_add_modal_line(lines, "名称", item_name)
+	_add_modal_line(lines, "品质", str(item.get("quality", "")))
+	_add_modal_line(lines, "占格", str(int(item_def.get("size", item.get("size", 1)))))
+	_add_modal_line(lines, "触发点数", _item_trigger_text(item))
+	_add_modal_line(lines, "位置", "%s (%d,%d)" % [str(item.get("area", "")), int(item.get("x", 0)), int(item.get("y", 0))])
+	_add_modal_line(lines, "效果", _fallback(str(item_def.get("description", "")), str(item.get("description", ""))))
+	var contribution := Label.new()
+	contribution.custom_minimum_size = Vector2(0, 28)
+	contribution.text = "本场贡献 %d" % _battle_item_contribution(str(item.get("id", "")), side)
+	lines.add_child(contribution)
+	stack.call("push_modal", panel, true)
+
+func _add_modal_line(parent: VBoxContainer, label: String, value: String) -> void:
+	var row := Label.new()
+	row.custom_minimum_size = Vector2(0, 28)
+	row.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	row.text = "%s：%s" % [label, value]
+	parent.add_child(row)
+
+func _item_trigger_text(item: Dictionary) -> String:
+	if item.has("triggerDice"):
+		return str(item.get("triggerDice"))
+	var def: Dictionary = _dict(item, "def")
+	if def.has("triggerDice"):
+		return str(def.get("triggerDice"))
+	return "无"
+
+func _battle_item_contribution(item_id: String, side: String) -> int:
+	if item_id.is_empty():
+		return 0
+	var total := 0
+	for raw_event in displayed_events:
+		if not raw_event is Dictionary:
+			continue
+		var event: Dictionary = raw_event
+		if str(event.get("itemId", "")) != item_id:
+			continue
+		var actor_side := _review_side(str(event.get("actor", "")))
+		if actor_side != side:
+			continue
+		var target_side := str(event.get("target", ""))
+		if target_side != "player" and target_side != "opponent":
+			target_side = _opposite_side(side)
+		var effect_type := str(event.get("effectType", ""))
+		if effect_type == "DAMAGE":
+			total += abs(min(0, _hp_delta_for_side(event, target_side)))
+		elif effect_type == "HEAL":
+			total += max(0, _hp_delta_for_side(event, side))
+		elif _is_shield_event(event):
+			total += max(0, int(event.get("amount", 0)))
+	return total
+
+func _modal_stack() -> Object:
+	if session == null:
+		return null
+	var stack = session.get("modal_stack")
+	if stack is Object and (stack as Object).has_method("push_modal"):
+		return stack
+	return null
 
 func _stats_for_side(side: String, player: Dictionary, opponent: Dictionary) -> Dictionary:
 	return player if side == "player" else opponent
