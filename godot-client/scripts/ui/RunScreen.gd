@@ -993,6 +993,9 @@ func _render_rooms_tab() -> void:
 			detail.add_child(_action_button("开始房间", _room_action.bind("start", {})))
 		if _can_ready_room_action(active_room):
 			detail.add_child(_action_button("准备 / 完成本回合", _room_action.bind("ready", {})))
+		var current_battle_id := _current_room_battle_id(active_room)
+		if not current_battle_id.is_empty():
+			detail.add_child(_action_button("载入当前战报", _load_room_battle.bind(current_battle_id)))
 		for member in _array(active_room, "members"):
 			if member is Dictionary:
 				var member_name := str(member.get("nickname", member.get("kind", "")))
@@ -2220,6 +2223,14 @@ func _room_current_run_action_locked() -> bool:
 
 func _room_run_method_locked(method: String) -> bool:
 	return _room_current_run_action_locked() and ROOM_LOCKED_RUN_METHODS.has(method)
+
+func _current_room_battle_id(room: Dictionary) -> String:
+	if str(room.get("phase", "")) != "BATTLE":
+		return ""
+	var member := _current_room_member(room)
+	if member.is_empty() or bool(member.get("eliminated", false)):
+		return ""
+	return str(member.get("currentBattleId", ""))
 
 func _current_room_member(room: Dictionary) -> Dictionary:
 	var explicit: Dictionary = _dict(room, "currentRunMember")
