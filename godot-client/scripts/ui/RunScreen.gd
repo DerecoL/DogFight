@@ -1333,11 +1333,11 @@ func _refresh_active_room() -> void:
 	await _fetch_into("rooms", ApiRoutes.dogfight_rooms())
 
 func _create_room() -> void:
-	var response: Dictionary = await _api_post(ApiRoutes.dogfight_rooms(), {})
+	var response: Dictionary = await _guarded_api_post(ApiRoutes.dogfight_rooms(), {})
 	await _apply_room_response(response, "create_room")
 
 func _match_room() -> void:
-	var response: Dictionary = await _api_post(ApiRoutes.dogfight_match(), {})
+	var response: Dictionary = await _guarded_api_post(ApiRoutes.dogfight_match(), {})
 	await _apply_room_response(response, "match_room")
 
 func _enter_or_view_room(room_id: String, status: String) -> void:
@@ -1346,16 +1346,16 @@ func _enter_or_view_room(room_id: String, status: String) -> void:
 	var path := ApiRoutes.dogfight_room(room_id)
 	var response: Dictionary
 	if status == "WAITING":
-		response = await _api_post(ApiRoutes.dogfight_room_join(room_id), {})
+		response = await _guarded_api_post(ApiRoutes.dogfight_room_join(room_id), {})
 	else:
-		response = await _api_get(path)
+		response = await _guarded_api_get(path)
 	await _apply_room_response(response, "enter_room" if status == "WAITING" else "")
 
 func _leave_active_room() -> void:
 	var room_id := str(active_room.get("id", ""))
 	if room_id.is_empty():
 		return
-	var response: Dictionary = await _api_post(ApiRoutes.dogfight_room_leave(room_id), {})
+	var response: Dictionary = await _guarded_api_post(ApiRoutes.dogfight_room_leave(room_id), {})
 	if bool(response.get("ok", false)):
 		active_room = {}
 		_push_ui_action_success("leave_room")
@@ -1377,7 +1377,7 @@ func _room_action(action: String, body: Dictionary) -> void:
 			path = ApiRoutes.dogfight_room_dog_choice(room_id)
 	if path.is_empty():
 		return
-	var response: Dictionary = await _api_post(path, body)
+	var response: Dictionary = await _guarded_api_post(path, body)
 	await _apply_room_response(response, "%s_room" % action)
 
 func _choose_room_dog() -> void:
@@ -1390,7 +1390,7 @@ func _choose_room_dog() -> void:
 	await _room_action("dog-choice", body)
 
 func _load_room_battle(battle_id: String) -> void:
-	var response: Dictionary = await _api_get(ApiRoutes.dogfight_battle(battle_id))
+	var response: Dictionary = await _guarded_api_get(ApiRoutes.dogfight_battle(battle_id))
 	if not bool(response.get("ok", false)):
 		_show_error(str(response.get("error", "")))
 		return
@@ -2752,6 +2752,26 @@ func _api_post(path: String, body: Dictionary) -> Dictionary:
 	if client == null:
 		return {"ok": false, "error": "API 未初始化", "data": {}}
 	return await client.post_json(path, body)
+
+func _guarded_api_get(path: String) -> Dictionary:
+	if action_in_progress:
+		return {"ok": false, "error": "操作进行中", "data": {}}
+	action_in_progress = true
+	_update_controls()
+	var response: Dictionary = await _api_get(path)
+	action_in_progress = false
+	_update_controls()
+	return response
+
+func _guarded_api_post(path: String, body: Dictionary) -> Dictionary:
+	if action_in_progress:
+		return {"ok": false, "error": "操作进行中", "data": {}}
+	action_in_progress = true
+	_update_controls()
+	var response: Dictionary = await _api_post(path, body)
+	action_in_progress = false
+	_update_controls()
+	return response
 
 func _api() -> ApiClient:
 	if session == null:
