@@ -140,6 +140,7 @@ func show_named_section(section_id: String) -> void:
 		_:
 			current_tab = TAB_LOBBY
 	_render_shell()
+	call_deferred("_refresh_current_section")
 
 func _build_layout() -> void:
 	var background := TextureRect.new()
@@ -1079,6 +1080,36 @@ func _refresh_after_action() -> void:
 		await _fetch_into("daily", ApiRoutes.daily_tasks())
 	elif current_tab == TAB_ROOMS:
 		await _refresh_active_room()
+	_render_shell()
+
+func _refresh_current_section() -> void:
+	if action_in_progress or session == null:
+		return
+	action_in_progress = true
+	_update_controls()
+	match current_tab:
+		TAB_ACCOUNT:
+			await _fetch_into("me", ApiRoutes.me())
+			await _fetch_into("history", ApiRoutes.runs_history())
+		TAB_ACHIEVEMENTS:
+			await _fetch_into("achievements", ApiRoutes.achievements())
+		TAB_DAILY:
+			await _fetch_into("daily", ApiRoutes.daily_tasks())
+		TAB_SHOP:
+			await _fetch_into("shop", ApiRoutes.shop())
+			await _fetch_into("cosmetics", ApiRoutes.cosmetics_me())
+		TAB_LEADERBOARDS:
+			await _fetch_into("ladder", ApiRoutes.ladder_me())
+			await _fetch_into("leaderboard", ApiRoutes.ladder_leaderboard())
+			await _fetch_into("apex", ApiRoutes.apex())
+		TAB_SEASON:
+			await _fetch_into("apex", ApiRoutes.apex())
+		TAB_ROOMS:
+			await _fetch_into("rooms", ApiRoutes.dogfight_rooms())
+		TAB_SETTINGS:
+			await _fetch_into("cosmetics", ApiRoutes.cosmetics_me())
+	action_in_progress = false
+	_update_controls()
 	_render_shell()
 
 func _claim_achievement(achievement_id: String) -> void:

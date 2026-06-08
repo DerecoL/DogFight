@@ -3,6 +3,8 @@ extends BaseWebScreen
 const DOG_OPTIONS := [
 	{"id": "SHIBA", "label": "柴犬"},
 	{"id": "SAMOYED", "label": "萨摩耶"},
+	{"id": "MUTT", "label": "土狗"},
+	{"id": "BULLY", "label": "恶霸"},
 	{"id": "FROG", "label": "祖灵莲池"},
 	{"id": "EMPEROR", "label": "帝王犬"},
 ]

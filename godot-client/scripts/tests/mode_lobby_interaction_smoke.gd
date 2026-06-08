@@ -28,7 +28,7 @@ func _run() -> void:
 		_fail("ModeLobbyScreen must expose dog, mode, and lucky number selectors")
 		return
 	var source := FileAccess.get_file_as_string("res://scripts/ui/screens/ModeLobbyScreen.gd")
-	for needle in ["create_run", "logout", "open_screen", "account_shop", "achievements", "leaderboards", "dogfight_rooms", "account_settings", "SHIBA", "CASUAL", "LADDER"]:
+	for needle in ["create_run", "logout", "open_screen", "account_shop", "achievements", "leaderboards", "dogfight_rooms", "account_settings", "SHIBA", "SAMOYED", "MUTT", "BULLY", "EMPEROR", "FROG", "CASUAL", "LADDER"]:
 		if not source.contains(str(needle)):
 			_fail("ModeLobbyScreen source missing interaction: %s" % str(needle))
 			return
