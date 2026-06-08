@@ -721,8 +721,10 @@ func _render_inventory(run: Dictionary) -> void:
 	toolbar.add_theme_constant_override("separation", 8)
 	card.add_child(toolbar)
 	toolbar.add_child(_action_button("查看选中详情", _show_selected_detail_modal))
-	toolbar.add_child(_action_button("出售选中装备", _call_selected_item.bind("sell_item")))
-	toolbar.add_child(_action_button("合成升级选中", _call_selected_item.bind("upgrade_item")))
+	if _can_sell_item_action(run, selected_item_id):
+		toolbar.add_child(_action_button("出售选中装备", _call_selected_item.bind("sell_item")))
+	if _can_upgrade_item_action(run, selected_item_id):
+		toolbar.add_child(_action_button("合成升级选中", _call_selected_item.bind("upgrade_item")))
 	_add_line(card, "当前选中", _fallback(selected_item_label, "无"))
 	_render_item_grid(card, "装备栏", "EQUIPMENT", run, _equipment_slot_count(run))
 	_render_relic_rail(card, run)
@@ -2358,11 +2360,15 @@ func _show_item_detail_modal(item: Dictionary) -> void:
 	_add_line(box, "位置", "%s  (%d,%d)" % [_area_label(str(item.get("area", ""))), int(item.get("x", 0)), int(item.get("y", 0))])
 	var id := str(item.get("id", ""))
 	if not id.is_empty():
+		var run := _current_run()
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 8)
-		row.add_child(_action_button("出售装备", _item_action_from_modal.bind("sell_item", id)))
-		row.add_child(_action_button("合成升级", _item_action_from_modal.bind("upgrade_item", id)))
-		box.add_child(row)
+		if _can_sell_item_action(run, id):
+			row.add_child(_action_button("出售装备", _item_action_from_modal.bind("sell_item", id)))
+		if _can_upgrade_item_action(run, id):
+			row.add_child(_action_button("合成升级", _item_action_from_modal.bind("upgrade_item", id)))
+		if row.get_child_count() > 0:
+			box.add_child(row)
 	_push_modal(modal["panel"])
 
 func _show_relic_detail_modal(relic: Dictionary) -> void:
@@ -2710,6 +2716,43 @@ func _run_store() -> Object:
 	if session == null:
 		return null
 	return session.get("run_store")
+
+func _current_run() -> Dictionary:
+	var store: Object = _run_store()
+	if store == null or not store.has_method("has_run") or not store.has_run():
+		return {}
+	return store.get("run")
+
+func _can_sell_item_action(run: Dictionary, item_id: String) -> bool:
+	return not item_id.is_empty() and str(run.get("phase", "")) == "SHOP"
+
+func _can_upgrade_item_action(run: Dictionary, item_id: String) -> bool:
+	if item_id.is_empty():
+		return false
+	if not ["MAP", "CLASS_REWARD", "SHOP", "PREP", "MATCH"].has(str(run.get("phase", ""))):
+		return false
+	var target := _item_by_id(run, item_id)
+	if target.is_empty():
+		return false
+	var target_quality := str(target.get("quality", "")).to_upper()
+	if target_quality == "DIAMOND":
+		return false
+	var target_def_id := str(target.get("defId", ""))
+	for entry in _array(run, "items"):
+		if not entry is Dictionary:
+			continue
+		var candidate: Dictionary = entry
+		if str(candidate.get("id", "")) == item_id:
+			continue
+		if str(candidate.get("defId", "")) == target_def_id and str(candidate.get("quality", "")).to_upper() == target_quality:
+			return true
+	return false
+
+func _item_by_id(run: Dictionary, item_id: String) -> Dictionary:
+	for entry in _array(run, "items"):
+		if entry is Dictionary and str((entry as Dictionary).get("id", "")) == item_id:
+			return (entry as Dictionary).duplicate(true)
+	return {}
 
 func _data(response: Dictionary) -> Dictionary:
 	var value = response.get("data", {})

@@ -37,6 +37,7 @@ func _run() -> void:
 	_assert_modal_text(modal_layer, ["商店报价", "1点牙咬", "价格", "6 金币", "购买到背包"])
 	run_screen.call("_close_top_modal")
 	await process_frame
+	main.get("run_store").set_run(_run_payload("SHOP", true))
 	run_screen.call("_show_item_detail_modal", {
 		"id": "item-bite",
 		"defId": "starter-1",
@@ -84,6 +85,27 @@ func _collect_text(node: Node) -> String:
 	for child in node.get_children():
 		text += _collect_text(child)
 	return text
+
+func _run_payload(phase: String, with_duplicate: bool) -> Dictionary:
+	var items := [
+		{"id": "item-bite", "defId": "starter-1", "quality": "BRONZE", "area": "BAG", "x": 2, "y": 0},
+	]
+	if with_duplicate:
+		items.append({"id": "item-bite-copy", "defId": "starter-1", "quality": "BRONZE", "area": "BAG", "x": 3, "y": 0})
+	return {
+		"id": "item-detail-%s" % phase,
+		"mode": "CASUAL",
+		"phase": phase,
+		"status": "ACTIVE",
+		"dogType": "SHIBA",
+		"round": 2,
+		"wins": 1,
+		"losses": 0,
+		"gold": 8,
+		"items": items,
+		"relics": [],
+		"shopItems": [],
+	}
 
 func _fail(message: String) -> void:
 	push_error(message)

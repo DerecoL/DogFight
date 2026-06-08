@@ -22,6 +22,20 @@ func _run() -> void:
 	if not run_screen.has_method("_show_selected_detail_modal"):
 		_fail("RunScreen selected detail modal is missing")
 		return
+	main.get("run_store").set_run({
+		"id": "selected-detail-shop",
+		"mode": "CASUAL",
+		"phase": "SHOP",
+		"status": "ACTIVE",
+		"dogType": "SHIBA",
+		"round": 2,
+		"wins": 1,
+		"losses": 0,
+		"gold": 8,
+		"items": [{"id": "item-1", "defId": "starter-1", "quality": "BRONZE", "area": "BAG", "x": 0, "y": 0}],
+		"relics": [],
+		"shopItems": [],
+	})
 	run_screen.set("selected_item", {
 		"id": "item-1",
 		"defId": "starter-1",
