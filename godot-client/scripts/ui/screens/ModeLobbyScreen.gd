@@ -5,6 +5,8 @@ var run_label: Label
 var status_label: Label
 var casual_button: Button
 var ladder_button: Button
+var action_buttons: Array[Button] = []
+var action_in_progress := false
 
 func _ready() -> void:
 	_build_lobby()
@@ -62,7 +64,7 @@ func _build_lobby() -> void:
 	logout_button.text = "退出登录"
 	logout_button.custom_minimum_size = Vector2(110, 44)
 	logout_button.pressed.connect(_logout)
-	header.add_child(logout_button)
+	header.add_child(_track_action_button(logout_button))
 
 	run_label = Label.new()
 	run_label.custom_minimum_size = Vector2(0, 52)
@@ -74,14 +76,14 @@ func _build_lobby() -> void:
 	tutorial_button.text = "新手引导"
 	tutorial_button.custom_minimum_size = Vector2(150, 44)
 	tutorial_button.pressed.connect(_replay_tutorial)
-	box.add_child(tutorial_button)
+	box.add_child(_track_action_button(tutorial_button))
 
 	var history_button := Button.new()
 	history_button.name = "HistoryDetailButton"
 	history_button.text = "查看详情和装备"
 	history_button.custom_minimum_size = Vector2(180, 44)
 	history_button.pressed.connect(_open_screen.bind("account"))
-	box.add_child(history_button)
+	box.add_child(_track_action_button(history_button))
 
 	var mode_entries := GridContainer.new()
 	mode_entries.columns = 2
@@ -117,7 +119,7 @@ func _add_shortcut_button(parent: Node, text: String, screen_id: String) -> void
 	button.custom_minimum_size = Vector2(0, 42)
 	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	button.pressed.connect(_open_screen.bind(screen_id))
-	parent.add_child(button)
+	parent.add_child(_track_action_button(button))
 
 func _add_mode_button(parent: Node, node_name: String, title: String, detail: String, action_label: String, action: Callable) -> Button:
 	var button := Button.new()
@@ -127,8 +129,18 @@ func _add_mode_button(parent: Node, node_name: String, title: String, detail: St
 	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	button.pressed.connect(action)
-	parent.add_child(button)
+	parent.add_child(_track_action_button(button))
 	return button
+
+func _track_action_button(button: Button) -> Button:
+	action_buttons.append(button)
+	button.disabled = action_in_progress
+	return button
+
+func _set_actions_disabled(disabled: bool) -> void:
+	for button in action_buttons:
+		if button != null:
+			button.disabled = disabled
 
 func _refresh_content() -> void:
 	if account_label == null:
@@ -163,6 +175,8 @@ func _refresh_content() -> void:
 		]
 
 func _enter_casual() -> void:
+	if action_in_progress:
+		return
 	var run: Dictionary = payload.get("run", {})
 	if not run.is_empty() and str(run.get("mode", "")) == "CASUAL":
 		_continue_run()
@@ -173,6 +187,8 @@ func _enter_casual() -> void:
 	_open_screen("legacy_run")
 
 func _enter_ladder() -> void:
+	if action_in_progress:
+		return
 	var run: Dictionary = payload.get("run", {})
 	if not run.is_empty() and str(run.get("mode", "")) == "LADDER":
 		_continue_run()
@@ -180,6 +196,8 @@ func _enter_ladder() -> void:
 	_open_screen("leaderboards")
 
 func _replay_tutorial() -> void:
+	if action_in_progress:
+		return
 	if session != null and session.has_method("replay_tutorial"):
 		session.call("replay_tutorial")
 		return
@@ -187,16 +205,26 @@ func _replay_tutorial() -> void:
 		session.call("open_run_lobby", "CASUAL")
 
 func _continue_run() -> void:
+	if action_in_progress:
+		return
 	if session != null and session.has_method("set_current_run"):
 		var run: Dictionary = payload.get("run", {})
 		if not run.is_empty():
 			session.call("set_current_run", run)
 
 func _logout() -> void:
+	if action_in_progress:
+		return
 	if session != null and session.has_method("logout"):
+		action_in_progress = true
+		_set_actions_disabled(true)
 		await session.call("logout")
+		action_in_progress = false
+		_set_actions_disabled(false)
 
 func _open_screen(screen_id: String) -> void:
+	if action_in_progress:
+		return
 	if session != null and session.has_method("open_screen"):
 		session.call("open_screen", screen_id)
 
