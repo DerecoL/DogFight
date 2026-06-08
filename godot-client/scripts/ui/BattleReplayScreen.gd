@@ -101,6 +101,7 @@ func start_replay(next_battle: Dictionary) -> void:
 	log_filter = "all"
 	playback_speed = 1.0
 	error_label.text = ""
+	_set_battle_controls_disabled(false)
 	finish_button.disabled = true
 	play_button.disabled = false
 	skip_button.disabled = false
@@ -128,7 +129,7 @@ func _render_initial_hp() -> void:
 	_update_battle_meta({})
 
 func _on_play_pressed() -> void:
-	if playing:
+	if finish_in_progress or playing:
 		return
 	playing = true
 	_update_playback_controls()
@@ -144,6 +145,8 @@ func _on_play_pressed() -> void:
 		_mark_replay_complete()
 
 func _on_skip_pressed() -> void:
+	if finish_in_progress:
+		return
 	playing = false
 	while event_index < events.size():
 		var event = events[event_index]
@@ -156,13 +159,16 @@ func _on_finish_pressed() -> void:
 	if finish_in_progress or session == null or not session.has_method("finish_battle"):
 		return
 	finish_in_progress = true
-	finish_button.disabled = true
+	_set_battle_controls_disabled(true)
 	var ok: bool = await session.finish_battle()
 	finish_in_progress = false
 	if not ok:
-		finish_button.disabled = false
+		_set_battle_controls_disabled(false)
+		_restore_replay_controls()
 
 func _on_restart_pressed() -> void:
+	if finish_in_progress:
+		return
 	playing = false
 	displayed_events = []
 	event_index = 0
@@ -212,8 +218,8 @@ func _mark_replay_complete() -> void:
 	replay_finished.emit()
 
 func _update_playback_controls() -> void:
-	play_button.disabled = playing
-	skip_button.disabled = false
+	play_button.disabled = finish_in_progress or playing
+	skip_button.disabled = finish_in_progress
 
 func _build_battle_layout() -> void:
 	if root == null or stage_label != null:
@@ -443,6 +449,8 @@ func _render_event_stage(event: Dictionary) -> void:
 	]
 
 func _set_speed(speed: float) -> void:
+	if finish_in_progress:
+		return
 	playback_speed = speed
 	_update_speed_buttons()
 	error_label.text = "战斗速度 %.0fx" % playback_speed
@@ -454,6 +462,8 @@ func _update_speed_buttons() -> void:
 			(button as Button).button_pressed = int(speed) == int(playback_speed)
 
 func _toggle_log() -> void:
+	if finish_in_progress:
+		return
 	log_view.visible = not log_view.visible
 
 func _update_log_filters() -> void:
@@ -470,6 +480,8 @@ func _update_log_filters() -> void:
 		log_filter_row.add_child(button)
 
 func _set_log_filter(filter: String) -> void:
+	if finish_in_progress:
+		return
 	log_filter = filter
 	_update_log_filters()
 	_refresh_log_view()
@@ -818,6 +830,8 @@ func _finalize_review_side(stats: Dictionary) -> Dictionary:
 	return stats
 
 func _show_battle_status_modal(side: String) -> void:
+	if finish_in_progress:
+		return
 	var stack := _modal_stack()
 	if stack == null:
 		error_label.text = "弹窗层未初始化"
@@ -884,6 +898,8 @@ func _status_detail_text(status: Dictionary) -> String:
 	return "；".join(parts)
 
 func _show_battle_item_modal(item: Dictionary, side: String) -> void:
+	if finish_in_progress:
+		return
 	var stack := _modal_stack()
 	if stack == null:
 		error_label.text = "弹窗层未初始化"
@@ -990,6 +1006,8 @@ func _modal_stack() -> Object:
 	return null
 
 func _show_battle_relic_modal(relic: Dictionary, side: String) -> void:
+	if finish_in_progress:
+		return
 	var stack := _modal_stack()
 	if stack == null:
 		error_label.text = "弹窗层未初始化"
@@ -1148,6 +1166,39 @@ func _clear_children(container: Node) -> void:
 	for child in container.get_children():
 		container.remove_child(child)
 		child.queue_free()
+
+func _set_battle_controls_disabled(disabled: bool) -> void:
+	if root != null:
+		_set_buttons_disabled(root, disabled)
+	var stack := _modal_stack()
+	if stack != null:
+		var panels: Array = stack.get("stack")
+		for panel in panels:
+			if panel is Node:
+				_set_buttons_disabled(panel, disabled)
+
+func _set_buttons_disabled(node: Node, disabled: bool) -> void:
+	if node is Button:
+		var button := node as Button
+		if disabled:
+			if not button.disabled:
+				button.set_meta("disabled_by_action", true)
+				button.disabled = true
+		elif button.has_meta("disabled_by_action"):
+			button.remove_meta("disabled_by_action")
+			button.disabled = false
+	for child in node.get_children():
+		_set_buttons_disabled(child, disabled)
+
+func _restore_replay_controls() -> void:
+	if play_button != null:
+		play_button.disabled = finish_in_progress or playing or replay_complete
+	if skip_button != null:
+		skip_button.disabled = finish_in_progress or replay_complete
+	if finish_button != null:
+		finish_button.disabled = finish_in_progress or not replay_complete
+	if restart_button != null:
+		restart_button.disabled = finish_in_progress or not replay_complete
 
 func _item_at_slot(items: Array, area: String, x: int) -> Dictionary:
 	for item in items:
