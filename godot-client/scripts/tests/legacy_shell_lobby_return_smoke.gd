@@ -42,11 +42,17 @@ func _run() -> void:
 	legacy.call("open_mode_lobby")
 	await process_frame
 	await process_frame
-	if str(router.get("current_screen_id")) != "mode_lobby":
-		_fail("open_mode_lobby should route to mode_lobby, got %s" % str(router.get("current_screen_id")))
+	if str(router.get("current_screen_id")) != "legacy_run":
+		_fail("open_mode_lobby should keep the playable shell visible, got %s" % str(router.get("current_screen_id")))
 		return
-	if not main.get_node_or_null("ScreenRoot/ModeLobbyScreen").visible:
-		_fail("ModeLobbyScreen should be visible after returning lobby")
+	if main.get_node_or_null("ScreenRoot/ModeLobbyScreen").visible:
+		_fail("open_mode_lobby must not show the old standalone ModeLobbyScreen")
+		return
+	if str(legacy.get("current_tab")) != "大厅":
+		_fail("open_mode_lobby should route to the playable lobby tab")
+		return
+	if not _collect_text(legacy).contains("竞技方式"):
+		_fail("open_mode_lobby should render playable mode entries")
 		return
 
 	main.queue_free()

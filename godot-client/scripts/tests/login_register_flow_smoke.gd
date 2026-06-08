@@ -42,8 +42,7 @@ func _run() -> void:
 		return
 	nickname_input.text = "登录烟测"
 	await nickname_screen.call("_submit_nickname")
-	if not await _wait_for_screen(router, "mode_lobby"):
-		_fail("Nickname submit should route to mode_lobby, got %s" % str(router.get("current_screen_id")))
+	if not await _assert_playable_lobby(main, router, "Nickname submit"):
 		return
 
 	if not await main.call("logout"):
@@ -56,32 +55,16 @@ func _run() -> void:
 	account_input.text = account
 	password_input.text = "dogdice"
 	await login_screen.call("_on_login_pressed")
-	if not await _wait_for_screen(router, "mode_lobby"):
-		_fail("Login with saved nickname should route to mode_lobby, got %s" % str(router.get("current_screen_id")))
-		return
-	var mode_lobby = main.get_node_or_null("ScreenRoot/ModeLobbyScreen")
-	if mode_lobby == null:
-		_fail("ModeLobbyScreen is missing after login")
-		return
-	var casual_button = mode_lobby.find_child("CasualModeButton", true, false) as Button
-	if casual_button == null:
-		_fail("ModeLobbyScreen must expose CasualModeButton after login")
-		return
-	if _has_visible_placeholder(mode_lobby):
-		_fail("ModeLobbyScreen must not show placeholder content after login")
-		return
-	var lobby_text := _collect_text(mode_lobby)
-	if lobby_text.contains("Web 对齐目标"):
-		_fail("ModeLobbyScreen must show the playable lobby, not the old Web alignment placeholder")
-		return
-	casual_button.pressed.emit()
-	if not await _wait_for_screen(router, "legacy_run"):
-		_fail("Entering casual mode should route to playable run UI, got %s" % str(router.get("current_screen_id")))
+	if not await _assert_playable_lobby(main, router, "Login with saved nickname"):
 		return
 	var legacy_run_screen = main.get_node_or_null("ScreenRoot/LegacyRunScreen")
-	if legacy_run_screen == null or not legacy_run_screen.visible:
-		_fail("Entering casual mode should show LegacyRunScreen")
+	var casual_button = _find_button_containing(legacy_run_screen, "开始休闲模式")
+	if casual_button == null:
+		_fail("Playable lobby must expose casual mode entry")
 		return
+	casual_button.pressed.emit()
+	await process_frame
+	await process_frame
 	if main.get("run_store").has_run():
 		_fail("Entering casual mode without a run must not create a run directly")
 		return
@@ -98,6 +81,40 @@ func _run() -> void:
 		await process_frame
 	print("Godot login/register flow smoke passed")
 	quit(0)
+
+func _assert_playable_lobby(main: Node, router: Node, context: String) -> bool:
+	if not await _wait_for_screen(router, "legacy_run"):
+		_fail("%s should route to playable lobby, got %s" % [context, str(router.get("current_screen_id"))])
+		return false
+	var legacy_run_screen = main.get_node_or_null("ScreenRoot/LegacyRunScreen")
+	if legacy_run_screen == null or not legacy_run_screen.visible:
+		_fail("%s should show LegacyRunScreen" % context)
+		return false
+	var mode_lobby = main.get_node_or_null("ScreenRoot/ModeLobbyScreen")
+	if mode_lobby == null:
+		_fail("Main scene should still keep ModeLobbyScreen registered for compatibility")
+		return false
+	if mode_lobby.visible:
+		_fail("%s must not show the old standalone ModeLobbyScreen" % context)
+		return false
+	if str(legacy_run_screen.get("current_tab")) != "大厅":
+		_fail("%s should open the playable mode lobby tab" % context)
+		return false
+	if _has_visible_placeholder(legacy_run_screen):
+		_fail("%s must not show placeholder content" % context)
+		return false
+	var lobby_text := _collect_text(legacy_run_screen)
+	if lobby_text.contains("Web 对齐目标"):
+		_fail("%s must not show the old Web alignment placeholder" % context)
+		return false
+	for part in ["模式大厅", "竞技方式", "休闲模式", "天梯模式", "多人房间", "巅峰竞技场"]:
+		if not lobby_text.contains(part):
+			_fail("%s playable lobby text missing: %s" % [context, part])
+			return false
+	if legacy_run_screen.find_child("StartRunButton", true, false) != null:
+		_fail("%s playable lobby should not expose direct start form controls before choosing the run tab" % context)
+		return false
+	return true
 
 func _wait_for_screen(router: Node, screen_id: String) -> bool:
 	for _frame in range(180):
@@ -135,12 +152,17 @@ func _has_visible_placeholder(node: Node) -> bool:
 			return true
 	return false
 
-func _cleanup() -> void:
-	if main_node != null and is_instance_valid(main_node):
-		main_node.queue_free()
-	main_node = null
+func _find_button_containing(node: Node, text: String) -> Button:
+	if node is Button and (node as Button).text.contains(text):
+		return node as Button
+	for child in node.get_children():
+		var result := _find_button_containing(child, text)
+		if result != null:
+			return result
+	return null
 
 func _fail(message: String) -> void:
 	push_error(message)
-	_cleanup()
+	if main_node != null:
+		main_node.queue_free()
 	quit(1)

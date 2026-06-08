@@ -368,6 +368,9 @@ func set_current_run(run: Dictionary) -> void:
 	_show_run_screen()
 
 func open_screen(screen_id: String) -> bool:
+	if screen_id == WebUiScreenIds.MODE_LOBBY:
+		_show_playable_mode_lobby_screen()
+		return true
 	if screen_id == WebUiScreenIds.PLAYABLE_RUN or _screen_uses_playable_run_shell(screen_id):
 		_show_playable_run_screen()
 		return true
@@ -597,6 +600,9 @@ func _show_run_screen() -> void:
 		target_screen = WebUiScreenIds.NICKNAME_SETUP
 	elif run_store != null and run_store.has_run():
 		target_screen = WebUiScreenIds.screen_for_run_phase(run_store.phase())
+	if target_screen == WebUiScreenIds.MODE_LOBBY:
+		_show_playable_mode_lobby_screen()
+		return
 	if target_screen == WebUiScreenIds.PLAYABLE_RUN:
 		_show_playable_run_screen()
 		return
@@ -609,8 +615,6 @@ func _show_run_screen() -> void:
 		return
 	router.show_screen(target_screen, false)
 	_apply_payload_to_screen(target_screen)
-	if target_screen == WebUiScreenIds.MODE_LOBBY:
-		call_deferred("_refresh_mode_lobby_payload")
 
 func _apply_payload_to_screen(screen_id: String) -> void:
 	var target_node_name := WebUiScreenIds.node_name_for(screen_id)
@@ -665,6 +669,15 @@ func _show_playable_lobby_screen(preferred_mode := "CASUAL") -> Node:
 	if run_screen != null and run_screen.has_method("show_run_lobby"):
 		run_screen.call("show_run_lobby", preferred_mode)
 	return run_screen
+
+func _show_playable_mode_lobby_screen() -> void:
+	var run_screen := get_node_or_null("ScreenRoot/LegacyRunScreen")
+	if run_screen != null and run_screen.has_method("bind_session") and run_screen.get("session") == null:
+		run_screen.bind_session(self)
+	if router != null:
+		router.show_screen(WebUiScreenIds.PLAYABLE_RUN, false)
+	if run_screen != null and run_screen.has_method("show_named_section"):
+		run_screen.call("show_named_section", WebUiScreenIds.MODE_LOBBY)
 
 func _show_playable_section(screen_id: String) -> void:
 	var run_screen := get_node_or_null("ScreenRoot/LegacyRunScreen")

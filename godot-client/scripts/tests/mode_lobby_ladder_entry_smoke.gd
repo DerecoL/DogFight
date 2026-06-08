@@ -6,60 +6,22 @@ func _init() -> void:
 	_run()
 
 func _run() -> void:
-	var main_scene = load("res://scenes/Main.tscn")
-	if main_scene == null:
-		_fail("Main scene failed to load")
+	var main := await _new_logged_in_main("godot-ladder-entry", "天梯入口烟测")
+	if main == null:
 		return
-	var main = main_scene.instantiate()
-	root.add_child(main)
-	await process_frame
-	await process_frame
-
-	var api = main.get("api")
-	if api == null or not api.has_signal("request_finished"):
-		_fail("Main API client must emit request_finished")
-		return
-	api.request_finished.connect(func(path: String, _ok: bool, _status: int, _payload: Dictionary) -> void:
-		seen_paths[path] = true
-	)
-
 	var router = main.get("router")
-	if router == null:
-		_fail("Main session must expose router")
-		return
-	var login_screen = main.get_node_or_null("ScreenRoot/LoginScreen")
-	var account_input = login_screen.get_node_or_null("%AccountInput") as LineEdit
-	var password_input = login_screen.get_node_or_null("%PasswordInput") as LineEdit
-	if account_input == null or password_input == null:
-		_fail("LoginScreen must expose account and password inputs")
-		return
-	var account := "godot-ladder-entry-%d-%d" % [int(Time.get_unix_time_from_system()), Time.get_ticks_usec()]
-	account_input.text = account
-	password_input.text = "dogdice"
-	await login_screen.call("_on_register_pressed")
-	if not await _wait_for_screen(router, "nickname_setup"):
-		_fail("Register should route to nickname setup")
-		return
-	var nickname_screen = main.get_node_or_null("ScreenRoot/NicknameSetupScreen")
-	var nickname_input := _find_line_edit(nickname_screen)
-	if nickname_input == null:
-		_fail("NicknameSetupScreen must expose nickname input")
-		return
-	nickname_input.text = "天梯入口烟测"
-	await nickname_screen.call("_submit_nickname")
-	if not await _wait_for_screen(router, "mode_lobby"):
-		_fail("Nickname should route to mode lobby")
+	if not await _assert_playable_lobby(main, router):
 		return
 
 	seen_paths.clear()
-	var mode_lobby = main.get_node_or_null("ScreenRoot/ModeLobbyScreen")
-	var ladder_button = mode_lobby.find_child("LadderModeButton", true, false) as Button
+	var legacy = main.get_node_or_null("ScreenRoot/LegacyRunScreen")
+	var ladder_button = _find_button_containing(legacy, "进入天梯模式")
 	if ladder_button == null:
-		_fail("Mode lobby must expose LadderModeButton")
+		_fail("Playable mode lobby must expose ladder entry")
 		return
 	ladder_button.pressed.emit()
 	if not await _wait_for_screen(router, "legacy_run"):
-		_fail("Ladder entry without ladder run should open playable ladder home, got %s" % str(router.get("current_screen_id")))
+		_fail("Ladder entry should keep playable shell visible, got %s" % str(router.get("current_screen_id")))
 		return
 	if main.get("run_store").has_run():
 		_fail("Ladder entry without ladder run must not create a run directly")
@@ -70,14 +32,13 @@ func _run() -> void:
 	if not await _wait_for_idle(main):
 		_fail("Ladder home should finish refreshing before interaction")
 		return
-	var legacy = main.get_node_or_null("ScreenRoot/LegacyRunScreen")
-	if legacy == null or str(legacy.get("current_tab")) != "排行":
+	if str(legacy.get("current_tab")) != "排行":
 		_fail("Ladder entry should show leaderboard tab")
 		return
 	var ladder_text := _collect_text(legacy)
 	for part in ["天梯排行榜", "选择天梯狗狗", "开始天梯"]:
-		if not ladder_text.contains(str(part)):
-			_fail("Ladder home missing Web-style start section: %s" % str(part))
+		if not ladder_text.contains(part):
+			_fail("Ladder home missing Web-style start section: %s" % part)
 			return
 	var start_ladder_button = legacy.find_child("StartLadderRunButton", true, false) as Button
 	if start_ladder_button == null:
@@ -93,6 +54,59 @@ func _run() -> void:
 		await process_frame
 	print("Godot mode lobby ladder entry smoke passed")
 	quit(0)
+
+func _new_logged_in_main(account_prefix: String, nickname: String) -> Node:
+	var main_scene = load("res://scenes/Main.tscn")
+	if main_scene == null:
+		_fail("Main scene failed to load")
+		return null
+	var main = main_scene.instantiate()
+	root.add_child(main)
+	await process_frame
+	await process_frame
+	var api = main.get("api")
+	if api == null or not api.has_signal("request_finished"):
+		_fail("Main API client must emit request_finished")
+		return null
+	api.request_finished.connect(func(path: String, _ok: bool, _status: int, _payload: Dictionary) -> void:
+		seen_paths[path] = true
+	)
+	var router = main.get("router")
+	var login_screen = main.get_node_or_null("ScreenRoot/LoginScreen")
+	if router == null or login_screen == null:
+		_fail("Main session must expose router and LoginScreen")
+		return null
+	var account_input = login_screen.get_node_or_null("%AccountInput") as LineEdit
+	var password_input = login_screen.get_node_or_null("%PasswordInput") as LineEdit
+	if account_input == null or password_input == null:
+		_fail("LoginScreen must expose account and password inputs")
+		return null
+	account_input.text = "%s-%d-%d" % [account_prefix, int(Time.get_unix_time_from_system()), Time.get_ticks_usec()]
+	password_input.text = "dogdice"
+	await login_screen.call("_on_register_pressed")
+	if not await _wait_for_screen(router, "nickname_setup"):
+		_fail("Register should route to nickname setup")
+		return null
+	var nickname_input := _find_line_edit(main.get_node_or_null("ScreenRoot/NicknameSetupScreen"))
+	if nickname_input == null:
+		_fail("NicknameSetupScreen must expose nickname input")
+		return null
+	nickname_input.text = nickname
+	await main.get_node_or_null("ScreenRoot/NicknameSetupScreen").call("_submit_nickname")
+	return main
+
+func _assert_playable_lobby(main: Node, router: Node) -> bool:
+	if not await _wait_for_screen(router, "legacy_run"):
+		_fail("Nickname should route to playable mode lobby")
+		return false
+	var legacy = main.get_node_or_null("ScreenRoot/LegacyRunScreen")
+	if legacy == null or not legacy.visible:
+		_fail("Playable mode lobby should show LegacyRunScreen")
+		return false
+	if main.get_node_or_null("ScreenRoot/ModeLobbyScreen").visible:
+		_fail("Playable mode lobby must not show the old standalone ModeLobbyScreen")
+		return false
+	return true
 
 func _wait_for_screen(router: Node, screen_id: String) -> bool:
 	for _frame in range(180):
@@ -151,6 +165,15 @@ func _collect_text(node: Node) -> String:
 	for child in node.get_children():
 		text += _collect_text(child)
 	return text
+
+func _find_button_containing(node: Node, text: String) -> Button:
+	if node is Button and (node as Button).text.contains(text):
+		return node as Button
+	for child in node.get_children():
+		var result := _find_button_containing(child, text)
+		if result != null:
+			return result
+	return null
 
 func _fail(message: String) -> void:
 	push_error(message)

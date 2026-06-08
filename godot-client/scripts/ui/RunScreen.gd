@@ -1109,11 +1109,16 @@ func _start_mode(mode: String) -> void:
 		if str(mode_select.get_item_metadata(index)) == mode:
 			mode_select.select(index)
 			break
-	current_tab = TAB_RUN
 	if _current_run_mode() == mode:
+		current_tab = TAB_RUN
 		_render_shell()
 		return
-	await _on_create_run_pressed()
+	if mode == "LADDER":
+		_switch_tab(TAB_LEADERBOARDS)
+		return
+	current_tab = TAB_RUN
+	_render_shell()
+	call_deferred("_refresh_current_section")
 
 func _start_ladder_run() -> void:
 	for index in range(mode_select.item_count):

@@ -19,6 +19,7 @@ func _run() -> void:
 		_fail("Main must expose router and LegacyRunScreen")
 		return
 	for screen_id in [
+		"mode_lobby",
 		"run_shell",
 		"exploration_map",
 		"run_shop",
