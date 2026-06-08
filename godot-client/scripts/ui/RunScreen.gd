@@ -790,10 +790,12 @@ func _render_map_or_shop(run: Dictionary) -> void:
 		var map_state: Dictionary = _dict(run, "mapState")
 		_add_line(card, "当前节点", str(map_state.get("currentNodeId", "无")))
 		_render_map_route(card, map_state)
-		card.add_child(_action_button("处理事件", _call_session.bind("resolve_map_event", [])))
-		card.add_child(_action_button("完成节点", _call_session.bind("complete_map_node", [])))
-		card.add_child(_action_button("领取怪物奖励", _call_session.bind("claim_monster_reward", [])))
-		card.add_child(_action_button("跳过怪物奖励", _call_session.bind("skip_monster_reward", [])))
+		var current_node := _map_current_node(map_state)
+		if str(current_node.get("kind", "")) == "EVENT" and not _dict(current_node, "event").is_empty():
+			card.add_child(_action_button("处理事件", _call_session.bind("resolve_map_event", [])))
+		if not _dict(map_state, "pendingReward").is_empty():
+			card.add_child(_action_button("领取怪物奖励", _call_session.bind("claim_monster_reward", [])))
+			card.add_child(_action_button("跳过怪物奖励", _call_session.bind("skip_monster_reward", [])))
 	else:
 		var shop_card := _section("跑局商店")
 		_add_line(shop_card, "类型 / 刷新费", "%s / %d" % [_shop_name(str(run.get("shopType", ""))), int(run.get("refreshCost", 0))])
@@ -2753,10 +2755,19 @@ func _render_relic_rail(parent: VBoxContainer, run: Dictionary) -> void:
 		else:
 			var relic_def: Dictionary = _dict(relic, "def")
 			var name := _fallback(str(relic_def.get("name", "")), str(relic.get("relicId", "")))
-			var label := "遗物：%s  %s" % [name, _quality_label(str(relic.get("quality", "")))]
-			_apply_button_icon(button, _relic_texture(relic))
-			button.pressed.connect(_open_relic_from_rail.bind(relic, label))
+		var label := "遗物：%s  %s" % [name, _quality_label(str(relic.get("quality", "")))]
+		_apply_button_icon(button, _relic_texture(relic))
+		button.pressed.connect(_open_relic_from_rail.bind(relic, label))
 		grid.add_child(button)
+
+func _map_current_node(map_state: Dictionary) -> Dictionary:
+	var current_node_id := str(map_state.get("currentNodeId", ""))
+	if current_node_id.is_empty():
+		return {}
+	for node in _array(map_state, "nodes"):
+		if node is Dictionary and str((node as Dictionary).get("id", "")) == current_node_id:
+			return node as Dictionary
+	return {}
 
 func _render_map_route(parent: VBoxContainer, map_state: Dictionary) -> void:
 	var nodes: Array = _array(map_state, "nodes")
