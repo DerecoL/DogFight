@@ -1,7 +1,7 @@
 extends SceneTree
 
 func _init() -> void:
-	var main_scene := load("res://scenes/Main.tscn")
+	var main_scene = load("res://scenes/Main.tscn")
 	if main_scene == null:
 		_fail("Main scene failed to load")
 		return
@@ -38,8 +38,8 @@ func _init() -> void:
 			"shopItems": [],
 		})
 		await process_frame
-		var expected := str(cases[phase])
-		var actual := str(router.get("current_screen_id"))
+		var expected = str(cases[phase])
+		var actual = str(router.get("current_screen_id"))
 		if actual != expected:
 			_fail("Phase %s should route to %s, got %s" % [phase, expected, actual])
 			return

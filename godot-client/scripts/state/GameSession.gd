@@ -151,7 +151,8 @@ func _update_needs_nickname(payload: Dictionary) -> void:
 		return
 	var user = payload.get("user", current_user)
 	if user is Dictionary and not (user as Dictionary).is_empty():
-		needs_nickname_setup = str((user as Dictionary).get("nickname", "")).strip_edges().is_empty()
+		var nickname = (user as Dictionary).get("nickname", null)
+		needs_nickname_setup = nickname == null or str(nickname).strip_edges().is_empty()
 
 func create_run(dog_type := "SHIBA", mode := "CASUAL", lucky_number: Variant = null) -> bool:
 	var body := {"dogType": dog_type, "mode": mode}
@@ -538,5 +539,7 @@ func _show_battle_screen(battle: Dictionary) -> void:
 		battle_screen.start_replay(battle)
 
 func _on_run_changed_for_screen(_run: Dictionary) -> void:
+	if current_user.is_empty():
+		return
 	if run_store.phase() != "BATTLE":
 		_show_run_screen()

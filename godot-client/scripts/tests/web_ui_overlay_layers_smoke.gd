@@ -1,7 +1,7 @@
 extends SceneTree
 
 func _init() -> void:
-	var overlay_scene := load("res://scenes/overlays/OverlayRoot.tscn")
+	var overlay_scene = load("res://scenes/overlays/OverlayRoot.tscn")
 	if overlay_scene == null:
 		_fail("OverlayRoot scene must load")
 		return
@@ -11,7 +11,7 @@ func _init() -> void:
 	if not overlay is CanvasLayer:
 		_fail("OverlayRoot must be CanvasLayer")
 		return
-	var overlay_canvas := overlay as CanvasLayer
+	var overlay_canvas = overlay as CanvasLayer
 	if overlay_canvas.layer != 20:
 		_fail("OverlayRoot CanvasLayer layer must be 20")
 		return
@@ -28,28 +28,28 @@ func _init() -> void:
 	]
 	var previous_index := -1
 	for layer_name in expected_order:
-		var layer := overlay.get_node_or_null(layer_name)
+		var layer = overlay.get_node_or_null(layer_name)
 		if layer == null:
 			_fail("OverlayRoot missing layer: %s" % layer_name)
 			return
 		if not layer is Control:
 			_fail("Overlay layer must be Control: %s" % layer_name)
 			return
-		var control_layer := layer as Control
+		var control_layer = layer as Control
 		if not _is_fullscreen_control(control_layer):
 			_fail("Overlay layer must keep stable fullscreen anchors/grow: %s" % layer_name)
 			return
-		var index := control_layer.get_index()
+		var index = control_layer.get_index()
 		if index <= previous_index:
 			_fail("Overlay layer order is wrong at %s" % layer_name)
 			return
 		previous_index = index
 
-	var blocking := overlay.get_node_or_null("BlockingLayer") as Control
-	var drag := overlay.get_node_or_null("DragLayer") as Control
-	var fx := overlay.get_node_or_null("BattleFxLayer") as Control
-	var tips := overlay.get_node_or_null("TipLayer") as Control
-	var loading := overlay.get_node_or_null("LoadingLayer") as Control
+	var blocking = overlay.get_node_or_null("BlockingLayer") as Control
+	var drag = overlay.get_node_or_null("DragLayer") as Control
+	var fx = overlay.get_node_or_null("BattleFxLayer") as Control
+	var tips = overlay.get_node_or_null("TipLayer") as Control
+	var loading = overlay.get_node_or_null("LoadingLayer") as Control
 	if blocking.visible:
 		_fail("BlockingLayer must be hidden by default")
 		return

@@ -4,7 +4,7 @@ func _init() -> void:
 	_run()
 
 func _run() -> void:
-	var screen_scene := load("res://scenes/screens/NicknameSetupScreen.tscn")
+	var screen_scene = load("res://scenes/screens/NicknameSetupScreen.tscn")
 	if screen_scene == null:
 		_fail("NicknameSetupScreen scene failed to load")
 		return

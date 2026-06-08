@@ -7,6 +7,7 @@ var api_failures: Array[String] = []
 var required_api_paths := [
 	"/auth/register",
 	"/me",
+	"/profile/nickname",
 ]
 var forbidden_legacy_refresh_paths := [
 	"/achievements",
@@ -24,7 +25,7 @@ func _init() -> void:
 	_run()
 
 func _run() -> void:
-	var main_scene := load("res://scenes/Main.tscn")
+	var main_scene = load("res://scenes/Main.tscn")
 	if main_scene == null:
 		_fail("Main scene failed to load")
 		return
@@ -57,7 +58,7 @@ func _run() -> void:
 	if router == null:
 		_fail("Quick start did not initialize router")
 		return
-	var current_screen := str(router.get("current_screen_id"))
+	var current_screen = str(router.get("current_screen_id"))
 	if current_screen == "login":
 		var error_label = login_screen.get_node_or_null("%ErrorLabel")
 		var error_text: String = error_label.text if error_label != null else ""
@@ -66,6 +67,25 @@ func _run() -> void:
 	if not ["nickname_setup", "mode_lobby"].has(current_screen):
 		_fail("Quick start routed to unexpected Web screen: %s" % current_screen)
 		return
+	if current_screen == "nickname_setup":
+		var nickname_screen = main.get_node_or_null("ScreenRoot/NicknameSetupScreen")
+		if nickname_screen == null:
+			_fail("NicknameSetupScreen is missing after quick start")
+			return
+		var nickname_input := _find_line_edit(nickname_screen)
+		if nickname_input == null:
+			_fail("NicknameSetupScreen must provide a nickname input")
+			return
+		nickname_input.text = "Godot烟测"
+		await nickname_screen.call("_submit_nickname")
+		for _frame in range(180):
+			if str(router.get("current_screen_id")) == "mode_lobby":
+				break
+			await process_frame
+		current_screen = str(router.get("current_screen_id"))
+		if current_screen != "mode_lobby":
+			_fail("Nickname submit did not route to mode_lobby, got %s" % current_screen)
+			return
 	var run_screen = main.get_node_or_null("ScreenRoot/LegacyRunScreen")
 	if run_screen == null:
 		_fail("LegacyRunScreen is missing")
@@ -103,3 +123,12 @@ func _fail(message: String) -> void:
 	push_error(message)
 	_cleanup()
 	quit(1)
+
+func _find_line_edit(node: Node) -> LineEdit:
+	if node is LineEdit:
+		return node as LineEdit
+	for child in node.get_children():
+		var result := _find_line_edit(child)
+		if result != null:
+			return result
+	return null

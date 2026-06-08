@@ -36,7 +36,7 @@ func _init() -> void:
 		_fail("WebUiScreenIds.gd must load")
 		return
 
-	var main_scene := load("res://scenes/Main.tscn")
+	var main_scene = load("res://scenes/Main.tscn")
 	if main_scene == null:
 		_fail("Main scene must load")
 		return
@@ -48,12 +48,12 @@ func _init() -> void:
 	await process_frame
 	await process_frame
 
-	var screen_root := main.get_node_or_null("ScreenRoot")
+	var screen_root = main.get_node_or_null("ScreenRoot")
 	if screen_root == null:
 		_fail("Main scene must include ScreenRoot")
 		return
 	for screen_id in manifest.screen_ids():
-		var node_name := str(manifest.node_name_for(screen_id))
+		var node_name = str(manifest.node_name_for(screen_id))
 		if screen_root.get_node_or_null(node_name) == null:
 			_fail("Main ScreenRoot missing Web UI node for %s: %s" % [screen_id, node_name])
 			return

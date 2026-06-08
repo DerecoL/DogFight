@@ -40,8 +40,8 @@ func _init() -> void:
 		_fail("Selected slot must visibly differ from normal slot")
 		return
 
-	var gold := tokens.quality_color("GOLD")
-	var bronze := tokens.quality_color("BRONZE")
+	var gold: Color = tokens.quality_color("GOLD")
+	var bronze: Color = tokens.quality_color("BRONZE")
 	if gold == bronze:
 		_fail("Quality colors must distinguish GOLD and BRONZE")
 		return

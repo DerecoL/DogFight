@@ -51,6 +51,7 @@ func _build_form() -> void:
 		_submit_nickname()
 	)
 	box.add_child(nickname_input)
+	nickname_input.call_deferred("grab_focus")
 
 	status_label = Label.new()
 	status_label.custom_minimum_size = Vector2(0, 34)
