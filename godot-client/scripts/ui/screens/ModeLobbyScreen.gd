@@ -29,7 +29,7 @@ func _build_lobby() -> void:
 	var panel := PanelContainer.new()
 	panel.name = "ModeLobbyPanel"
 	panel.set_anchors_preset(Control.PRESET_CENTER)
-	panel.custom_minimum_size = Vector2(720, 560)
+	panel.custom_minimum_size = Vector2(780, 680)
 	panel.size = panel.custom_minimum_size
 	panel.position = -panel.custom_minimum_size / 2.0
 	if tokens != null:
@@ -73,6 +73,16 @@ func _build_lobby() -> void:
 	run_label.custom_minimum_size = Vector2(0, 52)
 	run_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(run_label)
+
+	var mode_entries := GridContainer.new()
+	mode_entries.columns = 2
+	mode_entries.add_theme_constant_override("h_separation", 10)
+	mode_entries.add_theme_constant_override("v_separation", 8)
+	box.add_child(mode_entries)
+	_add_mode_button(mode_entries, "CasualModeButton", "休闲模式", "开始/继续休闲跑局", _enter_mode.bind("CASUAL"))
+	_add_mode_button(mode_entries, "LadderModeButton", "天梯模式", "开始/继续天梯跑局", _enter_mode.bind("LADDER"))
+	_add_mode_button(mode_entries, "DogfightModeButton", "斗狗模式", "创建、匹配、加入房间", _open_screen.bind("dogfight_rooms"))
+	_add_mode_button(mode_entries, "PeakModeButton", "巅峰模式", "提交完成狗并查看榜单", _open_screen.bind("leaderboards"))
 
 	var form := GridContainer.new()
 	form.columns = 2
@@ -165,6 +175,16 @@ func _add_shortcut_button(parent: Node, text: String, screen_id: String) -> void
 	button.pressed.connect(_open_screen.bind(screen_id))
 	parent.add_child(button)
 
+func _add_mode_button(parent: Node, node_name: String, title: String, detail: String, action: Callable) -> void:
+	var button := Button.new()
+	button.name = node_name
+	button.text = "%s\n%s" % [title, detail]
+	button.custom_minimum_size = Vector2(0, 62)
+	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	button.pressed.connect(action)
+	parent.add_child(button)
+
 func _refresh_content() -> void:
 	if account_label == null:
 		return
@@ -213,6 +233,17 @@ func _start_run() -> void:
 	start_button.disabled = false
 	if not ok:
 		status_label.text = "创建跑局失败，请重试"
+
+func _enter_mode(mode: String) -> void:
+	var run: Dictionary = payload.get("run", {})
+	if not run.is_empty() and str(run.get("mode", "")) == mode:
+		_continue_run()
+		return
+	for index in range(mode_select.item_count):
+		if str(mode_select.get_item_metadata(index)) == mode:
+			mode_select.select(index)
+			break
+	await _start_run()
 
 func _continue_run() -> void:
 	if session != null and session.has_method("set_current_run"):

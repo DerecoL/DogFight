@@ -23,12 +23,16 @@ func _run() -> void:
 	if screen.find_child("StartRunButton", true, false) == null:
 		_fail("ModeLobbyScreen must expose StartRunButton")
 		return
+	for button_name in ["CasualModeButton", "LadderModeButton", "DogfightModeButton", "PeakModeButton"]:
+		if screen.find_child(button_name, true, false) == null:
+			_fail("ModeLobbyScreen must expose Web-style mode entry: %s" % button_name)
+			return
 	var option_count := _count_option_buttons(screen)
 	if option_count < 3:
 		_fail("ModeLobbyScreen must expose dog, mode, and lucky number selectors")
 		return
 	var source := FileAccess.get_file_as_string("res://scripts/ui/screens/ModeLobbyScreen.gd")
-	for needle in ["create_run", "logout", "open_screen", "account_shop", "achievements", "leaderboards", "dogfight_rooms", "account_settings", "SHIBA", "SAMOYED", "MUTT", "BULLY", "EMPEROR", "FROG", "CASUAL", "LADDER"]:
+	for needle in ["create_run", "logout", "open_screen", "休闲模式", "天梯模式", "斗狗模式", "巅峰模式", "account_shop", "achievements", "leaderboards", "dogfight_rooms", "account_settings", "SHIBA", "SAMOYED", "MUTT", "BULLY", "EMPEROR", "FROG", "CASUAL", "LADDER"]:
 		if not source.contains(str(needle)):
 			_fail("ModeLobbyScreen source missing interaction: %s" % str(needle))
 			return
