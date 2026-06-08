@@ -85,10 +85,12 @@ async function saveAchievementProgress(db: Db, userId: string, progress: Achieve
 }
 
 async function getOrCreateDailySet(db: Db, userId: string, dateKey = shanghaiDateKey()) {
-  const existing = await db.dailyTaskSet.findUnique({ where: { userId_dateKey: { userId, dateKey } } })
-  if (existing) return existing
   const state = createInitialDailyTasks(userId, dateKey)
-  return db.dailyTaskSet.create({ data: { userId, dateKey, refreshUsed: state.refreshUsed, tasks: JSON.stringify(state.tasks) } })
+  return db.dailyTaskSet.upsert({
+    where: { userId_dateKey: { userId, dateKey } },
+    update: {},
+    create: { userId, dateKey, refreshUsed: state.refreshUsed, tasks: JSON.stringify(state.tasks) },
+  })
 }
 
 function dailyStateFromRow(row: { dateKey: string; refreshUsed: boolean; tasks: string }): DailyTaskState {

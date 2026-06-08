@@ -2,7 +2,7 @@
 import cookie from '@fastify/cookie'
 import cors from '@fastify/cors'
 import jwt from '@fastify/jwt'
-import Fastify from 'fastify'
+import Fastify, { type FastifyInstance } from 'fastify'
 import { Prisma, type ApexEntry, type ItemInstance } from '@prisma/client'
 import { z } from 'zod'
 import { cookieOptionsForEnv, resolveServerConfig } from './config'
@@ -53,6 +53,30 @@ type RewardSummary = {
   entries: RewardSummaryEntry[]
 }
 
+function shouldSerializeApiRequests() {
+  return process.env.DOGFIGHT_SERIALIZE_API_REQUESTS === '1'
+}
+
+function installRequestSerializer(app: FastifyInstance) {
+  let tail = Promise.resolve()
+  app.addHook('onRequest', async (_, reply) => {
+    let release!: () => void
+    const previous = tail
+    tail = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    await previous
+    let released = false
+    const done = () => {
+      if (released) return
+      released = true
+      release()
+    }
+    reply.raw.once('finish', done)
+    reply.raw.once('close', done)
+  })
+}
+
 declare module 'fastify' {
   interface FastifyRequest {
     userId?: string
@@ -63,6 +87,9 @@ export function buildApp() {
   const config = resolveServerConfig()
   const authCookieOptions = cookieOptionsForEnv(config.nodeEnv)
   const app = Fastify({ logger: false })
+  if (shouldSerializeApiRequests()) {
+    installRequestSerializer(app)
+  }
   app.register(cors, { origin: true, credentials: true })
   app.register(cookie)
   app.register(jwt, { secret: config.jwtSecret })

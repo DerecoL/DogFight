@@ -49,6 +49,37 @@ describeWithDatabase('run API', () => {
     expect(run.mapState.availableNodeIds.length).toBeLessThanOrEqual(3)
   })
 
+  it('initializes account daily state safely when lobby refresh races run creation', async () => {
+    const previous = process.env.DOGFIGHT_SERIALIZE_API_REQUESTS
+    process.env.DOGFIGHT_SERIALIZE_API_REQUESTS = '1'
+    const serializedApp = buildApp()
+    try {
+      const agent = request.agent(serializedApp.server)
+      await serializedApp.ready()
+      const account = `daily-race-${Date.now()}-${Math.random()}`
+      await agent.post('/api/auth/register').send({ account, password: 'dogdice' }).expect(200)
+      await agent.post('/api/profile/nickname').send({ nickname: '并发开局' }).expect(200)
+
+      const [me, daily, created] = await Promise.all([
+        agent.get('/api/me'),
+        agent.get('/api/daily-tasks'),
+        agent.post('/api/runs').send({ dogType: 'SHIBA', mode: 'CASUAL' }),
+      ])
+
+      expect(me.status).toBe(200)
+      expect(daily.status).toBe(200)
+      expect(created.status).toBe(200)
+      expect(created.body.run.phase).toBe('MAP')
+    } finally {
+      await serializedApp.close()
+      if (previous == null) {
+        delete process.env.DOGFIGHT_SERIALIZE_API_REQUESTS
+      } else {
+        process.env.DOGFIGHT_SERIALIZE_API_REQUESTS = previous
+      }
+    }
+  })
+
   it('routes equipment shop map nodes into equipment-only shop choices', async () => {
     const { agent, run } = await createAuthenticatedRun()
     const map = run.mapState

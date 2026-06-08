@@ -36,6 +36,7 @@ function runNpmScript(script) {
 }
 
 process.env.DATABASE_URL = ensureSslDisabled(process.env.DATABASE_URL)
+process.env.DOGFIGHT_SERIALIZE_API_REQUESTS ??= '1'
 
 await runNpmScript('db:push')
 await runNpmScript('dev:app')

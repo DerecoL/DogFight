@@ -23,6 +23,7 @@ func _run() -> void:
 		return
 
 	var cases := {
+		"account": "账号",
 		"account_shop": "商城",
 		"achievements": "成就",
 		"leaderboards": "排行",
