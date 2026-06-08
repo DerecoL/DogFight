@@ -25,7 +25,7 @@ func _init() -> void:
 		"POTION_CHOICE": "legacy_run",
 		"PREP": "legacy_run",
 		"MATCH": "legacy_run",
-		"BATTLE": "battle_replay",
+		"BATTLE": "legacy_run",
 		"COMPLETE": "legacy_run",
 	}
 	for phase in cases.keys():
@@ -43,6 +43,27 @@ func _init() -> void:
 		if actual != expected:
 			_fail("Phase %s should route to %s, got %s" % [phase, expected, actual])
 			return
+
+	main.call("set_current_run", {
+		"id": "route-smoke",
+		"phase": "BATTLE",
+		"status": "ACTIVE",
+		"items": [],
+		"relics": [],
+		"shopItems": [],
+		"lastBattle": {
+			"id": "route-battle",
+			"playerMaxHp": 100,
+			"opponentMaxHp": 100,
+			"playerSnapshot": {"name": "玩家", "dogType": "SHIBA", "items": [], "relics": []},
+			"opponentSnapshot": {"name": "对手", "dogType": "MUTT", "items": [], "relics": []},
+			"events": [],
+		},
+	})
+	await process_frame
+	if str(router.get("current_screen_id")) != "battle_replay":
+		_fail("BATTLE with lastBattle should route to battle_replay, got %s" % str(router.get("current_screen_id")))
+		return
 
 	main.queue_free()
 	for _frame in range(2):

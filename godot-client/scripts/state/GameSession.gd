@@ -582,6 +582,13 @@ func _show_run_screen() -> void:
 	if target_screen == WebUiScreenIds.PLAYABLE_RUN:
 		_show_playable_run_screen()
 		return
+	if target_screen == WebUiScreenIds.BATTLE_REPLAY:
+		var last_battle := run_store.last_battle()
+		if last_battle.is_empty():
+			_show_playable_run_screen()
+		else:
+			_show_battle_screen(last_battle)
+		return
 	router.show_screen(target_screen, false)
 	_apply_payload_to_screen(target_screen)
 	if target_screen == WebUiScreenIds.MODE_LOBBY:
