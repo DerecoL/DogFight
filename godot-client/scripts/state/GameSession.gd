@@ -279,8 +279,7 @@ func finish_dogfight_room_battle(room_id: String, _battle_id := "", mark_ready :
 	var run_screen := get_node_or_null("ScreenRoot/LegacyRunScreen")
 	if run_screen != null and run_screen.has_method("_apply_room_response"):
 		await run_screen.call("_apply_room_response", response, "ready_room")
-	else:
-		_show_playable_section(WebUiScreenIds.DOGFIGHT_ROOMS)
+	_show_playable_section(WebUiScreenIds.DOGFIGHT_ROOMS)
 	return true
 
 func _post_run_action(path: String, body: Dictionary, success_action := "") -> bool:
@@ -366,6 +365,9 @@ func set_current_run(run: Dictionary) -> void:
 	store.set_current_run(run)
 	run_changed.emit(run)
 	_show_run_screen()
+
+func sync_current_run_without_routing(run: Dictionary) -> void:
+	store.set_current_run(run)
 
 func open_screen(screen_id: String) -> bool:
 	if screen_id == WebUiScreenIds.MODE_LOBBY:

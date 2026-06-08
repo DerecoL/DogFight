@@ -52,7 +52,7 @@ func _run() -> void:
 	if not await _register_guest_and_join_room(room_id):
 		return
 
-	var start_button = _find_button_containing(legacy, "开始房间")
+	var start_button = await _wait_for_button_containing(legacy, "开始房间")
 	if start_button == null:
 		_fail("Host room detail must expose start-room action after creation")
 		return
@@ -212,6 +212,14 @@ func _wait_for_room_dog_choice_button(legacy: Node) -> Button:
 		var choice_button = legacy.find_child("RoomDogChoiceButton", true, false) as Button
 		if choice_button != null and choice_button.is_visible_in_tree():
 			return choice_button
+		await process_frame
+	return null
+
+func _wait_for_button_containing(node: Node, text: String) -> Button:
+	for _frame in range(180):
+		var button := _find_button_containing(node, text)
+		if button != null:
+			return button
 		await process_frame
 	return null
 

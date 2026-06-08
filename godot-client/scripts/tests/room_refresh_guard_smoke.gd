@@ -15,12 +15,21 @@ func _run() -> void:
 	if body.is_empty():
 		_fail("RunScreen missing _refresh_rooms")
 		return
-	var raw_check_body := body.replace("_guarded_fetch_into(", "")
-	if raw_check_body.contains("_fetch_into("):
-		_fail("_refresh_rooms must not call _fetch_into directly without action guard")
+	if not body.contains("var manages_progress := not action_in_progress"):
+		_fail("_refresh_rooms must decide whether it owns the action guard")
 		return
-	if not body.contains("_guarded_fetch_into("):
-		_fail("_refresh_rooms must use guarded fetch")
+	if not body.contains("action_in_progress = true") or not body.contains("action_in_progress = false"):
+		_fail("_refresh_rooms must manage action_in_progress around manual refreshes")
+		return
+	if not body.contains("_update_controls()") or not body.contains("_refresh_rooms_payload()"):
+		_fail("_refresh_rooms must disable controls while refreshing room payload")
+		return
+	var payload_body := _function_body(source, "func _refresh_rooms_payload")
+	if payload_body.is_empty():
+		_fail("RunScreen missing _refresh_rooms_payload")
+		return
+	if not payload_body.contains("_refresh_active_room()") or not payload_body.contains("ApiRoutes.dogfight_rooms()"):
+		_fail("_refresh_rooms_payload must refresh active room details and room list data")
 		return
 	print("Godot room refresh guard smoke passed")
 	quit(0)

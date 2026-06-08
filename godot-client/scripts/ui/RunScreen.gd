@@ -1257,7 +1257,7 @@ func _refresh_current_section() -> void:
 			await _fetch_into("ladder", ApiRoutes.ladder_me())
 			await _fetch_into("history", ApiRoutes.runs_history())
 		TAB_ROOMS:
-			await _fetch_into("rooms", ApiRoutes.dogfight_rooms())
+			await _refresh_active_room()
 		TAB_SETTINGS:
 			await _fetch_into("cosmetics", ApiRoutes.cosmetics_me())
 	action_in_progress = false
@@ -1377,8 +1377,21 @@ func _toggle_music() -> void:
 	_render_shell()
 
 func _refresh_rooms() -> void:
-	await _guarded_fetch_into("rooms", ApiRoutes.dogfight_rooms())
+	var manages_progress := not action_in_progress
+	if manages_progress:
+		action_in_progress = true
+		_update_controls()
+	await _refresh_rooms_payload()
+	if manages_progress:
+		action_in_progress = false
+		_update_controls()
 	_render_shell()
+
+func _refresh_rooms_payload() -> void:
+	if active_room.is_empty():
+		await _fetch_into("rooms", ApiRoutes.dogfight_rooms())
+	else:
+		await _refresh_active_room()
 
 func _refresh_active_room() -> void:
 	var room_id := str(active_room.get("id", ""))
@@ -1474,7 +1487,11 @@ func _apply_room_response(response: Dictionary, success_action := "") -> void:
 
 func _sync_room_run(room: Dictionary) -> void:
 	var room_run: Dictionary = _dict(room, "currentRun")
-	if not room_run.is_empty() and session != null and session.has_method("set_current_run"):
+	if room_run.is_empty() or session == null:
+		return
+	if session.has_method("sync_current_run_without_routing"):
+		session.sync_current_run_without_routing(room_run)
+	elif session.has_method("set_current_run"):
 		session.set_current_run(room_run)
 
 func _post_and_store(path: String, body: Dictionary, target: String, success_action := "") -> void:
