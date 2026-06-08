@@ -30,15 +30,25 @@ func request_json(method: int, path: String, body: Dictionary = {}) -> Dictionar
 	var start_error := http.request(url, headers, method, payload)
 	if start_error != OK:
 		http.queue_free()
-		var failed := {"ok": false, "status": 0, "error": "请求启动失败", "data": {}}
-		_finish_request(path, false, 0, failed)
-		return failed
+		var start_failed := {"ok": false, "status": 0, "error": _local_service_unavailable_message(), "data": {}}
+		_finish_request(path, false, 0, start_failed)
+		return start_failed
 	var response: Array = await http.request_completed
 	var status := int(response[1])
 	var response_headers: PackedStringArray = response[2]
 	var bytes: PackedByteArray = response[3]
 	_capture_cookie(response_headers)
 	var text := bytes.get_string_from_utf8()
+	if status == 0:
+		http.queue_free()
+		var connection_failed := {"ok": false, "status": status, "error": _local_service_unavailable_message(), "data": {}}
+		_finish_request(path, false, status, connection_failed)
+		return connection_failed
+	if text.strip_edges().is_empty():
+		http.queue_free()
+		var empty_response := {"ok": false, "status": status, "error": "服务端返回空响应，请确认本地服务状态", "data": {}}
+		_finish_request(path, false, status, empty_response)
+		return empty_response
 	var parsed = JSON.parse_string(text)
 	var data: Dictionary = parsed if parsed is Dictionary else {}
 	var ok := status >= 200 and status < 300
@@ -72,6 +82,9 @@ func _finish_request(path: String, ok: bool, status: int, payload: Dictionary) -
 	request_finished.emit(path, ok, status, payload)
 	if not is_loading():
 		loading_changed.emit(false)
+
+func _local_service_unavailable_message() -> String:
+	return "本地服务未启动。请先运行 scripts/start-godot-dev.ps1，再登录、注册或快速开始。"
 
 func _capture_cookie(headers: PackedStringArray) -> void:
 	for header in headers:
