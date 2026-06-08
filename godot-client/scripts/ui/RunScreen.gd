@@ -3287,6 +3287,27 @@ func _update_controls() -> void:
 		for child in nav_list.get_children():
 			if child is Button:
 				child.disabled = action_in_progress
+	if content != null:
+		_set_buttons_disabled(content, action_in_progress)
+	var stack := _modal_stack()
+	if stack != null:
+		var panels: Array = stack.get("stack")
+		for panel in panels:
+			if panel is Node:
+				_set_buttons_disabled(panel, action_in_progress)
+
+func _set_buttons_disabled(node: Node, disabled: bool) -> void:
+	if node is Button:
+		var button := node as Button
+		if disabled:
+			if not button.disabled:
+				button.set_meta("disabled_by_action", true)
+				button.disabled = true
+		elif button.has_meta("disabled_by_action"):
+			button.remove_meta("disabled_by_action")
+			button.disabled = false
+	for child in node.get_children():
+		_set_buttons_disabled(child, disabled)
 
 func _clear_children(container: Node) -> void:
 	for child in container.get_children():
