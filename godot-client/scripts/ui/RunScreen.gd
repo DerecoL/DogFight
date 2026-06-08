@@ -864,15 +864,6 @@ func _render_shop_tab() -> void:
 		for item in _array(sections, section_name):
 			if item is Dictionary:
 				card.add_child(_action_button(_shop_catalog_button_label(item), _show_cosmetic_modal.bind(item)))
-	var cosmetic_card := _section("已拥有外观")
-	var default_row := HBoxContainer.new()
-	default_row.add_theme_constant_override("separation", 8)
-	cosmetic_card.add_child(default_row)
-	for cosmetic_type in ["TITLE", "AVATAR", "BACKGROUND", "DOG_SKIN", "BATTLE_EFFECT"]:
-		default_row.add_child(_action_button("默认 " + _cosmetic_type_label(cosmetic_type), _unequip_cosmetic.bind(cosmetic_type)))
-	for item in _array(cosmetics_data, "inventory"):
-		if item is Dictionary:
-			cosmetic_card.add_child(_action_button("查看 %s" % _cosmetic_display_name(item), _show_cosmetic_modal.bind(item)))
 
 func _render_leaderboards_tab() -> void:
 	var ladder_card := _section("天梯排行榜")

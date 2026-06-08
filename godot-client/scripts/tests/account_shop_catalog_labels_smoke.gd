@@ -67,9 +67,13 @@ func _run() -> void:
 	run_screen.call("_render_current_tab")
 	await process_frame
 	var text := _collect_text(run_screen)
-	for part in ["账号商城 / 外观", "余额 360 / 今日获得 40", "常驻区", "精选轮换区", "购买 纸冠头衔", "称号", "史诗", "装备 皇冠头像", "头像", "稀有", "已装备 皇家犬舍", "主页背景", "传说", "默认 称号"]:
+	for part in ["账号商城 / 外观", "余额 360 / 今日获得 40", "常驻区", "精选轮换区", "购买 纸冠头衔", "称号", "史诗", "装备 皇冠头像", "头像", "稀有", "已装备 皇家犬舍", "主页背景", "传说"]:
 		if not text.contains(str(part)):
 			_fail("Account shop catalog label missing: %s" % str(part))
+			return
+	for forbidden in ["默认 称号", "默认 头像", "默认 主页背景", "默认 狗狗皮肤", "默认 战斗特效"]:
+		if text.contains(str(forbidden)):
+			_fail("Account shop must not expose settings-only default cosmetic action: %s" % str(forbidden))
 			return
 	for raw in ["featured", "permanent", "TITLE", "AVATAR", "BACKGROUND"]:
 		if text.contains(str(raw)):
