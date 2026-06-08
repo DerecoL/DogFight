@@ -738,10 +738,19 @@ func _render_map_or_shop_detail(run: Dictionary) -> void:
 	var shop_type := str(run.get("shopType", "GENERAL"))
 	_add_line(shop_card, _shop_name(shop_type), _shop_description(shop_type))
 	shop_card.add_child(_action_button("刷新 %d 金币" % int(run.get("refreshCost", 0)), _call_session.bind("reroll_shop", [])))
+	shop_card.add_child(_shop_progression_button(run))
 	_add_line(shop_card, "提示", "点击商品查看详情，确认后再购买。")
 	for offer in _array(run, "shopItems"):
 		if offer is Dictionary:
 			_render_shop_offer_card(shop_card, run, offer)
+
+func _shop_progression_button(run: Dictionary) -> Button:
+	var map_state: Dictionary = _dict(run, "mapState")
+	var current_node := _map_current_node(map_state)
+	if not current_node.is_empty():
+		var label := "进入战斗" if str(current_node.get("kind", "")) == "PLAYER_BATTLE" else "返回地图"
+		return _action_button(label, _call_session.bind("complete_map_node", []))
+	return _action_button("匹配对手", _call_session.bind("match_battle", []))
 
 func _render_shop_offer_card(parent: VBoxContainer, run: Dictionary, offer: Dictionary) -> void:
 	var def: Dictionary = _dict(offer, "def")
