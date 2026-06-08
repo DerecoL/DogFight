@@ -152,8 +152,42 @@ func _init() -> void:
 		push_error("OverlayRoot BlockingLayer must render below ModalLayer")
 		quit(1)
 		return
-	if toast_layer.get_index() <= modal_layer.get_index():
-		push_error("OverlayRoot ToastLayer must render above ModalLayer")
+	if toast_layer.get_index() >= modal_layer.get_index():
+		push_error("OverlayRoot ToastLayer must render below ModalLayer and above tips")
+		quit(1)
+		return
+	var drag_layer = overlay_root.get_node_or_null("DragLayer")
+	var fx_layer = overlay_root.get_node_or_null("BattleFxLayer")
+	var tip_layer = overlay_root.get_node_or_null("TipLayer")
+	var confirm_layer = overlay_root.get_node_or_null("ConfirmLayer")
+	var loading_layer = overlay_root.get_node_or_null("LoadingLayer")
+	if drag_layer == null or fx_layer == null or tip_layer == null or confirm_layer == null or loading_layer == null:
+		push_error("OverlayRoot must include drag, fx, tip, confirm, and loading layers")
+		quit(1)
+		return
+	var expected_overlay_order := [
+		blocking_layer,
+		drag_layer,
+		fx_layer,
+		tip_layer,
+		toast_layer,
+		modal_layer,
+		confirm_layer,
+		loading_layer,
+	]
+	var previous_overlay_index := -1
+	for overlay_layer in expected_overlay_order:
+		if overlay_layer.get_index() <= previous_overlay_index:
+			push_error("OverlayRoot layer order is not Blocking/Drag/Fx/Tip/Toast/Modal/Confirm/Loading")
+			quit(1)
+			return
+		previous_overlay_index = overlay_layer.get_index()
+	if tip_layer.get_index() >= toast_layer.get_index():
+		push_error("OverlayRoot ToastLayer must render above TipLayer and below ModalLayer")
+		quit(1)
+		return
+	if confirm_layer.get_index() <= modal_layer.get_index() or loading_layer.get_index() <= confirm_layer.get_index():
+		push_error("OverlayRoot blocking layers are not ordered correctly")
 		quit(1)
 		return
 	overlay_root.free()

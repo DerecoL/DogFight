@@ -1,10 +1,24 @@
-[gd_scene load_steps=6 format=3 uid="uid://dogfight_main"]
+[gd_scene load_steps=20 format=3 uid="uid://dogfight_main"]
 
 [ext_resource type="Script" path="res://scripts/state/GameSession.gd" id="1_session"]
 [ext_resource type="PackedScene" path="res://scenes/LoginScreen.tscn" id="2_login"]
 [ext_resource type="PackedScene" path="res://scenes/RunScreen.tscn" id="3_run"]
 [ext_resource type="PackedScene" path="res://scenes/BattleReplayScreen.tscn" id="4_battle"]
 [ext_resource type="PackedScene" path="res://scenes/overlays/OverlayRoot.tscn" id="5_overlay"]
+[ext_resource type="PackedScene" path="res://scenes/screens/ModeLobbyScreen.tscn" id="6_mode_lobby"]
+[ext_resource type="PackedScene" path="res://scenes/screens/RunShellScreen.tscn" id="7_run_shell"]
+[ext_resource type="PackedScene" path="res://scenes/screens/ExplorationMapScreen.tscn" id="8_exploration_map"]
+[ext_resource type="PackedScene" path="res://scenes/screens/RunShopScreen.tscn" id="9_run_shop"]
+[ext_resource type="PackedScene" path="res://scenes/screens/RewardChoiceScreen.tscn" id="10_reward_choice"]
+[ext_resource type="PackedScene" path="res://scenes/screens/RunSettlementScreen.tscn" id="11_run_settlement"]
+[ext_resource type="PackedScene" path="res://scenes/screens/AccountShopScreen.tscn" id="12_account_shop"]
+[ext_resource type="PackedScene" path="res://scenes/screens/AchievementsScreen.tscn" id="13_achievements"]
+[ext_resource type="PackedScene" path="res://scenes/screens/LeaderboardsScreen.tscn" id="14_leaderboards"]
+[ext_resource type="PackedScene" path="res://scenes/screens/SeasonScreen.tscn" id="15_season"]
+[ext_resource type="PackedScene" path="res://scenes/screens/DogfightRoomsScreen.tscn" id="16_rooms"]
+[ext_resource type="PackedScene" path="res://scenes/screens/DogfightRoomDetailScreen.tscn" id="17_room_detail"]
+[ext_resource type="PackedScene" path="res://scenes/screens/AccountSettingsScreen.tscn" id="18_settings"]
+[ext_resource type="PackedScene" path="res://scenes/screens/NicknameSetupScreen.tscn" id="19_nickname_setup"]
 
 [node name="Main" type="Control"]
 layout_mode = 3
@@ -26,10 +40,52 @@ grow_vertical = 2
 [node name="LoginScreen" parent="ScreenRoot" instance=ExtResource("2_login")]
 layout_mode = 1
 
-[node name="RunScreen" parent="ScreenRoot" instance=ExtResource("3_run")]
+[node name="LegacyRunScreen" parent="ScreenRoot" instance=ExtResource("3_run")]
+layout_mode = 1
+
+[node name="NicknameSetupScreen" parent="ScreenRoot" instance=ExtResource("19_nickname_setup")]
+layout_mode = 1
+
+[node name="ModeLobbyScreen" parent="ScreenRoot" instance=ExtResource("6_mode_lobby")]
+layout_mode = 1
+
+[node name="RunShellScreen" parent="ScreenRoot" instance=ExtResource("7_run_shell")]
+layout_mode = 1
+
+[node name="ExplorationMapScreen" parent="ScreenRoot" instance=ExtResource("8_exploration_map")]
+layout_mode = 1
+
+[node name="RunShopScreen" parent="ScreenRoot" instance=ExtResource("9_run_shop")]
+layout_mode = 1
+
+[node name="RewardChoiceScreen" parent="ScreenRoot" instance=ExtResource("10_reward_choice")]
 layout_mode = 1
 
 [node name="BattleReplayScreen" parent="ScreenRoot" instance=ExtResource("4_battle")]
+layout_mode = 1
+
+[node name="RunSettlementScreen" parent="ScreenRoot" instance=ExtResource("11_run_settlement")]
+layout_mode = 1
+
+[node name="AccountShopScreen" parent="ScreenRoot" instance=ExtResource("12_account_shop")]
+layout_mode = 1
+
+[node name="AchievementsScreen" parent="ScreenRoot" instance=ExtResource("13_achievements")]
+layout_mode = 1
+
+[node name="LeaderboardsScreen" parent="ScreenRoot" instance=ExtResource("14_leaderboards")]
+layout_mode = 1
+
+[node name="SeasonScreen" parent="ScreenRoot" instance=ExtResource("15_season")]
+layout_mode = 1
+
+[node name="DogfightRoomsScreen" parent="ScreenRoot" instance=ExtResource("16_rooms")]
+layout_mode = 1
+
+[node name="DogfightRoomDetailScreen" parent="ScreenRoot" instance=ExtResource("17_room_detail")]
+layout_mode = 1
+
+[node name="AccountSettingsScreen" parent="ScreenRoot" instance=ExtResource("18_settings")]
 layout_mode = 1
 
 [node name="OverlayRoot" parent="." instance=ExtResource("5_overlay")]

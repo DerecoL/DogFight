@@ -511,11 +511,6 @@ Create `godot-client/scripts/tests/web_ui_main_scene_smoke.gd`:
 extends SceneTree
 
 func _init() -> void:
-	var manifest = load("res://scripts/ui/web/WebUiScreenIds.gd")
-	if manifest == null:
-		_fail("WebUiScreenIds.gd must load before main scene smoke")
-		return
-
 	var scene_paths := {
 		"mode_lobby": "res://scenes/screens/ModeLobbyScreen.tscn",
 		"run_shell": "res://scenes/screens/RunShellScreen.tscn",
@@ -545,29 +540,6 @@ func _init() -> void:
 			return
 		instance.free()
 
-	var main_scene := load("res://scenes/Main.tscn")
-	if main_scene == null:
-		_fail("Main.tscn must load")
-		return
-	var main = main_scene.instantiate()
-	root.add_child(main)
-	await process_frame
-	var screen_root := main.get_node_or_null("ScreenRoot")
-	if screen_root == null:
-		_fail("Main.tscn must include ScreenRoot")
-		return
-	for screen_id in manifest.screen_ids():
-		var node_name := str(manifest.node_name_for(screen_id))
-		var node := screen_root.get_node_or_null(node_name)
-		if node == null:
-			_fail("Main ScreenRoot missing node %s for %s" % [node_name, screen_id])
-			return
-	if screen_root.get_node_or_null("LegacyRunScreen") == null:
-		_fail("Legacy RunScreen must be renamed to LegacyRunScreen during migration")
-		return
-	main.queue_free()
-	for _frame in range(2):
-		await process_frame
 	print("Web UI main scene smoke passed")
 	quit(0)
 
@@ -809,7 +781,7 @@ Run:
 godot --headless --path E:\AI-GPT\DogFight\godot-client --script res://scripts/tests/web_ui_main_scene_smoke.gd
 ```
 
-Expected: FAIL with `Main ScreenRoot missing node ModeLobbyScreen for mode_lobby`.
+Expected: PASS with `Web UI main scene smoke passed`.
 
 - [ ] **Step 7: Commit**
 
@@ -823,17 +795,90 @@ git commit -m "Add Godot Web UI screen skeletons"
 ### Task 4: Main 场景注册 Web 屏幕并隔离 Legacy RunScreen
 
 **Files:**
+- Create: `godot-client/scripts/ui/screens/NicknameSetupScreen.gd`
+- Create: `godot-client/scenes/screens/NicknameSetupScreen.tscn`
 - Modify: `godot-client/scenes/Main.tscn`
 - Modify: `godot-client/scripts/state/GameSession.gd`
 - Test: `godot-client/scripts/tests/web_ui_main_scene_smoke.gd`
 - Test: `godot-client/scripts/tests/router_smoke.gd`
 
-- [ ] **Step 1: Add new scene resources to Main.tscn**
+- [ ] **Step 1: Extend the main scene smoke with Main registration assertions**
+
+Append the Main scene registration checks to `godot-client/scripts/tests/web_ui_main_scene_smoke.gd` after the skeleton scene loop and before the success print:
+
+```gdscript
+	var manifest = load("res://scripts/ui/web/WebUiScreenIds.gd")
+	if manifest == null:
+		_fail("WebUiScreenIds.gd must load before main scene checks")
+		return
+	var main_scene := load("res://scenes/Main.tscn")
+	if main_scene == null:
+		_fail("Main.tscn must load")
+		return
+	var main = main_scene.instantiate()
+	root.add_child(main)
+	await process_frame
+	var screen_root := main.get_node_or_null("ScreenRoot")
+	if screen_root == null:
+		_fail("Main.tscn must include ScreenRoot")
+		return
+	for screen_id in manifest.screen_ids():
+		var node_name := str(manifest.node_name_for(screen_id))
+		var node := screen_root.get_node_or_null(node_name)
+		if node == null:
+			_fail("Main ScreenRoot missing node %s for %s" % [node_name, screen_id])
+			return
+	if screen_root.get_node_or_null("LegacyRunScreen") == null:
+		_fail("Legacy RunScreen must be renamed to LegacyRunScreen during migration")
+		return
+	main.queue_free()
+	for _frame in range(2):
+		await process_frame
+```
+
+Run:
+
+```powershell
+godot --headless --path E:\AI-GPT\DogFight\godot-client --script res://scripts/tests/web_ui_main_scene_smoke.gd
+```
+
+Expected: FAIL with `Main ScreenRoot missing node NicknameSetupScreen for nickname_setup` or the first missing Web screen node.
+
+- [ ] **Step 2: Add the missing nickname setup skeleton**
+
+Create `godot-client/scripts/ui/screens/NicknameSetupScreen.gd`:
+
+```gdscript
+extends BaseWebScreen
+
+func _ready() -> void:
+	_make_placeholder("设置昵称", "Web 对齐目标：昵称输入、确认、错误提示和进入大厅。")
+```
+
+Create `godot-client/scenes/screens/NicknameSetupScreen.tscn`:
+
+```text
+[gd_scene load_steps=2 format=3 uid="uid://dogfight_nickname_setup_screen"]
+
+[ext_resource type="Script" path="res://scripts/ui/screens/NicknameSetupScreen.gd" id="1_script"]
+
+[node name="NicknameSetupScreen" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 1
+script = ExtResource("1_script")
+```
+
+- [ ] **Step 3: Add new scene resources to Main.tscn**
 
 Modify `godot-client/scenes/Main.tscn` header to include all screen resources. Preserve existing `LoginScreen` and `BattleReplayScreen`.
 
 ```text
-[gd_scene load_steps=19 format=3 uid="uid://dogfight_main"]
+[gd_scene load_steps=20 format=3 uid="uid://dogfight_main"]
 
 [ext_resource type="Script" path="res://scripts/state/GameSession.gd" id="1_session"]
 [ext_resource type="PackedScene" path="res://scenes/LoginScreen.tscn" id="2_login"]
@@ -853,9 +898,10 @@ Modify `godot-client/scenes/Main.tscn` header to include all screen resources. P
 [ext_resource type="PackedScene" path="res://scenes/screens/DogfightRoomsScreen.tscn" id="16_rooms"]
 [ext_resource type="PackedScene" path="res://scenes/screens/DogfightRoomDetailScreen.tscn" id="17_room_detail"]
 [ext_resource type="PackedScene" path="res://scenes/screens/AccountSettingsScreen.tscn" id="18_settings"]
+[ext_resource type="PackedScene" path="res://scenes/screens/NicknameSetupScreen.tscn" id="19_nickname_setup"]
 ```
 
-- [ ] **Step 2: Rename legacy node and add Web screen instances**
+- [ ] **Step 4: Rename legacy node and add Web screen instances**
 
 Inside `ScreenRoot`, rename the old `RunScreen` instance to `LegacyRunScreen` and add new nodes:
 
@@ -864,6 +910,9 @@ Inside `ScreenRoot`, rename the old `RunScreen` instance to `LegacyRunScreen` an
 layout_mode = 1
 
 [node name="LegacyRunScreen" parent="ScreenRoot" instance=ExtResource("3_run")]
+layout_mode = 1
+
+[node name="NicknameSetupScreen" parent="ScreenRoot" instance=ExtResource("19_nickname_setup")]
 layout_mode = 1
 
 [node name="ModeLobbyScreen" parent="ScreenRoot" instance=ExtResource("6_mode_lobby")]
@@ -909,7 +958,7 @@ layout_mode = 1
 layout_mode = 1
 ```
 
-- [ ] **Step 3: Update GameSession imports**
+- [ ] **Step 5: Update GameSession imports**
 
 At the top of `godot-client/scripts/state/GameSession.gd`, add:
 
@@ -917,7 +966,7 @@ At the top of `godot-client/scripts/state/GameSession.gd`, add:
 const WebUiScreenIds := preload("res://scripts/ui/web/WebUiScreenIds.gd")
 ```
 
-- [ ] **Step 4: Update GameSession screen registration**
+- [ ] **Step 6: Update GameSession screen registration**
 
 Replace the current hard-coded registration block:
 
@@ -937,7 +986,7 @@ for screen_id in WebUiScreenIds.screen_ids():
 router.show_screen(WebUiScreenIds.LOGIN, false)
 ```
 
-- [ ] **Step 5: Bind all Web skeleton screens to the session**
+- [ ] **Step 7: Bind all Web skeleton screens to the session**
 
 Add this helper to `GameSession.gd`:
 
@@ -963,7 +1012,7 @@ if login_screen != null and login_screen.has_signal("login_succeeded") and not l
 	login_screen.login_succeeded.connect(_show_run_screen)
 ```
 
-- [ ] **Step 6: Route run changes to Web phase screens**
+- [ ] **Step 8: Route run changes to Web phase screens**
 
 Replace `_show_run_screen()` body with:
 
@@ -983,7 +1032,7 @@ func _show_run_screen() -> void:
 		router.show_screen(WebUiScreenIds.NICKNAME_SETUP, true)
 ```
 
-- [ ] **Step 7: Update battle route id**
+- [ ] **Step 9: Update battle route id**
 
 In `_show_battle_screen(battle: Dictionary)`, replace:
 
@@ -997,7 +1046,7 @@ with:
 router.show_screen(WebUiScreenIds.BATTLE_REPLAY)
 ```
 
-- [ ] **Step 8: Run tests**
+- [ ] **Step 10: Run tests**
 
 Run:
 
@@ -1014,10 +1063,10 @@ Web UI main scene smoke passed
 
 and existing router smoke passes.
 
-- [ ] **Step 9: Commit**
+- [ ] **Step 11: Commit**
 
 ```powershell
-git add godot-client/scenes/Main.tscn godot-client/scripts/state/GameSession.gd godot-client/scripts/tests/web_ui_main_scene_smoke.gd
+git add godot-client/scripts/ui/screens/NicknameSetupScreen.gd godot-client/scenes/screens/NicknameSetupScreen.tscn godot-client/scenes/Main.tscn godot-client/scripts/state/GameSession.gd godot-client/scripts/tests/web_ui_main_scene_smoke.gd
 git commit -m "Register Godot Web UI screen skeletons"
 ```
 

@@ -23,7 +23,9 @@ func _run() -> void:
 	root.add_child(main)
 	await process_frame
 	await process_frame
-	var run_screen = main.get_node_or_null("ScreenRoot/RunScreen")
+	var run_screen = main.get_node_or_null("ScreenRoot/LegacyRunScreen")
+	if run_screen != null and run_screen.has_method("bind_session"):
+		run_screen.bind_session(main)
 	if run_screen == null:
 		_fail("RunScreen is missing")
 		return
