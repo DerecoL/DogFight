@@ -16,6 +16,15 @@ function Test-PortListening {
   return $null -ne $connection
 }
 
+function Test-ApiHealthy {
+  try {
+    $health = Invoke-RestMethod -Uri "http://127.0.0.1:4000/api/health" -TimeoutSec 2
+    return $health.ok -eq $true -and $health.database -eq "ok"
+  } catch {
+    return $false
+  }
+}
+
 if (-not (Test-PortListening -Port 4000)) {
   $outLog = Join-Path $logDir "godot-dev.out.log"
   $errLog = Join-Path $logDir "godot-dev.err.log"
@@ -29,8 +38,8 @@ if (-not (Test-PortListening -Port 4000)) {
 }
 
 $ready = $false
-for ($i = 0; $i -lt 90; $i++) {
-  if (Test-PortListening -Port 4000) {
+for ($i = 0; $i -lt 120; $i++) {
+  if (Test-PortListening -Port 4000 -and (Test-ApiHealthy)) {
     $ready = $true
     break
   }
@@ -38,7 +47,7 @@ for ($i = 0; $i -lt 90; $i++) {
 }
 
 if (-not $ready) {
-  throw "DogFight API did not start on http://127.0.0.1:4000. Check $logDir\godot-dev.err.log"
+  throw "DogFight API database did not become healthy on http://127.0.0.1:4000/api/health. Check $logDir\godot-dev.out.log and $logDir\godot-dev.err.log"
 }
 
 Write-Host "DogFight API: http://127.0.0.1:4000"

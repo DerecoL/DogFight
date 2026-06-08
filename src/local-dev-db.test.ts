@@ -7,6 +7,8 @@ const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url),
 }
 const localDevScriptUrl = new URL('../scripts/start-local-dev.mjs', import.meta.url)
 const localDevScript = existsSync(localDevScriptUrl) ? readFileSync(localDevScriptUrl, 'utf8') : ''
+const godotDevScriptUrl = new URL('../scripts/start-godot-dev.ps1', import.meta.url)
+const godotDevScript = existsSync(godotDevScriptUrl) ? readFileSync(godotDevScriptUrl, 'utf8') : ''
 
 describe('local development database', () => {
   it('wraps the dev server with PGlite so local testing works without Docker or system Postgres', () => {
@@ -19,5 +21,11 @@ describe('local development database', () => {
     expect(localDevScript).toContain("runNpmScript('dev:app')")
     expect(pkg.scripts['dev:app']).toContain('npm:dev:server')
     expect(pkg.scripts['dev:app']).toContain('npm:dev:client')
+  })
+
+  it('waits for the Godot local API database health before launching the client', () => {
+    expect(godotDevScript).toContain('/api/health')
+    expect(godotDevScript).toContain('database')
+    expect(godotDevScript).toContain('ok')
   })
 })
