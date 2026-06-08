@@ -341,6 +341,34 @@ func set_current_run(run: Dictionary) -> void:
 	run_changed.emit(run)
 	_show_run_screen()
 
+func open_screen(screen_id: String) -> bool:
+	if screen_id == WebUiScreenIds.PLAYABLE_RUN:
+		_show_playable_run_screen()
+		return true
+	if _screen_uses_playable_shell(screen_id):
+		_show_playable_section(screen_id)
+		return true
+	if WebUiScreenIds.screen_ids().has(screen_id):
+		router.show_screen(screen_id, false)
+		var target_node_name := WebUiScreenIds.node_name_for(screen_id)
+		var target_node := get_node_or_null("ScreenRoot/%s" % target_node_name)
+		if target_node != null and target_node.has_method("set_payload"):
+			var run_payload := run_store.run.duplicate(true) if run_store != null and run_store.has_run() else {}
+			target_node.call("set_payload", {"run": run_payload, "user": current_user.duplicate(true)})
+		return true
+	return false
+
+func _screen_uses_playable_shell(screen_id: String) -> bool:
+	return [
+		WebUiScreenIds.ACCOUNT_SHOP,
+		WebUiScreenIds.ACHIEVEMENTS,
+		WebUiScreenIds.LEADERBOARDS,
+		WebUiScreenIds.SEASON,
+		WebUiScreenIds.DOGFIGHT_ROOMS,
+		WebUiScreenIds.DOGFIGHT_ROOM_DETAIL,
+		WebUiScreenIds.ACCOUNT_SETTINGS,
+	].has(screen_id)
+
 func _bind_screen_by_name(node_name: String) -> void:
 	var screen := get_node_or_null("ScreenRoot/%s" % node_name)
 	if screen != null and screen.has_method("bind_session"):
@@ -537,6 +565,15 @@ func _show_playable_run_screen() -> void:
 		router.show_screen(WebUiScreenIds.PLAYABLE_RUN, false)
 	if run_screen != null and run_screen.has_method("show_run_phase"):
 		run_screen.call("show_run_phase")
+
+func _show_playable_section(screen_id: String) -> void:
+	var run_screen := get_node_or_null("ScreenRoot/LegacyRunScreen")
+	if run_screen != null and run_screen.has_method("bind_session") and run_screen.get("session") == null:
+		run_screen.bind_session(self)
+	if router != null:
+		router.show_screen(WebUiScreenIds.PLAYABLE_RUN, false)
+	if run_screen != null and run_screen.has_method("show_named_section"):
+		run_screen.call("show_named_section", screen_id)
 
 func _show_battle_screen(battle: Dictionary) -> void:
 	if router != null:

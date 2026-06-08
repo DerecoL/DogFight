@@ -27,7 +27,7 @@ func _build_lobby() -> void:
 	var panel := PanelContainer.new()
 	panel.name = "ModeLobbyPanel"
 	panel.set_anchors_preset(Control.PRESET_CENTER)
-	panel.custom_minimum_size = Vector2(680, 440)
+	panel.custom_minimum_size = Vector2(720, 560)
 	panel.size = panel.custom_minimum_size
 	panel.position = -panel.custom_minimum_size / 2.0
 	if tokens != null:
@@ -129,6 +129,18 @@ func _build_lobby() -> void:
 	continue_button.pressed.connect(_continue_run)
 	actions.add_child(continue_button)
 
+	var shortcuts := GridContainer.new()
+	shortcuts.columns = 3
+	shortcuts.add_theme_constant_override("h_separation", 10)
+	shortcuts.add_theme_constant_override("v_separation", 8)
+	box.add_child(shortcuts)
+	_add_shortcut_button(shortcuts, "商城", "account_shop")
+	_add_shortcut_button(shortcuts, "成就", "achievements")
+	_add_shortcut_button(shortcuts, "排行", "leaderboards")
+	_add_shortcut_button(shortcuts, "赛季", "season")
+	_add_shortcut_button(shortcuts, "房间", "dogfight_rooms")
+	_add_shortcut_button(shortcuts, "设置", "account_settings")
+
 	status_label = Label.new()
 	status_label.custom_minimum_size = Vector2(0, 34)
 	status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -142,6 +154,14 @@ func _add_form_label(parent: Node, text: String) -> void:
 	label.custom_minimum_size = Vector2(120, 44)
 	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	parent.add_child(label)
+
+func _add_shortcut_button(parent: Node, text: String, screen_id: String) -> void:
+	var button := Button.new()
+	button.text = text
+	button.custom_minimum_size = Vector2(0, 42)
+	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	button.pressed.connect(_open_screen.bind(screen_id))
+	parent.add_child(button)
 
 func _refresh_content() -> void:
 	if account_label == null:
@@ -201,6 +221,10 @@ func _continue_run() -> void:
 func _logout() -> void:
 	if session != null and session.has_method("logout"):
 		await session.call("logout")
+
+func _open_screen(screen_id: String) -> void:
+	if session != null and session.has_method("open_screen"):
+		session.call("open_screen", screen_id)
 
 func _dog_label(dog_type: String) -> String:
 	for option in DOG_OPTIONS:

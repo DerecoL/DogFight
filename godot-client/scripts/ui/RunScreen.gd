@@ -123,6 +123,24 @@ func show_run_phase() -> void:
 	current_tab = TAB_RUN
 	_render_shell()
 
+func show_named_section(section_id: String) -> void:
+	match section_id:
+		"account_shop":
+			current_tab = TAB_SHOP
+		"achievements":
+			current_tab = TAB_ACHIEVEMENTS
+		"leaderboards":
+			current_tab = TAB_LEADERBOARDS
+		"season":
+			current_tab = TAB_SEASON
+		"dogfight_rooms", "dogfight_room_detail":
+			current_tab = TAB_ROOMS
+		"account_settings":
+			current_tab = TAB_SETTINGS
+		_:
+			current_tab = TAB_LOBBY
+	_render_shell()
+
 func _build_layout() -> void:
 	var background := TextureRect.new()
 	background.name = "Background"
