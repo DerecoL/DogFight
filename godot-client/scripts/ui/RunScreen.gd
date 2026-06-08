@@ -881,11 +881,17 @@ func _render_leaderboards_tab() -> void:
 			var entry_profile: Dictionary = _dict(entry, "profile")
 			_add_line(ladder_card, "#%d" % int(entry.get("rank", 0)), "%s  %s  %d" % [str(entry.get("title", "")), str(entry.get("name", "")), int(entry_profile.get("score", 0))])
 	var ladder_start := _section("选择天梯狗狗")
-	_add_line(ladder_start, "说明", "开始天梯会进入独立匹配池，并按整局表现结算。")
-	_render_dog_picker(ladder_start)
-	var start_ladder_button := _action_button("开始天梯", _start_ladder_run)
-	start_ladder_button.name = "StartLadderRunButton"
-	ladder_start.add_child(start_ladder_button)
+	if _current_run_mode() == "LADDER":
+		_add_line(ladder_start, "当前天梯", "已有进行中的天梯跑局，继续当前跑局后再结算积分。")
+		var continue_ladder_button := _action_button("继续天梯模式", _switch_tab.bind(TAB_RUN))
+		continue_ladder_button.name = "ContinueLadderRunButton"
+		ladder_start.add_child(continue_ladder_button)
+	else:
+		_add_line(ladder_start, "说明", "开始天梯会进入独立匹配池，并按整局表现结算。")
+		_render_dog_picker(ladder_start)
+		var start_ladder_button := _action_button("开始天梯", _start_ladder_run)
+		start_ladder_button.name = "StartLadderRunButton"
+		ladder_start.add_child(start_ladder_button)
 func _render_apex_tab() -> void:
 	var apex_card := _section("巅峰竞技场")
 	var season: Dictionary = _dict(apex_data, "season")
