@@ -24,6 +24,8 @@ func _make_placeholder(title: String, subtitle: String) -> PanelContainer:
 	panel.name = "PlaceholderPanel"
 	panel.set_anchors_preset(Control.PRESET_CENTER)
 	panel.custom_minimum_size = Vector2(520, 220)
+	panel.size = panel.custom_minimum_size
+	panel.position = -panel.custom_minimum_size / 2.0
 	if tokens != null:
 		panel.add_theme_stylebox_override("panel", tokens.paper_card_style())
 	var margin := MarginContainer.new()
