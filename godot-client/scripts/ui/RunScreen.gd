@@ -265,6 +265,11 @@ func _build_layout() -> void:
 	profile_title_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	profile_text.add_child(profile_title_label)
 
+	var run_creation_state := HBoxContainer.new()
+	run_creation_state.name = "RunCreationState"
+	run_creation_state.visible = false
+	header.add_child(run_creation_state)
+
 	dog_type_select = OptionButton.new()
 	dog_type_select.custom_minimum_size = Vector2(132, 36)
 	for dog_type in DOG_TYPES:
@@ -272,7 +277,7 @@ func _build_layout() -> void:
 		dog_type_select.add_item(_dog_name(dog_type))
 		dog_type_select.set_item_metadata(index, dog_type)
 	_apply_button_style(dog_type_select)
-	header.add_child(dog_type_select)
+	run_creation_state.add_child(dog_type_select)
 
 	mode_select = OptionButton.new()
 	mode_select.custom_minimum_size = Vector2(112, 36)
@@ -281,7 +286,7 @@ func _build_layout() -> void:
 		mode_select.add_item(_mode_name(mode))
 		mode_select.set_item_metadata(mode_index, mode)
 	_apply_button_style(mode_select)
-	header.add_child(mode_select)
+	run_creation_state.add_child(mode_select)
 
 	lucky_select = OptionButton.new()
 	lucky_select.custom_minimum_size = Vector2(96, 36)
@@ -289,15 +294,15 @@ func _build_layout() -> void:
 	for lucky in range(1, 7):
 		lucky_select.add_item("幸运 %d" % lucky)
 	_apply_button_style(lucky_select)
-	header.add_child(lucky_select)
+	run_creation_state.add_child(lucky_select)
 
 	create_run_button = _button("新建跑局", 118)
 	create_run_button.pressed.connect(_on_create_run_pressed)
-	header.add_child(create_run_button)
+	run_creation_state.add_child(create_run_button)
 
 	refresh_button = _button("刷新全部", 104)
 	refresh_button.pressed.connect(_refresh_all)
-	header.add_child(refresh_button)
+	run_creation_state.add_child(refresh_button)
 
 	status_label = Label.new()
 	status_label.custom_minimum_size = Vector2(0, 44)
