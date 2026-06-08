@@ -50,6 +50,7 @@ func _init() -> void:
 	var fx = overlay.get_node_or_null("BattleFxLayer") as Control
 	var tips = overlay.get_node_or_null("TipLayer") as Control
 	var loading = overlay.get_node_or_null("LoadingLayer") as Control
+	var loading_label = overlay.get_node_or_null("LoadingLayer/LoadingLabel") as Label
 	if blocking.visible:
 		_fail("BlockingLayer must be hidden by default")
 		return
@@ -70,6 +71,15 @@ func _init() -> void:
 		return
 	if loading.mouse_filter != Control.MOUSE_FILTER_STOP:
 		_fail("LoadingLayer must stop input when visible")
+		return
+	if loading_label == null:
+		_fail("LoadingLayer must expose a visible loading label")
+		return
+	if not loading_label.text.contains("同步"):
+		_fail("LoadingLayer label must explain that data is syncing")
+		return
+	if loading_label.anchor_left != 0.5 or loading_label.anchor_top != 0.5 or loading_label.anchor_right != 0.5 or loading_label.anchor_bottom != 0.5:
+		_fail("LoadingLayer label must stay centered with stable anchors")
 		return
 
 	overlay.queue_free()
