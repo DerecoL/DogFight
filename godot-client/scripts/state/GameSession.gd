@@ -342,7 +342,7 @@ func set_current_run(run: Dictionary) -> void:
 	_show_run_screen()
 
 func open_screen(screen_id: String) -> bool:
-	if screen_id == WebUiScreenIds.PLAYABLE_RUN:
+	if screen_id == WebUiScreenIds.PLAYABLE_RUN or _screen_uses_playable_run_shell(screen_id):
 		_show_playable_run_screen()
 		return true
 	if _screen_uses_playable_shell(screen_id):
@@ -357,6 +357,15 @@ func open_screen(screen_id: String) -> bool:
 			target_node.call("set_payload", {"run": run_payload, "user": current_user.duplicate(true)})
 		return true
 	return false
+
+func _screen_uses_playable_run_shell(screen_id: String) -> bool:
+	return [
+		WebUiScreenIds.RUN_SHELL,
+		WebUiScreenIds.EXPLORATION_MAP,
+		WebUiScreenIds.RUN_SHOP,
+		WebUiScreenIds.REWARD_CHOICE,
+		WebUiScreenIds.RUN_SETTLEMENT,
+	].has(screen_id)
 
 func _screen_uses_playable_shell(screen_id: String) -> bool:
 	return [
