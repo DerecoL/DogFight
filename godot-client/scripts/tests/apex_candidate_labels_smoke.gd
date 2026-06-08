@@ -46,11 +46,11 @@ func _run() -> void:
 			],
 		},
 	})
-	run_screen.set("current_tab", "排行")
+	run_screen.set("current_tab", "巅峰")
 	run_screen.call("_render_current_tab")
 	await process_frame
 	var text := _collect_text(run_screen)
-	for part in ["巅峰榜", "可提交完成局", "提交巅峰 柴犬", "12胜2负", "第16回合", "遗物 1", "装备 2", "查看配置", "巅峰柴", "柴犬", "我的记录", "雪原萨摩", "萨摩耶", "种子"]:
+	for part in ["巅峰竞技场", "巅峰赛季", "可提交完成局", "提交巅峰 柴犬", "12胜2负", "第16回合", "遗物 1", "装备 2", "查看配置", "巅峰柴", "柴犬", "我的记录", "雪原萨摩", "萨摩耶", "种子"]:
 		if not text.contains(str(part)):
 			_fail("Apex candidate label missing: %s" % str(part))
 			return

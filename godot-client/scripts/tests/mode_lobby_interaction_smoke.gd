@@ -32,7 +32,7 @@ func _run() -> void:
 		_fail("ModeLobbyScreen must match Web lobby structure without embedded dog/mode selectors")
 		return
 	var source := FileAccess.get_file_as_string("res://scripts/ui/screens/ModeLobbyScreen.gd")
-	for needle in ["open_screen", "open_run_lobby", "replay_tutorial", "休闲模式", "天梯模式", "斗狗模式", "巅峰模式", "dogfight_rooms", "leaderboards"]:
+	for needle in ["open_screen", "open_run_lobby", "replay_tutorial", "休闲模式", "天梯模式", "斗狗模式", "巅峰模式", "dogfight_rooms", "leaderboards", "apex"]:
 		if not source.contains(str(needle)):
 			_fail("ModeLobbyScreen source missing interaction: %s" % str(needle))
 			return

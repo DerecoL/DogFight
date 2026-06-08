@@ -84,7 +84,7 @@ func _build_lobby() -> void:
 	casual_button = _add_mode_button(mode_entries, "CasualModeButton", "休闲模式", "标准跑局，完成后的狗可提交巅峰竞技场。", "开始休闲模式", _enter_casual)
 	ladder_button = _add_mode_button(mode_entries, "LadderModeButton", "天梯模式", "进入独立匹配池，整局结算赛季积分。", "进入天梯模式", _enter_ladder)
 	_add_mode_button(mode_entries, "DogfightModeButton", "斗狗模式", "创建、匹配、加入房间", "进入斗狗模式", _open_screen.bind("dogfight_rooms"))
-	_add_mode_button(mode_entries, "PeakModeButton", "巅峰模式", "提交完成狗并查看榜单", "进入巅峰模式", _open_screen.bind("leaderboards"))
+	_add_mode_button(mode_entries, "PeakModeButton", "巅峰模式", "提交完成狗并查看榜单", "进入巅峰模式", _open_screen.bind("apex"))
 
 	var shortcuts := GridContainer.new()
 	shortcuts.columns = 3

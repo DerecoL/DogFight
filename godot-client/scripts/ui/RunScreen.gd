@@ -11,6 +11,7 @@ const TAB_ACHIEVEMENTS := "成就"
 const TAB_DAILY := "每日"
 const TAB_SHOP := "商城"
 const TAB_LEADERBOARDS := "排行"
+const TAB_APEX := "巅峰"
 const TAB_SEASON := "赛季"
 const TAB_ROOMS := "房间"
 const TAB_SETTINGS := "设置"
@@ -149,6 +150,8 @@ func show_named_section(section_id: String) -> void:
 			current_tab = TAB_ACHIEVEMENTS
 		"leaderboards":
 			current_tab = TAB_LEADERBOARDS
+		"apex":
+			current_tab = TAB_APEX
 		"season":
 			current_tab = TAB_SEASON
 		"dogfight_rooms", "dogfight_room_detail":
@@ -304,7 +307,7 @@ func _build_layout() -> void:
 func _render_shell() -> void:
 	_apply_equipped_cosmetic_shell()
 	_clear_children(nav_list)
-	for tab in [TAB_LOBBY, TAB_RUN, TAB_ACCOUNT, TAB_ACHIEVEMENTS, TAB_DAILY, TAB_SHOP, TAB_LEADERBOARDS, TAB_SEASON, TAB_ROOMS, TAB_SETTINGS]:
+	for tab in [TAB_LOBBY, TAB_RUN, TAB_ACCOUNT, TAB_ACHIEVEMENTS, TAB_DAILY, TAB_SHOP, TAB_LEADERBOARDS, TAB_APEX, TAB_SEASON, TAB_ROOMS, TAB_SETTINGS]:
 		var button := _button(tab, 0)
 		button.custom_minimum_size = Vector2(0, 42)
 		button.disabled = action_in_progress
@@ -385,6 +388,8 @@ func _render_current_tab() -> void:
 			_render_shop_tab()
 		TAB_LEADERBOARDS:
 			_render_leaderboards_tab()
+		TAB_APEX:
+			_render_apex_tab()
 		TAB_SEASON:
 			_render_season_tab()
 		TAB_ROOMS:
@@ -418,7 +423,7 @@ func _render_lobby_tab() -> void:
 	modes.add_child(_mode_button("休闲模式", "标准跑局，完成后的狗可提交巅峰竞技场。", casual_label, _start_mode.bind("CASUAL")))
 	modes.add_child(_mode_button("天梯模式", "进入独立匹配池，整局结算赛季积分。", ladder_label, _start_mode.bind("LADDER")))
 	modes.add_child(_mode_button("多人房间", "创建、匹配、加入房间并查看多人战报。", "进入斗狗模式", _switch_tab.bind(TAB_ROOMS)))
-	modes.add_child(_mode_button("巅峰竞技场", "提交完成局并查看总榜/当日榜配置。", "进入巅峰模式", _switch_tab.bind(TAB_LEADERBOARDS)))
+	modes.add_child(_mode_button("巅峰竞技场", "提交完成局并查看总榜/当日榜配置。", "进入巅峰模式", _switch_tab.bind(TAB_APEX)))
 	modes.add_child(_mode_button("新手引导", "按网页版教学顺序说明大厅、选狗、商店、放置、战斗和继续跑局。", "重播新手引导", _show_tutorial_modal))
 
 func _render_account_tab() -> void:
@@ -866,7 +871,11 @@ func _render_leaderboards_tab() -> void:
 	var start_ladder_button := _action_button("开始天梯", _start_ladder_run)
 	start_ladder_button.name = "StartLadderRunButton"
 	ladder_start.add_child(start_ladder_button)
-	var apex_card := _section("巅峰榜")
+func _render_apex_tab() -> void:
+	var apex_card := _section("巅峰竞技场")
+	var season: Dictionary = _dict(apex_data, "season")
+	_add_line(apex_card, "巅峰赛季", str(season.get("name", "读取中")))
+	_add_line(apex_card, "说明", "保存战斗结束后的死数据，自动从榜尾向上挑战，失败后固定在当前名次。")
 	var leaderboards: Dictionary = _dict(apex_data, "leaderboards")
 	var reports: Dictionary = _dict(apex_data, "reports")
 	var submitted_entries: Dictionary = _dict(apex_data, "entries")
@@ -875,7 +884,7 @@ func _render_leaderboards_tab() -> void:
 		_add_line(apex_card, "提交结果", "%s 已投入巅峰榜" % str(submitted_overall.get("name", "巅峰记录")))
 		_add_line(apex_card, "排名", "总榜%s，当日榜%s。新记录防守连胜从 %d 开始" % [_apex_rank_text(_dict(reports, "overall").get("placementRank", null)), _apex_rank_text(_dict(reports, "daily").get("placementRank", null)), int(submitted_overall.get("challengeWins", 0))])
 	var candidates := _array(apex_data, "candidates")
-	_add_line(apex_card, "可提交完成局", str(candidates.size()))
+	_add_line(apex_card, "可提交完成局", str(candidates.size()) if not candidates.is_empty() else "先在休闲模式完成一局，再回来冲榜。")
 	for candidate in candidates:
 		if candidate is Dictionary:
 			var run_id := str(candidate.get("id", ""))
@@ -1155,6 +1164,7 @@ func _refresh_current_section() -> void:
 		TAB_LEADERBOARDS:
 			await _fetch_into("ladder", ApiRoutes.ladder_me())
 			await _fetch_into("leaderboard", ApiRoutes.ladder_leaderboard())
+		TAB_APEX:
 			await _fetch_into("apex", ApiRoutes.apex())
 		TAB_SEASON:
 			await _fetch_into("apex", ApiRoutes.apex())

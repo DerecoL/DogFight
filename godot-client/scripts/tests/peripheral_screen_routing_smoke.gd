@@ -26,6 +26,7 @@ func _run() -> void:
 		"account_shop": "商城",
 		"achievements": "成就",
 		"leaderboards": "排行",
+		"apex": "巅峰",
 		"season": "赛季",
 		"dogfight_rooms": "房间",
 		"account_settings": "设置",

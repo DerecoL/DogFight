@@ -26,7 +26,8 @@ func _run() -> void:
 	var expectations := {
 		"account_shop": ["/shop", "/cosmetics/me"],
 		"achievements": ["/achievements"],
-		"leaderboards": ["/ladder/me", "/ladder/leaderboard", "/apex"],
+		"leaderboards": ["/ladder/me", "/ladder/leaderboard"],
+		"apex": ["/apex"],
 		"dogfight_rooms": ["/dogfight/rooms"],
 	}
 	for screen_id in expectations.keys():

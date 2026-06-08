@@ -66,8 +66,8 @@ func _run() -> void:
 			"daily": [],
 		},
 	})
-	run_screen.call("_clear_children", run_screen.get("content"))
-	run_screen.call("_render_leaderboards_tab")
+	run_screen.set("current_tab", "巅峰")
+	run_screen.call("_render_current_tab")
 	await process_frame
 	var text := _collect_text(run_screen)
 	for part in ["巅峰玩家 已投入巅峰榜", "总榜第 7 名", "当日榜未上榜", "防守连胜从 3 开始", "每日 05:00 更新", "我的记录", "查看配置"]:

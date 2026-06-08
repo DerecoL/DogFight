@@ -32,7 +32,8 @@ func _run() -> void:
 	var cases := {
 		"成就": ["/achievements"],
 		"商城": ["/shop", "/cosmetics/me"],
-		"排行": ["/ladder/me", "/ladder/leaderboard", "/apex"],
+		"排行": ["/ladder/me", "/ladder/leaderboard"],
+		"巅峰": ["/apex"],
 		"房间": ["/dogfight/rooms"],
 	}
 	for tab in cases.keys():
