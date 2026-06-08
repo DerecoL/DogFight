@@ -1,7 +1,5 @@
 extends SceneTree
 
-var main_node: Node
-
 func _init() -> void:
 	_run()
 
@@ -11,7 +9,6 @@ func _run() -> void:
 		_fail("Main scene failed to load")
 		return
 	var main = main_scene.instantiate()
-	main_node = main
 	root.add_child(main)
 	await process_frame
 	await process_frame
@@ -27,12 +24,12 @@ func _run() -> void:
 		_fail("LoginScreen must expose account and password inputs")
 		return
 
-	var account := "godot-login-flow-%d-%d" % [int(Time.get_unix_time_from_system()), Time.get_ticks_usec()]
+	var account := "godot-tutorial-entry-%d-%d" % [int(Time.get_unix_time_from_system()), Time.get_ticks_usec()]
 	account_input.text = account
 	password_input.text = "dogdice"
 	await login_screen.call("_on_register_pressed")
 	if not await _wait_for_screen(router, "nickname_setup"):
-		_fail("Register should route new account to nickname_setup, got %s" % str(router.get("current_screen_id")))
+		_fail("Register should route to nickname setup")
 		return
 
 	var nickname_screen = main.get_node_or_null("ScreenRoot/NicknameSetupScreen")
@@ -40,57 +37,57 @@ func _run() -> void:
 	if nickname_input == null:
 		_fail("NicknameSetupScreen must expose nickname input")
 		return
-	nickname_input.text = "登录烟测"
+	nickname_input.text = "引导入口烟测"
 	await nickname_screen.call("_submit_nickname")
 	if not await _wait_for_screen(router, "mode_lobby"):
-		_fail("Nickname submit should route to mode_lobby, got %s" % str(router.get("current_screen_id")))
+		_fail("Nickname should route to mode lobby")
 		return
 
-	if not await main.call("logout"):
-		_fail("Logout failed after registration")
-		return
-	if not await _wait_for_screen(router, "login"):
-		_fail("Logout should route back to login, got %s" % str(router.get("current_screen_id")))
-		return
-
-	account_input.text = account
-	password_input.text = "dogdice"
-	await login_screen.call("_on_login_pressed")
-	if not await _wait_for_screen(router, "mode_lobby"):
-		_fail("Login with saved nickname should route to mode_lobby, got %s" % str(router.get("current_screen_id")))
-		return
 	var mode_lobby = main.get_node_or_null("ScreenRoot/ModeLobbyScreen")
-	if mode_lobby == null:
-		_fail("ModeLobbyScreen is missing after login")
+	var tutorial_button = mode_lobby.find_child("TutorialReplayButton", true, false) as Button
+	if tutorial_button == null:
+		_fail("Mode lobby must expose TutorialReplayButton")
 		return
-	var casual_button = mode_lobby.find_child("CasualModeButton", true, false) as Button
-	if casual_button == null:
-		_fail("ModeLobbyScreen must expose CasualModeButton after login")
-		return
-	casual_button.pressed.emit()
+	tutorial_button.pressed.emit()
 	if not await _wait_for_screen(router, "legacy_run"):
-		_fail("Entering casual mode should route to playable run UI, got %s" % str(router.get("current_screen_id")))
-		return
-	var legacy_run_screen = main.get_node_or_null("ScreenRoot/LegacyRunScreen")
-	if legacy_run_screen == null or not legacy_run_screen.visible:
-		_fail("Entering casual mode should show LegacyRunScreen")
+		_fail("Tutorial entry should open playable run shell")
 		return
 	if main.get("run_store").has_run():
-		_fail("Entering casual mode without a run must not create a run directly")
+		_fail("Tutorial entry must not create a run directly")
 		return
-	if str(legacy_run_screen.get("current_tab")) != "大厅":
-		_fail("Entering casual mode should open the playable dog-selection lobby")
+	var legacy = main.get_node_or_null("ScreenRoot/LegacyRunScreen")
+	if legacy == null or str(legacy.get("current_tab")) != "大厅":
+		_fail("Tutorial entry should keep the run shell on lobby guidance")
 		return
+	var modal_layer = main.get_node_or_null("OverlayRoot/ModalLayer")
+	if modal_layer == null:
+		_fail("ModalLayer is missing")
+		return
+	if not await _wait_for_modal(modal_layer):
+		_fail("Tutorial entry should open tutorial modal")
+		return
+	var text := _collect_text(modal_layer)
+	for part in ["新手引导", "选择狗狗", "继续跑局"]:
+		if not text.contains(str(part)):
+			_fail("Tutorial modal missing text: %s" % str(part))
+			return
 
 	main.queue_free()
 	for _frame in range(2):
 		await process_frame
-	print("Godot login/register flow smoke passed")
+	print("Godot mode lobby tutorial entry smoke passed")
 	quit(0)
 
 func _wait_for_screen(router: Node, screen_id: String) -> bool:
 	for _frame in range(180):
 		if str(router.get("current_screen_id")) == screen_id:
+			return true
+		await process_frame
+	return false
+
+func _wait_for_modal(modal_layer: Node) -> bool:
+	for _frame in range(180):
+		if modal_layer.get_child_count() > 0:
 			return true
 		await process_frame
 	return false
@@ -106,12 +103,16 @@ func _find_line_edit(node: Node) -> LineEdit:
 			return result
 	return null
 
-func _cleanup() -> void:
-	if main_node != null and is_instance_valid(main_node):
-		main_node.queue_free()
-	main_node = null
+func _collect_text(node: Node) -> String:
+	var text := ""
+	if node is Label:
+		text += (node as Label).text + "\n"
+	if node is Button:
+		text += (node as Button).text + "\n"
+	for child in node.get_children():
+		text += _collect_text(child)
+	return text
 
 func _fail(message: String) -> void:
 	push_error(message)
-	_cleanup()
 	quit(1)

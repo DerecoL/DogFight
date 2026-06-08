@@ -123,6 +123,19 @@ func show_run_phase() -> void:
 	current_tab = TAB_RUN
 	_render_shell()
 
+func show_run_lobby(preferred_mode := "CASUAL") -> void:
+	for index in range(mode_select.item_count):
+		if str(mode_select.get_item_metadata(index)) == preferred_mode:
+			mode_select.select(index)
+			break
+	current_tab = TAB_LOBBY
+	_render_shell()
+	call_deferred("_refresh_current_section")
+
+func replay_tutorial() -> void:
+	show_run_lobby("CASUAL")
+	call_deferred("_show_tutorial_modal")
+
 func show_named_section(section_id: String) -> void:
 	match section_id:
 		"account_shop":

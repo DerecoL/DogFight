@@ -358,6 +358,17 @@ func open_screen(screen_id: String) -> bool:
 		return true
 	return false
 
+func open_run_lobby(preferred_mode := "CASUAL") -> bool:
+	_show_playable_lobby_screen(preferred_mode)
+	return true
+
+func replay_tutorial() -> bool:
+	var run_screen := _show_playable_lobby_screen("CASUAL")
+	if run_screen != null and run_screen.has_method("replay_tutorial"):
+		run_screen.call("replay_tutorial")
+		return true
+	return false
+
 func _screen_uses_playable_run_shell(screen_id: String) -> bool:
 	return [
 		WebUiScreenIds.RUN_SHELL,
@@ -574,6 +585,16 @@ func _show_playable_run_screen() -> void:
 		router.show_screen(WebUiScreenIds.PLAYABLE_RUN, false)
 	if run_screen != null and run_screen.has_method("show_run_phase"):
 		run_screen.call("show_run_phase")
+
+func _show_playable_lobby_screen(preferred_mode := "CASUAL") -> Node:
+	var run_screen := get_node_or_null("ScreenRoot/LegacyRunScreen")
+	if run_screen != null and run_screen.has_method("bind_session") and run_screen.get("session") == null:
+		run_screen.bind_session(self)
+	if router != null:
+		router.show_screen(WebUiScreenIds.PLAYABLE_RUN, false)
+	if run_screen != null and run_screen.has_method("show_run_lobby"):
+		run_screen.call("show_run_lobby", preferred_mode)
+	return run_screen
 
 func _show_playable_section(screen_id: String) -> void:
 	var run_screen := get_node_or_null("ScreenRoot/LegacyRunScreen")

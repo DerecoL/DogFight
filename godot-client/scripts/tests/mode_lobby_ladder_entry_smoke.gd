@@ -33,7 +33,7 @@ func _run() -> void:
 	if account_input == null or password_input == null:
 		_fail("LoginScreen must expose account and password inputs")
 		return
-	var account := "godot-ladder-entry-%d" % Time.get_ticks_msec()
+	var account := "godot-ladder-entry-%d-%d" % [int(Time.get_unix_time_from_system()), Time.get_ticks_usec()]
 	account_input.text = account
 	password_input.text = "dogdice"
 	await login_screen.call("_on_register_pressed")

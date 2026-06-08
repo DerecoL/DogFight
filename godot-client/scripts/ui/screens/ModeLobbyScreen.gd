@@ -1,21 +1,10 @@
 extends BaseWebScreen
 
-const DOG_OPTIONS := [
-	{"id": "SHIBA", "label": "柴犬"},
-	{"id": "SAMOYED", "label": "萨摩耶"},
-	{"id": "MUTT", "label": "土狗"},
-	{"id": "BULLY", "label": "恶霸"},
-	{"id": "FROG", "label": "祖灵莲池"},
-	{"id": "EMPEROR", "label": "帝王犬"},
-]
-
 var account_label: Label
 var run_label: Label
 var status_label: Label
-var dog_select: OptionButton
-var mode_select: OptionButton
-var lucky_select: OptionButton
-var start_button: Button
+var casual_button: Button
+var ladder_button: Button
 
 func _ready() -> void:
 	_build_lobby()
@@ -29,7 +18,7 @@ func _build_lobby() -> void:
 	var panel := PanelContainer.new()
 	panel.name = "ModeLobbyPanel"
 	panel.set_anchors_preset(Control.PRESET_CENTER)
-	panel.custom_minimum_size = Vector2(780, 680)
+	panel.custom_minimum_size = Vector2(860, 600)
 	panel.size = panel.custom_minimum_size
 	panel.position = -panel.custom_minimum_size / 2.0
 	if tokens != null:
@@ -59,6 +48,12 @@ func _build_lobby() -> void:
 	title.text = "模式大厅"
 	title_box.add_child(title)
 
+	var subtitle := Label.new()
+	subtitle.text = "选择本次要进入的竞技方式。休闲或天梯完成后的狗可以送入巅峰竞技场。"
+	subtitle.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	subtitle.custom_minimum_size = Vector2(0, 46)
+	title_box.add_child(subtitle)
+
 	account_label = Label.new()
 	account_label.custom_minimum_size = Vector2(0, 28)
 	title_box.add_child(account_label)
@@ -74,72 +69,22 @@ func _build_lobby() -> void:
 	run_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(run_label)
 
+	var tutorial_button := Button.new()
+	tutorial_button.name = "TutorialReplayButton"
+	tutorial_button.text = "新手引导"
+	tutorial_button.custom_minimum_size = Vector2(150, 44)
+	tutorial_button.pressed.connect(_replay_tutorial)
+	box.add_child(tutorial_button)
+
 	var mode_entries := GridContainer.new()
 	mode_entries.columns = 2
 	mode_entries.add_theme_constant_override("h_separation", 10)
 	mode_entries.add_theme_constant_override("v_separation", 8)
 	box.add_child(mode_entries)
-	_add_mode_button(mode_entries, "CasualModeButton", "休闲模式", "开始/继续休闲跑局", _enter_mode.bind("CASUAL"))
-	_add_mode_button(mode_entries, "LadderModeButton", "天梯模式", "进入天梯主页和榜单", _enter_ladder)
-	_add_mode_button(mode_entries, "DogfightModeButton", "斗狗模式", "创建、匹配、加入房间", _open_screen.bind("dogfight_rooms"))
-	_add_mode_button(mode_entries, "PeakModeButton", "巅峰模式", "提交完成狗并查看榜单", _open_screen.bind("leaderboards"))
-
-	var form := GridContainer.new()
-	form.columns = 2
-	form.add_theme_constant_override("h_separation", 12)
-	form.add_theme_constant_override("v_separation", 10)
-	box.add_child(form)
-
-	_add_form_label(form, "犬种")
-	dog_select = OptionButton.new()
-	dog_select.custom_minimum_size = Vector2(280, 44)
-	for option in DOG_OPTIONS:
-		dog_select.add_item(str(option["label"]))
-		dog_select.set_item_metadata(dog_select.item_count - 1, str(option["id"]))
-	dog_select.item_selected.connect(func(_index: int) -> void:
-		_update_lucky_visibility()
-	)
-	form.add_child(dog_select)
-
-	_add_form_label(form, "模式")
-	mode_select = OptionButton.new()
-	mode_select.custom_minimum_size = Vector2(280, 44)
-	mode_select.add_item("休闲跑局")
-	mode_select.set_item_metadata(0, "CASUAL")
-	mode_select.add_item("天梯跑局")
-	mode_select.set_item_metadata(1, "LADDER")
-	form.add_child(mode_select)
-
-	_add_form_label(form, "天命数字")
-	lucky_select = OptionButton.new()
-	lucky_select.custom_minimum_size = Vector2(280, 44)
-	for number in range(1, 7):
-		lucky_select.add_item(str(number))
-		lucky_select.set_item_metadata(lucky_select.item_count - 1, number)
-	form.add_child(lucky_select)
-
-	var actions := HBoxContainer.new()
-	actions.add_theme_constant_override("separation", 10)
-	box.add_child(actions)
-
-	start_button = Button.new()
-	start_button.name = "StartRunButton"
-	start_button.text = "开始跑局"
-	start_button.custom_minimum_size = Vector2(0, 48)
-	start_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	if tokens != null:
-		start_button.add_theme_stylebox_override("normal", tokens.handdrawn_button_style())
-		start_button.add_theme_stylebox_override("hover", tokens.handdrawn_button_hover_style())
-		start_button.add_theme_stylebox_override("pressed", tokens.handdrawn_button_pressed_style())
-	start_button.pressed.connect(_start_run)
-	actions.add_child(start_button)
-
-	var continue_button := Button.new()
-	continue_button.text = "继续跑局"
-	continue_button.custom_minimum_size = Vector2(0, 48)
-	continue_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	continue_button.pressed.connect(_continue_run)
-	actions.add_child(continue_button)
+	casual_button = _add_mode_button(mode_entries, "CasualModeButton", "休闲模式", "标准跑局，完成后的狗可提交巅峰竞技场。", "开始休闲模式", _enter_casual)
+	ladder_button = _add_mode_button(mode_entries, "LadderModeButton", "天梯模式", "进入独立匹配池，整局结算赛季积分。", "进入天梯模式", _enter_ladder)
+	_add_mode_button(mode_entries, "DogfightModeButton", "斗狗模式", "创建、匹配、加入房间", "进入斗狗模式", _open_screen.bind("dogfight_rooms"))
+	_add_mode_button(mode_entries, "PeakModeButton", "巅峰模式", "提交完成狗并查看榜单", "进入巅峰模式", _open_screen.bind("leaderboards"))
 
 	var shortcuts := GridContainer.new()
 	shortcuts.columns = 3
@@ -158,14 +103,6 @@ func _build_lobby() -> void:
 	status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(status_label)
-	_update_lucky_visibility()
-
-func _add_form_label(parent: Node, text: String) -> void:
-	var label := Label.new()
-	label.text = text
-	label.custom_minimum_size = Vector2(120, 44)
-	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	parent.add_child(label)
 
 func _add_shortcut_button(parent: Node, text: String, screen_id: String) -> void:
 	var button := Button.new()
@@ -175,15 +112,16 @@ func _add_shortcut_button(parent: Node, text: String, screen_id: String) -> void
 	button.pressed.connect(_open_screen.bind(screen_id))
 	parent.add_child(button)
 
-func _add_mode_button(parent: Node, node_name: String, title: String, detail: String, action: Callable) -> void:
+func _add_mode_button(parent: Node, node_name: String, title: String, detail: String, action_label: String, action: Callable) -> Button:
 	var button := Button.new()
 	button.name = node_name
-	button.text = "%s\n%s" % [title, detail]
-	button.custom_minimum_size = Vector2(0, 62)
+	button.text = "%s\n%s\n%s" % [title, detail, action_label]
+	button.custom_minimum_size = Vector2(0, 106)
 	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	button.pressed.connect(action)
 	parent.add_child(button)
+	return button
 
 func _refresh_content() -> void:
 	if account_label == null:
@@ -196,7 +134,7 @@ func _refresh_content() -> void:
 	account_label.text = "当前账号：%s" % account
 	var run: Dictionary = payload.get("run", {})
 	if run.is_empty():
-		run_label.text = "选择犬种和模式开始新跑局。"
+		run_label.text = "当前没有进行中的跑局。进入休闲模式后再选择狗狗并开始一局。"
 	else:
 		run_label.text = "当前跑局：%s · %d胜%d负 · 第%d回合" % [
 			_dog_label(str(run.get("dogType", ""))),
@@ -204,46 +142,28 @@ func _refresh_content() -> void:
 			int(run.get("losses", 0)),
 			int(run.get("round", 0)),
 		]
+	if casual_button != null:
+		casual_button.text = "%s\n%s\n%s" % [
+			"休闲模式",
+			"标准跑局，完成后的狗可提交巅峰竞技场。",
+			"继续休闲模式" if str(run.get("mode", "")) == "CASUAL" else "开始休闲模式",
+		]
+	if ladder_button != null:
+		ladder_button.text = "%s\n%s\n%s" % [
+			"天梯模式",
+			"进入独立匹配池，整局结算赛季积分。",
+			"继续天梯模式" if str(run.get("mode", "")) == "LADDER" else "进入天梯模式",
+		]
 
-func _selected_dog() -> String:
-	var metadata = dog_select.get_item_metadata(dog_select.selected)
-	return str(metadata) if metadata != null else "SHIBA"
-
-func _selected_mode() -> String:
-	var metadata = mode_select.get_item_metadata(mode_select.selected)
-	return str(metadata) if metadata != null else "CASUAL"
-
-func _selected_lucky_number() -> Variant:
-	if _selected_dog() != "EMPEROR":
-		return null
-	var metadata = lucky_select.get_item_metadata(lucky_select.selected)
-	return int(metadata) if metadata != null else 1
-
-func _update_lucky_visibility() -> void:
-	if lucky_select != null:
-		lucky_select.disabled = _selected_dog() != "EMPEROR"
-
-func _start_run() -> void:
-	if session == null or not session.has_method("create_run"):
-		status_label.text = "登录会话未初始化"
-		return
-	start_button.disabled = true
-	status_label.text = ""
-	var ok: bool = await session.call("create_run", _selected_dog(), _selected_mode(), _selected_lucky_number())
-	start_button.disabled = false
-	if not ok:
-		status_label.text = "创建跑局失败，请重试"
-
-func _enter_mode(mode: String) -> void:
+func _enter_casual() -> void:
 	var run: Dictionary = payload.get("run", {})
-	if not run.is_empty() and str(run.get("mode", "")) == mode:
+	if not run.is_empty() and str(run.get("mode", "")) == "CASUAL":
 		_continue_run()
 		return
-	for index in range(mode_select.item_count):
-		if str(mode_select.get_item_metadata(index)) == mode:
-			mode_select.select(index)
-			break
-	await _start_run()
+	if session != null and session.has_method("open_run_lobby"):
+		session.call("open_run_lobby", "CASUAL")
+		return
+	_open_screen("legacy_run")
 
 func _enter_ladder() -> void:
 	var run: Dictionary = payload.get("run", {})
@@ -251,6 +171,13 @@ func _enter_ladder() -> void:
 		_continue_run()
 		return
 	_open_screen("leaderboards")
+
+func _replay_tutorial() -> void:
+	if session != null and session.has_method("replay_tutorial"):
+		session.call("replay_tutorial")
+		return
+	if session != null and session.has_method("open_run_lobby"):
+		session.call("open_run_lobby", "CASUAL")
 
 func _continue_run() -> void:
 	if session != null and session.has_method("set_current_run"):
@@ -267,7 +194,18 @@ func _open_screen(screen_id: String) -> void:
 		session.call("open_screen", screen_id)
 
 func _dog_label(dog_type: String) -> String:
-	for option in DOG_OPTIONS:
-		if str(option["id"]) == dog_type:
-			return str(option["label"])
-	return dog_type
+	match dog_type:
+		"SHIBA":
+			return "柴犬"
+		"SAMOYED":
+			return "萨摩耶"
+		"MUTT":
+			return "土狗"
+		"BULLY":
+			return "恶霸"
+		"EMPEROR":
+			return "狗皇帝"
+		"FROG":
+			return "祖灵"
+		_:
+			return dog_type
