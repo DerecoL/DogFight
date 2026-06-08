@@ -49,6 +49,26 @@ const TUTORIAL_SECTION := "casual_tutorial"
 const SETTINGS_PATH := "user://dogfight_settings.cfg"
 const SETTINGS_SECTION := "settings"
 const MUSIC_ENABLED_KEY := "background_music_enabled"
+const ROOM_LOCKED_RUN_METHODS := [
+	"buy_offer",
+	"claim_monster_reward",
+	"complete_map_node",
+	"match_battle",
+	"move_item",
+	"reroll_shop",
+	"resolve_map_event",
+	"select_class_reward",
+	"select_enchant",
+	"select_potion",
+	"select_relic",
+	"select_shop_choice",
+	"select_upgrade_item",
+	"sell_item",
+	"sell_relic",
+	"skip_monster_reward",
+	"skip_upgrade_choice",
+	"upgrade_item",
+]
 
 var session: Node
 var current_tab := TAB_LOBBY
@@ -736,15 +756,15 @@ func _render_inventory(run: Dictionary) -> void:
 	card.add_child(toolbar)
 	toolbar.add_child(_action_button("查看选中详情", _show_selected_detail_modal))
 	if _can_sell_item_action(run, selected_item_id):
-		toolbar.add_child(_action_button("出售选中装备", _call_selected_item.bind("sell_item")))
+		toolbar.add_child(_run_action_button("出售选中装备", _call_selected_item.bind("sell_item")))
 	if _can_upgrade_item_action(run, selected_item_id):
-		toolbar.add_child(_action_button("合成升级选中", _call_selected_item.bind("upgrade_item")))
+		toolbar.add_child(_run_action_button("合成升级选中", _call_selected_item.bind("upgrade_item")))
 	_add_line(card, "当前选中", _fallback(selected_item_label, "无"))
 	_render_item_grid(card, "装备栏", "EQUIPMENT", run, _equipment_slot_count(run))
 	_render_relic_rail(card, run)
 	_render_item_grid(card, "背包", "BAG", run, 12)
 	if not selected_relic_id.is_empty():
-		card.add_child(_action_button("出售选中遗物", _call_session.bind("sell_relic", [selected_relic_id])))
+		card.add_child(_run_action_button("出售选中遗物", _call_session.bind("sell_relic", [selected_relic_id])))
 
 func _render_map_or_shop_detail(run: Dictionary) -> void:
 	var phase := str(run.get("phase", ""))
@@ -756,7 +776,7 @@ func _render_map_or_shop_detail(run: Dictionary) -> void:
 	var shop_card := _section("跑局商店")
 	var shop_type := str(run.get("shopType", "GENERAL"))
 	_add_line(shop_card, _shop_name(shop_type), _shop_description(shop_type))
-	shop_card.add_child(_action_button("刷新 %d 金币" % int(run.get("refreshCost", 0)), _call_session.bind("reroll_shop", [])))
+	shop_card.add_child(_run_action_button("刷新 %d 金币" % int(run.get("refreshCost", 0)), _call_session.bind("reroll_shop", [])))
 	shop_card.add_child(_shop_progression_button(run))
 	_add_line(shop_card, "提示", "点击商品查看详情，确认后再购买。")
 	for offer in _array(run, "shopItems"):
@@ -768,8 +788,8 @@ func _shop_progression_button(run: Dictionary) -> Button:
 	var current_node := _map_current_node(map_state)
 	if not current_node.is_empty():
 		var label := "进入战斗" if str(current_node.get("kind", "")) == "PLAYER_BATTLE" else "返回地图"
-		return _action_button(label, _call_session.bind("complete_map_node", []))
-	return _action_button("匹配对手", _call_session.bind("match_battle", []))
+		return _run_action_button(label, _call_session.bind("complete_map_node", []))
+	return _run_action_button("匹配对手", _call_session.bind("match_battle", []))
 
 func _render_shop_offer_card(parent: VBoxContainer, run: Dictionary, offer: Dictionary) -> void:
 	var def: Dictionary = _dict(offer, "def")
@@ -820,14 +840,14 @@ func _render_map_or_shop(run: Dictionary) -> void:
 		_render_map_route(card, map_state)
 		var current_node := _map_current_node(map_state)
 		if str(current_node.get("kind", "")) == "EVENT" and not _dict(current_node, "event").is_empty():
-			card.add_child(_action_button("处理事件", _call_session.bind("resolve_map_event", [])))
+			card.add_child(_run_action_button("处理事件", _call_session.bind("resolve_map_event", [])))
 		if not _dict(map_state, "pendingReward").is_empty():
-			card.add_child(_action_button("领取怪物奖励", _call_session.bind("claim_monster_reward", [])))
-			card.add_child(_action_button("跳过怪物奖励", _call_session.bind("skip_monster_reward", [])))
+			card.add_child(_run_action_button("领取怪物奖励", _call_session.bind("claim_monster_reward", [])))
+			card.add_child(_run_action_button("跳过怪物奖励", _call_session.bind("skip_monster_reward", [])))
 	else:
 		var shop_card := _section("跑局商店")
 		_add_line(shop_card, "类型 / 刷新费", "%s / %d" % [_shop_name(str(run.get("shopType", ""))), int(run.get("refreshCost", 0))])
-		shop_card.add_child(_action_button("刷新跑局商店", _call_session.bind("reroll_shop", [])))
+		shop_card.add_child(_run_action_button("刷新跑局商店", _call_session.bind("reroll_shop", [])))
 		for offer in _array(run, "shopItems"):
 			if offer is Dictionary:
 				var offer_button := _action_button("%s  价格 %d" % [_offer_label(offer), int(offer.get("price", 0))], _show_offer_modal.bind(offer))
@@ -1172,6 +1192,9 @@ func _on_error_raised(message: String) -> void:
 
 func _call_session(method: String, args: Array) -> bool:
 	if action_in_progress or session == null or not session.has_method(method):
+		return false
+	if _room_run_method_locked(method):
+		_show_error("本回合已完成，等待房间进入下一阶段。")
 		return false
 	action_in_progress = true
 	_update_controls()
@@ -2184,6 +2207,19 @@ func _can_ready_room_action(room: Dictionary) -> bool:
 		return false
 	return not bool(member.get("ready", false)) and not bool(member.get("eliminated", false))
 
+func _room_current_run_action_locked() -> bool:
+	if current_tab != TAB_ROOMS:
+		return false
+	if active_room.is_empty() or _dict(active_room, "currentRun").is_empty():
+		return false
+	var member := _current_room_member(active_room)
+	if member.is_empty():
+		return false
+	return bool(member.get("ready", false)) or bool(member.get("eliminated", false))
+
+func _room_run_method_locked(method: String) -> bool:
+	return _room_current_run_action_locked() and ROOM_LOCKED_RUN_METHODS.has(method)
+
 func _current_room_member(room: Dictionary) -> Dictionary:
 	var explicit: Dictionary = _dict(room, "currentRunMember")
 	if not explicit.is_empty():
@@ -2348,7 +2384,7 @@ func _show_offer_modal(offer: Dictionary) -> void:
 	var discount := int(offer.get("discount", 0))
 	if discount > 0:
 		_add_line(box, "折扣", "-%d 金币" % discount)
-	box.add_child(_action_button("购买到背包", _buy_offer_from_modal.bind(str(offer.get("offerId", "")))))
+	box.add_child(_run_action_button("购买到背包", _buy_offer_from_modal.bind(str(offer.get("offerId", "")))))
 	_push_modal(modal["panel"])
 
 func _show_class_reward_modal(choice: Dictionary) -> void:
@@ -2435,9 +2471,9 @@ func _show_item_detail_modal(item: Dictionary) -> void:
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 8)
 		if _can_sell_item_action(run, id):
-			row.add_child(_action_button("出售装备", _item_action_from_modal.bind("sell_item", id)))
+			row.add_child(_run_action_button("出售装备", _item_action_from_modal.bind("sell_item", id)))
 		if _can_upgrade_item_action(run, id):
-			row.add_child(_action_button("合成升级", _item_action_from_modal.bind("upgrade_item", id)))
+			row.add_child(_run_action_button("合成升级", _item_action_from_modal.bind("upgrade_item", id)))
 		if row.get_child_count() > 0:
 			box.add_child(row)
 	_push_modal(modal["panel"])
@@ -2459,7 +2495,7 @@ func _show_relic_detail_modal(relic: Dictionary) -> void:
 		_add_line(box, "效果", effect)
 	var relic_id := str(relic.get("id", relic.get("relicId", "")))
 	if not relic_id.is_empty():
-		box.add_child(_action_button("出售遗物", _relic_action_from_modal.bind(relic_id)))
+		box.add_child(_run_action_button("出售遗物", _relic_action_from_modal.bind(relic_id)))
 	_push_modal(modal["panel"])
 
 func _show_selected_detail_modal() -> void:
@@ -3314,6 +3350,11 @@ func _action_button(text: String, handler: Callable) -> Button:
 	var button := _button(text, 0)
 	button.disabled = action_in_progress
 	button.pressed.connect(handler)
+	return button
+
+func _run_action_button(text: String, handler: Callable) -> Button:
+	var button := _action_button(text, handler)
+	button.disabled = button.disabled or _room_current_run_action_locked()
 	return button
 
 func _disabled_action_button(text: String) -> Button:
