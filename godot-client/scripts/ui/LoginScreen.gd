@@ -15,6 +15,7 @@ const UiTokens := preload("res://scripts/ui/kit/UiTokens.gd")
 @onready var error_label: Label = %ErrorLabel
 
 var session: Node
+var auth_in_progress := false
 
 func bind_session(next_session: Node) -> void:
 	if session != null and session.has_signal("error_raised") and session.error_raised.is_connected(_on_error_raised):
@@ -41,6 +42,8 @@ func _on_register_pressed() -> void:
 	await _submit_auth("register")
 
 func _on_quick_start_pressed() -> void:
+	if auth_in_progress:
+		return
 	error_label.text = ""
 	if session == null or not session.has_method("register"):
 		error_label.text = "登录会话未初始化"
@@ -51,13 +54,17 @@ func _on_quick_start_pressed() -> void:
 	var password := "dogdice"
 	account_input.text = account
 	password_input.text = password
+	auth_in_progress = true
 	_set_busy(true)
 	var ok: bool = await session.call("register", account, password)
+	auth_in_progress = false
 	_set_busy(false)
 	if ok:
 		login_succeeded.emit()
 
 func _on_taptap_pressed() -> void:
+	if auth_in_progress:
+		return
 	error_label.text = ""
 	if session == null or not session.has_method("login_taptap"):
 		error_label.text = "登录会话未初始化"
@@ -66,13 +73,17 @@ func _on_taptap_pressed() -> void:
 	if code.is_empty():
 		error_label.text = "请输入 TapTap 授权码"
 		return
+	auth_in_progress = true
 	_set_busy(true)
 	var ok: bool = await session.call("login_taptap", code)
+	auth_in_progress = false
 	_set_busy(false)
 	if ok:
 		login_succeeded.emit()
 
 func _submit_auth(action: String) -> void:
+	if auth_in_progress:
+		return
 	error_label.text = ""
 	if session == null or not session.has_method(action):
 		error_label.text = "登录会话未初始化"
@@ -84,8 +95,10 @@ func _submit_auth(action: String) -> void:
 	if password_input.text.length() < 6:
 		error_label.text = "密码至少 6 个字符"
 		return
+	auth_in_progress = true
 	_set_busy(true)
 	var ok: bool = await session.call(action, account, password_input.text)
+	auth_in_progress = false
 	_set_busy(false)
 	if ok:
 		login_succeeded.emit()
@@ -95,6 +108,9 @@ func _set_busy(busy: bool) -> void:
 	register_button.disabled = busy
 	quick_start_button.disabled = busy
 	taptap_button.disabled = busy
+	account_input.editable = not busy
+	password_input.editable = not busy
+	taptap_code_input.editable = not busy
 
 func _on_error_raised(message: String) -> void:
 	if message.contains("账号") and message.contains("密码"):
