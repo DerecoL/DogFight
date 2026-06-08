@@ -101,6 +101,8 @@ func update_nickname(nickname: String) -> bool:
 	user_changed.emit(current_user)
 	if toast_bus != null:
 		toast_bus.push("昵称已保存", "success")
+	if not needs_nickname_setup:
+		_show_run_screen()
 	return true
 
 func logout() -> bool:
