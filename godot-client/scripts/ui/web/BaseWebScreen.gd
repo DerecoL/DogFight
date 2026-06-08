@@ -3,9 +3,11 @@ extends Control
 
 var session: Node
 var payload: Dictionary = {}
+var playable_redirect_screen_id := ""
 
 func bind_session(next_session: Node) -> void:
 	session = next_session
+	_maybe_redirect_to_playable()
 
 func set_payload(next_payload: Dictionary) -> void:
 	payload = next_payload.duplicate(true)
@@ -17,6 +19,19 @@ func clear_payload() -> void:
 
 func _on_payload_changed() -> void:
 	pass
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_VISIBILITY_CHANGED or what == NOTIFICATION_READY:
+		_maybe_redirect_to_playable()
+
+func _maybe_redirect_to_playable() -> void:
+	if playable_redirect_screen_id.is_empty():
+		return
+	if session == null or not session.has_method("open_screen"):
+		return
+	if not is_inside_tree() or not visible:
+		return
+	session.call_deferred("open_screen", playable_redirect_screen_id)
 
 func _make_placeholder(title: String, subtitle: String) -> PanelContainer:
 	var tokens = load("res://scripts/ui/web/WebUiTokens.gd")
