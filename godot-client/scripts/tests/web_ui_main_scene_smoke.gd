@@ -2,6 +2,7 @@ extends SceneTree
 
 func _init() -> void:
 	var scene_paths := {
+		"nickname_setup": "res://scenes/screens/NicknameSetupScreen.tscn",
 		"mode_lobby": "res://scenes/screens/ModeLobbyScreen.tscn",
 		"run_shell": "res://scenes/screens/RunShellScreen.tscn",
 		"exploration_map": "res://scenes/screens/ExplorationMapScreen.tscn",
@@ -29,6 +30,43 @@ func _init() -> void:
 			_fail("Scene %s must expose bind_session" % screen_id)
 			return
 		instance.free()
+
+	var manifest = load("res://scripts/ui/web/WebUiScreenIds.gd")
+	if manifest == null:
+		_fail("WebUiScreenIds.gd must load")
+		return
+
+	var main_scene := load("res://scenes/Main.tscn")
+	if main_scene == null:
+		_fail("Main scene must load")
+		return
+	var main = main_scene.instantiate()
+	if main == null:
+		_fail("Main scene must instantiate")
+		return
+	root.add_child(main)
+	await process_frame
+	await process_frame
+
+	var screen_root := main.get_node_or_null("ScreenRoot")
+	if screen_root == null:
+		_fail("Main scene must include ScreenRoot")
+		return
+	for screen_id in manifest.screen_ids():
+		var node_name := str(manifest.node_name_for(screen_id))
+		if screen_root.get_node_or_null(node_name) == null:
+			_fail("Main ScreenRoot missing Web UI node for %s: %s" % [screen_id, node_name])
+			return
+	if screen_root.get_node_or_null("RunScreen") != null:
+		_fail("Legacy RunScreen node must be renamed to LegacyRunScreen")
+		return
+	if screen_root.get_node_or_null("LegacyRunScreen") == null:
+		_fail("Main ScreenRoot must retain LegacyRunScreen")
+		return
+
+	main.queue_free()
+	for _frame in range(2):
+		await process_frame
 
 	print("Web UI main scene smoke passed")
 	quit(0)

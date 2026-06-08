@@ -11,6 +11,7 @@ const ScreenRouter := preload("res://scripts/router/ScreenRouter.gd")
 const ModalStack := preload("res://scripts/router/ModalStack.gd")
 const ToastBus := preload("res://scripts/router/ToastBus.gd")
 const FeedbackSoundBus := preload("res://scripts/router/FeedbackSoundBus.gd")
+const WebUiScreenIds := preload("res://scripts/ui/web/WebUiScreenIds.gd")
 const AppStore := preload("res://scripts/state/AppStore.gd")
 const RunStore := preload("res://scripts/state/RunStore.gd")
 const DEFAULT_API_BASE_URL := "http://127.0.0.1:4000/api"
@@ -41,10 +42,9 @@ func _ready() -> void:
 		router = ScreenRouter.new()
 		add_child(router)
 		router.configure(screen_root)
-		router.register_screen("login", "LoginScreen")
-		router.register_screen("run", "RunScreen")
-		router.register_screen("battle", "BattleReplayScreen")
-		router.show_screen("login", false)
+		for screen_id in WebUiScreenIds.screen_ids():
+			router.register_screen(screen_id, WebUiScreenIds.node_name_for(screen_id))
+		router.show_screen(WebUiScreenIds.LOGIN, false)
 	var overlay_root := get_node_or_null("OverlayRoot")
 	if overlay_root != null:
 		modal_stack = ModalStack.new()
@@ -61,16 +61,11 @@ func _ready() -> void:
 				blocking_layer.visible = blocking
 		)
 	var login_screen := get_node_or_null("ScreenRoot/LoginScreen")
-	if login_screen != null and login_screen.has_method("bind_session"):
-		login_screen.bind_session(self)
-		if login_screen.has_signal("login_succeeded") and not login_screen.login_succeeded.is_connected(_show_run_screen):
-			login_screen.login_succeeded.connect(_show_run_screen)
-	var run_screen := get_node_or_null("ScreenRoot/RunScreen")
-	if run_screen != null and run_screen.has_method("bind_session"):
-		run_screen.bind_session(self)
-	var battle_screen := get_node_or_null("ScreenRoot/BattleReplayScreen")
-	if battle_screen != null and battle_screen.has_method("bind_session"):
-		battle_screen.bind_session(self)
+	for screen_id in WebUiScreenIds.screen_ids():
+		_bind_screen_by_name(WebUiScreenIds.node_name_for(screen_id))
+	_bind_screen_by_name("LegacyRunScreen")
+	if login_screen != null and login_screen.has_signal("login_succeeded") and not login_screen.login_succeeded.is_connected(_show_run_screen):
+		login_screen.login_succeeded.connect(_show_run_screen)
 	if not battle_started.is_connected(_show_battle_screen):
 		battle_started.connect(_show_battle_screen)
 	if not run_changed.is_connected(_on_run_changed_for_screen):
@@ -120,7 +115,7 @@ func logout() -> bool:
 	store.set_user({})
 	store.set_current_run({})
 	if router != null:
-		router.show_screen("login", false)
+		router.show_screen(WebUiScreenIds.LOGIN, false)
 	run_changed.emit({})
 	if toast_bus != null:
 		toast_bus.push("已退出登录", "success")
@@ -342,6 +337,11 @@ func set_current_run(run: Dictionary) -> void:
 	store.set_current_run(run)
 	run_changed.emit(run)
 
+func _bind_screen_by_name(node_name: String) -> void:
+	var screen := get_node_or_null("ScreenRoot/%s" % node_name)
+	if screen != null and screen.has_method("bind_session"):
+		screen.bind_session(self)
+
 func _raise_error(message: String) -> void:
 	store.raise_error(message)
 	if toast_bus != null:
@@ -508,21 +508,27 @@ func _toast_color(kind: String) -> Color:
 			return Color(0.92, 0.82, 0.48, 0.96)
 
 func _show_run_screen() -> void:
-	if router != null:
-		router.show_screen("run", false)
-	var run_screen := get_node_or_null("ScreenRoot/RunScreen")
-	if run_screen != null and run_screen.has_method("clear_error"):
-		run_screen.call("clear_error")
-	if needs_nickname_setup and run_screen != null and run_screen.has_method("_show_nickname_setup_modal"):
-		run_screen.call_deferred("_show_nickname_setup_modal")
+	if router == null:
+		return
+	var target_screen := WebUiScreenIds.MODE_LOBBY
+	if needs_nickname_setup:
+		target_screen = WebUiScreenIds.NICKNAME_SETUP
+	elif run_store != null and run_store.has_run():
+		target_screen = WebUiScreenIds.screen_for_run_phase(run_store.phase())
+	router.show_screen(target_screen, false)
+	var target_node_name := WebUiScreenIds.node_name_for(target_screen)
+	var target_node := get_node_or_null("ScreenRoot/%s" % target_node_name)
+	if target_node != null and target_node.has_method("set_payload"):
+		var run_payload := run_store.run.duplicate(true) if run_store != null and run_store.has_run() else {}
+		target_node.call("set_payload", {"run": run_payload, "user": current_user.duplicate(true)})
 
 func _show_battle_screen(battle: Dictionary) -> void:
 	if router != null:
-		router.show_screen("battle")
+		router.show_screen(WebUiScreenIds.BATTLE_REPLAY)
 	var battle_screen := get_node_or_null("ScreenRoot/BattleReplayScreen")
 	if battle_screen != null and battle_screen.has_method("start_replay"):
 		if battle_screen.has_method("configure_cosmetics"):
-			var run_screen := get_node_or_null("ScreenRoot/RunScreen")
+			var run_screen := get_node_or_null("ScreenRoot/LegacyRunScreen")
 			if run_screen != null:
 				var cosmetics = run_screen.get("cosmetics_data")
 				if cosmetics is Dictionary:
