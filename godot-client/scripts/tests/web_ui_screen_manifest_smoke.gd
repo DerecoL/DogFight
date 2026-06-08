@@ -35,18 +35,18 @@ func _init() -> void:
 			return
 
 	var phase_expectations := {
-		"MAP": "exploration_map",
-		"CHOICE": "reward_choice",
-		"CLASS_REWARD": "reward_choice",
-		"ENCHANT_CHOICE": "reward_choice",
-		"RELIC_CHOICE": "reward_choice",
-		"UPGRADE_CHOICE": "reward_choice",
-		"POTION_CHOICE": "reward_choice",
-		"SHOP": "run_shop",
-		"PREP": "run_shell",
-		"MATCH": "run_shell",
+		"MAP": "legacy_run",
+		"CHOICE": "legacy_run",
+		"CLASS_REWARD": "legacy_run",
+		"ENCHANT_CHOICE": "legacy_run",
+		"RELIC_CHOICE": "legacy_run",
+		"UPGRADE_CHOICE": "legacy_run",
+		"POTION_CHOICE": "legacy_run",
+		"SHOP": "legacy_run",
+		"PREP": "legacy_run",
+		"MATCH": "legacy_run",
 		"BATTLE": "battle_replay",
-		"COMPLETE": "run_settlement",
+		"COMPLETE": "legacy_run",
 	}
 	for phase in phase_expectations.keys():
 		var actual := str(manifest.screen_for_run_phase(phase))
@@ -55,8 +55,8 @@ func _init() -> void:
 			_fail("Phase %s should route to %s, got %s" % [phase, expected, actual])
 			return
 
-	if str(manifest.screen_for_run_phase("UNKNOWN_PHASE")) != "run_shell":
-		_fail("Unknown run phase should fall back to run_shell")
+	if str(manifest.screen_for_run_phase("UNKNOWN_PHASE")) != "legacy_run":
+		_fail("Unknown run phase should fall back to playable run screen")
 		return
 
 	print("Web UI screen manifest smoke passed")

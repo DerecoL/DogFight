@@ -68,8 +68,12 @@ func _run() -> void:
 		_fail("ModeLobbyScreen must expose StartRunButton after login")
 		return
 	start_button.pressed.emit()
-	if not await _wait_for_screen(router, "exploration_map"):
-		_fail("Starting a casual run should route to exploration_map, got %s" % str(router.get("current_screen_id")))
+	if not await _wait_for_screen(router, "legacy_run"):
+		_fail("Starting a casual run should route to playable run UI, got %s" % str(router.get("current_screen_id")))
+		return
+	var legacy_run_screen = main.get_node_or_null("ScreenRoot/LegacyRunScreen")
+	if legacy_run_screen == null or not legacy_run_screen.visible:
+		_fail("Starting a casual run should show LegacyRunScreen")
 		return
 
 	main.queue_free()

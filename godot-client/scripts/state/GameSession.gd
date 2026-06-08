@@ -44,6 +44,7 @@ func _ready() -> void:
 		router.configure(screen_root)
 		for screen_id in WebUiScreenIds.screen_ids():
 			router.register_screen(screen_id, WebUiScreenIds.node_name_for(screen_id))
+		router.register_screen(WebUiScreenIds.PLAYABLE_RUN, "LegacyRunScreen")
 		router.show_screen(WebUiScreenIds.LOGIN, false)
 	var overlay_root := get_node_or_null("OverlayRoot")
 	if overlay_root != null:
@@ -518,12 +519,24 @@ func _show_run_screen() -> void:
 		target_screen = WebUiScreenIds.NICKNAME_SETUP
 	elif run_store != null and run_store.has_run():
 		target_screen = WebUiScreenIds.screen_for_run_phase(run_store.phase())
+	if target_screen == WebUiScreenIds.PLAYABLE_RUN:
+		_show_playable_run_screen()
+		return
 	router.show_screen(target_screen, false)
 	var target_node_name := WebUiScreenIds.node_name_for(target_screen)
 	var target_node := get_node_or_null("ScreenRoot/%s" % target_node_name)
 	if target_node != null and target_node.has_method("set_payload"):
 		var run_payload := run_store.run.duplicate(true) if run_store != null and run_store.has_run() else {}
 		target_node.call("set_payload", {"run": run_payload, "user": current_user.duplicate(true)})
+
+func _show_playable_run_screen() -> void:
+	var run_screen := get_node_or_null("ScreenRoot/LegacyRunScreen")
+	if run_screen != null and run_screen.has_method("bind_session") and run_screen.get("session") == null:
+		run_screen.bind_session(self)
+	if router != null:
+		router.show_screen(WebUiScreenIds.PLAYABLE_RUN, false)
+	if run_screen != null and run_screen.has_method("show_run_phase"):
+		run_screen.call("show_run_phase")
 
 func _show_battle_screen(battle: Dictionary) -> void:
 	if router != null:

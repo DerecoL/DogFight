@@ -119,6 +119,10 @@ func clear_error() -> void:
 	if status_label != null:
 		status_label.text = ""
 
+func show_run_phase() -> void:
+	current_tab = TAB_RUN
+	_render_shell()
+
 func _build_layout() -> void:
 	var background := TextureRect.new()
 	background.name = "Background"

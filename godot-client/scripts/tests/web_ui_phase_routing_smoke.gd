@@ -15,18 +15,18 @@ func _init() -> void:
 		return
 
 	var cases := {
-		"MAP": "exploration_map",
-		"SHOP": "run_shop",
-		"CHOICE": "reward_choice",
-		"CLASS_REWARD": "reward_choice",
-		"ENCHANT_CHOICE": "reward_choice",
-		"RELIC_CHOICE": "reward_choice",
-		"UPGRADE_CHOICE": "reward_choice",
-		"POTION_CHOICE": "reward_choice",
-		"PREP": "run_shell",
-		"MATCH": "run_shell",
+		"MAP": "legacy_run",
+		"SHOP": "legacy_run",
+		"CHOICE": "legacy_run",
+		"CLASS_REWARD": "legacy_run",
+		"ENCHANT_CHOICE": "legacy_run",
+		"RELIC_CHOICE": "legacy_run",
+		"UPGRADE_CHOICE": "legacy_run",
+		"POTION_CHOICE": "legacy_run",
+		"PREP": "legacy_run",
+		"MATCH": "legacy_run",
 		"BATTLE": "battle_replay",
-		"COMPLETE": "run_settlement",
+		"COMPLETE": "legacy_run",
 	}
 	for phase in cases.keys():
 		main.call("set_current_run", {

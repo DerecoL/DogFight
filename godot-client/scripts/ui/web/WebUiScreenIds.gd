@@ -4,6 +4,7 @@ extends RefCounted
 const LOGIN := "login"
 const NICKNAME_SETUP := "nickname_setup"
 const MODE_LOBBY := "mode_lobby"
+const PLAYABLE_RUN := "legacy_run"
 const RUN_SHELL := "run_shell"
 const EXPLORATION_MAP := "exploration_map"
 const RUN_SHOP := "run_shop"
@@ -38,18 +39,18 @@ const SCREEN_NODES := {
 }
 
 const RUN_PHASE_SCREENS := {
-	"MAP": EXPLORATION_MAP,
-	"CHOICE": REWARD_CHOICE,
-	"CLASS_REWARD": REWARD_CHOICE,
-	"ENCHANT_CHOICE": REWARD_CHOICE,
-	"RELIC_CHOICE": REWARD_CHOICE,
-	"UPGRADE_CHOICE": REWARD_CHOICE,
-	"POTION_CHOICE": REWARD_CHOICE,
-	"SHOP": RUN_SHOP,
-	"PREP": RUN_SHELL,
-	"MATCH": RUN_SHELL,
+	"MAP": PLAYABLE_RUN,
+	"CHOICE": PLAYABLE_RUN,
+	"CLASS_REWARD": PLAYABLE_RUN,
+	"ENCHANT_CHOICE": PLAYABLE_RUN,
+	"RELIC_CHOICE": PLAYABLE_RUN,
+	"UPGRADE_CHOICE": PLAYABLE_RUN,
+	"POTION_CHOICE": PLAYABLE_RUN,
+	"SHOP": PLAYABLE_RUN,
+	"PREP": PLAYABLE_RUN,
+	"MATCH": PLAYABLE_RUN,
 	"BATTLE": BATTLE_REPLAY,
-	"COMPLETE": RUN_SETTLEMENT,
+	"COMPLETE": PLAYABLE_RUN,
 }
 
 static func screen_ids() -> Array[String]:
@@ -62,4 +63,4 @@ static func node_name_for(screen_id: String) -> String:
 	return str(SCREEN_NODES.get(screen_id, ""))
 
 static func screen_for_run_phase(phase: String) -> String:
-	return str(RUN_PHASE_SCREENS.get(phase, RUN_SHELL))
+	return str(RUN_PHASE_SCREENS.get(phase, PLAYABLE_RUN))
