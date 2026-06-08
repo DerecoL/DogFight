@@ -3,6 +3,8 @@ extends BaseWebScreen
 var nickname_input: LineEdit
 var status_label: Label
 var submit_button: Button
+var logout_button: Button
+var action_in_progress := false
 
 func _ready() -> void:
 	_build_form()
@@ -74,7 +76,7 @@ func _build_form() -> void:
 	submit_button.pressed.connect(_submit_nickname)
 	actions.add_child(submit_button)
 
-	var logout_button := Button.new()
+	logout_button = Button.new()
 	logout_button.text = "退出登录"
 	logout_button.custom_minimum_size = Vector2(0, 44)
 	logout_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -82,6 +84,8 @@ func _build_form() -> void:
 	actions.add_child(logout_button)
 
 func _submit_nickname() -> void:
+	if action_in_progress:
+		return
 	var nickname := nickname_input.text.strip_edges()
 	if nickname.length() < 2 or nickname.length() > 16:
 		status_label.text = "昵称需要 2-16 个字符"
@@ -89,13 +93,25 @@ func _submit_nickname() -> void:
 	if session == null or not session.has_method("update_nickname"):
 		status_label.text = "登录会话未初始化"
 		return
-	submit_button.disabled = true
+	action_in_progress = true
+	_set_actions_disabled(true)
 	status_label.text = ""
 	var ok: bool = await session.call("update_nickname", nickname)
-	submit_button.disabled = false
+	action_in_progress = false
+	_set_actions_disabled(false)
 	if not ok:
 		status_label.text = "昵称保存失败，请重试"
 
 func _logout() -> void:
+	if action_in_progress:
+		return
 	if session != null and session.has_method("logout"):
 		await session.call("logout")
+
+func _set_actions_disabled(disabled: bool) -> void:
+	if nickname_input != null:
+		nickname_input.editable = not disabled
+	if submit_button != null:
+		submit_button.disabled = disabled
+	if logout_button != null:
+		logout_button.disabled = disabled
