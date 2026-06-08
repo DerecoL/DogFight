@@ -23,6 +23,7 @@ var modal_stack: ModalStack
 var toast_bus: ToastBus
 var feedback_sound_bus: FeedbackSoundBus
 var toast_layer: Control
+var loading_layer: Control
 var current_user: Dictionary = {}
 var needs_nickname_setup := false
 var store: AppStore = AppStore.new()
@@ -54,8 +55,11 @@ func _ready() -> void:
 		add_child(toast_bus)
 		modal_stack.configure(overlay_root.get_node_or_null("ModalLayer"))
 		toast_layer = overlay_root.get_node_or_null("ToastLayer")
+		loading_layer = overlay_root.get_node_or_null("LoadingLayer")
 		if not toast_bus.toast_queued.is_connected(_show_toast):
 			toast_bus.toast_queued.connect(_show_toast)
+		if loading_layer != null and not api.loading_changed.is_connected(_set_loading_visible):
+			api.loading_changed.connect(_set_loading_visible)
 		modal_stack.stack_changed.connect(func(_depth: int, blocking: bool) -> void:
 			var blocking_layer := overlay_root.get_node_or_null("BlockingLayer")
 			if blocking_layer != null:
@@ -429,6 +433,10 @@ func _show_toast(toast: Dictionary) -> void:
 	tween.tween_interval(max(0.5, duration))
 	tween.tween_property(panel, "modulate:a", 0.0, 0.24)
 	tween.tween_callback(panel.queue_free)
+
+func _set_loading_visible(active: bool) -> void:
+	if loading_layer != null:
+		loading_layer.visible = active
 
 func _show_reward_summary(summary: Dictionary) -> void:
 	if modal_stack == null:
