@@ -59,6 +59,18 @@ func _run() -> void:
 	if not await _wait_for_screen(router, "mode_lobby"):
 		_fail("Login with saved nickname should route to mode_lobby, got %s" % str(router.get("current_screen_id")))
 		return
+	var mode_lobby = main.get_node_or_null("ScreenRoot/ModeLobbyScreen")
+	if mode_lobby == null:
+		_fail("ModeLobbyScreen is missing after login")
+		return
+	var start_button = mode_lobby.find_child("StartRunButton", true, false) as Button
+	if start_button == null:
+		_fail("ModeLobbyScreen must expose StartRunButton after login")
+		return
+	start_button.pressed.emit()
+	if not await _wait_for_screen(router, "exploration_map"):
+		_fail("Starting a casual run should route to exploration_map, got %s" % str(router.get("current_screen_id")))
+		return
 
 	main.queue_free()
 	for _frame in range(2):
