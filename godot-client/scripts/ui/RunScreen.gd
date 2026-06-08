@@ -801,6 +801,7 @@ func _render_map_or_shop(run: Dictionary) -> void:
 				shop_card.add_child(offer_button)
 
 func _render_achievements_tab() -> void:
+	_render_daily_tasks_section("每日任务")
 	var card := _section("成就与每日任务")
 	var wallet: Dictionary = _dict(achievements_data, "wallet")
 	_add_line(card, "长期目标", "余额 %d / 今日获得 %d" % [int(wallet.get("balance", 0)), int(wallet.get("dailyEarned", 0))])
@@ -810,7 +811,10 @@ func _render_achievements_tab() -> void:
 			card.add_child(_action_button(_achievement_button_label(achievement), _show_achievement_modal.bind(achievement)))
 
 func _render_daily_tab() -> void:
-	var card := _section("每日任务")
+	_render_daily_tasks_section("每日任务")
+
+func _render_daily_tasks_section(title: String) -> void:
+	var card := _section(title)
 	var wallet: Dictionary = _dict(daily_data, "wallet")
 	_add_line(card, "日期 / 钱包", "%s · 余额 %d" % [str(daily_data.get("dateKey", "")), int(wallet.get("balance", 0))])
 	var refresh_used := bool(daily_data.get("refreshUsed", false))
@@ -1139,6 +1143,7 @@ func _refresh_after_action() -> void:
 	await _fetch_into("history", ApiRoutes.runs_history())
 	if current_tab == TAB_ACHIEVEMENTS:
 		await _fetch_into("achievements", ApiRoutes.achievements())
+		await _fetch_into("daily", ApiRoutes.daily_tasks())
 	elif current_tab == TAB_DAILY:
 		await _fetch_into("daily", ApiRoutes.daily_tasks())
 	elif current_tab == TAB_ROOMS:
@@ -1156,6 +1161,7 @@ func _refresh_current_section() -> void:
 			await _fetch_into("history", ApiRoutes.runs_history())
 		TAB_ACHIEVEMENTS:
 			await _fetch_into("achievements", ApiRoutes.achievements())
+			await _fetch_into("daily", ApiRoutes.daily_tasks())
 		TAB_DAILY:
 			await _fetch_into("daily", ApiRoutes.daily_tasks())
 		TAB_SHOP:

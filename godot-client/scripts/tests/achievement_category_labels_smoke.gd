@@ -59,11 +59,34 @@ func _run() -> void:
 			},
 		],
 	})
+	run_screen.set("daily_data", {
+		"dateKey": "2026-06-02",
+		"refreshUsed": false,
+		"wallet": {"balance": 500},
+		"tasks": [
+			{
+				"taskId": "daily-ready",
+				"progress": 5,
+				"target": 5,
+				"reward": 20,
+				"claimedAt": "",
+				"def": {"title": "商店达人", "description": "购买 5 件商品"},
+			},
+			{
+				"taskId": "daily-open",
+				"progress": 1,
+				"target": 4,
+				"reward": 10,
+				"claimedAt": "",
+				"def": {"title": "继续挑战", "description": "完成 4 个回合"},
+			},
+		],
+	})
 	run_screen.set("current_tab", "成就")
 	run_screen.call("_render_current_tab")
 	await process_frame
 	var text := _collect_text(run_screen)
-	for part in ["成就与每日任务", "长期目标", "余额 500 / 今日获得 60", "分类", "全部 / 战斗 / 收藏 / 任务", "可领取 首胜", "战斗", "1/1", "奖励 30", "未完成 隐藏成就 收藏大师", "收藏", "2/5", "已领取 任务常客", "任务"]:
+	for part in ["成就与每日任务", "每日任务", "2026-06-02 · 余额 500", "刷新每日任务", "可领取 商店达人", "未完成 继续挑战", "长期目标", "余额 500 / 今日获得 60", "分类", "全部 / 战斗 / 收藏 / 任务", "可领取 首胜", "战斗", "1/1", "奖励 30", "未完成 隐藏成就 收藏大师", "收藏", "2/5", "已领取 任务常客", "任务"]:
 		if not text.contains(str(part)):
 			_fail("Achievement category label missing: %s" % str(part))
 			return

@@ -30,7 +30,7 @@ func _run() -> void:
 		_fail("LegacyRunScreen is missing")
 		return
 	var cases := {
-		"成就": ["/achievements"],
+		"成就": ["/achievements", "/daily-tasks"],
 		"商城": ["/shop", "/cosmetics/me"],
 		"排行": ["/ladder/me", "/ladder/leaderboard"],
 		"巅峰": ["/apex"],
