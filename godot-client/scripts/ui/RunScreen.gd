@@ -1298,7 +1298,7 @@ func _submit_apex_candidate(run_id: String) -> void:
 	await _post_and_store(ApiRoutes.apex_submit(), {"runId": run_id}, "apex", "submit_apex")
 
 func _refresh_cosmetics() -> void:
-	await _fetch_into("cosmetics", ApiRoutes.cosmetics_me())
+	await _guarded_fetch_into("cosmetics", ApiRoutes.cosmetics_me())
 	_render_shell()
 
 func _music_enabled_preference() -> bool:
