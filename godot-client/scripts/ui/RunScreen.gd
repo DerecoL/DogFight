@@ -186,9 +186,13 @@ func _build_layout() -> void:
 	header.add_theme_constant_override("separation", 10)
 	root.add_child(header)
 
+	var lobby_button := _button("返回大厅", 96)
+	lobby_button.pressed.connect(open_mode_lobby)
+	header.add_child(lobby_button)
+
 	title_label = Label.new()
 	title_label.text = "狗骰乱斗 Godot 工作台"
-	title_label.custom_minimum_size = Vector2(240, 44)
+	title_label.custom_minimum_size = Vector2(180, 44)
 	title_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	header.add_child(title_label)
 
@@ -963,13 +967,19 @@ func _on_history_run_pressed(run_id: String) -> void:
 	current_tab = TAB_RUN
 	_render_shell()
 
+func open_mode_lobby() -> void:
+	if session != null and session.has_method("open_screen"):
+		session.call("open_screen", "mode_lobby")
+
 func _on_tab_pressed(tab: String) -> void:
 	current_tab = tab
 	_render_shell()
+	call_deferred("_refresh_current_section")
 
 func _switch_tab(tab: String) -> void:
 	current_tab = tab
 	_render_shell()
+	call_deferred("_refresh_current_section")
 
 func _current_run_mode() -> String:
 	var store: Object = _run_store()
