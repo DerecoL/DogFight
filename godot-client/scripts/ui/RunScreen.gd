@@ -58,6 +58,8 @@ var selected_item_label := ""
 var selected_item: Dictionary = {}
 var selected_relic_id := ""
 var selected_relic: Dictionary = {}
+var selected_enchant_choice_id := ""
+var selected_potion_choice_id := ""
 var selected_room_id := ""
 var active_room: Dictionary = {}
 var history_tab := "ALL"
@@ -2380,6 +2382,7 @@ func _show_relic_choice_modal(choice: Dictionary) -> void:
 	_push_modal(modal["panel"])
 
 func _show_enchant_choice_modal(choice: Dictionary) -> void:
+	selected_enchant_choice_id = str(choice.get("id", ""))
 	var modal := _modal_panel("附魔选择", Vector2(540, 430))
 	if modal.is_empty():
 		return
@@ -2402,6 +2405,7 @@ func _show_enchant_choice_modal(choice: Dictionary) -> void:
 	_push_modal(modal["panel"])
 
 func _show_potion_choice_modal(choice: Dictionary) -> void:
+	selected_potion_choice_id = str(choice.get("id", ""))
 	var modal := _modal_panel("药水选择", Vector2(540, 430))
 	if modal.is_empty():
 		return
@@ -2713,6 +2717,15 @@ func _select_item(item: Dictionary, label: String) -> void:
 	status_label.text = "已选中：%s" % label
 	_render_current_tab()
 
+func _select_reward_target_or_item(item: Dictionary, label: String) -> void:
+	_select_item(item, label)
+	var run := _current_run()
+	var phase := str(run.get("phase", ""))
+	if phase == "ENCHANT_CHOICE":
+		await _select_enchant(_active_enchant_choice_id())
+	elif phase == "POTION_CHOICE":
+		await _select_potion(_active_potion_choice_id())
+
 func _select_relic(relic: Dictionary, label: String) -> void:
 	selected_relic = relic.duplicate(true)
 	selected_relic_id = str(relic.get("id", relic.get("relicId", "")))
@@ -2751,16 +2764,44 @@ func _select_upgrade_item() -> void:
 	await _call_session("select_upgrade_item", [selected_item_id])
 
 func _select_potion(potion_id: String) -> void:
+	if potion_id.is_empty():
+		_show_error("请先选择药水")
+		return
 	if selected_item_id.is_empty():
 		_show_error("请先选中要使用药水的装备")
 		return
 	await _call_session("select_potion", [potion_id, selected_item_id])
 
 func _select_enchant(enchant_id: String) -> void:
+	if enchant_id.is_empty():
+		_show_error("请先选择附魔")
+		return
 	if selected_item_id.is_empty():
 		_show_error("请先选中要附魔的装备")
 		return
 	await _call_session("select_enchant", [enchant_id, selected_item_id])
+
+func _active_enchant_choice_id() -> String:
+	var choices := _array(_current_run(), "enchantChoices")
+	if not selected_enchant_choice_id.is_empty():
+		for choice in choices:
+			if choice is Dictionary and str(choice.get("id", "")) == selected_enchant_choice_id:
+				return selected_enchant_choice_id
+	for choice in choices:
+		if choice is Dictionary:
+			return str(choice.get("id", ""))
+	return ""
+
+func _active_potion_choice_id() -> String:
+	var choices := _array(_current_run(), "potionChoices")
+	if not selected_potion_choice_id.is_empty():
+		for choice in choices:
+			if choice is Dictionary and str(choice.get("id", "")) == selected_potion_choice_id:
+				return selected_potion_choice_id
+	for choice in choices:
+		if choice is Dictionary:
+			return str(choice.get("id", ""))
+	return ""
 
 func _api_get(path: String) -> Dictionary:
 	var client: ApiClient = _api()
@@ -2882,7 +2923,7 @@ func _render_item_grid(parent: VBoxContainer, title: String, area: String, run: 
 		else:
 			var label := _item_label(item)
 			_apply_button_icon(button, _item_texture(item))
-			button.pressed.connect(_select_item.bind(item, label))
+			button.pressed.connect(_select_reward_target_or_item.bind(item, label))
 		grid.add_child(button)
 
 func _render_relic_rail(parent: VBoxContainer, run: Dictionary) -> void:
