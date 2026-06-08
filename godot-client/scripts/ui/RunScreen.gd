@@ -563,7 +563,7 @@ func _render_reward_choices(run: Dictionary) -> void:
 			var def: Dictionary = _dict(relic, "def")
 			card.add_child(_action_button("查看遗物：%s" % _fallback(str(def.get("name", "")), str(relic.get("relicId", ""))), _show_relic_choice_modal.bind(relic)))
 		else:
-			card.add_child(_action_button("选择遗物：%s" % str(relic), _call_session.bind("select_relic", [str(relic)])))
+			card.add_child(_run_action_button("选择遗物：%s" % str(relic), _call_session.bind("select_relic", [str(relic)])))
 	for item in classes:
 		if item is Dictionary:
 			var item_def: Dictionary = _dict(item, "def")
@@ -578,8 +578,8 @@ func _render_reward_choices(run: Dictionary) -> void:
 		if selected_item_id.is_empty():
 			card.add_child(_disabled_action_button("先选中装备再升级"))
 		else:
-			card.add_child(_action_button("升级选中装备", _select_upgrade_item))
-		card.add_child(_action_button("跳过升级", _call_session.bind("skip_upgrade_choice", [])))
+			card.add_child(_run_action_button("升级选中装备", _select_upgrade_item))
+		card.add_child(_run_action_button("跳过升级", _call_session.bind("skip_upgrade_choice", [])))
 
 func _render_shop_choice_panel(parent: VBoxContainer, choices: Array) -> void:
 	_add_line(parent, "选择本回合要访问的商店", "不同商店提供不同类型的道具，选择适合你战术的商店")
@@ -596,7 +596,7 @@ func _render_shop_choice_panel(parent: VBoxContainer, choices: Array) -> void:
 			box.add_theme_constant_override("separation", 4)
 			grid.add_child(box)
 			_add_line(box, _shop_choice_icon(shop_type) + " " + _shop_name(shop_type), _shop_description(shop_type))
-			box.add_child(_action_button("进入 %s" % _shop_name(shop_type), _call_session.bind("select_shop_choice", [shop_type])))
+			box.add_child(_run_action_button("进入 %s" % _shop_name(shop_type), _call_session.bind("select_shop_choice", [shop_type])))
 		else:
 			var placeholder := Label.new()
 			placeholder.text = "空商店位 %d" % (index + 1)
@@ -1027,6 +1027,7 @@ func _render_room_current_run(run: Dictionary) -> void:
 	_add_line(card, "阶段", "%s / %s" % [_room_phase_label(str(run.get("phase", ""))), _room_status_label(str(run.get("status", "")))])
 	_add_line(card, "犬种", "%s  幸运号 %s" % [_dog_name(str(run.get("dogType", ""))), str(run.get("luckyNumber", "-"))])
 	_add_line(card, "进度", "第 %d 回合 · %d 胜 %d 负 · 金币 %d" % [int(run.get("round", 0)), int(run.get("wins", 0)), int(run.get("losses", 0)), int(run.get("gold", 0))])
+	_render_reward_choices(run)
 	_render_inventory(run)
 	_render_map_or_shop_detail(run)
 
@@ -2396,7 +2397,7 @@ func _show_class_reward_modal(choice: Dictionary) -> void:
 	var box: VBoxContainer = modal["box"]
 	_render_detail_header(box, _sticker_texture(str(choice.get("defId", ""))), title, "职业装备奖励 · %s" % _quality_label(str(choice.get("quality", ""))))
 	_add_item_def_details(box, def, str(choice.get("quality", "")), str(choice.get("defId", "")))
-	box.add_child(_action_button("领取职业装备", _class_reward_from_modal.bind(str(choice.get("defId", "")))))
+	box.add_child(_run_action_button("领取职业装备", _class_reward_from_modal.bind(str(choice.get("defId", "")))))
 	_push_modal(modal["panel"])
 
 func _show_relic_choice_modal(choice: Dictionary) -> void:
@@ -2414,7 +2415,7 @@ func _show_relic_choice_modal(choice: Dictionary) -> void:
 	var effect := str(def.get("effect", ""))
 	if not effect.is_empty():
 		_add_line(box, "效果", effect)
-	box.add_child(_action_button("选择遗物", _relic_choice_from_modal.bind(str(choice.get("relicId", "")))))
+	box.add_child(_run_action_button("选择遗物", _relic_choice_from_modal.bind(str(choice.get("relicId", "")))))
 	_push_modal(modal["panel"])
 
 func _show_enchant_choice_modal(choice: Dictionary) -> void:
@@ -2437,7 +2438,7 @@ func _show_enchant_choice_modal(choice: Dictionary) -> void:
 	if selected_item_id.is_empty():
 		box.add_child(_disabled_action_button("先选中装备再附魔"))
 	else:
-		box.add_child(_action_button("附魔到选中装备", _enchant_from_modal.bind(str(choice.get("id", "")))))
+		box.add_child(_run_action_button("附魔到选中装备", _enchant_from_modal.bind(str(choice.get("id", "")))))
 	_push_modal(modal["panel"])
 
 func _show_potion_choice_modal(choice: Dictionary) -> void:
@@ -2452,7 +2453,7 @@ func _show_potion_choice_modal(choice: Dictionary) -> void:
 	if selected_item_id.is_empty():
 		box.add_child(_disabled_action_button("先选中装备再使用药水"))
 	else:
-		box.add_child(_action_button("药水给选中装备", _potion_from_modal.bind(str(choice.get("id", "")))))
+		box.add_child(_run_action_button("药水给选中装备", _potion_from_modal.bind(str(choice.get("id", "")))))
 	_push_modal(modal["panel"])
 
 func _show_item_detail_modal(item: Dictionary) -> void:
@@ -2467,7 +2468,7 @@ func _show_item_detail_modal(item: Dictionary) -> void:
 	_add_line(box, "位置", "%s  (%d,%d)" % [_area_label(str(item.get("area", ""))), int(item.get("x", 0)), int(item.get("y", 0))])
 	var id := str(item.get("id", ""))
 	if not id.is_empty():
-		var run := _current_run()
+		var run := _current_interaction_run()
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 8)
 		if _can_sell_item_action(run, id):
@@ -2755,7 +2756,7 @@ func _select_item(item: Dictionary, label: String) -> void:
 
 func _select_reward_target_or_item(item: Dictionary, label: String) -> void:
 	_select_item(item, label)
-	var run := _current_run()
+	var run := _current_interaction_run()
 	var phase := str(run.get("phase", ""))
 	if phase == "ENCHANT_CHOICE":
 		await _select_enchant(_active_enchant_choice_id())
@@ -2818,7 +2819,7 @@ func _select_enchant(enchant_id: String) -> void:
 	await _call_session("select_enchant", [enchant_id, selected_item_id])
 
 func _active_enchant_choice_id() -> String:
-	var choices := _array(_current_run(), "enchantChoices")
+	var choices := _array(_current_interaction_run(), "enchantChoices")
 	if not selected_enchant_choice_id.is_empty():
 		for choice in choices:
 			if choice is Dictionary and str(choice.get("id", "")) == selected_enchant_choice_id:
@@ -2829,7 +2830,7 @@ func _active_enchant_choice_id() -> String:
 	return ""
 
 func _active_potion_choice_id() -> String:
-	var choices := _array(_current_run(), "potionChoices")
+	var choices := _array(_current_interaction_run(), "potionChoices")
 	if not selected_potion_choice_id.is_empty():
 		for choice in choices:
 			if choice is Dictionary and str(choice.get("id", "")) == selected_potion_choice_id:
@@ -2886,6 +2887,13 @@ func _current_run() -> Dictionary:
 	if store == null or not store.has_method("has_run") or not store.has_run():
 		return {}
 	return store.get("run")
+
+func _current_interaction_run() -> Dictionary:
+	if current_tab == TAB_ROOMS and not active_room.is_empty():
+		var room_run: Dictionary = _dict(active_room, "currentRun")
+		if not room_run.is_empty():
+			return room_run
+	return _current_run()
 
 func _can_sell_item_action(run: Dictionary, item_id: String) -> bool:
 	return not item_id.is_empty() and str(run.get("phase", "")) == "SHOP"
