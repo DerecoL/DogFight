@@ -1,5 +1,19 @@
 const DATABASE_ERROR_MESSAGE = 'Database is not ready. Check DATABASE_URL and start PostgreSQL.'
 
+export class ClientError extends Error {
+  statusCode: number
+
+  constructor(message: string, statusCode = 400) {
+    super(message)
+    this.name = 'ClientError'
+    this.statusCode = statusCode
+  }
+}
+
+export function clientError(message: string, statusCode = 400) {
+  return new ClientError(message, statusCode)
+}
+
 export function publicErrorMessage(error: Error & { statusCode?: number }) {
   if (error.statusCode && error.statusCode >= 400 && error.statusCode < 500) {
     return error.message

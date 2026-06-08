@@ -22,10 +22,32 @@ import {
   type EquippedCosmetic,
   type ShopCatalogItem,
 } from './account-systems'
+import { clientError } from './errors'
 import { parseJson } from './state'
 
 type Tx = Prisma.TransactionClient
 type Db = typeof prisma | Tx
+
+const ACCOUNT_CLIENT_ERROR_MESSAGES = new Set([
+  'Achievement not found',
+  'Achievement not completed',
+  'Achievement already claimed',
+  'Daily refresh already used',
+  'Daily task not found',
+  'Daily task already claimed',
+  'Daily task not completed',
+  'Catalog item not found',
+  'Catalog item already owned',
+  'Insufficient currency',
+  'Catalog item not owned',
+])
+
+function rethrowAccountClientError(error: unknown): never {
+  if (error instanceof Error && ACCOUNT_CLIENT_ERROR_MESSAGES.has(error.message)) {
+    throw clientError(error.message)
+  }
+  throw error
+}
 
 export function shanghaiDateKey(now = new Date()) {
   return new Intl.DateTimeFormat('en-CA', {
@@ -175,7 +197,7 @@ export async function claimAchievement(userId: string, achievementId: string) {
     const updated = await tx.accountWallet.update({ where: { userId }, data: { balance: claimed.wallet.balance } })
     await saveAchievementProgress(tx, userId, claimed.progress)
     await writeLedger(tx, { userId, amount: claimed.amount, balanceAfter: updated.balance, source: 'ACHIEVEMENT', refId: achievementId })
-  })
+  }).catch(rethrowAccountClientError)
   return getAchievements(userId)
 }
 
@@ -196,7 +218,7 @@ export async function refreshDaily(userId: string) {
     const set = await getOrCreateDailySet(tx, userId)
     const next = refreshDailyTasks(dailyStateFromRow(set), userId)
     await saveDailyState(tx, userId, next)
-  })
+  }).catch(rethrowAccountClientError)
   return getDailyTasks(userId)
 }
 
@@ -208,7 +230,7 @@ export async function claimDaily(userId: string, taskId: string) {
     const updated = await tx.accountWallet.update({ where: { userId }, data: { balance: claimed.wallet.balance } })
     await saveDailyState(tx, userId, claimed.state)
     await writeLedger(tx, { userId, amount: claimed.amount, balanceAfter: updated.balance, source: 'DAILY_TASK', refId: taskId, dailyKey: claimed.state.dateKey })
-  })
+  }).catch(rethrowAccountClientError)
   return getDailyTasks(userId)
 }
 
@@ -239,7 +261,7 @@ export async function purchaseShopItem(userId: string, catalogItemId: string) {
     await tx.cosmeticInventory.create({ data: { userId, catalogItemId } })
     await writeLedger(tx, { userId, amount: -purchased.item.price, balanceAfter: updated.balance, source: 'SHOP_PURCHASE', refId: catalogItemId })
     await recordAccountEvent(userId, { kind: 'COSMETIC_PURCHASED', catalogItemId, cosmeticType: purchased.item.type }, tx)
-  })
+  }).catch(rethrowAccountClientError)
   return getShop(userId)
 }
 
@@ -271,7 +293,7 @@ export async function equipUserCosmetic(userId: string, catalogItemId: string) {
       create: { userId, slot: target.slot, catalogItemId },
     })
     await recordAccountEvent(userId, { kind: 'COSMETIC_EQUIPPED', catalogItemId, cosmeticType: item.type }, tx)
-  })
+  }).catch(rethrowAccountClientError)
   return getCosmetics(userId)
 }
 
