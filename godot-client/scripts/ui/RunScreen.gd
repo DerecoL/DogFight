@@ -541,7 +541,10 @@ func _render_reward_choices(run: Dictionary) -> void:
 		if potion is Dictionary:
 			card.add_child(_action_button("查看药水：%s" % _potion_choice_label(potion), _show_potion_choice_modal.bind(potion)))
 	if str(run.get("phase", "")) == "UPGRADE_CHOICE":
-		card.add_child(_action_button("升级选中装备", _select_upgrade_item))
+		if selected_item_id.is_empty():
+			card.add_child(_disabled_action_button("先选中装备再升级"))
+		else:
+			card.add_child(_action_button("升级选中装备", _select_upgrade_item))
 		card.add_child(_action_button("跳过升级", _call_session.bind("skip_upgrade_choice", [])))
 
 func _render_shop_choice_panel(parent: VBoxContainer, choices: Array) -> void:
@@ -2323,7 +2326,10 @@ func _show_enchant_choice_modal(choice: Dictionary) -> void:
 			_add_line(box, "效果", _enchant_effect_label(str(enchant.get("effect", ""))))
 		if enchant.has("amount"):
 			_add_line(box, "数值", str(enchant.get("amount", "")))
-	box.add_child(_action_button("附魔到选中装备", _enchant_from_modal.bind(str(choice.get("id", "")))))
+	if selected_item_id.is_empty():
+		box.add_child(_disabled_action_button("先选中装备再附魔"))
+	else:
+		box.add_child(_action_button("附魔到选中装备", _enchant_from_modal.bind(str(choice.get("id", "")))))
 	_push_modal(modal["panel"])
 
 func _show_potion_choice_modal(choice: Dictionary) -> void:
@@ -2334,7 +2340,10 @@ func _show_potion_choice_modal(choice: Dictionary) -> void:
 	_add_line(box, "类型", _potion_category_label(str(choice.get("category", ""))))
 	_add_line(box, "点数", _detail_array_text(choice.get("dice", [])))
 	_add_line(box, "说明", str(choice.get("description", "")))
-	box.add_child(_action_button("药水给选中装备", _potion_from_modal.bind(str(choice.get("id", "")))))
+	if selected_item_id.is_empty():
+		box.add_child(_disabled_action_button("先选中装备再使用药水"))
+	else:
+		box.add_child(_action_button("药水给选中装备", _potion_from_modal.bind(str(choice.get("id", "")))))
 	_push_modal(modal["panel"])
 
 func _show_item_detail_modal(item: Dictionary) -> void:
@@ -3134,6 +3143,11 @@ func _action_button(text: String, handler: Callable) -> Button:
 	var button := _button(text, 0)
 	button.disabled = action_in_progress
 	button.pressed.connect(handler)
+	return button
+
+func _disabled_action_button(text: String) -> Button:
+	var button := _button(text, 0)
+	button.disabled = true
 	return button
 
 func _mode_button(title: String, description: String, action_label: String, handler: Callable) -> Button:

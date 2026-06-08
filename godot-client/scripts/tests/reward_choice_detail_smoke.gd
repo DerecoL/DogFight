@@ -44,6 +44,7 @@ func _run() -> void:
 	_assert_modal_text(modal_layer, ["遗物选择", "双面金牌", "白银", "商店折扣提高", "选择遗物"])
 	run_screen.call("_close_top_modal")
 	await process_frame
+	run_screen.set("selected_item_id", "item-1")
 	run_screen.call("_show_enchant_choice_modal", {
 		"id": "ench-1",
 		"description": "相邻装备伤害 +2",
