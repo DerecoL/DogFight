@@ -1056,11 +1056,15 @@ func open_mode_lobby() -> void:
 		session.call("open_screen", "mode_lobby")
 
 func _on_tab_pressed(tab: String) -> void:
+	if action_in_progress:
+		return
 	current_tab = tab
 	_render_shell()
 	call_deferred("_refresh_current_section")
 
 func _switch_tab(tab: String) -> void:
+	if action_in_progress:
+		return
 	current_tab = tab
 	_render_shell()
 	call_deferred("_refresh_current_section")
@@ -3284,6 +3288,12 @@ func _mode_button(title: String, description: String, action_label: String, hand
 func _update_controls() -> void:
 	if lobby_button != null:
 		lobby_button.disabled = action_in_progress
+	if dog_type_select != null:
+		dog_type_select.disabled = action_in_progress
+	if mode_select != null:
+		mode_select.disabled = action_in_progress
+	if lucky_select != null:
+		lucky_select.disabled = action_in_progress
 	if create_run_button != null:
 		create_run_button.disabled = action_in_progress
 	if refresh_button != null:
