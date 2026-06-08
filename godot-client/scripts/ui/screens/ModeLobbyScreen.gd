@@ -80,7 +80,7 @@ func _build_lobby() -> void:
 	mode_entries.add_theme_constant_override("v_separation", 8)
 	box.add_child(mode_entries)
 	_add_mode_button(mode_entries, "CasualModeButton", "休闲模式", "开始/继续休闲跑局", _enter_mode.bind("CASUAL"))
-	_add_mode_button(mode_entries, "LadderModeButton", "天梯模式", "开始/继续天梯跑局", _enter_mode.bind("LADDER"))
+	_add_mode_button(mode_entries, "LadderModeButton", "天梯模式", "进入天梯主页和榜单", _enter_ladder)
 	_add_mode_button(mode_entries, "DogfightModeButton", "斗狗模式", "创建、匹配、加入房间", _open_screen.bind("dogfight_rooms"))
 	_add_mode_button(mode_entries, "PeakModeButton", "巅峰模式", "提交完成狗并查看榜单", _open_screen.bind("leaderboards"))
 
@@ -244,6 +244,13 @@ func _enter_mode(mode: String) -> void:
 			mode_select.select(index)
 			break
 	await _start_run()
+
+func _enter_ladder() -> void:
+	var run: Dictionary = payload.get("run", {})
+	if not run.is_empty() and str(run.get("mode", "")) == "LADDER":
+		_continue_run()
+		return
+	_open_screen("leaderboards")
 
 func _continue_run() -> void:
 	if session != null and session.has_method("set_current_run"):
