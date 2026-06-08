@@ -30,6 +30,14 @@ func _run() -> void:
 		if not text.contains(part):
 			_fail("Room battle phase current entry missing: %s" % part)
 			return
+	var current_context: Dictionary = run_screen.call("_room_battle_finish_context", "battle-current")
+	if str(current_context.get("kind", "")) != "DOGFIGHT_ROOM_READY":
+		_fail("Current room battle should finish by marking ready")
+		return
+	var view_context: Dictionary = run_screen.call("_room_battle_finish_context", "battle-other")
+	if str(view_context.get("kind", "")) != "DOGFIGHT_ROOM_VIEW":
+		_fail("Non-current room battle should only return to room")
+		return
 
 	main.queue_free()
 	for _frame in range(5):

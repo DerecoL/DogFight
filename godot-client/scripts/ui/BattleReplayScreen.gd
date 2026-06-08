@@ -39,6 +39,7 @@ var replay_complete := false
 var finish_in_progress := false
 var playback_speed := 1.0
 var log_filter := "all"
+var finish_context: Dictionary = {}
 var current_player_statuses: Dictionary = {}
 var current_opponent_statuses: Dictionary = {}
 
@@ -91,6 +92,8 @@ func _ready() -> void:
 
 func start_replay(next_battle: Dictionary) -> void:
 	battle = next_battle.duplicate(true)
+	finish_context = _dict(battle, "_finishContext")
+	finish_button.text = _finish_button_label()
 	var next_events = battle.get("events", [])
 	events = next_events if next_events is Array else []
 	displayed_events = []
@@ -156,15 +159,38 @@ func _on_skip_pressed() -> void:
 	_mark_replay_complete()
 
 func _on_finish_pressed() -> void:
-	if finish_in_progress or session == null or not session.has_method("finish_battle"):
+	if finish_in_progress or session == null:
+		return
+	var finish_method := _finish_method()
+	if not session.has_method(finish_method):
 		return
 	finish_in_progress = true
 	_set_battle_controls_disabled(true)
-	var ok: bool = await session.finish_battle()
+	var ok: bool = await session.callv(finish_method, _finish_args())
 	finish_in_progress = false
 	if not ok:
 		_set_battle_controls_disabled(false)
 		_restore_replay_controls()
+
+func _finish_method() -> String:
+	var kind := str(finish_context.get("kind", ""))
+	if kind == "DOGFIGHT_ROOM_READY" or kind == "DOGFIGHT_ROOM_VIEW":
+		return "finish_dogfight_room_battle"
+	return "finish_battle"
+
+func _finish_args() -> Array:
+	var kind := str(finish_context.get("kind", ""))
+	if kind == "DOGFIGHT_ROOM_READY" or kind == "DOGFIGHT_ROOM_VIEW":
+		return [str(finish_context.get("roomId", "")), str(finish_context.get("battleId", "")), kind == "DOGFIGHT_ROOM_READY"]
+	return []
+
+func _finish_button_label() -> String:
+	var kind := str(finish_context.get("kind", ""))
+	if kind == "DOGFIGHT_ROOM_READY":
+		return "完成本回合"
+	if kind == "DOGFIGHT_ROOM_VIEW":
+		return "返回房间"
+	return "结算"
 
 func _on_restart_pressed() -> void:
 	if finish_in_progress:

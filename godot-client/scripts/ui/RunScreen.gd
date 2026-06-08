@@ -1447,7 +1447,9 @@ func _load_room_battle(battle_id: String) -> void:
 	var data: Dictionary = _data(response)
 	var battle: Dictionary = _dict(data, "battle")
 	if session != null and session.has_signal("battle_started"):
-		session.battle_started.emit(_dict(battle, "result"))
+		var result := _dict(battle, "result")
+		result["_finishContext"] = _room_battle_finish_context(battle_id)
+		session.battle_started.emit(result)
 
 func _apply_room_response(response: Dictionary, success_action := "") -> void:
 	if not bool(response.get("ok", false)):
@@ -2231,6 +2233,13 @@ func _current_room_battle_id(room: Dictionary) -> String:
 	if member.is_empty() or bool(member.get("eliminated", false)):
 		return ""
 	return str(member.get("currentBattleId", ""))
+
+func _room_battle_finish_context(battle_id: String) -> Dictionary:
+	var room_id := str(active_room.get("id", ""))
+	if room_id.is_empty():
+		return {}
+	var kind := "DOGFIGHT_ROOM_READY" if _can_ready_room_action(active_room) and battle_id == _current_room_battle_id(active_room) else "DOGFIGHT_ROOM_VIEW"
+	return {"kind": kind, "roomId": room_id, "battleId": battle_id}
 
 func _current_room_member(room: Dictionary) -> Dictionary:
 	var explicit: Dictionary = _dict(room, "currentRunMember")

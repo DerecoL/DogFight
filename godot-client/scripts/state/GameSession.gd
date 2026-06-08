@@ -265,6 +265,24 @@ func start_battle() -> bool:
 func finish_battle() -> bool:
 	return await _post_run_action(ApiRoutes.run_battle_finish(run_store.run_id()), {}, "finish_battle")
 
+func finish_dogfight_room_battle(room_id: String, _battle_id := "", mark_ready := true) -> bool:
+	if room_id.is_empty():
+		_raise_error("房间战报缺少房间 ID")
+		return false
+	if not mark_ready:
+		_show_playable_section(WebUiScreenIds.DOGFIGHT_ROOMS)
+		return true
+	var response := await api.post_json(ApiRoutes.dogfight_room_ready(room_id), {})
+	if not response.ok:
+		_raise_error(str(response.error))
+		return false
+	var run_screen := get_node_or_null("ScreenRoot/LegacyRunScreen")
+	if run_screen != null and run_screen.has_method("_apply_room_response"):
+		await run_screen.call("_apply_room_response", response, "ready_room")
+	else:
+		_show_playable_section(WebUiScreenIds.DOGFIGHT_ROOMS)
+	return true
+
 func _post_run_action(path: String, body: Dictionary, success_action := "") -> bool:
 	if not run_store.has_run():
 		_raise_error("没有当前跑局")
