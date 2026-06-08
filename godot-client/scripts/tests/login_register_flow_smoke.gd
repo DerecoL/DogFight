@@ -67,6 +67,13 @@ func _run() -> void:
 	if casual_button == null:
 		_fail("ModeLobbyScreen must expose CasualModeButton after login")
 		return
+	if _has_visible_placeholder(mode_lobby):
+		_fail("ModeLobbyScreen must not show placeholder content after login")
+		return
+	var lobby_text := _collect_text(mode_lobby)
+	if lobby_text.contains("Web 对齐目标"):
+		_fail("ModeLobbyScreen must show the playable lobby, not the old Web alignment placeholder")
+		return
 	casual_button.pressed.emit()
 	if not await _wait_for_screen(router, "legacy_run"):
 		_fail("Entering casual mode should route to playable run UI, got %s" % str(router.get("current_screen_id")))
@@ -119,6 +126,14 @@ func _collect_text(node: Node) -> String:
 	for child in node.get_children():
 		text += _collect_text(child)
 	return text
+
+func _has_visible_placeholder(node: Node) -> bool:
+	if node.name == "PlaceholderPanel" and node is CanvasItem and (node as CanvasItem).is_visible_in_tree():
+		return true
+	for child in node.get_children():
+		if _has_visible_placeholder(child):
+			return true
+	return false
 
 func _cleanup() -> void:
 	if main_node != null and is_instance_valid(main_node):

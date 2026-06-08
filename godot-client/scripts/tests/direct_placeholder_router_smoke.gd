@@ -18,6 +18,23 @@ func _run() -> void:
 		_fail("Main must expose router")
 		return
 
+	router.call("show_screen", "mode_lobby", false)
+	await process_frame
+	await process_frame
+	if str(router.get("current_screen_id")) != "mode_lobby":
+		_fail("Direct router display of mode_lobby should stay on mode_lobby, got %s" % str(router.get("current_screen_id")))
+		return
+	var mode_lobby = main.get_node_or_null("ScreenRoot/ModeLobbyScreen")
+	if mode_lobby == null or not mode_lobby.visible:
+		_fail("Direct router display of mode_lobby should show ModeLobbyScreen")
+		return
+	if mode_lobby.find_child("ModeLobbyPanel", true, false) == null:
+		_fail("ModeLobbyScreen must show the playable lobby panel")
+		return
+	if _any_visible_placeholder(main):
+		_fail("Direct router display of mode_lobby must not show a placeholder panel")
+		return
+
 	for screen_id in [
 		"run_shell",
 		"exploration_map",
