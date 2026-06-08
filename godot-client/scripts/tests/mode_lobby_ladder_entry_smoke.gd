@@ -67,9 +67,25 @@ func _run() -> void:
 	if not await _wait_for_paths(["/ladder/me", "/ladder/leaderboard"]):
 		_fail("Ladder entry should refresh ladder profile and leaderboard")
 		return
+	if not await _wait_for_idle(main):
+		_fail("Ladder home should finish refreshing before interaction")
+		return
 	var legacy = main.get_node_or_null("ScreenRoot/LegacyRunScreen")
 	if legacy == null or str(legacy.get("current_tab")) != "排行":
 		_fail("Ladder entry should show leaderboard tab")
+		return
+	var ladder_text := _collect_text(legacy)
+	for part in ["天梯排行榜", "选择天梯狗狗", "开始天梯"]:
+		if not ladder_text.contains(str(part)):
+			_fail("Ladder home missing Web-style start section: %s" % str(part))
+			return
+	var start_ladder_button = legacy.find_child("StartLadderRunButton", true, false) as Button
+	if start_ladder_button == null:
+		_fail("Ladder home must expose StartLadderRunButton")
+		return
+	start_ladder_button.pressed.emit()
+	if not await _wait_for_run(main, "LADDER"):
+		_fail("Starting from ladder home should create a LADDER run")
 		return
 
 	main.queue_free()
@@ -97,6 +113,24 @@ func _wait_for_paths(paths: Array) -> bool:
 		await process_frame
 	return false
 
+func _wait_for_run(main: Node, mode: String) -> bool:
+	for _frame in range(240):
+		var run_store = main.get("run_store")
+		if run_store != null and run_store.has_method("has_run") and run_store.has_run():
+			var run: Dictionary = run_store.get("run")
+			if str(run.get("mode", "")) == mode:
+				return true
+		await process_frame
+	return false
+
+func _wait_for_idle(main: Node) -> bool:
+	for _frame in range(240):
+		var legacy = main.get_node_or_null("ScreenRoot/LegacyRunScreen")
+		if legacy != null and not bool(legacy.get("action_in_progress")):
+			return true
+		await process_frame
+	return false
+
 func _find_line_edit(node: Node) -> LineEdit:
 	if node == null:
 		return null
@@ -107,6 +141,16 @@ func _find_line_edit(node: Node) -> LineEdit:
 		if result != null:
 			return result
 	return null
+
+func _collect_text(node: Node) -> String:
+	var text := ""
+	if node is Label:
+		text += (node as Label).text + "\n"
+	if node is Button:
+		text += (node as Button).text + "\n"
+	for child in node.get_children():
+		text += _collect_text(child)
+	return text
 
 func _fail(message: String) -> void:
 	push_error(message)

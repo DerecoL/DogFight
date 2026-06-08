@@ -860,6 +860,12 @@ func _render_leaderboards_tab() -> void:
 		if entry is Dictionary:
 			var entry_profile: Dictionary = _dict(entry, "profile")
 			_add_line(ladder_card, "#%d" % int(entry.get("rank", 0)), "%s  %s  %d" % [str(entry.get("title", "")), str(entry.get("name", "")), int(entry_profile.get("score", 0))])
+	var ladder_start := _section("选择天梯狗狗")
+	_add_line(ladder_start, "说明", "开始天梯会进入独立匹配池，并按整局表现结算。")
+	_render_dog_picker(ladder_start)
+	var start_ladder_button := _action_button("开始天梯", _start_ladder_run)
+	start_ladder_button.name = "StartLadderRunButton"
+	ladder_start.add_child(start_ladder_button)
 	var apex_card := _section("巅峰榜")
 	var leaderboards: Dictionary = _dict(apex_data, "leaderboards")
 	var reports: Dictionary = _dict(apex_data, "reports")
@@ -1017,6 +1023,14 @@ func _start_mode(mode: String) -> void:
 	if _current_run_mode() == mode:
 		_render_shell()
 		return
+	await _on_create_run_pressed()
+
+func _start_ladder_run() -> void:
+	for index in range(mode_select.item_count):
+		if str(mode_select.get_item_metadata(index)) == "LADDER":
+			mode_select.select(index)
+			break
+	current_tab = TAB_RUN
 	await _on_create_run_pressed()
 
 func _render_dog_picker(parent: VBoxContainer) -> void:
