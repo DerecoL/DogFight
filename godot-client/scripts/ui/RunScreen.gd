@@ -727,8 +727,11 @@ func _render_inventory(run: Dictionary) -> void:
 		card.add_child(_action_button("出售选中遗物", _call_session.bind("sell_relic", [selected_relic_id])))
 
 func _render_map_or_shop_detail(run: Dictionary) -> void:
-	if str(run.get("phase", "")) == "MAP":
+	var phase := str(run.get("phase", ""))
+	if phase == "MAP":
 		_render_map_or_shop(run)
+		return
+	if phase != "SHOP":
 		return
 	var shop_card := _section("跑局商店")
 	var shop_type := str(run.get("shopType", "GENERAL"))
