@@ -1045,7 +1045,9 @@ func _on_create_run_pressed() -> void:
 func _on_history_run_pressed(run_id: String) -> void:
 	if run_id.is_empty():
 		return
-	await _call_session("load_run", [run_id])
+	var ok: bool = await _call_session("load_run", [run_id])
+	if not ok:
+		return
 	current_tab = TAB_RUN
 	_render_shell()
 
@@ -1166,9 +1168,9 @@ func _on_user_changed(_user: Dictionary) -> void:
 func _on_error_raised(message: String) -> void:
 	status_label.text = message
 
-func _call_session(method: String, args: Array) -> void:
+func _call_session(method: String, args: Array) -> bool:
 	if action_in_progress or session == null or not session.has_method(method):
-		return
+		return false
 	action_in_progress = true
 	_update_controls()
 	var ok: bool = await session.callv(method, args)
@@ -1176,6 +1178,7 @@ func _call_session(method: String, args: Array) -> void:
 	_update_controls()
 	if ok and method != "logout":
 		await _refresh_after_action()
+	return ok
 
 func _refresh_after_action() -> void:
 	await _fetch_into("me", ApiRoutes.me())
