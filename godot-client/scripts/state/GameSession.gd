@@ -380,6 +380,7 @@ func _screen_uses_playable_run_shell(screen_id: String) -> bool:
 
 func _screen_uses_playable_shell(screen_id: String) -> bool:
 	return [
+		"account",
 		WebUiScreenIds.ACCOUNT_SHOP,
 		WebUiScreenIds.ACHIEVEMENTS,
 		WebUiScreenIds.LEADERBOARDS,

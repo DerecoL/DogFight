@@ -76,6 +76,13 @@ func _build_lobby() -> void:
 	tutorial_button.pressed.connect(_replay_tutorial)
 	box.add_child(tutorial_button)
 
+	var history_button := Button.new()
+	history_button.name = "HistoryDetailButton"
+	history_button.text = "查看详情和装备"
+	history_button.custom_minimum_size = Vector2(180, 44)
+	history_button.pressed.connect(_open_screen.bind("account"))
+	box.add_child(history_button)
+
 	var mode_entries := GridContainer.new()
 	mode_entries.columns = 2
 	mode_entries.add_theme_constant_override("h_separation", 10)

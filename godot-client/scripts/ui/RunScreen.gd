@@ -144,6 +144,8 @@ func replay_tutorial() -> void:
 
 func show_named_section(section_id: String) -> void:
 	match section_id:
+		"account":
+			current_tab = TAB_ACCOUNT
 		"account_shop":
 			current_tab = TAB_SHOP
 		"achievements":
