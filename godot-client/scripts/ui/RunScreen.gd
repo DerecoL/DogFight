@@ -1006,7 +1006,10 @@ func _render_settings_tab() -> void:
 	for cosmetic_type in ["TITLE", "AVATAR", "BACKGROUND", "DOG_SKIN", "BATTLE_EFFECT"]:
 		var cosmetic_label := _cosmetic_type_label(cosmetic_type)
 		_add_line(groups, cosmetic_label, "默认外观可直接恢复")
-		groups.add_child(_action_button("选择默认 " + cosmetic_label, _unequip_cosmetic.bind(cosmetic_type)))
+		if _is_default_cosmetic_equipped(cosmetic_type):
+			groups.add_child(_disabled_action_button("已选择 默认 " + cosmetic_label))
+		else:
+			groups.add_child(_action_button("选择默认 " + cosmetic_label, _unequip_cosmetic.bind(cosmetic_type)))
 		for item in _array(cosmetics_data, "inventory"):
 			if item is Dictionary and _cosmetic_type(item) == cosmetic_type:
 				groups.add_child(_action_button(("%s %s" % ["已装备" if _is_cosmetic_equipped(item) else "查看", _cosmetic_display_name(item)]), _show_cosmetic_modal.bind(item)))
@@ -1963,6 +1966,14 @@ func _is_cosmetic_equipped(raw_item: Dictionary) -> bool:
 			if _cosmetic_catalog_id(entry) == catalog_item_id:
 				return true
 	return false
+
+func _is_default_cosmetic_equipped(cosmetic_type: String) -> bool:
+	for entry in _array(cosmetics_data, "equipped"):
+		if entry is Dictionary:
+			var entry_type := str((entry as Dictionary).get("slot", (entry as Dictionary).get("cosmeticType", _cosmetic_type(entry))))
+			if entry_type == cosmetic_type:
+				return false
+	return true
 
 func _shop_catalog_section_label(section_name: String) -> String:
 	match section_name:
