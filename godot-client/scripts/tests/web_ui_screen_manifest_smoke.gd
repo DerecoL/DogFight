@@ -6,31 +6,32 @@ func _init() -> void:
 		_fail("WebUiScreenIds.gd must exist")
 		return
 
-	var required_screens := [
-		"login",
-		"nickname_setup",
-		"mode_lobby",
-		"run_shell",
-		"exploration_map",
-		"run_shop",
-		"reward_choice",
-		"battle_replay",
-		"run_settlement",
-		"account_shop",
-		"achievements",
-		"leaderboards",
-		"season",
-		"dogfight_rooms",
-		"dogfight_room_detail",
-		"account_settings",
-	]
-	for screen_id in required_screens:
+	var expected_node_names := {
+		"login": "LoginScreen",
+		"nickname_setup": "NicknameSetupScreen",
+		"mode_lobby": "ModeLobbyScreen",
+		"run_shell": "RunShellScreen",
+		"exploration_map": "ExplorationMapScreen",
+		"run_shop": "RunShopScreen",
+		"reward_choice": "RewardChoiceScreen",
+		"battle_replay": "BattleReplayScreen",
+		"run_settlement": "RunSettlementScreen",
+		"account_shop": "AccountShopScreen",
+		"achievements": "AchievementsScreen",
+		"leaderboards": "LeaderboardsScreen",
+		"season": "SeasonScreen",
+		"dogfight_rooms": "DogfightRoomsScreen",
+		"dogfight_room_detail": "DogfightRoomDetailScreen",
+		"account_settings": "AccountSettingsScreen",
+	}
+	for screen_id in expected_node_names.keys():
 		if not manifest.screen_ids().has(screen_id):
 			_fail("Missing Web UI screen id: %s" % screen_id)
 			return
 		var node_name := str(manifest.node_name_for(screen_id))
-		if node_name.is_empty():
-			_fail("Missing node name for screen id: %s" % screen_id)
+		var expected_node_name := str(expected_node_names[screen_id])
+		if node_name != expected_node_name:
+			_fail("Screen id %s should map to node %s, got %s" % [screen_id, expected_node_name, node_name])
 			return
 
 	var phase_expectations := {
