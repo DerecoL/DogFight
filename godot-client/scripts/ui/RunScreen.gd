@@ -369,6 +369,15 @@ func _fetch_into(key: String, path: String) -> void:
 		"rooms":
 			rooms_data = _data(response)
 
+func _guarded_fetch_into(key: String, path: String) -> void:
+	if action_in_progress:
+		return
+	action_in_progress = true
+	_update_controls()
+	await _fetch_into(key, path)
+	action_in_progress = false
+	_update_controls()
+
 func _render_current_tab() -> void:
 	if content == null:
 		return
@@ -1317,7 +1326,7 @@ func _toggle_music() -> void:
 	_render_shell()
 
 func _refresh_rooms() -> void:
-	await _fetch_into("rooms", ApiRoutes.dogfight_rooms())
+	await _guarded_fetch_into("rooms", ApiRoutes.dogfight_rooms())
 	_render_shell()
 
 func _refresh_active_room() -> void:
