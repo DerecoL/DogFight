@@ -1416,8 +1416,14 @@ func _sync_room_run(room: Dictionary) -> void:
 		session.set_current_run(room_run)
 
 func _post_and_store(path: String, body: Dictionary, target: String, success_action := "") -> void:
+	if action_in_progress:
+		return
+	action_in_progress = true
+	_update_controls()
 	var response: Dictionary = await _api_post(path, body)
+	action_in_progress = false
 	if not bool(response.get("ok", false)):
+		_update_controls()
 		_show_error(str(response.get("error", "")))
 		return
 	match target:
