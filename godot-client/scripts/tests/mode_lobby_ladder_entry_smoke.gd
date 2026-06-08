@@ -1,6 +1,8 @@
 extends SceneTree
 
+var main_node: Node
 var seen_paths: Dictionary = {}
+var seen_responses: Dictionary = {}
 
 func _init() -> void:
 	_run()
@@ -44,10 +46,45 @@ func _run() -> void:
 	if start_ladder_button == null:
 		_fail("Ladder home must expose StartLadderRunButton")
 		return
+	seen_paths.clear()
 	start_ladder_button.pressed.emit()
-	if not await _wait_for_run(main, "LADDER"):
-		_fail("Starting from ladder home should create a LADDER run")
+	if not await _wait_for_path("/runs"):
+		_fail("StartLadderRunButton should POST /runs")
 		return
+	if not await _wait_for_idle(main):
+		_fail("StartLadderRunButton should finish refreshing")
+		return
+	if not await _wait_for_run(main, "LADDER"):
+		_fail("Starting from ladder home should create a playable LADDER run; /runs response=%s store=%s" % [
+			str(seen_responses.get("/runs", {})),
+			_run_store_debug(main),
+		])
+		return
+	if str(router.get("current_screen_id")) != "legacy_run":
+		_fail("Created ladder run should stay in playable run shell")
+		return
+	if not legacy.visible:
+		_fail("Created ladder run should keep LegacyRunScreen visible")
+		return
+	if main.get_node_or_null("ScreenRoot/ModeLobbyScreen").visible:
+		_fail("Created ladder run must not show the old standalone ModeLobbyScreen")
+		return
+	if main.get_node_or_null("ScreenRoot/LeaderboardsScreen").visible:
+		_fail("Created ladder run must not show the old standalone LeaderboardsScreen")
+		return
+	if legacy.find_child("PlaceholderPanel", true, false) != null:
+		_fail("Created ladder run must not show placeholder content")
+		return
+	var run_text := _collect_text(legacy)
+	for part in ["当前跑局", "地图", "装备", "遗物"]:
+		if not run_text.contains(part):
+			_fail("Created ladder run UI missing section: %s; current_tab=%s store=%s text=%s" % [
+				part,
+				str(legacy.get("current_tab")),
+				_run_store_debug(main),
+				run_text.substr(0, 500),
+			])
+			return
 
 	main.queue_free()
 	for _frame in range(2):
@@ -61,6 +98,7 @@ func _new_logged_in_main(account_prefix: String, nickname: String) -> Node:
 		_fail("Main scene failed to load")
 		return null
 	var main = main_scene.instantiate()
+	main_node = main
 	root.add_child(main)
 	await process_frame
 	await process_frame
@@ -70,6 +108,7 @@ func _new_logged_in_main(account_prefix: String, nickname: String) -> Node:
 		return null
 	api.request_finished.connect(func(path: String, _ok: bool, _status: int, _payload: Dictionary) -> void:
 		seen_paths[path] = true
+		seen_responses[path] = {"ok": _ok, "status": _status, "payload": _payload}
 	)
 	var router = main.get("router")
 	var login_screen = main.get_node_or_null("ScreenRoot/LoginScreen")
@@ -127,18 +166,41 @@ func _wait_for_paths(paths: Array) -> bool:
 		await process_frame
 	return false
 
+func _wait_for_path(path: String) -> bool:
+	for _frame in range(600):
+		if seen_paths.has(path):
+			return true
+		await process_frame
+	return false
+
 func _wait_for_run(main: Node, mode: String) -> bool:
-	for _frame in range(240):
+	for _frame in range(600):
 		var run_store = main.get("run_store")
 		if run_store != null and run_store.has_method("has_run") and run_store.has_run():
 			var run: Dictionary = run_store.get("run")
-			if str(run.get("mode", "")) == mode:
+			if str(run.get("mode", "")) == mode and str(run.get("phase", "")).length() > 0:
 				return true
 		await process_frame
 	return false
 
+func _run_store_debug(main: Node) -> String:
+	var run_store = main.get("run_store")
+	if run_store == null:
+		return "missing"
+	if not run_store.has_method("has_run"):
+		return "no has_run method"
+	if not run_store.has_run():
+		return "empty"
+	var run: Dictionary = run_store.get("run")
+	return "mode=%s phase=%s status=%s id=%s" % [
+		str(run.get("mode", "")),
+		str(run.get("phase", "")),
+		str(run.get("status", "")),
+		str(run.get("id", "")),
+	]
+
 func _wait_for_idle(main: Node) -> bool:
-	for _frame in range(240):
+	for _frame in range(600):
 		var legacy = main.get_node_or_null("ScreenRoot/LegacyRunScreen")
 		if legacy != null and not bool(legacy.get("action_in_progress")):
 			return true
@@ -158,6 +220,8 @@ func _find_line_edit(node: Node) -> LineEdit:
 
 func _collect_text(node: Node) -> String:
 	var text := ""
+	if node is CanvasItem and not (node as CanvasItem).is_visible_in_tree():
+		return text
 	if node is Label:
 		text += (node as Label).text + "\n"
 	if node is Button:
@@ -167,7 +231,7 @@ func _collect_text(node: Node) -> String:
 	return text
 
 func _find_button_containing(node: Node, text: String) -> Button:
-	if node is Button and (node as Button).text.contains(text):
+	if node is Button and (node as Button).is_visible_in_tree() and (node as Button).text.contains(text):
 		return node as Button
 	for child in node.get_children():
 		var result := _find_button_containing(child, text)
@@ -177,4 +241,6 @@ func _find_button_containing(node: Node, text: String) -> Button:
 
 func _fail(message: String) -> void:
 	push_error(message)
+	if main_node != null:
+		main_node.queue_free()
 	quit(1)

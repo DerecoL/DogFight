@@ -1071,7 +1071,10 @@ func _on_create_run_pressed() -> void:
 		if lucky_select.selected <= 0:
 			lucky_select.select(1)
 		lucky = lucky_select.selected
-	await _call_session("create_run", [dog_type, mode, lucky])
+	var ok: bool = await _call_session("create_run", [dog_type, mode, lucky])
+	if ok:
+		current_tab = TAB_RUN
+		_render_shell()
 
 func _on_history_run_pressed(run_id: String) -> void:
 	if run_id.is_empty():
@@ -1213,10 +1216,12 @@ func _call_session(method: String, args: Array) -> bool:
 	action_in_progress = true
 	_update_controls()
 	var ok: bool = await session.callv(method, args)
+	if ok and method != "logout":
+		await _refresh_after_action()
 	action_in_progress = false
 	_update_controls()
 	if ok and method != "logout":
-		await _refresh_after_action()
+		_render_shell()
 	return ok
 
 func _refresh_after_action() -> void:

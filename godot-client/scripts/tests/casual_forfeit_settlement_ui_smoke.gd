@@ -148,7 +148,13 @@ func _start_and_finish_battle(main: Node, legacy: Node, router: Node, run_id: St
 			_fail("MATCH phase should finish rendering before battle start")
 			return false
 		if not await _click_action_and_wait(legacy, "开始战斗", "/runs/%s/battle/start" % run_id):
-			_fail("MATCH phase should start battle from the visible UI (%s)" % _button_debug_summary(legacy))
+			_fail("MATCH phase should start battle from the visible UI (tab=%s phase=%s enabled=%s all=%s text=%s)" % [
+				str(legacy.get("current_tab")),
+				_current_run_phase(main),
+				_button_debug_summary(legacy),
+				_all_button_debug_summary(legacy),
+				_collect_text(legacy).substr(0, 500),
+			])
 			return false
 	if not await _wait_for_screen(router, "battle_replay"):
 		_fail("Starting a battle should route to BattleReplayScreen")
@@ -385,6 +391,22 @@ func _button_debug_summary(node: Node) -> String:
 	var parts: Array[String] = []
 	for button in buttons.slice(0, 12):
 		parts.append(button.text.replace("\n", " / "))
+	return "buttons=%d [%s]" % [buttons.size(), " | ".join(parts)]
+
+func _collect_all_visible_buttons(node: Node, out: Array[Button]) -> void:
+	if node == null:
+		return
+	if node is Button and (node as Button).is_visible_in_tree():
+		out.append(node as Button)
+	for child in node.get_children():
+		_collect_all_visible_buttons(child, out)
+
+func _all_button_debug_summary(node: Node) -> String:
+	var buttons: Array[Button] = []
+	_collect_all_visible_buttons(node, buttons)
+	var parts: Array[String] = []
+	for button in buttons:
+		parts.append("%s%s" % [button.text.replace("\n", " / "), " (disabled)" if button.disabled else ""])
 	return "buttons=%d [%s]" % [buttons.size(), " | ".join(parts)]
 
 func _map_debug_summary(root_node: Node, run: Dictionary) -> String:
