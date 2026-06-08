@@ -1,6 +1,7 @@
 extends SceneTree
 
 var main_node: Node
+var seen_paths: Dictionary = {}
 
 func _init() -> void:
 	_run()
@@ -36,7 +37,14 @@ func _run() -> void:
 		return
 
 	var start_button = _find_button_containing(legacy, "开始一局")
+	seen_paths.clear()
 	start_button.pressed.emit()
+	if not await _wait_for_path("/runs"):
+		_fail("Start-run confirmation should POST /runs")
+		return
+	if not await _wait_for_idle(legacy):
+		_fail("Start-run confirmation should finish refreshing")
+		return
 	if not await _wait_for_run(main):
 		_fail("Start-run confirmation should create a playable CASUAL run")
 		return
@@ -76,6 +84,13 @@ func _new_logged_in_main() -> Node:
 	if router == null or login_screen == null:
 		_fail("Main must expose router and LoginScreen")
 		return null
+	var api = main.get("api")
+	if api == null or not api.has_signal("request_finished"):
+		_fail("Main API client must emit request_finished")
+		return null
+	api.request_finished.connect(func(path: String, _ok: bool, _status: int, _payload: Dictionary) -> void:
+		seen_paths[path] = true
+	)
 	var account_input = login_screen.get_node_or_null("%AccountInput") as LineEdit
 	var password_input = login_screen.get_node_or_null("%PasswordInput") as LineEdit
 	if account_input == null or password_input == null:
@@ -110,6 +125,20 @@ func _wait_for_run(main: Node) -> bool:
 			var run: Dictionary = run_store.get("run")
 			if str(run.get("mode", "")) == "CASUAL" and str(run.get("phase", "")).length() > 0:
 				return true
+		await process_frame
+	return false
+
+func _wait_for_path(path: String) -> bool:
+	for _frame in range(240):
+		if seen_paths.has(path):
+			return true
+		await process_frame
+	return false
+
+func _wait_for_idle(legacy: Node) -> bool:
+	for _frame in range(240):
+		if legacy != null and not bool(legacy.get("action_in_progress")):
+			return true
 		await process_frame
 	return false
 
