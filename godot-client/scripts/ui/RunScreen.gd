@@ -74,6 +74,7 @@ var status_label: Label
 var profile_badge_label: Label
 var profile_name_label: Label
 var profile_title_label: Label
+var lobby_button: Button
 var refresh_button: Button
 var dog_type_select: OptionButton
 var mode_select: OptionButton
@@ -209,7 +210,7 @@ func _build_layout() -> void:
 	header.add_theme_constant_override("separation", 10)
 	root.add_child(header)
 
-	var lobby_button := _button("返回大厅", 96)
+	lobby_button = _button("返回大厅", 96)
 	lobby_button.pressed.connect(open_mode_lobby)
 	header.add_child(lobby_button)
 
@@ -1049,6 +1050,8 @@ func _on_history_run_pressed(run_id: String) -> void:
 	_render_shell()
 
 func open_mode_lobby() -> void:
+	if action_in_progress:
+		return
 	if session != null and session.has_method("open_screen"):
 		session.call("open_screen", "mode_lobby")
 
@@ -3279,6 +3282,8 @@ func _mode_button(title: String, description: String, action_label: String, hand
 	return button
 
 func _update_controls() -> void:
+	if lobby_button != null:
+		lobby_button.disabled = action_in_progress
 	if create_run_button != null:
 		create_run_button.disabled = action_in_progress
 	if refresh_button != null:
