@@ -958,9 +958,10 @@ func _render_rooms_tab() -> void:
 		var detail := _section("当前房间")
 		_add_line(detail, "状态", _room_summary_label(active_room))
 		detail.add_child(_action_button("离开房间", _leave_active_room))
-		detail.add_child(_action_button("开始房间", _room_action.bind("start", {})))
-		detail.add_child(_action_button("准备 / 完成本回合", _room_action.bind("ready", {})))
-		detail.add_child(_action_button("选择当前狗狗", _choose_room_dog))
+		if _can_start_room_action(active_room):
+			detail.add_child(_action_button("开始房间", _room_action.bind("start", {})))
+		if _can_ready_room_action(active_room):
+			detail.add_child(_action_button("准备 / 完成本回合", _room_action.bind("ready", {})))
 		for member in _array(active_room, "members"):
 			if member is Dictionary:
 				var member_name := str(member.get("nickname", member.get("kind", "")))
@@ -2130,6 +2131,37 @@ func _room_summary_label(room: Dictionary) -> String:
 
 func _room_list_action_label(room: Dictionary) -> String:
 	return "加入房间" if str(room.get("status", "")) == "WAITING" else "观战"
+
+func _can_start_room_action(room: Dictionary) -> bool:
+	return bool(room.get("isHost", false)) and str(room.get("status", "")) == "WAITING"
+
+func _can_ready_room_action(room: Dictionary) -> bool:
+	if str(room.get("status", "")) != "ACTIVE":
+		return false
+	if not ["SHOP", "BATTLE"].has(str(room.get("phase", ""))):
+		return false
+	if _dict(room, "currentRun").is_empty():
+		return false
+	var member := _current_room_member(room)
+	if member.is_empty():
+		return false
+	return not bool(member.get("ready", false)) and not bool(member.get("eliminated", false))
+
+func _current_room_member(room: Dictionary) -> Dictionary:
+	var explicit: Dictionary = _dict(room, "currentRunMember")
+	if not explicit.is_empty():
+		return explicit
+	var current_run: Dictionary = _dict(room, "currentRun")
+	var run_id := str(current_run.get("id", ""))
+	if run_id.is_empty():
+		return {}
+	for entry in _array(room, "members"):
+		if not entry is Dictionary:
+			continue
+		var member: Dictionary = entry
+		if str(member.get("runId", "")) == run_id or str(member.get("currentRunId", "")) == run_id:
+			return member.duplicate(true)
+	return {}
 
 func _room_status_label(status: String) -> String:
 	match status:
