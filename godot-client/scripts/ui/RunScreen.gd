@@ -489,7 +489,8 @@ func _render_run_actions(run: Dictionary, card: VBoxContainer) -> void:
 		row.add_child(_action_button("开始战斗", _call_session.bind("start_battle", [])))
 	elif phase == "BATTLE":
 		row.add_child(_action_button("完成结算", _call_session.bind("finish_battle", [])))
-	row.add_child(_action_button("放弃并结算", _show_forfeit_modal.bind(run)))
+	if str(run.get("status", "")) == "ACTIVE" and phase != "BATTLE":
+		row.add_child(_action_button("放弃并结算", _show_forfeit_modal.bind(run)))
 
 func _render_settlement_summary(run: Dictionary) -> void:
 	if str(run.get("phase", "")) != "COMPLETE" and str(run.get("status", "")) != "COMPLETE":
