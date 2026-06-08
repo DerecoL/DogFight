@@ -34,6 +34,7 @@ func _run() -> void:
 		"商城": ["/shop", "/cosmetics/me"],
 		"排行": ["/ladder/me", "/ladder/leaderboard"],
 		"巅峰": ["/apex"],
+		"赛季": ["/ladder/me", "/runs/history"],
 		"房间": ["/dogfight/rooms"],
 	}
 	for tab in cases.keys():

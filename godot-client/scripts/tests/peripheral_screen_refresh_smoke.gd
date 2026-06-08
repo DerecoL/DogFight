@@ -28,6 +28,7 @@ func _run() -> void:
 		"achievements": ["/achievements"],
 		"leaderboards": ["/ladder/me", "/ladder/leaderboard"],
 		"apex": ["/apex"],
+		"season": ["/ladder/me", "/runs/history"],
 		"dogfight_rooms": ["/dogfight/rooms"],
 	}
 	for screen_id in expectations.keys():

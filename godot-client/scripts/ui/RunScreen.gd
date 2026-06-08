@@ -1167,7 +1167,8 @@ func _refresh_current_section() -> void:
 		TAB_APEX:
 			await _fetch_into("apex", ApiRoutes.apex())
 		TAB_SEASON:
-			await _fetch_into("apex", ApiRoutes.apex())
+			await _fetch_into("ladder", ApiRoutes.ladder_me())
+			await _fetch_into("history", ApiRoutes.runs_history())
 		TAB_ROOMS:
 			await _fetch_into("rooms", ApiRoutes.dogfight_rooms())
 		TAB_SETTINGS:
