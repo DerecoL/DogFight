@@ -28,6 +28,8 @@ var current_user: Dictionary = {}
 var needs_nickname_setup := false
 var store: AppStore = AppStore.new()
 var run_store: RunStore = store.run
+var lobby_history_data: Dictionary = {}
+var lobby_ladder_data: Dictionary = {}
 
 func _ready() -> void:
 	var override_url := OS.get_environment("DOGFIGHT_API_BASE_URL")
@@ -117,6 +119,8 @@ func logout() -> bool:
 		return false
 	current_user = {}
 	needs_nickname_setup = false
+	lobby_history_data = {}
+	lobby_ladder_data = {}
 	api.cookie_header = ""
 	store.set_user({})
 	store.set_current_run({})
@@ -354,11 +358,9 @@ func open_screen(screen_id: String) -> bool:
 		return true
 	if WebUiScreenIds.screen_ids().has(screen_id):
 		router.show_screen(screen_id, false)
-		var target_node_name := WebUiScreenIds.node_name_for(screen_id)
-		var target_node := get_node_or_null("ScreenRoot/%s" % target_node_name)
-		if target_node != null and target_node.has_method("set_payload"):
-			var run_payload := run_store.run.duplicate(true) if run_store != null and run_store.has_run() else {}
-			target_node.call("set_payload", {"run": run_payload, "user": current_user.duplicate(true)})
+		_apply_payload_to_screen(screen_id)
+		if screen_id == WebUiScreenIds.MODE_LOBBY:
+			call_deferred("_refresh_mode_lobby_payload")
 		return true
 	return false
 
@@ -581,11 +583,44 @@ func _show_run_screen() -> void:
 		_show_playable_run_screen()
 		return
 	router.show_screen(target_screen, false)
-	var target_node_name := WebUiScreenIds.node_name_for(target_screen)
+	_apply_payload_to_screen(target_screen)
+	if target_screen == WebUiScreenIds.MODE_LOBBY:
+		call_deferred("_refresh_mode_lobby_payload")
+
+func _apply_payload_to_screen(screen_id: String) -> void:
+	var target_node_name := WebUiScreenIds.node_name_for(screen_id)
 	var target_node := get_node_or_null("ScreenRoot/%s" % target_node_name)
 	if target_node != null and target_node.has_method("set_payload"):
-		var run_payload := run_store.run.duplicate(true) if run_store != null and run_store.has_run() else {}
-		target_node.call("set_payload", {"run": run_payload, "user": current_user.duplicate(true)})
+		target_node.call("set_payload", _screen_payload())
+
+func _screen_payload() -> Dictionary:
+	var run_payload := run_store.run.duplicate(true) if run_store != null and run_store.has_run() else {}
+	var payload := {"run": run_payload, "user": current_user.duplicate(true)}
+	var history = lobby_history_data.get("history", {})
+	payload["history"] = history.duplicate(true) if history is Dictionary else {}
+	var season_summaries = lobby_history_data.get("seasonSummaries", [])
+	payload["seasonSummaries"] = season_summaries.duplicate(true) if season_summaries is Array else []
+	var ladder_profile = lobby_ladder_data.get("profile", {})
+	payload["ladderProfile"] = ladder_profile.duplicate(true) if ladder_profile is Dictionary else {}
+	var season = lobby_ladder_data.get("season", {})
+	payload["season"] = season.duplicate(true) if season is Dictionary else {}
+	return payload
+
+func _refresh_mode_lobby_payload() -> void:
+	if api == null or current_user.is_empty() or router == null or str(router.get("current_screen_id")) != WebUiScreenIds.MODE_LOBBY:
+		return
+	var history_response := await api.get_json(ApiRoutes.runs_history())
+	if bool(history_response.get("ok", false)):
+		lobby_history_data = _response_data(history_response)
+	var ladder_response := await api.get_json(ApiRoutes.ladder_me())
+	if bool(ladder_response.get("ok", false)):
+		lobby_ladder_data = _response_data(ladder_response)
+	if router != null and str(router.get("current_screen_id")) == WebUiScreenIds.MODE_LOBBY:
+		_apply_payload_to_screen(WebUiScreenIds.MODE_LOBBY)
+
+func _response_data(response: Dictionary) -> Dictionary:
+	var value = response.get("data", {})
+	return value if value is Dictionary else {}
 
 func _show_playable_run_screen() -> void:
 	var run_screen := get_node_or_null("ScreenRoot/LegacyRunScreen")
