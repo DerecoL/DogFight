@@ -336,6 +336,7 @@ func _apply_run_response(response: Dictionary, fallback_error: String) -> bool:
 func set_current_run(run: Dictionary) -> void:
 	store.set_current_run(run)
 	run_changed.emit(run)
+	_show_run_screen()
 
 func _bind_screen_by_name(node_name: String) -> void:
 	var screen := get_node_or_null("ScreenRoot/%s" % node_name)
