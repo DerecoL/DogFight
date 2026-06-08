@@ -7,6 +7,8 @@ var api_failures: Array[String] = []
 var required_api_paths := [
 	"/auth/register",
 	"/me",
+]
+var forbidden_legacy_refresh_paths := [
 	"/achievements",
 	"/daily-tasks",
 	"/shop",
@@ -49,28 +51,38 @@ func _run() -> void:
 
 	var router = main.get("router")
 	for _frame in range(180):
-		if router != null and str(router.get("current_screen_id")) == "run":
+		if router != null and str(router.get("current_screen_id")) != "login":
 			break
 		await process_frame
-	if router == null or str(router.get("current_screen_id")) != "run":
+	if router == null:
+		_fail("Quick start did not initialize router")
+		return
+	var current_screen := str(router.get("current_screen_id"))
+	if current_screen == "login":
 		var error_label = login_screen.get_node_or_null("%ErrorLabel")
 		var error_text: String = error_label.text if error_label != null else ""
-		_fail("Quick start did not navigate to RunScreen: %s" % error_text)
+		_fail("Quick start did not leave LoginScreen: %s" % error_text)
 		return
-	var run_screen = main.get_node_or_null("ScreenRoot/RunScreen")
-	if run_screen == null or not run_screen.visible:
-		_fail("RunScreen is not visible after quick start")
+	if not ["nickname_setup", "mode_lobby"].has(current_screen):
+		_fail("Quick start routed to unexpected Web screen: %s" % current_screen)
 		return
-	for _frame in range(360):
-		if api_finished_count >= 12 and not bool(run_screen.get("action_in_progress")):
-			break
-		await process_frame
-	if bool(run_screen.get("action_in_progress")):
-		_fail("RunScreen data refresh did not finish after quick start")
+	var run_screen = main.get_node_or_null("ScreenRoot/LegacyRunScreen")
+	if run_screen == null:
+		_fail("LegacyRunScreen is missing")
+		return
+	if run_screen.visible:
+		_fail("LegacyRunScreen must stay hidden after quick start")
+		return
+	if run_screen.get("session") != null:
+		_fail("LegacyRunScreen must stay unbound after quick start")
 		return
 	for path in required_api_paths:
 		if not api_seen_paths.has(path):
 			_fail("Quick start did not request required API path: %s" % path)
+			return
+	for path in forbidden_legacy_refresh_paths:
+		if api_seen_paths.has(path):
+			_fail("Quick start triggered legacy RunScreen refresh path: %s" % path)
 			return
 	if not api_failures.is_empty():
 		_fail("Quick start API failures: %s" % "; ".join(api_failures))

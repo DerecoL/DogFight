@@ -63,7 +63,6 @@ func _ready() -> void:
 	var login_screen := get_node_or_null("ScreenRoot/LoginScreen")
 	for screen_id in WebUiScreenIds.screen_ids():
 		_bind_screen_by_name(WebUiScreenIds.node_name_for(screen_id))
-	_bind_screen_by_name("LegacyRunScreen")
 	if login_screen != null and login_screen.has_signal("login_succeeded") and not login_screen.login_succeeded.is_connected(_show_run_screen):
 		login_screen.login_succeeded.connect(_show_run_screen)
 	if not battle_started.is_connected(_show_battle_screen):

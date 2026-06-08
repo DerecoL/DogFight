@@ -63,6 +63,10 @@ func _init() -> void:
 	if screen_root.get_node_or_null("LegacyRunScreen") == null:
 		_fail("Main ScreenRoot must retain LegacyRunScreen")
 		return
+	var legacy_run_screen = screen_root.get_node_or_null("LegacyRunScreen")
+	if legacy_run_screen.get("session") != null:
+		_fail("LegacyRunScreen must stay unbound so hidden legacy UI cannot drive live run side effects")
+		return
 
 	main.queue_free()
 	for _frame in range(2):
