@@ -940,12 +940,22 @@ func _render_rooms_tab() -> void:
 		var room_run: Dictionary = _dict(active_room, "currentRun")
 		if not room_run.is_empty():
 			_render_room_current_run(room_run)
+		elif str(active_room.get("phase", "")) == "DOG_SELECT":
+			_render_room_dog_select()
 	_add_line(card, "房间列表", "")
 	for room in _array(rooms_data, "rooms"):
 		if room is Dictionary:
 			var room_id := str(room.get("id", ""))
 			var text := "%s 的房间  %s  真人 %d/%d  存活 %d/%d  %s" % [str(room.get("hostName", "")), _room_summary_label(room), int(room.get("memberCount", 0)), int(room.get("maxPlayers", 0)), int(room.get("aliveCount", 0)), int(room.get("targetPlayerCount", 0)), _room_list_action_label(room)]
 			card.add_child(_action_button(text, _enter_or_view_room.bind(room_id, str(room.get("status", "")))))
+
+func _render_room_dog_select() -> void:
+	var card := _section("选择斗狗")
+	_add_line(card, "说明", "15 秒内锁定狗狗；超时会自动随机。")
+	_render_dog_picker(card)
+	var choice_button := _action_button("锁定斗狗", _choose_room_dog)
+	choice_button.name = "RoomDogChoiceButton"
+	card.add_child(choice_button)
 
 func _render_room_current_run(run: Dictionary) -> void:
 	var card := _section("房间当前跑局")
