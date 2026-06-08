@@ -78,8 +78,12 @@ func _run() -> void:
 	if main.get("run_store").has_run():
 		_fail("Entering casual mode without a run must not create a run directly")
 		return
-	if str(legacy_run_screen.get("current_tab")) != "大厅":
-		_fail("Entering casual mode should open the playable dog-selection lobby")
+	if str(legacy_run_screen.get("current_tab")) != "跑局":
+		_fail("Entering casual mode should open the playable dog-selection screen")
+		return
+	var run_text := _collect_text(legacy_run_screen)
+	if not run_text.contains("选择狗狗") or not run_text.contains("开始一局"):
+		_fail("Entering casual mode should show dog selection and start action")
 		return
 
 	main.queue_free()
@@ -105,6 +109,16 @@ func _find_line_edit(node: Node) -> LineEdit:
 		if result != null:
 			return result
 	return null
+
+func _collect_text(node: Node) -> String:
+	var text := ""
+	if node is Label:
+		text += (node as Label).text + "\n"
+	if node is Button:
+		text += (node as Button).text + "\n"
+	for child in node.get_children():
+		text += _collect_text(child)
+	return text
 
 func _cleanup() -> void:
 	if main_node != null and is_instance_valid(main_node):

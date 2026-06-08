@@ -128,12 +128,17 @@ func show_run_lobby(preferred_mode := "CASUAL") -> void:
 		if str(mode_select.get_item_metadata(index)) == preferred_mode:
 			mode_select.select(index)
 			break
-	current_tab = TAB_LOBBY
+	current_tab = TAB_RUN
 	_render_shell()
 	call_deferred("_refresh_current_section")
 
 func replay_tutorial() -> void:
-	show_run_lobby("CASUAL")
+	for index in range(mode_select.item_count):
+		if str(mode_select.get_item_metadata(index)) == "CASUAL":
+			mode_select.select(index)
+			break
+	current_tab = TAB_LOBBY
+	_render_shell()
 	call_deferred("_show_tutorial_modal")
 
 func show_named_section(section_id: String) -> void:
@@ -451,8 +456,10 @@ func _render_account_tab() -> void:
 func _render_run_tab() -> void:
 	var store: Object = _run_store()
 	if store == null or not store.has_method("has_run") or not store.has_run():
-		var empty := _section("当前跑局")
-		_add_line(empty, "状态", "暂无跑局。选择犬种/模式后点击“新建跑局”。")
+		var picker := _section("选择狗狗伙伴")
+		_add_line(picker, "说明", "每个狗狗都有独特的被动特性和策略玩法。")
+		_render_dog_picker(picker)
+		picker.add_child(_action_button("开始一局", _on_create_run_pressed))
 		return
 	var run: Dictionary = store.get("run")
 	var summary := _section("当前跑局")
