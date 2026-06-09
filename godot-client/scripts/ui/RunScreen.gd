@@ -2189,6 +2189,11 @@ func _render_leaderboards_tab() -> void:
 	_add_plain_line(heading, "天梯模式")
 	_add_plain_line(heading, "天梯排行榜")
 	_add_plain_line(heading, "当前赛季：%s · 12 胜或 5 败结算积分，低段位更宽松，高段位按犬王积分榜竞争。" % str(season.get("name", "读取中")))
+	for child in heading.get_children():
+		heading.remove_child(child)
+		child.queue_free()
+	_named_plain_line(heading, "LadderHeadingTitle", "天梯模式")
+	_named_plain_line(heading, "LadderHeadingSubtitle", "当前赛季：%s · 12 胜或 5 败结算积分，低段位更宽松，高段位按犬王积分榜竞争。" % str(season.get("name", "读取中")))
 	var layout := GridContainer.new()
 	layout.name = "LadderLayout"
 	layout.columns = 2
@@ -2202,6 +2207,16 @@ func _render_leaderboards_tab() -> void:
 	var tier_panel := _ladder_panel("CurrentTierPanel")
 	layout.add_child(tier_panel)
 	_add_line(tier_panel, "当前段位", "%d 局 · %d胜 %d负" % [int(player_profile.get("gamesPlayed", 0)), int(player_profile.get("totalWins", 0)), int(player_profile.get("totalLosses", 0))])
+	for child in tier_panel.get_children():
+		tier_panel.remove_child(child)
+		child.queue_free()
+	var tier_header := VBoxContainer.new()
+	tier_header.name = "CurrentTierHeader"
+	tier_header.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	tier_header.add_theme_constant_override("separation", 4)
+	tier_panel.add_child(tier_header)
+	_named_plain_line(tier_header, "CurrentTierTitle", "当前段位")
+	_named_plain_line(tier_header, "CurrentTierSubtitle", "%d 局 · %d胜 %d败" % [int(player_profile.get("gamesPlayed", 0)), int(player_profile.get("totalWins", 0)), int(player_profile.get("totalLosses", 0))])
 	var rank := Label.new()
 	rank.name = "LadderRank"
 	rank.text = _tier_display_label(player_profile)
@@ -2216,10 +2231,26 @@ func _render_leaderboards_tab() -> void:
 	tier_panel.add_child(progress)
 	_add_line(tier_panel, _tier_display_label(player_profile), "%d分" % int(player_profile.get("score", 0)))
 	_add_line(tier_panel, "积分", _ladder_score_text(player_profile))
+	for index in range(tier_panel.get_child_count() - 1, -1, -1):
+		var child := tier_panel.get_child(index)
+		if child is Label and child.name != "LadderRank":
+			tier_panel.remove_child(child)
+			child.queue_free()
+	_named_plain_line(tier_panel, "LadderScoreText", _ladder_score_text(player_profile))
 	var player_rank = leaderboard_data.get("playerRank", null)
 	var board_panel := _ladder_panel("DogKingLeaderboardPanel")
 	layout.add_child(board_panel)
 	_add_line(board_panel, "犬王积分榜", "你的犬王排名：第 %d 名" % int(player_rank) if player_rank != null else "进入犬王后参与排名")
+	for child in board_panel.get_children():
+		board_panel.remove_child(child)
+		child.queue_free()
+	var board_header := VBoxContainer.new()
+	board_header.name = "DogKingLeaderboardHeader"
+	board_header.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	board_header.add_theme_constant_override("separation", 4)
+	board_panel.add_child(board_header)
+	_named_plain_line(board_header, "DogKingLeaderboardTitle", "犬王积分榜")
+	_named_plain_line(board_header, "DogKingLeaderboardSubtitle", "你的犬王排名：第 %d 名" % int(player_rank) if player_rank != null else "进入犬王后参与排名")
 	var board := VBoxContainer.new()
 	board.name = "LadderBoard"
 	board.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -2275,16 +2306,28 @@ func _ladder_row(parent: VBoxContainer, node_name: String, left: String, center:
 	parent.add_child(row)
 	var left_label := Label.new()
 	left_label.text = left
+	if node_name.begins_with("LadderRow_"):
+		left_label.name = node_name.replace("LadderRow_", "LadderRowRank_")
+		var rank_parts := center.split("  ", false, 1)
+		if rank_parts.size() > 0:
+			left_label.text = str(rank_parts[0])
 	left_label.custom_minimum_size = Vector2(88, 0)
 	left_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	row.add_child(left_label)
 	var center_label := Label.new()
 	center_label.text = center
+	if node_name.begins_with("LadderRow_"):
+		center_label.name = node_name.replace("LadderRow_", "LadderRowName_")
+		var name_parts := center.split("  ", false, 1)
+		if name_parts.size() > 1:
+			center_label.text = str(name_parts[1])
 	center_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	center_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	row.add_child(center_label)
 	var right_label := Label.new()
 	right_label.text = right
+	if node_name.begins_with("LadderRow_"):
+		right_label.name = node_name.replace("LadderRow_", "LadderRowScore_")
 	right_label.custom_minimum_size = Vector2(80, 0)
 	right_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	right_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER

@@ -54,9 +54,13 @@ func _run() -> void:
 		return
 
 	var text := _collect_text(run_screen)
-	for part in ["天梯模式", "当前赛季", "当前段位", "犬王积分榜", "选择天梯狗狗", "最近结算", "开始天梯", "#1", "#2", "+34"]:
+	for part in ["天梯模式", "当前赛季", "当前段位", "犬王积分榜", "选择天梯狗狗", "最近结算", "开始天梯", "榜首狗", "我的狗", "+34"]:
 		if not text.contains(part):
 			_fail("Ladder Web text missing: %s" % part)
+			return
+	for raw in ["天梯排行榜", "#1", "#2"]:
+		if text.contains(raw):
+			_fail("Ladder Web text leaked non-Web label: %s" % raw)
 			return
 
 	main.queue_free()
@@ -77,7 +81,7 @@ func _leaderboard_data() -> Dictionary:
 			"totalLosses": 9,
 		},
 		"leaderboard": [
-			{"rank": 1, "title": "犬王", "name": "榜首柴", "profile": {"score": 880}},
+			{"rank": 1, "title": "犬王", "name": "榜首狗", "profile": {"score": 880}},
 			{"rank": 2, "title": "犬王", "name": "我的狗", "profile": {"score": 720}},
 		],
 	}
