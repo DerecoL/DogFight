@@ -120,9 +120,25 @@ func _run() -> void:
 		_fail("Direct router display of run_shop must not show a placeholder panel")
 		return
 
+	router.call("show_screen", "exploration_map", false)
+	await process_frame
+	await process_frame
+	if str(router.get("current_screen_id")) != "exploration_map":
+		_fail("Direct router display of exploration_map should stay on standalone exploration_map, got %s" % str(router.get("current_screen_id")))
+		return
+	var exploration_map = main.get_node_or_null("ScreenRoot/ExplorationMapScreen")
+	if exploration_map == null or not exploration_map.visible:
+		_fail("Direct router display of exploration_map should show ExplorationMapScreen")
+		return
+	if exploration_map.find_child("ExplorationMapEmpty", true, false) == null and exploration_map.find_child("ExplorationMapOverlay", true, false) == null:
+		_fail("ExplorationMapScreen must render a Web exploration map surface")
+		return
+	if _any_visible_placeholder(main):
+		_fail("Direct router display of exploration_map must not show a placeholder panel")
+		return
+
 	for screen_id in [
 		"run_shell",
-		"exploration_map",
 		"reward_choice",
 		"run_settlement",
 		"achievements",

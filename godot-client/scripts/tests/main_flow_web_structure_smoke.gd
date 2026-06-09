@@ -12,21 +12,25 @@ func _run() -> void:
 	root.add_child(main)
 	await process_frame
 	await process_frame
-	var run_screen = main.get_node_or_null("ScreenRoot/LegacyRunScreen")
-	if run_screen == null:
-		_fail("RunScreen is missing")
-		return
 	if not main.has_method("set_current_run"):
 		_fail("Main session does not expose set_current_run")
 		return
+	var router = main.get("router")
+	if router == null:
+		_fail("Main session must expose router")
+		return
 
 	main.call("set_current_run", _map_run(true))
-	run_screen.set("current_tab", "跑局")
-	run_screen.call("_render_current_tab")
 	await process_frame
+	await process_frame
+	if str(router.get("current_screen_id")) != "exploration_map":
+		_fail("MAP main flow should route to standalone ExplorationMapScreen, got %s" % str(router.get("current_screen_id")))
+		return
+	var map_screen = main.get_node_or_null("ScreenRoot/ExplorationMapScreen")
+	if map_screen == null or not map_screen.visible:
+		_fail("MAP main flow should show ExplorationMapScreen")
+		return
 	for node_name in [
-		"PlayableRunScreen",
-		"RunSummaryTopbar",
 		"ExplorationMapScreen",
 		"ExplorationMapOverlay",
 		"ExplorationMapShell",
@@ -40,18 +44,22 @@ func _run() -> void:
 		"MapNodeDetailPanel",
 		"MapRewardInventory",
 		"InventoryBoard",
-		"EquipmentBoard",
-		"RelicRail",
-		"BagBoard",
+		"EquipmentGridPanel",
+		"BagGridPanel",
 	]:
-		_assert_has(run_screen, node_name)
+		_assert_has(map_screen, node_name)
 
 	main.call("set_current_run", _shop_run())
-	run_screen.call("_render_current_tab")
 	await process_frame
+	await process_frame
+	if str(router.get("current_screen_id")) != "run_shop":
+		_fail("SHOP main flow should route to standalone RunShopScreen, got %s" % str(router.get("current_screen_id")))
+		return
+	var shop_screen = main.get_node_or_null("ScreenRoot/RunShopScreen")
+	if shop_screen == null or not shop_screen.visible:
+		_fail("SHOP main flow should show RunShopScreen")
+		return
 	for node_name in [
-		"PlayableRunScreen",
-		"RunSummaryTopbar",
 		"ShopWorkbench",
 		"ShopShelf",
 		"ShopActions",
@@ -60,11 +68,10 @@ func _run() -> void:
 		"ShopCard_offer-1",
 		"MatchButton",
 		"InventoryBoard",
-		"EquipmentBoard",
-		"RelicRail",
-		"BagBoard",
+		"EquipmentGridPanel",
+		"BagGridPanel",
 	]:
-		_assert_has(run_screen, node_name)
+		_assert_has(shop_screen, node_name)
 
 	main.queue_free()
 	for _frame in range(5):
@@ -97,7 +104,7 @@ func _map_run(with_reward: bool) -> Dictionary:
 		"currentNodeId": "monster-1",
 	}
 	if with_reward:
-		map_state["pendingReward"] = {"nodeId": "monster-1", "defId": "starter-1", "quality": "SILVER"}
+		map_state["pendingReward"] = {"nodeId": "monster-1", "defId": "starter-1", "quality": "SILVER", "def": {"name": "1点牙咬"}}
 	return {
 		"id": "main-flow-map",
 		"mode": "CASUAL",

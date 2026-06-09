@@ -26,6 +26,15 @@ func _run() -> void:
 		main.call("set_current_run", _run_payload(phase))
 		await process_frame
 		await process_frame
+		if phase == "MAP":
+			if str(router.get("current_screen_id")) != "exploration_map":
+				_fail("MAP should show standalone ExplorationMapScreen, got %s" % str(router.get("current_screen_id")))
+				return
+			var exploration_map = main.get_node_or_null("ScreenRoot/ExplorationMapScreen")
+			if exploration_map == null or not exploration_map.visible or exploration_map.find_child("ExplorationMapOverlay", true, false) == null:
+				_fail("MAP should render standalone ExplorationMapOverlay")
+				return
+			continue
 		if phase == "SHOP":
 			if str(router.get("current_screen_id")) != "run_shop":
 				_fail("SHOP should show standalone RunShopScreen, got %s" % str(router.get("current_screen_id")))

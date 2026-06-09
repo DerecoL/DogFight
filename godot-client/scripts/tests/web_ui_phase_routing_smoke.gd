@@ -15,7 +15,7 @@ func _init() -> void:
 		return
 
 	var cases := {
-		"MAP": "legacy_run",
+		"MAP": "exploration_map",
 		"SHOP": "run_shop",
 		"CHOICE": "legacy_run",
 		"CLASS_REWARD": "legacy_run",
