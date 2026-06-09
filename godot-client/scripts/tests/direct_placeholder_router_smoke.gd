@@ -137,9 +137,25 @@ func _run() -> void:
 		_fail("Direct router display of exploration_map must not show a placeholder panel")
 		return
 
+	router.call("show_screen", "reward_choice", false)
+	await process_frame
+	await process_frame
+	if str(router.get("current_screen_id")) != "reward_choice":
+		_fail("Direct router display of reward_choice should stay on standalone reward_choice, got %s" % str(router.get("current_screen_id")))
+		return
+	var reward_choice = main.get_node_or_null("ScreenRoot/RewardChoiceScreen")
+	if reward_choice == null or not reward_choice.visible:
+		_fail("Direct router display of reward_choice should show RewardChoiceScreen")
+		return
+	if reward_choice.find_child("RewardChoiceEmpty", true, false) == null and reward_choice.find_child("RewardPanel", true, false) == null and reward_choice.find_child("ShopChoiceScreen", true, false) == null:
+		_fail("RewardChoiceScreen must render a Web reward choice surface")
+		return
+	if _any_visible_placeholder(main):
+		_fail("Direct router display of reward_choice must not show a placeholder panel")
+		return
+
 	for screen_id in [
 		"run_shell",
-		"reward_choice",
 		"run_settlement",
 		"achievements",
 		"season",

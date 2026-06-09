@@ -416,7 +416,6 @@ func replay_tutorial() -> bool:
 func _screen_uses_playable_run_shell(screen_id: String) -> bool:
 	return [
 		WebUiScreenIds.RUN_SHELL,
-		WebUiScreenIds.REWARD_CHOICE,
 		WebUiScreenIds.RUN_SETTLEMENT,
 	].has(screen_id)
 

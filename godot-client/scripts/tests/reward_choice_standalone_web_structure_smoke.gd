@@ -4,27 +4,19 @@ func _init() -> void:
 	_run()
 
 func _run() -> void:
-	var main_scene := load("res://scenes/Main.tscn")
-	if main_scene == null:
-		_fail("Main scene failed to load")
+	var scene := load("res://scenes/screens/RewardChoiceScreen.tscn")
+	if scene == null:
+		_fail("RewardChoiceScreen scene failed to load")
 		return
-	var main = main_scene.instantiate()
-	root.add_child(main)
+	var screen = scene.instantiate()
+	root.add_child(screen)
 	await process_frame
-	await process_frame
-	var router = main.get("router")
-	if router == null:
-		_fail("Main session must expose router")
-		return
-	if not main.has_method("set_current_run"):
-		_fail("Main session does not expose set_current_run")
-		return
 
-	main.call("set_current_run", _run_payload("CHOICE"))
+	if screen.has_method("set_payload"):
+		screen.call("set_payload", {"run": _run_payload("CHOICE")})
 	await process_frame
-	await process_frame
-	var screen = _reward_screen(main, router, "CHOICE")
-	if screen == null:
+	if str(screen.get("playable_redirect_screen_id")) != "":
+		_fail("RewardChoiceScreen must be standalone and must not redirect to LegacyRunScreen")
 		return
 	for node_name in [
 		"ShopChoiceScreen",
@@ -35,12 +27,9 @@ func _run() -> void:
 	]:
 		_assert_has(screen, node_name)
 
-	main.call("set_current_run", _run_payload("CLASS_REWARD"))
+	if screen.has_method("set_payload"):
+		screen.call("set_payload", {"run": _run_payload("CLASS_REWARD")})
 	await process_frame
-	await process_frame
-	screen = _reward_screen(main, router, "CLASS_REWARD")
-	if screen == null:
-		return
 	for node_name in [
 		"RewardWorkbench",
 		"ClassRewardSelect",
@@ -56,12 +45,9 @@ func _run() -> void:
 	]:
 		_assert_has(screen, node_name)
 
-	main.call("set_current_run", _run_payload("RELIC_CHOICE"))
+	if screen.has_method("set_payload"):
+		screen.call("set_payload", {"run": _run_payload("RELIC_CHOICE")})
 	await process_frame
-	await process_frame
-	screen = _reward_screen(main, router, "RELIC_CHOICE")
-	if screen == null:
-		return
 	for node_name in [
 		"RelicChoiceSelect",
 		"RewardPanel",
@@ -74,12 +60,9 @@ func _run() -> void:
 		_assert_has(screen, node_name)
 
 	for phase in ["UPGRADE_CHOICE", "ENCHANT_CHOICE", "POTION_CHOICE"]:
-		main.call("set_current_run", _run_payload(phase))
+		if screen.has_method("set_payload"):
+			screen.call("set_payload", {"run": _run_payload(phase)})
 		await process_frame
-		await process_frame
-		screen = _reward_screen(main, router, phase)
-		if screen == null:
-			return
 		for node_name in [
 			"RewardWorkbench",
 			"RewardPanel",
@@ -104,25 +87,21 @@ func _run() -> void:
 			_assert_has(screen, "PotionPanel")
 			_assert_has(screen, "RewardChoice_potion-1")
 
-	main.queue_free()
-	for _frame in range(5):
-		await process_frame
-	print("Godot main flow reward Web structure smoke passed")
-	quit(0)
+	var text := _collect_text(screen)
+	for part in ["选择药水", "药水奖励", "职业装备", "1点牙咬", "背包"]:
+		if not text.contains(part):
+			_fail("Standalone reward choice Web text missing: %s" % part)
+			return
 
-func _reward_screen(main: Node, router: Node, phase: String) -> Node:
-	if str(router.get("current_screen_id")) != "reward_choice":
-		_fail("%s should route to standalone RewardChoiceScreen, got %s" % [phase, str(router.get("current_screen_id"))])
-		return null
-	var screen = main.get_node_or_null("ScreenRoot/RewardChoiceScreen")
-	if screen == null or not screen.visible:
-		_fail("%s should show RewardChoiceScreen" % phase)
-		return null
-	return screen
+	screen.queue_free()
+	for _frame in range(3):
+		await process_frame
+	print("Godot standalone reward choice Web structure smoke passed")
+	quit(0)
 
 func _assert_has(root_node: Node, node_name: String) -> void:
 	if _find_by_name(root_node, node_name) == null:
-		_fail("Missing Web reward flow node: %s" % node_name)
+		_fail("Missing standalone reward choice Web node: %s" % node_name)
 
 func _find_by_name(node: Node, node_name: String) -> Node:
 	if node.name == node_name:
@@ -133,9 +112,19 @@ func _find_by_name(node: Node, node_name: String) -> Node:
 			return found
 	return null
 
+func _collect_text(node: Node) -> String:
+	var text := ""
+	if node is Label:
+		text += (node as Label).text + "\n"
+	if node is Button:
+		text += (node as Button).text + "\n"
+	for child in node.get_children():
+		text += _collect_text(child)
+	return text
+
 func _run_payload(phase: String) -> Dictionary:
 	return {
-		"id": "reward-flow-%s" % phase.to_lower(),
+		"id": "reward-choice-%s" % phase.to_lower(),
 		"mode": "CASUAL",
 		"phase": phase,
 		"status": "ACTIVE",

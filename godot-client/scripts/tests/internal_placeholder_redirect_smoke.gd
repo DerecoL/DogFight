@@ -35,7 +35,6 @@ func _run() -> void:
 		return
 	for screen_id in [
 		"run_shell",
-		"reward_choice",
 		"run_settlement",
 		"achievements",
 		"season",
@@ -134,6 +133,22 @@ func _run() -> void:
 		return
 	if exploration_map.find_child("PlaceholderPanel", true, false) != null:
 		_fail("exploration_map must not show a placeholder panel")
+		return
+
+	if not main.call("open_screen", "reward_choice"):
+		_fail("open_screen should accept standalone reward_choice")
+		return
+	await process_frame
+	await process_frame
+	if str(router.get("current_screen_id")) != "reward_choice":
+		_fail("reward_choice should stay on standalone RewardChoiceScreen, got %s" % str(router.get("current_screen_id")))
+		return
+	var reward_choice = main.get_node_or_null("ScreenRoot/RewardChoiceScreen")
+	if reward_choice == null or not reward_choice.visible:
+		_fail("reward_choice should show RewardChoiceScreen")
+		return
+	if reward_choice.find_child("PlaceholderPanel", true, false) != null:
+		_fail("reward_choice must not show a placeholder panel")
 		return
 
 	if not main.call("open_screen", "account_shop"):

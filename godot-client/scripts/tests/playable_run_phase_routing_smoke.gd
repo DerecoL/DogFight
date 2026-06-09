@@ -44,6 +44,21 @@ func _run() -> void:
 				_fail("SHOP should render standalone ShopWorkbench")
 				return
 			continue
+		if ["CHOICE", "CLASS_REWARD", "RELIC_CHOICE", "UPGRADE_CHOICE", "POTION_CHOICE", "ENCHANT_CHOICE"].has(phase):
+			if str(router.get("current_screen_id")) != "reward_choice":
+				_fail("%s should show standalone RewardChoiceScreen, got %s" % [phase, str(router.get("current_screen_id"))])
+				return
+			var reward_choice = main.get_node_or_null("ScreenRoot/RewardChoiceScreen")
+			if reward_choice == null or not reward_choice.visible:
+				_fail("%s should show RewardChoiceScreen" % phase)
+				return
+			if phase == "CHOICE" and reward_choice.find_child("ShopChoiceScreen", true, false) == null:
+				_fail("CHOICE should render standalone ShopChoiceScreen")
+				return
+			if phase != "CHOICE" and reward_choice.find_child("RewardPanel", true, false) == null:
+				_fail("%s should render standalone RewardPanel" % phase)
+				return
+			continue
 		if not legacy.visible:
 			_fail("Phase %s should show playable LegacyRunScreen, got %s" % [phase, str(router.get("current_screen_id"))])
 			return
