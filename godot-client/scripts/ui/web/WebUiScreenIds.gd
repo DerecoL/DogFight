@@ -11,6 +11,7 @@ const RUN_SHOP := "run_shop"
 const REWARD_CHOICE := "reward_choice"
 const BATTLE_REPLAY := "battle_replay"
 const RUN_SETTLEMENT := "run_settlement"
+const ACCOUNT := "account"
 const ACCOUNT_SHOP := "account_shop"
 const ACHIEVEMENTS := "achievements"
 const LEADERBOARDS := "leaderboards"
@@ -30,6 +31,7 @@ const SCREEN_NODES := {
 	REWARD_CHOICE: "RewardChoiceScreen",
 	BATTLE_REPLAY: "BattleReplayScreen",
 	RUN_SETTLEMENT: "RunSettlementScreen",
+	ACCOUNT: "AccountHistoryScreen",
 	ACCOUNT_SHOP: "AccountShopScreen",
 	ACHIEVEMENTS: "AchievementsScreen",
 	LEADERBOARDS: "LeaderboardsScreen",

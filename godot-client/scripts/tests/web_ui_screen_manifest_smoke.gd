@@ -16,6 +16,7 @@ func _init() -> void:
 		"reward_choice": "RewardChoiceScreen",
 		"battle_replay": "BattleReplayScreen",
 		"run_settlement": "RunSettlementScreen",
+		"account": "AccountHistoryScreen",
 		"account_shop": "AccountShopScreen",
 		"achievements": "AchievementsScreen",
 		"leaderboards": "LeaderboardsScreen",

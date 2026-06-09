@@ -9,6 +9,7 @@ func _init() -> void:
 		"run_shop": "res://scenes/screens/RunShopScreen.tscn",
 		"reward_choice": "res://scenes/screens/RewardChoiceScreen.tscn",
 		"run_settlement": "res://scenes/screens/RunSettlementScreen.tscn",
+		"account": "res://scenes/screens/AccountHistoryScreen.tscn",
 		"account_shop": "res://scenes/screens/AccountShopScreen.tscn",
 		"achievements": "res://scenes/screens/AchievementsScreen.tscn",
 		"leaderboards": "res://scenes/screens/LeaderboardsScreen.tscn",

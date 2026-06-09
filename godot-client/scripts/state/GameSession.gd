@@ -396,6 +396,9 @@ func open_screen(screen_id: String) -> bool:
 	if screen_id == WebUiScreenIds.SEASON:
 		_show_season_screen()
 		return true
+	if screen_id == WebUiScreenIds.ACCOUNT:
+		_show_account_history_screen()
+		return true
 	if screen_id == WebUiScreenIds.PLAYABLE_RUN or _screen_uses_playable_run_shell(screen_id):
 		_show_playable_run_screen()
 		return true
@@ -427,7 +430,6 @@ func _screen_uses_playable_run_shell(screen_id: String) -> bool:
 
 func _screen_uses_playable_shell(screen_id: String) -> bool:
 	return [
-		"account",
 	].has(screen_id)
 
 func _bind_screen_by_name(node_name: String) -> void:
@@ -740,6 +742,22 @@ func _show_season_screen() -> void:
 	router.show_screen(WebUiScreenIds.SEASON, false)
 	_apply_payload_to_screen(WebUiScreenIds.SEASON)
 	call_deferred("_refresh_season_payload")
+
+func _show_account_history_screen() -> void:
+	if router == null:
+		return
+	router.show_screen(WebUiScreenIds.ACCOUNT, false)
+	_apply_payload_to_screen(WebUiScreenIds.ACCOUNT)
+	call_deferred("_refresh_account_history_payload")
+
+func _refresh_account_history_payload() -> void:
+	if api == null or router == null or str(router.get("current_screen_id")) != WebUiScreenIds.ACCOUNT:
+		return
+	var history_response := await api.get_json(ApiRoutes.runs_history())
+	if bool(history_response.get("ok", false)):
+		lobby_history_data = _response_data(history_response)
+	if router != null and str(router.get("current_screen_id")) == WebUiScreenIds.ACCOUNT:
+		_apply_payload_to_screen(WebUiScreenIds.ACCOUNT)
 
 func _refresh_season_payload() -> void:
 	if api == null or current_user.is_empty() or router == null or str(router.get("current_screen_id")) != WebUiScreenIds.SEASON:

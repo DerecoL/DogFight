@@ -1,4 +1,4 @@
-[gd_scene load_steps=21 format=3 uid="uid://dogfight_main"]
+[gd_scene load_steps=22 format=3 uid="uid://dogfight_main"]
 
 [ext_resource type="Script" path="res://scripts/state/GameSession.gd" id="1_session"]
 [ext_resource type="PackedScene" path="res://scenes/LoginScreen.tscn" id="2_login"]
@@ -20,6 +20,7 @@
 [ext_resource type="PackedScene" path="res://scenes/screens/AccountSettingsScreen.tscn" id="18_settings"]
 [ext_resource type="PackedScene" path="res://scenes/screens/NicknameSetupScreen.tscn" id="19_nickname_setup"]
 [ext_resource type="PackedScene" path="res://scenes/screens/ApexScreen.tscn" id="20_apex"]
+[ext_resource type="PackedScene" path="res://scenes/screens/AccountHistoryScreen.tscn" id="21_account_history"]
 
 [node name="Main" type="Control"]
 layout_mode = 3
@@ -66,6 +67,9 @@ layout_mode = 1
 layout_mode = 1
 
 [node name="RunSettlementScreen" parent="ScreenRoot" instance=ExtResource("11_run_settlement")]
+layout_mode = 1
+
+[node name="AccountHistoryScreen" parent="ScreenRoot" instance=ExtResource("21_account_history")]
 layout_mode = 1
 
 [node name="AccountShopScreen" parent="ScreenRoot" instance=ExtResource("12_account_shop")]

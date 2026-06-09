@@ -35,6 +35,23 @@ func _run() -> void:
 		_fail("Direct router display of mode_lobby must not show a placeholder panel")
 		return
 
+	router.call("show_screen", "account", false)
+	await process_frame
+	await process_frame
+	if str(router.get("current_screen_id")) != "account":
+		_fail("Direct router display of account should stay on standalone account, got %s" % str(router.get("current_screen_id")))
+		return
+	var account_history = main.get_node_or_null("ScreenRoot/AccountHistoryScreen")
+	if account_history == null or not account_history.visible:
+		_fail("Direct router display of account should show AccountHistoryScreen")
+		return
+	if account_history.find_child("AccountHistoryScreen", true, false) == null:
+		_fail("AccountHistoryScreen must show the Web account history page")
+		return
+	if _any_visible_placeholder(main):
+		_fail("Direct router display of account must not show a placeholder panel")
+		return
+
 	router.call("show_screen", "account_shop", false)
 	await process_frame
 	await process_frame

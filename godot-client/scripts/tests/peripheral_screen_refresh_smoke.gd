@@ -16,15 +16,15 @@ func _run() -> void:
 	await process_frame
 
 	var api = main.get("api")
-	if api == null or not api.has_signal("request_finished"):
-		_fail("Main API client must emit request_finished")
+	if api == null or not api.has_signal("request_started"):
+		_fail("Main API client must emit request_started")
 		return
-	api.request_finished.connect(func(path: String, _ok: bool, _status: int, _payload: Dictionary) -> void:
+	api.request_started.connect(func(path: String) -> void:
 		seen_paths[path] = true
 	)
 
 	var expectations := {
-		"account": ["/me", "/runs/history"],
+		"account": ["/runs/history"],
 		"achievements": ["/achievements", "/daily-tasks"],
 		"leaderboards": ["/ladder/me", "/ladder/leaderboard"],
 		"apex": ["/apex"],

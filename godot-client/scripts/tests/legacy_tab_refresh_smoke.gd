@@ -16,13 +16,13 @@ func _run() -> void:
 	await process_frame
 
 	var api = main.get("api")
-	if api == null or not api.has_signal("request_finished"):
-		_fail("Main API client must emit request_finished")
+	if api == null or not api.has_signal("request_started"):
+		_fail("Main API client must emit request_started")
 		return
-	api.request_finished.connect(func(path: String, _ok: bool, _status: int, _payload: Dictionary) -> void:
+	api.request_started.connect(func(path: String) -> void:
 		seen_paths[path] = true
 	)
-	main.call("open_screen", "account")
+	main.call("open_screen", "legacy_run")
 	await _wait_for_idle(main)
 
 	var legacy = main.get_node_or_null("ScreenRoot/LegacyRunScreen")

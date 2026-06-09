@@ -22,20 +22,7 @@ func _run() -> void:
 		_fail("Main must expose router and playable LegacyRunScreen")
 		return
 
-	for screen_id in ["account"]:
-		main.call("open_screen", screen_id)
-		await process_frame
-		await process_frame
-		if str(router.get("current_screen_id")) != "legacy_run":
-			_fail("%s should route to playable shell, got %s" % [screen_id, str(router.get("current_screen_id"))])
-			return
-		if not legacy.visible:
-			_fail("%s should show LegacyRunScreen" % screen_id)
-			return
-		if legacy.find_child("PlaceholderPanel", true, false) != null:
-			_fail("%s must not show placeholder panel" % screen_id)
-			return
-
+	await _assert_standalone(main, router, "account", "AccountHistoryScreen", "AccountHistoryScreen")
 	await _assert_standalone(main, router, "leaderboards", "LeaderboardsScreen", "LadderScreen")
 	await _assert_standalone(main, router, "dogfight_rooms", "DogfightRoomsScreen", "DogfightScreen")
 	await _assert_standalone(main, router, "account_shop", "AccountShopScreen", "AccountShopPanel")

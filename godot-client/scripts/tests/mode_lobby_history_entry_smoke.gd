@@ -27,15 +27,18 @@ func _run() -> void:
 	await process_frame
 	await process_frame
 
-	if str(router.get("current_screen_id")) != "legacy_run":
-		_fail("HistoryDetailButton should route to playable account/history shell, got %s" % str(router.get("current_screen_id")))
+	if str(router.get("current_screen_id")) != "account":
+		_fail("HistoryDetailButton should route to standalone account history, got %s" % str(router.get("current_screen_id")))
 		return
-	var legacy = main.get_node_or_null("ScreenRoot/LegacyRunScreen")
-	if legacy == null or not legacy.visible:
-		_fail("HistoryDetailButton should show LegacyRunScreen")
+	var account_history = main.get_node_or_null("ScreenRoot/AccountHistoryScreen")
+	if account_history == null or not account_history.visible:
+		_fail("HistoryDetailButton should show AccountHistoryScreen")
 		return
-	if str(legacy.get("current_tab")) != "账号":
-		_fail("HistoryDetailButton should open account/history tab, got %s" % str(legacy.get("current_tab")))
+	if account_history.find_child("AccountHistoryScreen", true, false) == null:
+		_fail("HistoryDetailButton should render standalone account history content")
+		return
+	if account_history.find_child("PlaceholderPanel", true, false) != null:
+		_fail("HistoryDetailButton must not show placeholder content")
 		return
 
 	main.queue_free()
