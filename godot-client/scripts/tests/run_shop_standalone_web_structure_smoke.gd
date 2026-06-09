@@ -9,8 +9,12 @@ func _run() -> void:
 		_fail("RunShopScreen scene failed to load")
 		return
 	var screen = scene.instantiate()
+	var fake_session := FakeSession.new()
+	root.add_child(fake_session)
 	root.add_child(screen)
 	await process_frame
+	if screen.has_method("bind_session"):
+		screen.call("bind_session", fake_session)
 	if screen.has_method("set_payload"):
 		screen.call("set_payload", {"run": _shop_run()})
 	await process_frame
@@ -58,6 +62,55 @@ func _run() -> void:
 	if not workbench is HBoxContainer:
 		_fail("ShopWorkbench must use a horizontal workbench matching the Web shop layout")
 		return
+	var offer_button := _find_by_name(screen, "ShopCardArt_offer-1") as Button
+	if offer_button == null:
+		_fail("Shop offer art button is missing")
+		return
+	offer_button.pressed.emit()
+	await process_frame
+	for node_name in [
+		"FloatingTip",
+		"ShopOfferTip",
+		"ShopOfferTipTags",
+		"ShopOfferTipIdentity",
+		"ShopOfferTipSizePreview",
+		"ShopOfferTipDice",
+		"ShopOfferTipDescription",
+		"ShopOfferTipPrice",
+		"ShopOfferTipActions",
+		"BuyOfferButton",
+		"CloseOfferTipButton",
+	]:
+		_assert_has(screen, node_name)
+	var buy_button := _find_by_name(screen, "BuyOfferButton") as Button
+	if buy_button == null or buy_button.disabled:
+		_fail("Selected shop offer should expose an enabled buy button")
+		return
+	var close_button := _find_by_name(screen, "CloseOfferTipButton") as Button
+	if close_button == null:
+		_fail("Selected shop offer should expose a close button")
+		return
+	close_button.pressed.emit()
+	await process_frame
+	if _find_by_name(screen, "FloatingTip") != null:
+		_fail("Shop offer tip should close from its close button")
+		return
+	offer_button = _find_by_name(screen, "ShopCardArt_offer-1") as Button
+	if offer_button == null:
+		_fail("Shop offer art button disappeared after closing the tip")
+		return
+	offer_button.pressed.emit()
+	await process_frame
+	buy_button = _find_by_name(screen, "BuyOfferButton") as Button
+	if buy_button == null or buy_button.disabled:
+		_fail("Selected shop offer should expose an enabled buy button after reopening")
+		return
+	buy_button.pressed.emit()
+	await process_frame
+	await process_frame
+	if fake_session.bought_offer_id != "offer-1" or fake_session.bought_area != "BAG":
+		_fail("BuyOfferButton must call buy_offer with offer-1 into BAG")
+		return
 	var text := _collect_text(screen)
 	for part in [
 		"装备店",
@@ -80,10 +133,21 @@ func _run() -> void:
 			return
 
 	screen.queue_free()
+	fake_session.queue_free()
 	for _frame in range(3):
 		await process_frame
 	print("Godot standalone run shop Web structure smoke passed")
 	quit(0)
+
+class FakeSession:
+	extends Node
+	var bought_offer_id := ""
+	var bought_area := ""
+
+	func buy_offer(offer_id: String, area := "BAG") -> bool:
+		bought_offer_id = offer_id
+		bought_area = area
+		return true
 
 func _shop_run() -> Dictionary:
 	return {

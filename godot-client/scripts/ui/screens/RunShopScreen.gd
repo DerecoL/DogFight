@@ -99,6 +99,8 @@ func _render_shop_shelf(parent: Node, run: Dictionary) -> void:
 		if offer_value is Dictionary:
 			_render_shop_offer_card(offer_row, run, offer_value)
 
+	_render_selected_offer_tip(shelf, run)
+
 	var match_button := _action_button(_match_label(run), _match_battle)
 	match_button.name = "MatchButton"
 	match_button.disabled = action_in_progress
@@ -230,6 +232,79 @@ func _render_grid_panel(parent: VBoxContainer, node_name: String, title: String,
 			button.custom_minimum_size = Vector2(90, 52)
 			item_line.add_child(button)
 
+func _render_selected_offer_tip(parent: VBoxContainer, run: Dictionary) -> void:
+	var offer := _selected_offer(run)
+	if offer.is_empty():
+		return
+	var def: Dictionary = _dict(offer, "def")
+	var title := _fallback(str(def.get("name", "")), str(offer.get("defId", offer.get("offerId", ""))))
+	var floating_tip := PanelContainer.new()
+	floating_tip.name = "FloatingTip"
+	floating_tip.custom_minimum_size = Vector2(0, 244)
+	floating_tip.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	floating_tip.add_theme_stylebox_override("panel", WebUiTokens.paper_card_style())
+	parent.add_child(floating_tip)
+
+	var tip := VBoxContainer.new()
+	tip.name = "ShopOfferTip"
+	tip.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	tip.add_theme_constant_override("separation", 7)
+	floating_tip.add_child(tip)
+
+	var tags := HBoxContainer.new()
+	tags.name = "ShopOfferTipTags"
+	tags.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	tags.add_theme_constant_override("separation", 6)
+	tip.add_child(tags)
+	_add_label(tags, "ShopOfferTipSizeTag", "%s格" % _fallback(_detail_size_text(def), "?"), HORIZONTAL_ALIGNMENT_CENTER)
+	_add_label(tags, "ShopOfferTipQualityTag", _quality_label(str(offer.get("quality", ""))), HORIZONTAL_ALIGNMENT_CENTER)
+	_add_label(tags, "ShopOfferTipDiceTone", "点数", HORIZONTAL_ALIGNMENT_CENTER)
+	_add_label(tags, "ShopOfferTipEffectTone", "效果", HORIZONTAL_ALIGNMENT_CENTER)
+
+	var identity := HBoxContainer.new()
+	identity.name = "ShopOfferTipIdentity"
+	identity.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	identity.add_theme_constant_override("separation", 8)
+	tip.add_child(identity)
+	var art := Label.new()
+	art.name = "ShopOfferTipArt"
+	art.text = ""
+	art.custom_minimum_size = Vector2(54, 54)
+	art.add_theme_stylebox_override("normal", WebUiTokens.resource_pill_style())
+	identity.add_child(art)
+	_add_label(identity, "ShopOfferTipTitle", title)
+
+	var size_preview := HBoxContainer.new()
+	size_preview.name = "ShopOfferTipSizePreview"
+	size_preview.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	size_preview.add_theme_constant_override("separation", 8)
+	tip.add_child(size_preview)
+	_add_label(size_preview, "ShopOfferTipGridPreview", _shop_size_preview_text(def))
+	_add_label(size_preview, "ShopOfferTipSizeText", "占用 %s 格" % _fallback(_detail_size_text(def), "?"))
+
+	var trigger := _trigger_dice_text(def)
+	if not trigger.is_empty():
+		_add_label(tip, "ShopOfferTipDice", "触发点数 %s" % trigger)
+	else:
+		_add_label(tip, "ShopOfferTipDice", "触发点数 -")
+
+	var description := _fallback(str(def.get("description", "")), str(offer.get("description", "")))
+	_add_label(tip, "ShopOfferTipDescription", description)
+	_add_label(tip, "ShopOfferTipPrice", "价格 %s" % _price_text(offer))
+
+	var actions := HBoxContainer.new()
+	actions.name = "ShopOfferTipActions"
+	actions.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	actions.add_theme_constant_override("separation", 8)
+	tip.add_child(actions)
+	var buy_button := _action_button("购买到背包", _buy_selected_offer)
+	buy_button.name = "BuyOfferButton"
+	buy_button.disabled = action_in_progress or int(run.get("gold", 0)) < int(offer.get("price", 0))
+	actions.add_child(buy_button)
+	var close_button := _action_button("关闭", _close_offer_tip)
+	close_button.name = "CloseOfferTipButton"
+	actions.add_child(close_button)
+
 func _action_button(text: String, callback: Callable) -> Button:
 	var button := Button.new()
 	button.text = text
@@ -262,6 +337,22 @@ func _match_battle() -> void:
 
 func _select_offer(offer_id: String) -> void:
 	selected_offer_id = offer_id
+	_render()
+
+func _close_offer_tip() -> void:
+	selected_offer_id = ""
+	_render()
+
+func _buy_selected_offer() -> void:
+	if selected_offer_id.is_empty() or action_in_progress:
+		return
+	action_in_progress = true
+	var offer_id := selected_offer_id
+	if session != null and session.has_method("buy_offer"):
+		await session.call("buy_offer", offer_id, "BAG")
+	selected_offer_id = ""
+	action_in_progress = false
+	_render()
 
 func _run() -> Dictionary:
 	var value = payload.get("run", {})
@@ -274,6 +365,14 @@ func _dict(source: Dictionary, key: String) -> Dictionary:
 func _array(source: Dictionary, key: String) -> Array:
 	var value = source.get(key, [])
 	return value if value is Array else []
+
+func _selected_offer(run: Dictionary) -> Dictionary:
+	if selected_offer_id.is_empty():
+		return {}
+	for offer_value in _array(run, "shopItems"):
+		if offer_value is Dictionary and str((offer_value as Dictionary).get("offerId", "")) == selected_offer_id:
+			return offer_value
+	return {}
 
 func _fallback(value: String, fallback: String) -> String:
 	return fallback if value.strip_edges().is_empty() else value
