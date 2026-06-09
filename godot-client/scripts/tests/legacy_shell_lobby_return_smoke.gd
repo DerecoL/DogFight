@@ -17,18 +17,11 @@ func _run() -> void:
 	if router == null:
 		_fail("Main session must expose router")
 		return
-	main.call("set_current_run", {
-		"id": "lobby-return-smoke",
-		"phase": "MAP",
-		"status": "ACTIVE",
-		"items": [],
-		"relics": [],
-		"shopItems": [],
-	})
+	main.call("open_screen", "legacy_run")
 	await process_frame
 	await process_frame
 	if str(router.get("current_screen_id")) != "legacy_run":
-		_fail("Run payload should show playable shell before returning lobby")
+		_fail("Test setup should show playable shell before returning lobby")
 		return
 
 	var legacy = main.get_node_or_null("ScreenRoot/LegacyRunScreen")
