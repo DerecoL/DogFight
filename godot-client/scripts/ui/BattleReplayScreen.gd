@@ -60,6 +60,17 @@ var player_status_button: Button
 var opponent_status_button: Button
 var player_reservoir_label: Label
 var opponent_reservoir_label: Label
+var player_stage_name_label: Label
+var opponent_stage_name_label: Label
+var player_stage_avatar: TextureRect
+var opponent_stage_avatar: TextureRect
+var player_stage_shield_label: Label
+var opponent_stage_shield_label: Label
+var player_stage_status_label: Label
+var opponent_stage_status_label: Label
+var player_stage_hp: ProgressBar
+var opponent_stage_hp: ProgressBar
+var battle_dice_label: Label
 var player_item_buttons := {}
 var opponent_item_buttons := {}
 var player_item_state_markers := {}
@@ -85,7 +96,7 @@ func configure_cosmetics(next_cosmetics: Dictionary) -> void:
 	cosmetics_data = next_cosmetics.duplicate(true)
 
 func _ready() -> void:
-	_build_battle_layout()
+	_build_web_battle_layout()
 	_connect_button_once(play_button, _on_play_pressed)
 	_connect_button_once(skip_button, _on_skip_pressed)
 	_connect_button_once(finish_button, _on_finish_pressed)
@@ -116,6 +127,7 @@ func start_replay(next_battle: Dictionary) -> void:
 		review_panel.visible = false
 	_render_initial_hp()
 	_render_snapshots()
+	_render_stage_snapshots()
 	_render_event_stage({})
 	_update_log_filters()
 	_update_speed_buttons()
@@ -125,11 +137,23 @@ func _render_initial_hp() -> void:
 	opponent_hp.max_value = int(battle.get("opponentMaxHp", 100))
 	player_hp.value = player_hp.max_value
 	opponent_hp.value = opponent_hp.max_value
+	_sync_web_battle_stage()
 	dice_label.text = "骰点 -%s" % _battle_effect_suffix()
 	current_player_statuses = {}
 	current_opponent_statuses = {}
 	_reset_battle_item_state_markers()
 	_update_battle_meta({})
+	_sync_web_battle_stage()
+
+func _sync_web_battle_stage() -> void:
+	if player_stage_hp != null:
+		player_stage_hp.max_value = player_hp.max_value
+		player_stage_hp.value = player_hp.value
+	if opponent_stage_hp != null:
+		opponent_stage_hp.max_value = opponent_hp.max_value
+		opponent_stage_hp.value = opponent_hp.value
+	if battle_dice_label != null:
+		battle_dice_label.text = dice_label.text
 
 func _on_play_pressed() -> void:
 	if finish_in_progress or playing:
@@ -212,6 +236,7 @@ func _on_restart_pressed() -> void:
 		review_panel.visible = false
 	_render_initial_hp()
 	_render_snapshots()
+	_render_stage_snapshots()
 	_render_event_stage({})
 	_update_log_filters()
 	_update_speed_buttons()
@@ -223,6 +248,7 @@ func _apply_event(event: Dictionary) -> void:
 	opponent_hp.value = int(event.get("opponentHp", opponent_hp.value))
 	if event.has("roll"):
 		dice_label.text = "骰点 %s%s" % [str(event.get("roll")), _battle_effect_suffix()]
+	_sync_web_battle_stage()
 	displayed_events.append(event.duplicate(true))
 	_render_event_stage(event)
 	_update_battle_meta(event)
@@ -246,6 +272,212 @@ func _mark_replay_complete() -> void:
 func _update_playback_controls() -> void:
 	play_button.disabled = finish_in_progress or playing
 	skip_button.disabled = finish_in_progress
+
+func _build_web_battle_layout() -> void:
+	if root == null or stage_label != null:
+		return
+	root.name = "BattlePanel"
+	root.add_theme_constant_override("separation", 10)
+	var old_header := player_hp.get_parent()
+	if old_header is CanvasItem:
+		(old_header as CanvasItem).visible = false
+	log_view.visible = false
+	if footer.get_parent() == root:
+		root.remove_child(footer)
+
+	var toolbar := HBoxContainer.new()
+	toolbar.name = "BattleToolbar"
+	toolbar.custom_minimum_size = Vector2(0, 66)
+	toolbar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	toolbar.add_theme_constant_override("separation", 12)
+	root.add_child(toolbar)
+	var status_box := VBoxContainer.new()
+	status_box.name = "BattleStatus"
+	status_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	status_box.add_theme_constant_override("separation", 2)
+	toolbar.add_child(status_box)
+	var title := Label.new()
+	title.text = "自动战斗"
+	title.custom_minimum_size = Vector2(0, 26)
+	title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	status_box.add_child(title)
+	stage_label = Label.new()
+	stage_label.name = "BattleStageSummary"
+	stage_label.custom_minimum_size = Vector2(0, 34)
+	stage_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	stage_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	status_box.add_child(stage_label)
+	var speed_row := HBoxContainer.new()
+	speed_row.name = "BattleSpeedRow"
+	speed_row.custom_minimum_size = Vector2(210, 44)
+	speed_row.add_theme_constant_override("separation", 6)
+	toolbar.add_child(speed_row)
+	for speed in [1, 2, 4]:
+		var button := Button.new()
+		button.text = "%dx" % speed
+		button.custom_minimum_size = Vector2(58, 38)
+		button.toggle_mode = true
+		button.pressed.connect(_set_speed.bind(float(speed)))
+		speed_row.add_child(button)
+		speed_buttons[speed] = button
+	_update_speed_buttons()
+
+	var fx_stage := Control.new()
+	fx_stage.name = "BattleFxStage"
+	fx_stage.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	fx_stage.custom_minimum_size = Vector2(0, 1)
+	root.add_child(fx_stage)
+
+	var opponent_panel := _snapshot_panel("Opponent equipment")
+	(opponent_panel["panel"] as PanelContainer).name = "OpponentEquipmentRow"
+	(opponent_panel["grid"] as GridContainer).name = "OpponentBattleSlotGrid"
+	opponent_name_label = opponent_panel["name"]
+	opponent_avatar = opponent_panel["avatar"]
+	opponent_shield_label = opponent_panel["shield"]
+	opponent_status_label = opponent_panel["statuses"]
+	opponent_status_button = opponent_panel["status_button"]
+	opponent_status_button.text = "%s%s" % [_battle_actor_label("opponent"), str(opponent_status_button.text)]
+	opponent_status_button.pressed.connect(_show_battle_status_modal.bind("opponent"))
+	opponent_reservoir_label = opponent_panel["reservoirs"]
+	opponent_equipment_grid = opponent_panel["grid"]
+	opponent_relic_row = opponent_panel["relics"]
+	root.add_child(opponent_panel["panel"])
+
+	var battle_stage := GridContainer.new()
+	battle_stage.name = "BattleStage"
+	battle_stage.columns = 3
+	battle_stage.custom_minimum_size = Vector2(0, 210)
+	battle_stage.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	battle_stage.add_theme_constant_override("h_separation", 12)
+	battle_stage.add_theme_constant_override("v_separation", 8)
+	root.add_child(battle_stage)
+	var opponent_dog := _battle_dog_panel("OpponentBattleDog")
+	opponent_stage_name_label = opponent_dog["name"]
+	opponent_stage_avatar = opponent_dog["avatar"]
+	opponent_stage_shield_label = opponent_dog["shield"]
+	opponent_stage_status_label = opponent_dog["statuses"]
+	opponent_stage_hp = opponent_dog["hp"]
+	battle_stage.add_child(opponent_dog["panel"])
+	var dice_panel := PanelContainer.new()
+	dice_panel.name = "BattleDice"
+	dice_panel.custom_minimum_size = Vector2(136, 132)
+	var dice_box := VBoxContainer.new()
+	dice_box.alignment = BoxContainer.ALIGNMENT_CENTER
+	dice_box.add_theme_constant_override("separation", 6)
+	dice_panel.add_child(dice_box)
+	battle_dice_label = Label.new()
+	battle_dice_label.name = "BattleDiceLabel"
+	battle_dice_label.custom_minimum_size = Vector2(0, 80)
+	battle_dice_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	battle_dice_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	battle_dice_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	dice_box.add_child(battle_dice_label)
+	battle_stage.add_child(dice_panel)
+	var player_dog := _battle_dog_panel("PlayerBattleDog")
+	player_stage_name_label = player_dog["name"]
+	player_stage_avatar = player_dog["avatar"]
+	player_stage_shield_label = player_dog["shield"]
+	player_stage_status_label = player_dog["statuses"]
+	player_stage_hp = player_dog["hp"]
+	battle_stage.add_child(player_dog["panel"])
+
+	var player_panel := _snapshot_panel("Player equipment")
+	(player_panel["panel"] as PanelContainer).name = "PlayerEquipmentRow"
+	(player_panel["grid"] as GridContainer).name = "PlayerBattleSlotGrid"
+	player_name_label = player_panel["name"]
+	player_avatar = player_panel["avatar"]
+	player_shield_label = player_panel["shield"]
+	player_status_label = player_panel["statuses"]
+	player_status_button = player_panel["status_button"]
+	player_status_button.text = "%s%s" % [_battle_actor_label("player"), str(player_status_button.text)]
+	player_status_button.pressed.connect(_show_battle_status_modal.bind("player"))
+	player_reservoir_label = player_panel["reservoirs"]
+	player_equipment_grid = player_panel["grid"]
+	player_relic_row = player_panel["relics"]
+	root.add_child(player_panel["panel"])
+
+	var review := _build_review_panel()
+	review_panel = review["panel"]
+	review_title_label = review["title"]
+	player_review_label = review["player"]
+	opponent_review_label = review["opponent"]
+	system_review_label = review["system"]
+	root.add_child(review_panel)
+
+	restart_button = Button.new()
+	restart_button.text = "Replay"
+	restart_button.custom_minimum_size = Vector2(82, 44)
+	restart_button.disabled = true
+	restart_button.pressed.connect(_on_restart_pressed)
+	footer.add_child(restart_button)
+	log_toggle_button = Button.new()
+	log_toggle_button.text = "Log"
+	log_toggle_button.custom_minimum_size = Vector2(72, 44)
+	log_toggle_button.pressed.connect(_toggle_log)
+	footer.add_child(log_toggle_button)
+	log_filter_row = HBoxContainer.new()
+	log_filter_row.name = "BattleLogFilters"
+	log_filter_row.add_theme_constant_override("separation", 6)
+	var log_shell := PanelContainer.new()
+	log_shell.name = "CollapsedBattleLog"
+	log_shell.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var log_box := VBoxContainer.new()
+	log_box.add_theme_constant_override("separation", 6)
+	log_shell.add_child(log_box)
+	log_box.add_child(log_filter_row)
+	var log_body := VBoxContainer.new()
+	log_body.name = "BattleLogBody"
+	log_body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	log_body.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	log_box.add_child(log_body)
+	root.add_child(log_shell)
+	footer.name = "BattleControls"
+	root.add_child(footer)
+
+func _battle_dog_panel(node_name: String) -> Dictionary:
+	var panel := PanelContainer.new()
+	panel.name = node_name
+	panel.custom_minimum_size = Vector2(220, 176)
+	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 6)
+	panel.add_child(box)
+	var header := HBoxContainer.new()
+	header.add_theme_constant_override("separation", 8)
+	box.add_child(header)
+	var avatar := TextureRect.new()
+	avatar.custom_minimum_size = Vector2(88, 88)
+	avatar.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	header.add_child(avatar)
+	var text_box := VBoxContainer.new()
+	text_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	text_box.add_theme_constant_override("separation", 4)
+	header.add_child(text_box)
+	var name_label := Label.new()
+	name_label.custom_minimum_size = Vector2(0, 30)
+	name_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	name_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	text_box.add_child(name_label)
+	var shield_label := Label.new()
+	shield_label.custom_minimum_size = Vector2(0, 24)
+	shield_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	text_box.add_child(shield_label)
+	var hp_bar := ProgressBar.new()
+	hp_bar.name = "%sHp" % node_name
+	hp_bar.custom_minimum_size = Vector2(0, 28)
+	box.add_child(hp_bar)
+	var statuses := Label.new()
+	statuses.custom_minimum_size = Vector2(0, 34)
+	statuses.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(statuses)
+	return {"panel": panel, "name": name_label, "avatar": avatar, "shield": shield_label, "statuses": statuses, "hp": hp_bar}
+
+func _move_node(node: Node, next_parent: Node) -> void:
+	var current_parent := node.get_parent()
+	if current_parent != null:
+		current_parent.remove_child(node)
+	next_parent.add_child(node)
+	node.unique_name_in_owner = true
 
 func _build_battle_layout() -> void:
 	if root == null or stage_label != null:
@@ -460,6 +692,25 @@ func _render_snapshot(name_label: Label, avatar: TextureRect, grid: GridContaine
 			relic_button.pressed.connect(_show_battle_relic_modal.bind(relic, side))
 			relic_row.add_child(relic_button)
 
+func _render_stage_snapshots() -> void:
+	_render_stage_snapshot(player_stage_name_label, player_stage_avatar, _dict(battle, "playerSnapshot"), "Your dog", "player")
+	_render_stage_snapshot(opponent_stage_name_label, opponent_stage_avatar, _dict(battle, "opponentSnapshot"), "Opponent dog", "opponent")
+
+func _render_stage_snapshot(name_label: Label, avatar: TextureRect, snapshot: Dictionary, fallback_name: String, side: String) -> void:
+	if name_label == null:
+		return
+	var dog_type := str(snapshot.get("dogType", ""))
+	name_label.text = "%s\n%s · %dW/%dL · R%d" % [
+		str(snapshot.get("name", fallback_name)),
+		_dog_name(dog_type),
+		int(snapshot.get("wins", 0)),
+		int(snapshot.get("losses", 0)),
+		int(snapshot.get("round", 0)),
+	]
+	if avatar != null:
+		avatar.texture = _dog_texture(dog_type)
+		avatar.modulate = _dog_skin_tint(dog_type, side)
+
 func _render_event_stage(event: Dictionary) -> void:
 	if stage_label == null:
 		return
@@ -569,7 +820,18 @@ func _update_battle_meta(event: Dictionary) -> void:
 	if opponent_reservoir_label != null:
 		opponent_reservoir_label.text = "蓄水池：%s" % _format_reservoirs(_array(reservoirs, "opponent"))
 
+	_update_stage_battle_meta(event)
 	_update_status_buttons()
+
+func _update_stage_battle_meta(event: Dictionary) -> void:
+	if player_stage_shield_label != null:
+		player_stage_shield_label.text = "Shield %d" % int(event.get("playerShield", 0))
+	if opponent_stage_shield_label != null:
+		opponent_stage_shield_label.text = "Shield %d" % int(event.get("opponentShield", 0))
+	if player_stage_status_label != null:
+		player_stage_status_label.text = "Status: %s" % _format_status_rows(_dict(event, "playerStatuses"))
+	if opponent_stage_status_label != null:
+		opponent_stage_status_label.text = "Status: %s" % _format_status_rows(_dict(event, "opponentStatuses"))
 
 func _update_status_buttons() -> void:
 	if player_status_button != null:
