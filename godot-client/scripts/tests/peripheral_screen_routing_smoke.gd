@@ -27,7 +27,6 @@ func _run() -> void:
 		"achievements": "成就",
 		"apex": "巅峰",
 		"season": "赛季",
-		"dogfight_rooms": "房间",
 		"account_settings": "设置",
 	}
 	for screen_id in legacy_cases.keys():
@@ -56,6 +55,20 @@ func _run() -> void:
 		return
 	if leaderboards.find_child("LadderScreen", true, false) == null:
 		_fail("leaderboards should render the Web ladder screen")
+		return
+
+	main.call("open_screen", "dogfight_rooms")
+	await process_frame
+	await process_frame
+	if str(router.get("current_screen_id")) != "dogfight_rooms":
+		_fail("dogfight_rooms should route to standalone DogfightRoomsScreen, got %s" % str(router.get("current_screen_id")))
+		return
+	var dogfight_rooms = main.get_node_or_null("ScreenRoot/DogfightRoomsScreen")
+	if dogfight_rooms == null or not dogfight_rooms.visible:
+		_fail("dogfight_rooms should show DogfightRoomsScreen")
+		return
+	if dogfight_rooms.find_child("DogfightScreen", true, false) == null:
+		_fail("dogfight_rooms should render the Web dogfight room list")
 		return
 
 	main.call("open_screen", "account_shop")

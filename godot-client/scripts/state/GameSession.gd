@@ -31,6 +31,8 @@ var run_store: RunStore = store.run
 var lobby_history_data: Dictionary = {}
 var lobby_ladder_data: Dictionary = {}
 var lobby_leaderboard_data: Dictionary = {}
+var lobby_dogfight_rooms_data: Dictionary = {}
+var lobby_dogfight_active_room_data: Dictionary = {}
 
 func _ready() -> void:
 	var override_url := OS.get_environment("DOGFIGHT_API_BASE_URL")
@@ -123,6 +125,8 @@ func logout() -> bool:
 	lobby_history_data = {}
 	lobby_ladder_data = {}
 	lobby_leaderboard_data = {}
+	lobby_dogfight_rooms_data = {}
+	lobby_dogfight_active_room_data = {}
 	api.cookie_header = ""
 	store.set_user({})
 	store.set_current_run({})
@@ -378,6 +382,9 @@ func open_screen(screen_id: String) -> bool:
 	if screen_id == WebUiScreenIds.LEADERBOARDS:
 		_show_leaderboards_screen()
 		return true
+	if screen_id == WebUiScreenIds.DOGFIGHT_ROOMS:
+		_show_dogfight_rooms_screen()
+		return true
 	if screen_id == WebUiScreenIds.PLAYABLE_RUN or _screen_uses_playable_run_shell(screen_id):
 		_show_playable_run_screen()
 		return true
@@ -418,7 +425,6 @@ func _screen_uses_playable_shell(screen_id: String) -> bool:
 		WebUiScreenIds.ACHIEVEMENTS,
 		"apex",
 		WebUiScreenIds.SEASON,
-		WebUiScreenIds.DOGFIGHT_ROOMS,
 		WebUiScreenIds.DOGFIGHT_ROOM_DETAIL,
 		WebUiScreenIds.ACCOUNT_SETTINGS,
 	].has(screen_id)
@@ -640,6 +646,8 @@ func _screen_payload() -> Dictionary:
 	payload["season"] = season.duplicate(true) if season is Dictionary else {}
 	payload["ladderData"] = lobby_ladder_data.duplicate(true)
 	payload["leaderboardData"] = lobby_leaderboard_data.duplicate(true)
+	payload["dogfightRoomsData"] = lobby_dogfight_rooms_data.duplicate(true)
+	payload["dogfightRoomData"] = lobby_dogfight_active_room_data.duplicate(true)
 	return payload
 
 func _refresh_mode_lobby_payload() -> void:
@@ -680,6 +688,47 @@ func _refresh_leaderboards_payload() -> void:
 	if router != null and str(router.get("current_screen_id")) == WebUiScreenIds.LEADERBOARDS:
 		_apply_payload_to_screen(WebUiScreenIds.LEADERBOARDS)
 
+func _show_dogfight_rooms_screen() -> void:
+	if router == null:
+		return
+	router.show_screen(WebUiScreenIds.DOGFIGHT_ROOMS, false)
+	_apply_payload_to_screen(WebUiScreenIds.DOGFIGHT_ROOMS)
+	call_deferred("_refresh_dogfight_rooms_payload")
+
+func _refresh_dogfight_rooms_payload() -> void:
+	if api == null or router == null or str(router.get("current_screen_id")) != WebUiScreenIds.DOGFIGHT_ROOMS:
+		return
+	var rooms_response := await api.get_json(ApiRoutes.dogfight_rooms())
+	if bool(rooms_response.get("ok", false)):
+		lobby_dogfight_rooms_data = _response_data(rooms_response)
+	if router != null and str(router.get("current_screen_id")) == WebUiScreenIds.DOGFIGHT_ROOMS:
+		_apply_payload_to_screen(WebUiScreenIds.DOGFIGHT_ROOMS)
+
+func dogfight_room_request(path: String, method := "GET", body: Dictionary = {}) -> Dictionary:
+	if api == null:
+		return {"ok": false, "status": 0, "error": "API client is not ready", "data": {}}
+	var response: Dictionary
+	if method.to_upper() == "POST":
+		response = await api.post_json(path, body)
+	else:
+		response = await api.get_json(path)
+	if bool(response.get("ok", false)):
+		var data := _response_data(response)
+		var room: Variant = data.get("room", {})
+		if room is Dictionary:
+			lobby_dogfight_active_room_data = room.duplicate(true)
+		if data.has("rooms"):
+			lobby_dogfight_rooms_data = data
+		elif path == ApiRoutes.dogfight_rooms():
+			lobby_dogfight_rooms_data = data
+		else:
+			var rooms_response := await api.get_json(ApiRoutes.dogfight_rooms())
+			if bool(rooms_response.get("ok", false)):
+				lobby_dogfight_rooms_data = _response_data(rooms_response)
+	if router != null and str(router.get("current_screen_id")) == WebUiScreenIds.DOGFIGHT_ROOMS:
+		_apply_payload_to_screen(WebUiScreenIds.DOGFIGHT_ROOMS)
+	return response
+
 func _response_data(response: Dictionary) -> Dictionary:
 	var value = response.get("data", {})
 	return value if value is Dictionary else {}
@@ -716,6 +765,8 @@ func _show_playable_section(screen_id: String) -> void:
 	var run_screen := get_node_or_null("ScreenRoot/LegacyRunScreen")
 	if run_screen != null and run_screen.has_method("bind_session") and run_screen.get("session") == null:
 		run_screen.bind_session(self)
+	if run_screen != null and screen_id == WebUiScreenIds.DOGFIGHT_ROOM_DETAIL:
+		run_screen.set("active_room", lobby_dogfight_active_room_data.duplicate(true))
 	if router != null:
 		router.show_screen(WebUiScreenIds.PLAYABLE_RUN, false)
 	if run_screen != null and run_screen.has_method("show_named_section"):

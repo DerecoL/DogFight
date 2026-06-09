@@ -41,7 +41,6 @@ func _run() -> void:
 		"run_settlement",
 		"achievements",
 		"season",
-		"dogfight_rooms",
 		"dogfight_room_detail",
 		"account_settings",
 	]:
@@ -74,6 +73,22 @@ func _run() -> void:
 		return
 	if leaderboards.find_child("PlaceholderPanel", true, false) != null:
 		_fail("leaderboards must not show a placeholder panel")
+		return
+
+	if not main.call("open_screen", "dogfight_rooms"):
+		_fail("open_screen should accept standalone dogfight_rooms")
+		return
+	await process_frame
+	await process_frame
+	if str(router.get("current_screen_id")) != "dogfight_rooms":
+		_fail("dogfight_rooms should stay on standalone DogfightRoomsScreen, got %s" % str(router.get("current_screen_id")))
+		return
+	var dogfight_rooms = main.get_node_or_null("ScreenRoot/DogfightRoomsScreen")
+	if dogfight_rooms == null or not dogfight_rooms.visible:
+		_fail("dogfight_rooms should show DogfightRoomsScreen")
+		return
+	if dogfight_rooms.find_child("PlaceholderPanel", true, false) != null:
+		_fail("dogfight_rooms must not show a placeholder panel")
 		return
 
 	if not main.call("open_screen", "account_shop"):

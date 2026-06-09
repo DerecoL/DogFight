@@ -69,6 +69,23 @@ func _run() -> void:
 		_fail("Direct router display of leaderboards must not show a placeholder panel")
 		return
 
+	router.call("show_screen", "dogfight_rooms", false)
+	await process_frame
+	await process_frame
+	if str(router.get("current_screen_id")) != "dogfight_rooms":
+		_fail("Direct router display of dogfight_rooms should stay on standalone dogfight_rooms, got %s" % str(router.get("current_screen_id")))
+		return
+	var dogfight_rooms = main.get_node_or_null("ScreenRoot/DogfightRoomsScreen")
+	if dogfight_rooms == null or not dogfight_rooms.visible:
+		_fail("Direct router display of dogfight_rooms should show DogfightRoomsScreen")
+		return
+	if dogfight_rooms.find_child("DogfightScreen", true, false) == null:
+		_fail("DogfightRoomsScreen must show the Web dogfight room list")
+		return
+	if _any_visible_placeholder(main):
+		_fail("Direct router display of dogfight_rooms must not show a placeholder panel")
+		return
+
 	for screen_id in [
 		"run_shell",
 		"exploration_map",
@@ -77,7 +94,6 @@ func _run() -> void:
 		"run_settlement",
 		"achievements",
 		"season",
-		"dogfight_rooms",
 		"dogfight_room_detail",
 		"account_settings",
 	]:

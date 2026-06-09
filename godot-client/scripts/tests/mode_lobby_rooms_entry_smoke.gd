@@ -28,28 +28,29 @@ func _run() -> void:
 
 	seen_paths.clear()
 	rooms_button.pressed.emit()
-	if not await _wait_for_screen(router, "legacy_run"):
-		_fail("Dogfight room entry should show the playable room shell")
+	if not await _wait_for_screen(router, "dogfight_rooms"):
+		_fail("Dogfight room entry should show the standalone dogfight room list")
 		return
-	var legacy = main.get_node_or_null("ScreenRoot/LegacyRunScreen")
-	if legacy == null or not legacy.visible:
-		_fail("Dogfight room entry should show LegacyRunScreen room flow")
+	var dogfight_rooms = main.get_node_or_null("ScreenRoot/DogfightRoomsScreen")
+	if dogfight_rooms == null or not dogfight_rooms.visible:
+		_fail("Dogfight room entry should show DogfightRoomsScreen")
 		return
 	for _frame in range(4):
 		await process_frame
-	if str(legacy.get("current_tab")) != "房间":
-		_fail("Dogfight room entry should switch to room tab before refresh, got %s" % str(legacy.get("current_tab")))
+	if dogfight_rooms.find_child("DogfightScreen", true, false) == null:
+		_fail("Dogfight room entry should render the Web dogfight room list")
 		return
 	if not await _wait_for_path("/dogfight/rooms"):
-		_fail("Dogfight room entry should refresh room list; seen paths: %s rooms=%s" % [str(seen_paths.keys()), str(legacy.get("rooms_data"))])
+		_fail("Dogfight room entry should refresh room list; seen paths: %s" % str(seen_paths.keys()))
 		return
-	if not await _wait_for_idle(legacy):
+	if not await _wait_for_idle(dogfight_rooms):
 		_fail("Dogfight room entry should finish refreshing before interaction")
 		return
-	if main.get_node_or_null("ScreenRoot/DogfightRoomsScreen").visible:
-		_fail("Dogfight room entry must not show the old standalone DogfightRoomsScreen")
+	var legacy = main.get_node_or_null("ScreenRoot/LegacyRunScreen")
+	if legacy != null and legacy.visible:
+		_fail("Dogfight room entry must not show LegacyRunScreen")
 		return
-	if legacy.find_child("PlaceholderPanel", true, false) != null:
+	if dogfight_rooms.find_child("PlaceholderPanel", true, false) != null:
 		_fail("Dogfight room entry must not show placeholder content")
 		return
 	if main.get("run_store").has_run():
