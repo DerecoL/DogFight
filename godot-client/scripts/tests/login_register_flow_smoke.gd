@@ -31,7 +31,13 @@ func _run() -> void:
 	account_input.text = account
 	password_input.text = "dogdice"
 	await login_screen.call("_on_register_pressed")
-	if not await _wait_for_screen(router, "nickname_setup"):
+	var reached_nickname := false
+	for _frame in range(240):
+		if str(router.get("current_screen_id")) == "nickname_setup":
+			reached_nickname = true
+			break
+		await process_frame
+	if not reached_nickname:
 		_fail("Register should route new account to nickname_setup, got %s" % str(router.get("current_screen_id")))
 		return
 
@@ -42,43 +48,78 @@ func _run() -> void:
 		return
 	nickname_input.text = "LoginFlowSmoke"
 	await nickname_screen.call("_submit_nickname")
-	if not await _assert_standalone_mode_lobby(main, router, "Nickname submit"):
+	var reached_lobby_after_nickname := false
+	for _frame in range(240):
+		if str(router.get("current_screen_id")) == "mode_lobby":
+			reached_lobby_after_nickname = true
+			break
+		await process_frame
+	if not reached_lobby_after_nickname:
+		_fail("Nickname submit should route to standalone mode lobby, got %s" % str(router.get("current_screen_id")))
+		return
+	if not _assert_mode_lobby_visible(main, "Nickname submit"):
 		return
 
 	if not await main.call("logout"):
 		_fail("Logout failed after registration")
 		return
-	if not await _wait_for_screen(router, "login"):
+	var reached_login := false
+	for _frame in range(240):
+		if str(router.get("current_screen_id")) == "login":
+			reached_login = true
+			break
+		await process_frame
+	if not reached_login:
 		_fail("Logout should route back to login, got %s" % str(router.get("current_screen_id")))
 		return
 
 	account_input.text = account
 	password_input.text = "dogdice"
 	await login_screen.call("_on_login_pressed")
-	if not await _assert_standalone_mode_lobby(main, router, "Login with saved nickname"):
+	var reached_lobby_after_login := false
+	for _frame in range(240):
+		if str(router.get("current_screen_id")) == "mode_lobby":
+			reached_lobby_after_login = true
+			break
+		await process_frame
+	if not reached_lobby_after_login:
+		_fail("Login with saved nickname should route to standalone mode lobby, got %s" % str(router.get("current_screen_id")))
 		return
+	if not _assert_mode_lobby_visible(main, "Login with saved nickname"):
+		return
+
 	var mode_lobby = main.get_node_or_null("ScreenRoot/ModeLobbyScreen")
 	var casual_button = mode_lobby.find_child("CasualModeButton", true, false) as Button
 	if casual_button == null:
 		_fail("Standalone mode lobby must expose CasualModeButton")
 		return
 	casual_button.pressed.emit()
-	if not await _wait_for_screen(router, "legacy_run"):
-		_fail("Entering casual mode should open the playable dog-selection shell, got %s" % str(router.get("current_screen_id")))
+	var reached_dog_select := false
+	for _frame in range(240):
+		if str(router.get("current_screen_id")) == "dog_select":
+			reached_dog_select = true
+			break
+		await process_frame
+	if not reached_dog_select:
+		_fail("Entering casual mode should open standalone dog_select, got %s" % str(router.get("current_screen_id")))
 		return
-	var legacy_run_screen = main.get_node_or_null("ScreenRoot/LegacyRunScreen")
-	if legacy_run_screen == null or not legacy_run_screen.visible:
-		_fail("Casual mode entry should show LegacyRunScreen dog-selection flow")
+	var dog_select = main.get_node_or_null("ScreenRoot/DogSelectScreen")
+	if dog_select == null or not dog_select.visible:
+		_fail("Casual mode entry should show standalone DogSelectScreen")
 		return
 	if main.get("run_store").has_run():
 		_fail("Entering casual mode without a run must not create a run directly")
 		return
-	if str(legacy_run_screen.get("current_tab")) != "跑局":
-		_fail("Entering casual mode should open the run tab, got %s" % str(legacy_run_screen.get("current_tab")))
+	var legacy_run_screen = main.get_node_or_null("ScreenRoot/LegacyRunScreen")
+	if legacy_run_screen != null and legacy_run_screen.visible:
+		_fail("Casual mode entry must not show LegacyRunScreen")
 		return
-	var run_text := _collect_text(legacy_run_screen)
-	if not run_text.contains("选择狗狗") or not run_text.contains("开始一局"):
-		_fail("Entering casual mode should show dog selection and start action")
+	for node_name in ["DogSelectScreen", "DogCardGrid", "DogDetailPanel", "StartRunButton"]:
+		if dog_select.find_child(node_name, true, false) == null:
+			_fail("Standalone dog_select missing Web node after login: %s" % node_name)
+			return
+	if dog_select.find_child("PlaceholderPanel", true, false) != null:
+		_fail("Standalone dog_select must not show placeholder content")
 		return
 
 	main.queue_free()
@@ -87,10 +128,7 @@ func _run() -> void:
 	print("Godot login/register flow smoke passed")
 	quit(0)
 
-func _assert_standalone_mode_lobby(main: Node, router: Node, context: String) -> bool:
-	if not await _wait_for_screen(router, "mode_lobby"):
-		_fail("%s should route to standalone mode lobby, got %s" % [context, str(router.get("current_screen_id"))])
-		return false
+func _assert_mode_lobby_visible(main: Node, context: String) -> bool:
 	var mode_lobby = main.get_node_or_null("ScreenRoot/ModeLobbyScreen")
 	if mode_lobby == null or not mode_lobby.visible:
 		_fail("%s should show ModeLobbyScreen" % context)
@@ -111,13 +149,6 @@ func _assert_standalone_mode_lobby(main: Node, router: Node, context: String) ->
 		return false
 	return true
 
-func _wait_for_screen(router: Node, screen_id: String) -> bool:
-	for _frame in range(240):
-		if str(router.get("current_screen_id")) == screen_id:
-			return true
-		await process_frame
-	return false
-
 func _find_line_edit(node: Node) -> LineEdit:
 	if node == null:
 		return null
@@ -128,16 +159,6 @@ func _find_line_edit(node: Node) -> LineEdit:
 		if result != null:
 			return result
 	return null
-
-func _collect_text(node: Node) -> String:
-	var text := ""
-	if node is Label:
-		text += (node as Label).text + "\n"
-	if node is Button:
-		text += (node as Button).text + "\n"
-	for child in node.get_children():
-		text += _collect_text(child)
-	return text
 
 func _fail(message: String) -> void:
 	push_error(message)

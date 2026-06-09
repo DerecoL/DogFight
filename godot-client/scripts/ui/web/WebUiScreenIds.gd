@@ -4,6 +4,7 @@ extends RefCounted
 const LOGIN := "login"
 const NICKNAME_SETUP := "nickname_setup"
 const MODE_LOBBY := "mode_lobby"
+const DOG_SELECT := "dog_select"
 const PLAYABLE_RUN := "legacy_run"
 const RUN_SHELL := "run_shell"
 const EXPLORATION_MAP := "exploration_map"
@@ -25,6 +26,7 @@ const SCREEN_NODES := {
 	LOGIN: "LoginScreen",
 	NICKNAME_SETUP: "NicknameSetupScreen",
 	MODE_LOBBY: "ModeLobbyScreen",
+	DOG_SELECT: "DogSelectScreen",
 	RUN_SHELL: "RunShellScreen",
 	EXPLORATION_MAP: "ExplorationMapScreen",
 	RUN_SHOP: "RunShopScreen",

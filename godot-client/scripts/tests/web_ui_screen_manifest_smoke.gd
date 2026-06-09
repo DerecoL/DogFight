@@ -10,6 +10,7 @@ func _init() -> void:
 		"login": "LoginScreen",
 		"nickname_setup": "NicknameSetupScreen",
 		"mode_lobby": "ModeLobbyScreen",
+		"dog_select": "DogSelectScreen",
 		"run_shell": "RunShellScreen",
 		"exploration_map": "ExplorationMapScreen",
 		"run_shop": "RunShopScreen",

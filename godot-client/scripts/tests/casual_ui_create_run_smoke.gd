@@ -1,69 +1,171 @@
 extends SceneTree
 
+const ApiClientScript := preload("res://scripts/api/ApiClient.gd")
+
+class FakeApi:
+	extends ApiClientScript
+
+	var seen_paths: Dictionary = {}
+	var seen_bodies: Dictionary = {}
+
+	func post_json(path: String, body: Dictionary = {}) -> Dictionary:
+		seen_paths[path] = true
+		seen_bodies[path] = body.duplicate(true)
+		return {
+			"ok": true,
+			"data": {
+				"run": {
+					"id": "casual-created-run",
+					"mode": str(body.get("mode", "CASUAL")),
+					"phase": "SHOP",
+					"status": "ACTIVE",
+					"dogType": str(body.get("dogType", "SHIBA")),
+					"luckyNumber": body.get("luckyNumber", null),
+					"round": 1,
+					"wins": 0,
+					"losses": 0,
+					"gold": 10,
+					"items": [],
+					"relics": [],
+					"shopItems": [],
+					"choices": [],
+					"classRewardChoices": [],
+					"enchantChoices": [],
+					"relicChoices": [],
+					"upgradeChoices": [],
+					"potionChoices": [],
+					"mapState": {"nodes": [], "availableNodeIds": [], "completedNodeIds": [], "currentNodeId": ""},
+				},
+			},
+		}
+
 var main_node: Node
-var seen_paths: Dictionary = {}
-var seen_responses: Dictionary = {}
+var fake_api_node: FakeApi
 
 func _init() -> void:
 	_run()
 
 func _run() -> void:
-	var main := await _new_logged_in_main()
-	if main == null:
+	var main_scene = load("res://scenes/Main.tscn")
+	if main_scene == null:
+		_fail("Main scene failed to load")
 		return
+	var main = main_scene.instantiate()
+	main_node = main
+	root.add_child(main)
+	await process_frame
+	await process_frame
 	var router = main.get("router")
-	if not await _wait_for_screen(router, "mode_lobby"):
-		_fail("Login should route to standalone mode lobby")
+	if router == null:
+		_fail("Main must expose router")
+		return
+	var fake_api := FakeApi.new()
+	fake_api_node = fake_api
+	main.set("api", fake_api)
+	main.add_child(fake_api)
+	main.set("current_user", {"id": "casual-smoke-user", "nickname": "CasualUiSmoke"})
+	main.set("needs_nickname_setup", false)
+	main.call("open_screen", "mode_lobby")
+	var reached_mode_lobby := false
+	for _frame in range(240):
+		if str(router.get("current_screen_id")) == "mode_lobby":
+			reached_mode_lobby = true
+			break
+		await process_frame
+	if not reached_mode_lobby:
+		_fail("Main should route to standalone mode lobby")
 		return
 	var mode_lobby = main.get_node_or_null("ScreenRoot/ModeLobbyScreen")
 	if mode_lobby == null or not mode_lobby.visible:
-		_fail("ModeLobbyScreen should be visible after login")
+		_fail("ModeLobbyScreen should be visible")
 		return
 	var casual_button = mode_lobby.find_child("CasualModeButton", true, false) as Button
 	if casual_button == null:
 		_fail("Standalone mode lobby must expose CasualModeButton")
 		return
+
 	casual_button.pressed.emit()
-	if not await _wait_for_screen(router, "legacy_run"):
-		_fail("Casual mode entry should open playable dog-selection shell")
+	var reached_dog_select := false
+	for _frame in range(240):
+		if str(router.get("current_screen_id")) == "dog_select":
+			reached_dog_select = true
+			break
+		await process_frame
+	if not reached_dog_select:
+		_fail("Casual mode entry should open standalone dog_select screen")
 		return
-	var legacy = main.get_node_or_null("ScreenRoot/LegacyRunScreen")
-	if legacy == null or not legacy.visible:
-		_fail("Casual mode entry should show LegacyRunScreen")
+	var dog_select = main.get_node_or_null("ScreenRoot/DogSelectScreen")
+	if dog_select == null or not dog_select.visible:
+		_fail("Casual mode entry should show standalone DogSelectScreen")
 		return
 	if main.get("run_store").has_run():
 		_fail("Entering casual mode must not create a run before dog confirmation")
 		return
-	if str(legacy.get("current_tab")) != "跑局":
-		_fail("Casual mode entry should open dog-selection run tab, got %s" % str(legacy.get("current_tab")))
-		return
-	var start_button = _find_button_containing(legacy, "开始一局")
-	if start_button == null:
-		_fail("Dog-selection run tab must expose start-run confirmation")
+	var legacy = main.get_node_or_null("ScreenRoot/LegacyRunScreen")
+	if legacy != null and legacy.visible:
+		_fail("Casual mode entry must not show LegacyRunScreen")
 		return
 
-	seen_paths.clear()
+	var start_button = dog_select.find_child("StartRunButton", true, false) as Button
+	if start_button == null:
+		_fail("Standalone dog_select screen must expose StartRunButton")
+		return
 	start_button.pressed.emit()
-	if not await _wait_for_path("/runs"):
+	var posted_runs := false
+	for _frame in range(600):
+		if fake_api_node != null and fake_api_node.seen_paths.has("/runs"):
+			posted_runs = true
+			break
+		await process_frame
+	if not posted_runs:
 		_fail("Start-run confirmation should POST /runs")
 		return
-	if not await _wait_for_idle(legacy):
+	var body: Dictionary = fake_api_node.seen_bodies.get("/runs", {})
+	if str(body.get("mode", "")) != "CASUAL" or str(body.get("dogType", "")) != "SHIBA":
+		_fail("Start-run confirmation should send Web dog-select payload, got %s" % str(body))
+		return
+	var became_idle := false
+	for _frame in range(600):
+		if dog_select != null and not bool(dog_select.get("action_in_progress")):
+			became_idle = true
+			break
+		await process_frame
+	if not became_idle:
 		_fail("Start-run confirmation should finish refreshing")
 		return
-	if not await _wait_for_run(main):
-		_fail("Start-run confirmation should create a playable CASUAL run; /runs response=%s store=%s" % [
-			str(seen_responses.get("/runs", {})),
-			_run_store_debug(main),
-		])
+	var created_run := false
+	for _frame in range(600):
+		var run_store = main.get("run_store")
+		if run_store != null and run_store.has_method("has_run") and run_store.has_run():
+			var run: Dictionary = run_store.get("run")
+			if str(run.get("mode", "")) == "CASUAL":
+				created_run = true
+				break
+		await process_frame
+	if not created_run:
+		_fail("Start-run confirmation should create a playable CASUAL run; store=%s" % _run_store_debug(main))
 		return
-	if str(router.get("current_screen_id")) != "legacy_run":
-		_fail("Created run should stay in playable run shell")
+	var reached_run_shop := false
+	for _frame in range(240):
+		if str(router.get("current_screen_id")) == "run_shop":
+			reached_run_shop = true
+			break
+		await process_frame
+	if not reached_run_shop:
+		_fail("Created CASUAL run should route to standalone run_shop screen, got %s" % str(router.get("current_screen_id")))
 		return
 	if main.get_node_or_null("ScreenRoot/ModeLobbyScreen").visible:
 		_fail("Created run must hide ModeLobbyScreen")
 		return
-	if legacy.find_child("PlaceholderPanel", true, false) != null:
-		_fail("Created run must not show placeholder content")
+	if dog_select.visible:
+		_fail("Created run must hide DogSelectScreen")
+		return
+	if legacy != null and legacy.visible:
+		_fail("Created run must not show LegacyRunScreen")
+		return
+	var run_shop = main.get_node_or_null("ScreenRoot/RunShopScreen")
+	if run_shop == null or run_shop.find_child("PlaceholderPanel", true, false) != null:
+		_fail("Created run must show real standalone RunShopScreen content")
 		return
 
 	main.queue_free()
@@ -71,101 +173,6 @@ func _run() -> void:
 		await process_frame
 	print("Godot casual UI create run smoke passed")
 	quit(0)
-
-func _new_logged_in_main() -> Node:
-	var main_scene = load("res://scenes/Main.tscn")
-	if main_scene == null:
-		_fail("Main scene failed to load")
-		return null
-	var main = main_scene.instantiate()
-	main_node = main
-	root.add_child(main)
-	await process_frame
-	await process_frame
-	var router = main.get("router")
-	var login_screen = main.get_node_or_null("ScreenRoot/LoginScreen")
-	if router == null or login_screen == null:
-		_fail("Main must expose router and LoginScreen")
-		return null
-	var api = main.get("api")
-	if api == null or not api.has_signal("request_finished"):
-		_fail("Main API client must emit request_finished")
-		return null
-	api.request_finished.connect(func(path: String, _ok: bool, _status: int, _payload: Dictionary) -> void:
-		seen_paths[path] = true
-		seen_responses[path] = {"ok": _ok, "status": _status, "payload": _payload}
-	)
-	var account_input = login_screen.get_node_or_null("%AccountInput") as LineEdit
-	var password_input = login_screen.get_node_or_null("%PasswordInput") as LineEdit
-	if account_input == null or password_input == null:
-		_fail("LoginScreen must expose account and password inputs")
-		return null
-	account_input.text = "godot-casual-ui-%d-%d" % [int(Time.get_unix_time_from_system()), Time.get_ticks_usec()]
-	password_input.text = "dogdice"
-	await login_screen.call("_on_register_pressed")
-	if not await _wait_for_screen(router, "nickname_setup"):
-		var error_label = login_screen.get_node_or_null("%ErrorLabel")
-		var error_text := str(error_label.text) if error_label != null else ""
-		_fail("Register should route to nickname setup, got %s error=%s" % [str(router.get("current_screen_id")), error_text])
-		return null
-	var nickname_input := _find_line_edit(main.get_node_or_null("ScreenRoot/NicknameSetupScreen"))
-	if nickname_input == null:
-		_fail("NicknameSetupScreen must expose nickname input")
-		return null
-	nickname_input.text = "CasualUiSmoke"
-	await main.get_node_or_null("ScreenRoot/NicknameSetupScreen").call("_submit_nickname")
-	return main
-
-func _wait_for_screen(router: Node, screen_id: String) -> bool:
-	for _frame in range(240):
-		if str(router.get("current_screen_id")) == screen_id:
-			return true
-		await process_frame
-	return false
-
-func _wait_for_path(path: String) -> bool:
-	for _frame in range(600):
-		if seen_paths.has(path):
-			return true
-		await process_frame
-	return false
-
-func _wait_for_run(main: Node) -> bool:
-	for _frame in range(600):
-		var run_store = main.get("run_store")
-		if run_store != null and run_store.has_method("has_run") and run_store.has_run():
-			var run: Dictionary = run_store.get("run")
-			if str(run.get("mode", "")) == "CASUAL":
-				return true
-		await process_frame
-	return false
-
-func _wait_for_idle(node: Node) -> bool:
-	for _frame in range(600):
-		if node != null and not bool(node.get("action_in_progress")):
-			return true
-		await process_frame
-	return false
-
-func _find_line_edit(node: Node) -> LineEdit:
-	if node == null:
-		return null
-	if node is LineEdit:
-		return node as LineEdit
-	for child in node.get_children():
-		var result := _find_line_edit(child)
-		if result != null:
-			return result
-	return null
-
-func _find_button_containing(node: Node, text: String) -> Button:
-	if node is Button and (node as Button).text.contains(text):
-		return node as Button
-	for child in node.get_children():
-		var result := _find_button_containing(child, text)
-		if result != null:
-			return result
-	return null
 
 func _run_store_debug(main: Node) -> String:
 	var run_store = main.get("run_store")

@@ -35,6 +35,24 @@ func _run() -> void:
 		_fail("Direct router display of mode_lobby must not show a placeholder panel")
 		return
 
+	router.call("show_screen", "dog_select", false)
+	await process_frame
+	await process_frame
+	if str(router.get("current_screen_id")) != "dog_select":
+		_fail("Direct router display of dog_select should stay on standalone dog_select, got %s" % str(router.get("current_screen_id")))
+		return
+	var dog_select = main.get_node_or_null("ScreenRoot/DogSelectScreen")
+	if dog_select == null or not dog_select.visible:
+		_fail("Direct router display of dog_select should show DogSelectScreen")
+		return
+	for node_name in ["DogSelectScreen", "DogCardGrid", "DogDetailPanel", "StartRunButton"]:
+		if dog_select.find_child(node_name, true, false) == null:
+			_fail("DogSelectScreen must show the Web dog select page: %s" % node_name)
+			return
+	if _any_visible_placeholder(main):
+		_fail("Direct router display of dog_select must not show a placeholder panel")
+		return
+
 	router.call("show_screen", "account", false)
 	await process_frame
 	await process_frame

@@ -414,7 +414,7 @@ func open_screen(screen_id: String) -> bool:
 	return false
 
 func open_run_lobby(preferred_mode := "CASUAL") -> bool:
-	_show_playable_lobby_screen(preferred_mode)
+	_show_dog_select_screen(preferred_mode)
 	return true
 
 func replay_tutorial() -> bool:
@@ -672,6 +672,17 @@ func _show_mode_lobby_screen() -> void:
 	router.show_screen(WebUiScreenIds.MODE_LOBBY, false)
 	_apply_payload_to_screen(WebUiScreenIds.MODE_LOBBY)
 	call_deferred("_refresh_mode_lobby_payload")
+
+func _show_dog_select_screen(preferred_mode := "CASUAL") -> Node:
+	if router == null:
+		return null
+	router.show_screen(WebUiScreenIds.DOG_SELECT, false)
+	var payload := _screen_payload()
+	payload["mode"] = preferred_mode
+	var dog_select := get_node_or_null("ScreenRoot/%s" % WebUiScreenIds.node_name_for(WebUiScreenIds.DOG_SELECT))
+	if dog_select != null and dog_select.has_method("set_payload"):
+		dog_select.call("set_payload", payload)
+	return dog_select
 
 func _show_leaderboards_screen() -> void:
 	if router == null:
