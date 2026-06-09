@@ -1313,9 +1313,12 @@ func _battle_review_damage(battle: Dictionary, side_aliases: Array) -> int:
 
 func _render_inventory_board(parent: VBoxContainer, run: Dictionary, include_toolbar: bool) -> void:
 	parent.name = "InventoryBoard"
+	parent.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	parent.add_theme_constant_override("separation", 8)
 	if include_toolbar:
 		var toolbar := HBoxContainer.new()
 		toolbar.name = "InventoryToolbar"
+		toolbar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		toolbar.add_theme_constant_override("separation", 8)
 		parent.add_child(toolbar)
 		toolbar.add_child(_action_button("查看选中详情", _show_selected_detail_modal))
@@ -1323,24 +1326,37 @@ func _render_inventory_board(parent: VBoxContainer, run: Dictionary, include_too
 			toolbar.add_child(_run_action_button("出售选中装备", _call_selected_item.bind("sell_item")))
 		if _can_upgrade_item_action(run, selected_item_id):
 			toolbar.add_child(_run_action_button("合成升级选中", _call_selected_item.bind("upgrade_item")))
-		_add_line(parent, "当前选中", _fallback(selected_item_label, "无"))
+		var selected_line := Label.new()
+		selected_line.name = "InventorySelectedLine"
+		selected_line.text = "当前选中：%s" % _fallback(selected_item_label, "无")
+		selected_line.custom_minimum_size = Vector2(0, 28)
+		selected_line.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		selected_line.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		selected_line.add_theme_color_override("font_color", UiTokens.ink_color())
+		parent.add_child(selected_line)
 	var equipment := VBoxContainer.new()
 	equipment.name = "EquipmentBoard"
 	equipment.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	equipment.add_theme_constant_override("separation", 6)
 	parent.add_child(equipment)
 	_render_item_grid(equipment, "装备栏", "EQUIPMENT", run, _equipment_slot_count(run))
+	var bag_relic_row := HBoxContainer.new()
+	bag_relic_row.name = "BagRelicRow"
+	bag_relic_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	bag_relic_row.add_theme_constant_override("separation", 12)
+	parent.add_child(bag_relic_row)
 	var relic_rail := VBoxContainer.new()
 	relic_rail.name = "RelicRail"
-	relic_rail.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	relic_rail.custom_minimum_size = Vector2(220, 0)
+	relic_rail.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	relic_rail.add_theme_constant_override("separation", 6)
-	parent.add_child(relic_rail)
+	bag_relic_row.add_child(relic_rail)
 	_render_relic_rail(relic_rail, run)
 	var bag := VBoxContainer.new()
 	bag.name = "BagBoard"
 	bag.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	bag.add_theme_constant_override("separation", 6)
-	parent.add_child(bag)
+	bag_relic_row.add_child(bag)
 	_render_item_grid(bag, "背包", "BAG", run, 12)
 	if include_toolbar and not selected_relic_id.is_empty():
 		parent.add_child(_run_action_button("出售选中遗物", _call_session.bind("sell_relic", [selected_relic_id])))
@@ -4849,49 +4865,116 @@ func _available_map_nodes(map_state: Dictionary) -> Array:
 			result.append(node)
 	return result
 
+func _inventory_area_prefix(area: String) -> String:
+	return "Equipment" if area == "EQUIPMENT" else "Bag"
+
+func _inventory_grid_subtitle(area: String, slot_count: int) -> String:
+	if area == "BAG":
+		return "%d 格单行，战斗中默认不生效" % slot_count
+	return "%d 格单行，从左向右触发" % slot_count
+
+func _node_key(value: String) -> String:
+	var key := value
+	for part in ["/", "\\", ":", " ", ".", "\n", "\t"]:
+		key = key.replace(part, "_")
+	return key
+
 func _render_item_grid(parent: VBoxContainer, title: String, area: String, run: Dictionary, slot_count: int) -> void:
-	_add_line(parent, title, "%d 格固定槽位，从左向右触发" % slot_count)
+	var prefix := _inventory_area_prefix(area)
+	var panel := PanelContainer.new()
+	panel.name = "%sGridPanel" % prefix
+	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	panel.add_theme_stylebox_override("panel", UiTokens.paper_panel_style())
+	parent.add_child(panel)
+	var box := VBoxContainer.new()
+	box.name = "%sGridPanelContent" % prefix
+	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	box.add_theme_constant_override("separation", 6)
+	panel.add_child(box)
+	var heading := VBoxContainer.new()
+	heading.name = "%sGridHeading" % prefix
+	heading.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	heading.add_theme_constant_override("separation", 2)
+	box.add_child(heading)
+	_add_plain_line(heading, title)
+	_add_plain_line(heading, _inventory_grid_subtitle(area, slot_count))
 	var grid := GridContainer.new()
+	grid.name = "%sSlotGrid" % prefix
 	grid.columns = min(12, slot_count)
+	grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	grid.add_theme_constant_override("h_separation", 4)
 	grid.add_theme_constant_override("v_separation", 4)
-	parent.add_child(grid)
+	box.add_child(grid)
 	var items: Array = _array(run, "items")
 	for x in range(slot_count):
 		var item: Dictionary = _item_at_slot(items, area, x)
+		var slot := VBoxContainer.new()
+		slot.name = "%sSlot_%s_%d_0" % [prefix, area, x]
+		slot.custom_minimum_size = Vector2(58, 64)
+		slot.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 		var button := _button(_slot_label(item, x), 58)
+		button.name = "%sEmpty_%s_%d_0" % [prefix, area, x]
 		button.custom_minimum_size = Vector2(58, 64)
 		button.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 		if item.is_empty():
 			button.pressed.connect(_move_selected_to.bind(area, x, 0))
 		else:
+			button.name = "%sItem_%s" % [prefix, _node_key(str(item.get("id", item.get("defId", x))))]
 			var label := _item_label(item)
 			_apply_button_icon(button, _item_texture(item))
 			button.pressed.connect(_select_reward_target_or_item.bind(item, label))
-		grid.add_child(button)
+		slot.add_child(button)
+		grid.add_child(slot)
 
 func _render_relic_rail(parent: VBoxContainer, run: Dictionary) -> void:
 	var relics: Array = _array(run, "relics")
-	_add_line(parent, "遗物", "6槽，重复获得升级 · 已拥有 %d 个" % relics.size())
+	var heading := VBoxContainer.new()
+	heading.name = "RelicGridHeading"
+	heading.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	heading.add_theme_constant_override("separation", 2)
+	parent.add_child(heading)
+	_add_plain_line(heading, "遗物")
+	_add_plain_line(heading, "6槽，重复获得升级 · 已拥有 %d 个" % relics.size())
 	var grid := GridContainer.new()
-	grid.columns = 6
+	grid.name = "RelicSlotGrid"
+	grid.columns = 2
+	grid.custom_minimum_size = Vector2(180, 232)
 	grid.add_theme_constant_override("h_separation", 4)
 	grid.add_theme_constant_override("v_separation", 4)
 	parent.add_child(grid)
 	for slot in range(6):
 		var relic: Dictionary = _relic_at_slot(relics, slot)
+		var slot_box := VBoxContainer.new()
+		slot_box.name = "RelicSlot_%d" % slot
+		slot_box.custom_minimum_size = Vector2(82, 68)
+		slot_box.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 		var button := _button(_relic_slot_label(relic, slot), 82)
+		button.name = "RelicEmptyButton_%d" % slot
 		button.custom_minimum_size = Vector2(82, 68)
 		button.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 		if relic.is_empty():
 			button.disabled = true
+			var empty_mark := Label.new()
+			empty_mark.name = "RelicEmptyMark_%d" % slot
+			empty_mark.text = ""
+			empty_mark.custom_minimum_size = Vector2(0, 1)
+			slot_box.add_child(empty_mark)
 		else:
+			var relic_id := _node_key(str(relic.get("id", relic.get("relicId", slot))))
+			button.name = "RelicIconButton_%s" % relic_id
 			var relic_def: Dictionary = _dict(relic, "def")
 			var name := _fallback(str(relic_def.get("name", "")), str(relic.get("relicId", "")))
-		var label := "遗物：%s  %s" % [name, _quality_label(str(relic.get("quality", "")))]
-		_apply_button_icon(button, _relic_texture(relic))
-		button.pressed.connect(_open_relic_from_rail.bind(relic, label))
-		grid.add_child(button)
+			var label := "遗物：%s  %s" % [name, _quality_label(str(relic.get("quality", "")))]
+			_apply_button_icon(button, _relic_texture(relic))
+			button.pressed.connect(_open_relic_from_rail.bind(relic, label))
+			var quality_dot := Label.new()
+			quality_dot.name = "RelicQualityDot_%s" % relic_id
+			quality_dot.text = _quality_label(str(relic.get("quality", "")))
+			quality_dot.custom_minimum_size = Vector2(0, 1)
+			quality_dot.add_theme_color_override("font_color", UiTokens.ink_color())
+			slot_box.add_child(quality_dot)
+		slot_box.add_child(button)
+		grid.add_child(slot_box)
 
 func _map_current_node(map_state: Dictionary) -> Dictionary:
 	var current_node_id := str(map_state.get("currentNodeId", ""))
