@@ -30,19 +30,20 @@ func _run() -> void:
 	screen.call("_mark_replay_complete")
 	screen.set("event_index", 1)
 	await process_frame
-	var finish_button: Button = screen.get_node("%FinishButton")
+	var finish_button: Button = screen.get("finish_button")
 	var restart_button: Button = screen.get("restart_button")
+	var continue_button: Button = screen.get("continue_button")
 	var speed_buttons: Dictionary = screen.get("speed_buttons")
-	if restart_button == null or speed_buttons.is_empty():
-		_fail("Battle replay must expose restart and speed controls")
+	if finish_button == null or restart_button == null or continue_button == null or speed_buttons.is_empty():
+		_fail("Battle replay must expose finish, continue, restart, and speed controls")
 		return
 	screen.call("_on_finish_pressed")
 	await process_frame
 	if not session.started or not bool(screen.get("finish_in_progress")):
 		_fail("Finish action must enter an in-flight state")
 		return
-	if not finish_button.disabled or not restart_button.disabled:
-		_fail("Finish action must disable completion and restart controls while in flight")
+	if not finish_button.disabled or not continue_button.disabled or not restart_button.disabled:
+		_fail("Finish action must disable completion, continue, and restart controls while in flight")
 		return
 	for speed in speed_buttons.keys():
 		var button = speed_buttons[speed]

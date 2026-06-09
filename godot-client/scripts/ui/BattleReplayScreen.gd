@@ -82,6 +82,8 @@ var player_review_label: Label
 var opponent_review_label: Label
 var system_review_label: Label
 var restart_button: Button
+var continue_row: PanelContainer
+var continue_button: Button
 var log_toggle_button: Button
 var log_filter_row: HBoxContainer
 
@@ -121,6 +123,10 @@ func start_replay(next_battle: Dictionary) -> void:
 	skip_button.disabled = false
 	if restart_button != null:
 		restart_button.disabled = true
+	if continue_row != null:
+		continue_row.visible = false
+	if continue_button != null:
+		continue_button.disabled = true
 	log_view.visible = false
 	log_view.text = ""
 	if review_panel != null:
@@ -230,6 +236,10 @@ func _on_restart_pressed() -> void:
 	skip_button.disabled = false
 	if restart_button != null:
 		restart_button.disabled = true
+	if continue_row != null:
+		continue_row.visible = false
+	if continue_button != null:
+		continue_button.disabled = true
 	log_view.text = ""
 	log_view.visible = false
 	if review_panel != null:
@@ -266,6 +276,10 @@ func _mark_replay_complete() -> void:
 	finish_button.disabled = false
 	if restart_button != null:
 		restart_button.disabled = false
+	if continue_row != null:
+		continue_row.visible = true
+	if continue_button != null:
+		continue_button.disabled = false
 	_render_battle_review()
 	replay_finished.emit()
 
@@ -404,6 +418,11 @@ func _build_web_battle_layout() -> void:
 	system_review_label = review["system"]
 	root.add_child(review_panel)
 
+	var continue_controls := _build_continue_row()
+	continue_row = continue_controls["row"]
+	continue_button = continue_controls["button"]
+	root.add_child(continue_row)
+
 	restart_button = Button.new()
 	restart_button.text = "Replay"
 	restart_button.custom_minimum_size = Vector2(82, 44)
@@ -528,6 +547,12 @@ func _build_battle_layout() -> void:
 	root.add_child(review_panel)
 	root.move_child(review_panel, 4)
 
+	var continue_controls := _build_continue_row()
+	continue_row = continue_controls["row"]
+	continue_button = continue_controls["button"]
+	root.add_child(continue_row)
+	root.move_child(continue_row, 5)
+
 	var speed_label := Label.new()
 	speed_label.text = "速度"
 	speed_label.custom_minimum_size = Vector2(42, 44)
@@ -591,6 +616,26 @@ func _review_side_label(title: String) -> Label:
 	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	return label
+
+func _build_continue_row() -> Dictionary:
+	var row := PanelContainer.new()
+	row.name = "BattleContinueRow"
+	row.visible = false
+	row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.custom_minimum_size = Vector2(0, 58)
+	var box := HBoxContainer.new()
+	box.name = "BattleContinueContent"
+	box.alignment = BoxContainer.ALIGNMENT_CENTER
+	box.add_theme_constant_override("separation", 8)
+	row.add_child(box)
+	var button := Button.new()
+	button.name = "BattleContinueButton"
+	button.text = "继续"
+	button.custom_minimum_size = Vector2(132, 44)
+	button.disabled = true
+	button.pressed.connect(_on_finish_pressed)
+	box.add_child(button)
+	return {"row": row, "button": button}
 
 func _snapshot_panel(title: String, prefix: String) -> Dictionary:
 	var panel := PanelContainer.new()
@@ -1599,6 +1644,10 @@ func _restore_replay_controls() -> void:
 		finish_button.disabled = finish_in_progress or not replay_complete
 	if restart_button != null:
 		restart_button.disabled = finish_in_progress or not replay_complete
+	if continue_button != null:
+		continue_button.disabled = finish_in_progress or not replay_complete
+	if continue_row != null:
+		continue_row.visible = replay_complete
 
 func _item_at_slot(items: Array, area: String, x: int) -> Dictionary:
 	for item in items:
