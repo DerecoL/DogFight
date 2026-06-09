@@ -649,7 +649,7 @@ func _render_web_map_run(run: Dictionary) -> void:
 	_add_plain_line(title, "探索地图")
 	var map_state: Dictionary = _dict(run, "mapState")
 	var layer_count := _map_layer_count(map_state)
-	_add_plain_line(title, "第 %d 张地图 · 共 %d 层" % [int(map_state.get("mapIndex", 0)) + 1, layer_count])
+	_add_plain_line(title, "第 %d 张地图 · 第 %d / %d 层" % [int(map_state.get("mapIndex", 0)) + 1, min(layer_count, _map_current_layer(map_state) + 1), layer_count])
 	var stats := HBoxContainer.new()
 	stats.name = "MapRunStats"
 	stats.add_theme_constant_override("separation", 8)
@@ -670,11 +670,29 @@ func _render_web_map_run(run: Dictionary) -> void:
 	canvas.custom_minimum_size = Vector2(520, 390)
 	canvas.add_theme_constant_override("separation", 8)
 	route_board.add_child(canvas)
+	var marker_row := HBoxContainer.new()
+	marker_row.name = "MapLayerMarkerRow"
+	marker_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	marker_row.add_theme_constant_override("separation", 8)
+	canvas.add_child(marker_row)
+	for layer in range(layer_count):
+		var marker := Label.new()
+		marker.name = "MapLayerMarker_%d" % layer
+		marker.text = str(layer + 1)
+		marker.custom_minimum_size = Vector2(42, 28)
+		marker.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		marker.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		marker.add_theme_color_override("font_color", UiTokens.ink_color())
+		marker_row.add_child(marker)
 	var route_layer := VBoxContainer.new()
 	route_layer.name = "MapRouteLayer"
 	route_layer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	route_layer.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	canvas.add_child(route_layer)
+	var svg_layer := Control.new()
+	svg_layer.name = "MapRouteSvg"
+	svg_layer.custom_minimum_size = Vector2(0, 1)
+	route_layer.add_child(svg_layer)
 	_render_map_route(route_layer, map_state)
 	var toolbar := HBoxContainer.new()
 	toolbar.name = "MapDrawingToolbar"
@@ -691,36 +709,65 @@ func _render_web_map_run(run: Dictionary) -> void:
 	detail.add_theme_constant_override("separation", 8)
 	route_board.add_child(detail)
 	_render_map_detail_panel(detail, map_state)
-	var reward_inventory := VBoxContainer.new()
-	reward_inventory.name = "MapRewardInventory"
-	reward_inventory.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	reward_inventory.add_theme_constant_override("separation", 8)
-	shell.add_child(reward_inventory)
-	var inventory := VBoxContainer.new()
-	inventory.name = "InventoryBoard"
-	inventory.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	inventory.add_theme_constant_override("separation", 8)
-	reward_inventory.add_child(inventory)
-	_render_inventory_board(inventory, run, true)
+	if not _dict(map_state, "pendingReward").is_empty():
+		var reward_inventory := VBoxContainer.new()
+		reward_inventory.name = "MapRewardInventory"
+		reward_inventory.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		reward_inventory.add_theme_constant_override("separation", 8)
+		shell.add_child(reward_inventory)
+		var inventory := VBoxContainer.new()
+		inventory.name = "InventoryBoard"
+		inventory.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		inventory.add_theme_constant_override("separation", 8)
+		reward_inventory.add_child(inventory)
+		_render_inventory_board(inventory, run, true)
 
 func _render_map_detail_panel(parent: VBoxContainer, map_state: Dictionary) -> void:
-	var current_node := _map_current_node(map_state)
+	var current_node := _map_selected_node(map_state)
 	if str(current_node.get("kind", "")) == "EVENT" and not _dict(current_node, "event").is_empty():
+		var event_card := _map_side_card(parent, "MapCurrentEvent")
 		var event: Dictionary = _dict(current_node, "event")
-		_add_plain_line(parent, _fallback(str(event.get("title", "")), "事件"))
-		_add_plain_line(parent, str(event.get("description", "")))
-		parent.add_child(_run_action_button("处理事件", _call_session.bind("resolve_map_event", [])))
-	if not _dict(map_state, "pendingReward").is_empty():
-		_add_plain_line(parent, "待领取掉落")
-		parent.add_child(_run_action_button("领取怪物奖励", _call_session.bind("claim_monster_reward", [])))
-		parent.add_child(_run_action_button("跳过怪物奖励", _call_session.bind("skip_monster_reward", [])))
+		_add_plain_line(event_card, _fallback(str(event.get("title", "")), "事件"))
+		_add_plain_line(event_card, str(event.get("description", "")))
+		var event_action := _run_action_button("处理事件", _call_session.bind("resolve_map_event", []))
+		event_action.name = "ResolveMapEventButton"
+		event_card.add_child(event_action)
+	var pending_reward: Dictionary = _dict(map_state, "pendingReward")
+	if not pending_reward.is_empty():
+		var reward_card := _map_side_card(parent, "MapCurrentReward")
+		var reward_copy := VBoxContainer.new()
+		reward_copy.name = "MapRewardCopy"
+		reward_copy.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		reward_copy.add_theme_constant_override("separation", 4)
+		reward_card.add_child(reward_copy)
+		_add_plain_line(reward_copy, "待领取掉落")
+		_add_plain_line(reward_copy, _map_reward_label(pending_reward))
+		var reward_actions := HBoxContainer.new()
+		reward_actions.name = "MapRewardActions"
+		reward_actions.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		reward_actions.add_theme_constant_override("separation", 8)
+		reward_card.add_child(reward_actions)
+		var claim_button := _run_action_button("领取怪物奖励", _call_session.bind("claim_monster_reward", []))
+		claim_button.name = "ClaimMonsterRewardButton"
+		reward_actions.add_child(claim_button)
+		var skip_button := _run_action_button("跳过怪物奖励", _call_session.bind("skip_monster_reward", []))
+		skip_button.name = "SkipMonsterRewardButton"
+		reward_actions.add_child(skip_button)
 	if not current_node.is_empty():
-		_add_plain_line(parent, _map_node_title(current_node))
+		var detail := _map_side_card(parent, "MapSelectedNodeDetail")
+		var kicker := Label.new()
+		kicker.name = "MapNodeDetailKicker"
+		kicker.text = "第 %d 层" % (int(current_node.get("layer", 0)) + 1)
+		kicker.custom_minimum_size = Vector2(0, 24)
+		kicker.add_theme_color_override("font_color", UiTokens.ink_color())
+		detail.add_child(kicker)
+		_add_plain_line(detail, _map_node_title(current_node))
 		var monster: Dictionary = _dict(current_node, "monster")
 		if not monster.is_empty():
-			_add_line(parent, "对手", "%s · %s" % [str(monster.get("name", "")), _dog_name(str(monster.get("dogType", "")))])
-			_render_map_monster_equipment(parent, monster)
-			_render_map_reward_preview(parent, _variant_array(monster.get("possibleRewards", [])))
+			_add_line(detail, "对手", "%s · %s" % [str(monster.get("name", "")), _dog_name(str(monster.get("dogType", "")))])
+			_render_map_monster_equipment(detail, monster)
+			_render_map_reward_preview(detail, _variant_array(monster.get("possibleRewards", [])))
+		_add_plain_line(detail, _map_node_state_text(current_node, map_state))
 
 func _map_layer_count(map_state: Dictionary) -> int:
 	var count := 1
@@ -728,6 +775,14 @@ func _map_layer_count(map_state: Dictionary) -> int:
 		if node is Dictionary:
 			count = max(count, int((node as Dictionary).get("layer", 0)) + 1)
 	return count
+
+func _map_current_layer(map_state: Dictionary) -> int:
+	var current := 0
+	for node_id in _variant_array(map_state.get("completedNodeIds", [])):
+		for node in _array(map_state, "nodes"):
+			if node is Dictionary and str((node as Dictionary).get("id", "")) == str(node_id):
+				current = max(current, int((node as Dictionary).get("layer", 0)) + 1)
+	return current
 
 func _render_web_shop_run(run: Dictionary) -> void:
 	var root := _render_playable_root()
@@ -4706,6 +4761,48 @@ func _map_current_node(map_state: Dictionary) -> Dictionary:
 			return node as Dictionary
 	return {}
 
+func _map_selected_node(map_state: Dictionary) -> Dictionary:
+	var current := _map_current_node(map_state)
+	if not current.is_empty():
+		return current
+	var available := _variant_array(map_state.get("availableNodeIds", []))
+	for node_id in available:
+		for node in _array(map_state, "nodes"):
+			if node is Dictionary and str((node as Dictionary).get("id", "")) == str(node_id):
+				return node as Dictionary
+	var nodes := _array(map_state, "nodes")
+	if not nodes.is_empty() and nodes[0] is Dictionary:
+		return nodes[0] as Dictionary
+	return {}
+
+func _map_side_card(parent: VBoxContainer, node_name: String) -> VBoxContainer:
+	var panel := PanelContainer.new()
+	panel.name = "%sPanel" % node_name
+	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	panel.add_theme_stylebox_override("panel", UiTokens.paper_panel_style())
+	parent.add_child(panel)
+	var card := VBoxContainer.new()
+	card.name = node_name
+	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	card.add_theme_constant_override("separation", 8)
+	panel.add_child(card)
+	return card
+
+func _map_reward_label(reward: Dictionary) -> String:
+	var def: Dictionary = _dict(reward, "def")
+	var name := _fallback(str(def.get("name", "")), str(reward.get("defId", "")))
+	return "%s · %s" % [name, _quality_label(str(reward.get("quality", "")))]
+
+func _map_node_state_text(node: Dictionary, map_state: Dictionary) -> String:
+	var node_id := str(node.get("id", ""))
+	if _variant_array(map_state.get("availableNodeIds", [])).has(node_id):
+		return "前往"
+	if str(map_state.get("currentNodeId", "")) == node_id:
+		return "当前处理中"
+	if _variant_array(map_state.get("completedNodeIds", [])).has(node_id):
+		return "已完成"
+	return "路线未解锁"
+
 func _render_map_route(parent: VBoxContainer, map_state: Dictionary) -> void:
 	var nodes: Array = _array(map_state, "nodes")
 	if nodes.is_empty():
@@ -4761,6 +4858,7 @@ func _map_node_button(node: Dictionary, available: Array, completed: Array, curr
 	var state := "可进入" if available_state else ("当前" if current_state else ("已完成" if completed_state else "未解锁"))
 	var text := "%s\n%s" % [_map_node_title(node), state]
 	var button := _button(text, 86)
+	button.name = "MapNodeButton_%s" % node_id
 	button.custom_minimum_size = Vector2(86, 74)
 	button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_apply_button_icon(button, _map_texture(str(node.get("kind", ""))))
@@ -4817,16 +4915,24 @@ func _render_map_monster_equipment(parent: VBoxContainer, monster: Dictionary) -
 		grid.add_child(button)
 
 func _render_map_reward_preview(parent: VBoxContainer, rewards: Array) -> void:
+	var links := VBoxContainer.new()
+	links.name = "MapRewardPreviewLinks"
+	links.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	links.add_theme_constant_override("separation", 6)
+	parent.add_child(links)
 	var label := Label.new()
-	label.text = "可能掉落"
+	label.name = "MapRewardPreviewKicker"
+	label.text = "预期掉落"
 	label.custom_minimum_size = Vector2(0, 28)
 	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	parent.add_child(label)
+	label.add_theme_color_override("font_color", UiTokens.ink_color())
+	links.add_child(label)
 	var row := HBoxContainer.new()
+	row.name = "MapRewardPreviewRow"
 	row.add_theme_constant_override("separation", 6)
-	parent.add_child(row)
+	links.add_child(row)
 	if rewards.is_empty():
-		_add_line(parent, "", "暂无可预览掉落")
+		_add_line(links, "", "预期掉落：暂无明确装备")
 		return
 	for reward in rewards.slice(0, 8):
 		if reward is Dictionary:
