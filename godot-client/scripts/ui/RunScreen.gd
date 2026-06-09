@@ -538,6 +538,13 @@ func _render_run_tab() -> void:
 		_render_web_shop_run(run)
 		_maybe_show_reward_ceremony(run)
 		return
+	if phase == "CHOICE":
+		_render_web_shop_choice_run(run)
+		return
+	if ["CLASS_REWARD", "RELIC_CHOICE", "UPGRADE_CHOICE", "ENCHANT_CHOICE", "POTION_CHOICE"].has(phase):
+		_render_web_reward_run(run)
+		_maybe_show_reward_ceremony(run)
+		return
 	var summary := _section("当前跑局")
 	_add_line(summary, "阶段", "%s / %s" % [_run_phase_label(str(run.get("phase", ""))), _run_status_label(str(run.get("status", "")))])
 	_add_line(summary, "犬种", "%s  幸运号 %s" % [_dog_name(str(run.get("dogType", ""))), str(run.get("luckyNumber", "-"))])
@@ -767,6 +774,283 @@ func _render_web_shop_run(run: Dictionary) -> void:
 	inventory.add_theme_constant_override("separation", 8)
 	workbench.add_child(inventory)
 	_render_inventory_board(inventory, run, true)
+
+func _render_screen_heading(parent: VBoxContainer, title: String, description: String) -> void:
+	var heading := VBoxContainer.new()
+	heading.name = "ScreenHeading"
+	heading.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	heading.add_theme_constant_override("separation", 4)
+	parent.add_child(heading)
+	var title_label := Label.new()
+	title_label.text = title
+	title_label.custom_minimum_size = Vector2(0, 32)
+	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	title_label.add_theme_color_override("font_color", UiTokens.ink_color())
+	heading.add_child(title_label)
+	var description_label := Label.new()
+	description_label.text = description
+	description_label.custom_minimum_size = Vector2(0, 28)
+	description_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	description_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	description_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	description_label.add_theme_color_override("font_color", UiTokens.ink_color())
+	heading.add_child(description_label)
+
+func _render_web_shop_choice_run(run: Dictionary) -> void:
+	var root := _render_playable_root()
+	_render_run_summary_topbar(root, run)
+	var screen := VBoxContainer.new()
+	screen.name = "ShopChoiceScreen"
+	screen.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	screen.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	screen.add_theme_constant_override("separation", 12)
+	root.add_child(screen)
+	_render_screen_heading(screen, "选择本回合要访问的商店", "不同商店提供不同类型的道具，选择适合你战术的商店")
+	var grid := GridContainer.new()
+	grid.name = "ChoiceGrid"
+	grid.columns = 3
+	grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	grid.add_theme_constant_override("h_separation", 10)
+	grid.add_theme_constant_override("v_separation", 10)
+	screen.add_child(grid)
+	var choices := _array(run, "choices")
+	for index in range(9):
+		if index < choices.size():
+			var shop_type := str(choices[index])
+			var button := _button("%s\n%s\n进入 %s" % [_shop_name(shop_type), _shop_description(shop_type), _shop_name(shop_type)], 0)
+			button.name = "ChoiceCard_%s" % shop_type
+			button.custom_minimum_size = Vector2(176, 126)
+			button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			button.pressed.connect(_call_session.bind("select_shop_choice", [shop_type]))
+			grid.add_child(button)
+		else:
+			var placeholder := Label.new()
+			placeholder.name = "ChoicePlaceholder_%d" % (index + 1)
+			placeholder.text = "空商店位 %d" % (index + 1)
+			placeholder.custom_minimum_size = Vector2(176, 126)
+			placeholder.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+			placeholder.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			grid.add_child(placeholder)
+	var submit := _disabled_action_button("进入商店")
+	submit.name = "ChoiceSubmit"
+	if not choices.is_empty():
+		var first_shop := str(choices[0])
+		submit.text = "进入 %s" % _shop_name(first_shop)
+		submit.disabled = action_in_progress or _room_current_run_action_locked()
+		submit.pressed.connect(_call_session.bind("select_shop_choice", [first_shop]))
+	screen.add_child(submit)
+
+func _render_web_reward_run(run: Dictionary) -> void:
+	var phase := str(run.get("phase", ""))
+	var root := _render_playable_root()
+	_render_run_summary_topbar(root, run)
+	if phase == "RELIC_CHOICE":
+		_render_relic_choice_select(root, run)
+		return
+	var workbench := HBoxContainer.new()
+	workbench.name = "RewardWorkbench"
+	workbench.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	workbench.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	workbench.add_theme_constant_override("separation", 12)
+	root.add_child(workbench)
+	match phase:
+		"CLASS_REWARD":
+			_render_class_reward_select(workbench, run)
+		"UPGRADE_CHOICE":
+			workbench.name = "RewardWorkbench"
+			var upgrade := VBoxContainer.new()
+			upgrade.name = "UpgradeWorkbench"
+			upgrade.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			upgrade.size_flags_vertical = Control.SIZE_EXPAND_FILL
+			workbench.add_child(upgrade)
+			_render_upgrade_choice_select(upgrade, run)
+		"ENCHANT_CHOICE":
+			var enchant := VBoxContainer.new()
+			enchant.name = "EnchantWorkbench"
+			enchant.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			enchant.size_flags_vertical = Control.SIZE_EXPAND_FILL
+			workbench.add_child(enchant)
+			_render_enchant_choice_select(enchant, run)
+		"POTION_CHOICE":
+			var potion := VBoxContainer.new()
+			potion.name = "PotionWorkbench"
+			potion.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			potion.size_flags_vertical = Control.SIZE_EXPAND_FILL
+			workbench.add_child(potion)
+			_render_potion_choice_select(potion, run)
+		_:
+			_render_reward_empty_panel(workbench)
+	if phase != "RELIC_CHOICE":
+		var inventory := VBoxContainer.new()
+		inventory.name = "InventoryBoard"
+		inventory.custom_minimum_size = Vector2(420, 0)
+		inventory.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		inventory.add_theme_constant_override("separation", 8)
+		workbench.add_child(inventory)
+		_render_inventory_board(inventory, run, true)
+
+func _new_reward_panel(parent: VBoxContainer, panel_name: String = "RewardPanel") -> VBoxContainer:
+	var panel := VBoxContainer.new()
+	panel.name = panel_name
+	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	panel.add_theme_constant_override("separation", 10)
+	parent.add_child(panel)
+	return panel
+
+func _render_class_reward_select(parent: HBoxContainer, run: Dictionary) -> void:
+	var selector := VBoxContainer.new()
+	selector.name = "ClassRewardSelect"
+	selector.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	selector.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	parent.add_child(selector)
+	var panel := _new_reward_panel(selector)
+	_render_screen_heading(panel, "选择职业装备", "先整理背包，再选择一个职业装备放入背包。")
+	var grid := GridContainer.new()
+	grid.name = "RewardChoiceGrid"
+	grid.columns = 2
+	grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	grid.add_theme_constant_override("h_separation", 10)
+	grid.add_theme_constant_override("v_separation", 10)
+	panel.add_child(grid)
+	var choices := _array(run, "classRewardChoices")
+	for choice in choices:
+		if choice is Dictionary:
+			var def: Dictionary = _dict(choice, "def")
+			var def_id := str(choice.get("defId", ""))
+			var button := _button("%s\n%s" % [_fallback(str(def.get("name", "")), def_id), _fallback(str(def.get("description", "")), str(choice.get("quality", "")))], 0)
+			button.name = "RewardChoice_%s" % def_id
+			button.custom_minimum_size = Vector2(220, 128)
+			button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			button.pressed.connect(_show_class_reward_modal.bind(choice))
+			grid.add_child(button)
+	var submit := _disabled_action_button("领取职业装备")
+	submit.name = "ChoiceSubmit"
+	if not choices.is_empty() and choices[0] is Dictionary:
+		var first_id := str((choices[0] as Dictionary).get("defId", ""))
+		if not first_id.is_empty():
+			submit.disabled = action_in_progress or _room_current_run_action_locked()
+			submit.pressed.connect(_call_session.bind("select_class_reward", [first_id]))
+	panel.add_child(submit)
+
+func _render_relic_choice_select(parent: VBoxContainer, run: Dictionary) -> void:
+	var selector := VBoxContainer.new()
+	selector.name = "RelicChoiceSelect"
+	selector.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	selector.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	selector.add_theme_constant_override("separation", 10)
+	parent.add_child(selector)
+	var panel := _new_reward_panel(selector)
+	_render_screen_heading(panel, "选择遗物", "免费选择一个遗物；重复遗物会直接升级。")
+	var grid_wrap := VBoxContainer.new()
+	grid_wrap.name = "ChoiceGrid"
+	grid_wrap.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	panel.add_child(grid_wrap)
+	var grid := GridContainer.new()
+	grid.name = "RelicChoiceGrid"
+	grid.columns = 3
+	grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	grid.add_theme_constant_override("h_separation", 10)
+	grid.add_theme_constant_override("v_separation", 10)
+	grid_wrap.add_child(grid)
+	var choices := _array(run, "relicChoices")
+	for choice in choices:
+		if choice is Dictionary:
+			var def: Dictionary = _dict(choice, "def")
+			var relic_id := str(choice.get("relicId", ""))
+			var button := _button("%s\n%s" % [_fallback(str(def.get("name", "")), relic_id), _fallback(str(def.get("description", "")), str(choice.get("quality", "")))], 0)
+			button.name = "RelicChoice_%s" % relic_id
+			button.custom_minimum_size = Vector2(190, 132)
+			button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			button.pressed.connect(_show_relic_choice_modal.bind(choice))
+			grid.add_child(button)
+	var submit := _disabled_action_button("获得遗物")
+	submit.name = "ChoiceSubmit"
+	if not choices.is_empty() and choices[0] is Dictionary:
+		var first_id := str((choices[0] as Dictionary).get("relicId", ""))
+		if not first_id.is_empty():
+			submit.disabled = action_in_progress or _room_current_run_action_locked()
+			submit.pressed.connect(_call_session.bind("select_relic", [first_id]))
+	panel.add_child(submit)
+
+func _render_upgrade_choice_select(parent: VBoxContainer, run: Dictionary) -> void:
+	var panel := _new_reward_panel(parent, "UpgradePanel")
+	var alias := Control.new()
+	alias.name = "RewardPanel"
+	panel.add_child(alias)
+	_render_screen_heading(panel, "选择升级装备", "点击装备栏或背包中可升级的装备，免费提升 1 个品质。")
+	var grid := GridContainer.new()
+	grid.name = "RewardChoiceGrid"
+	grid.columns = 1
+	grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	panel.add_child(grid)
+	var card := _button("%s\n%s" % [_shop_name(str(run.get("shopType", "UPGRADE"))), "选择装备后确认升级"], 0)
+	card.name = "RewardChoice_upgrade"
+	card.custom_minimum_size = Vector2(220, 120)
+	card.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	grid.add_child(card)
+	if selected_item_id.is_empty():
+		panel.add_child(_disabled_action_button("先选中装备再升级"))
+	else:
+		panel.add_child(_run_action_button("升级选中装备", _select_upgrade_item))
+	var submit := _run_action_button("跳过升级", _call_session.bind("skip_upgrade_choice", []))
+	submit.name = "ChoiceSubmit"
+	panel.add_child(submit)
+
+func _render_enchant_choice_select(parent: VBoxContainer, run: Dictionary) -> void:
+	var panel := _new_reward_panel(parent, "EnchantPanel")
+	var alias := Control.new()
+	alias.name = "RewardPanel"
+	panel.add_child(alias)
+	_render_screen_heading(panel, "选择附魔", "选中一个附魔后，点击装备栏或背包中的任意装备施加。")
+	_render_named_choice_grid(panel, _array(run, "enchantChoices"), "RewardChoice_", func(choice: Dictionary) -> String:
+		return str(choice.get("id", ""))
+	, func(choice: Dictionary) -> String:
+		return _enchant_choice_label(choice)
+	, func(choice: Dictionary) -> Callable:
+		return _show_enchant_choice_modal.bind(choice)
+	)
+
+func _render_potion_choice_select(parent: VBoxContainer, run: Dictionary) -> void:
+	var panel := _new_reward_panel(parent, "PotionPanel")
+	var alias := Control.new()
+	alias.name = "RewardPanel"
+	panel.add_child(alias)
+	_render_screen_heading(panel, "选择药水", "先选一瓶药水，再点击一件非职业装备修改基础触发点数。")
+	_render_named_choice_grid(panel, _array(run, "potionChoices"), "RewardChoice_", func(choice: Dictionary) -> String:
+		return str(choice.get("id", ""))
+	, func(choice: Dictionary) -> String:
+		return _potion_choice_label(choice)
+	, func(choice: Dictionary) -> Callable:
+		return _show_potion_choice_modal.bind(choice)
+	)
+
+func _render_named_choice_grid(parent: VBoxContainer, choices: Array, node_prefix: String, id_resolver: Callable, label_resolver: Callable, action_resolver: Callable) -> void:
+	var grid := GridContainer.new()
+	grid.name = "RewardChoiceGrid"
+	grid.columns = 2
+	grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	grid.add_theme_constant_override("h_separation", 10)
+	grid.add_theme_constant_override("v_separation", 10)
+	parent.add_child(grid)
+	for choice in choices:
+		if choice is Dictionary:
+			var choice_id := str(id_resolver.call(choice))
+			var label := str(label_resolver.call(choice))
+			var button := _button(label, 0)
+			button.name = "%s%s" % [node_prefix, choice_id]
+			button.custom_minimum_size = Vector2(220, 112)
+			button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			button.pressed.connect(action_resolver.call(choice))
+			grid.add_child(button)
+
+func _render_reward_empty_panel(parent: HBoxContainer) -> void:
+	var panel := VBoxContainer.new()
+	panel.name = "RewardPanel"
+	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	parent.add_child(panel)
+	_render_screen_heading(panel, "奖励", "暂无可选奖励。")
 
 func _render_inventory_board(parent: VBoxContainer, run: Dictionary, include_toolbar: bool) -> void:
 	parent.name = "InventoryBoard"
