@@ -222,16 +222,22 @@ func _run() -> void:
 		_fail("Direct router display of account_settings must not show a placeholder panel")
 		return
 
-	for screen_id in [
-		"season",
-	]:
-		router.call("show_screen", screen_id, false)
-		if not await _wait_for_screen(router, "legacy_run"):
-			_fail("Direct router display of %s should redirect to playable UI, got %s" % [screen_id, str(router.get("current_screen_id"))])
-			return
-		if _any_visible_placeholder(main):
-			_fail("Direct router display of %s must not show a placeholder panel" % screen_id)
-			return
+	router.call("show_screen", "season", false)
+	await process_frame
+	await process_frame
+	if str(router.get("current_screen_id")) != "season":
+		_fail("Direct router display of season should stay on standalone season, got %s" % str(router.get("current_screen_id")))
+		return
+	var season = main.get_node_or_null("ScreenRoot/SeasonScreen")
+	if season == null or not season.visible:
+		_fail("Direct router display of season should show SeasonScreen")
+		return
+	if season.find_child("SeasonScreen", true, false) == null:
+		_fail("SeasonScreen must render a Web season surface")
+		return
+	if _any_visible_placeholder(main):
+		_fail("Direct router display of season must not show a placeholder panel")
+		return
 
 	main.queue_free()
 	for _frame in range(2):

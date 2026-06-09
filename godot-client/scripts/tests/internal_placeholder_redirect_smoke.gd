@@ -14,9 +14,8 @@ func _run() -> void:
 	await process_frame
 
 	var router = main.get("router")
-	var legacy = main.get_node_or_null("ScreenRoot/LegacyRunScreen")
-	if router == null or legacy == null:
-		_fail("Main must expose router and LegacyRunScreen")
+	if router == null:
+		_fail("Main must expose router")
 		return
 	if not main.call("open_screen", "mode_lobby"):
 		_fail("open_screen should accept standalone mode_lobby")
@@ -91,23 +90,24 @@ func _run() -> void:
 		_fail("account_settings must render a Web settings surface")
 		return
 
-	for screen_id in [
-		"season",
-	]:
-		if not main.call("open_screen", screen_id):
-			_fail("open_screen should accept internal run screen id: %s" % screen_id)
-			return
-		await process_frame
-		await process_frame
-		if str(router.get("current_screen_id")) != "legacy_run":
-			_fail("%s should redirect to playable shell, got %s" % [screen_id, str(router.get("current_screen_id"))])
-			return
-		if not legacy.visible:
-			_fail("%s should show LegacyRunScreen" % screen_id)
-			return
-		if _any_visible_placeholder(main):
-			_fail("%s must not show any visible placeholder panel" % screen_id)
-			return
+	if not main.call("open_screen", "season"):
+		_fail("open_screen should accept standalone season")
+		return
+	await process_frame
+	await process_frame
+	if str(router.get("current_screen_id")) != "season":
+		_fail("season should stay on standalone SeasonScreen, got %s" % str(router.get("current_screen_id")))
+		return
+	var season = main.get_node_or_null("ScreenRoot/SeasonScreen")
+	if season == null or not season.visible:
+		_fail("season should show SeasonScreen")
+		return
+	if season.find_child("PlaceholderPanel", true, false) != null:
+		_fail("season must not show a placeholder panel")
+		return
+	if season.find_child("SeasonScreen", true, false) == null:
+		_fail("season must render a Web season surface")
+		return
 
 	if not main.call("open_screen", "leaderboards"):
 		_fail("open_screen should accept standalone leaderboards")
