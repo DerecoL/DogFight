@@ -68,9 +68,12 @@ func _run() -> void:
 	if claimed_button == null or not claimed_button.disabled:
 		_fail("Claimed daily task action should be disabled")
 		return
-	var open_button := _find_by_name(run_screen, "DailyTaskAction_daily-open") as Button
-	if open_button == null or not open_button.disabled:
-		_fail("Incomplete daily task action should be disabled")
+	var open_state := _find_by_name(run_screen, "DailyTaskAction_daily-open")
+	if open_state == null:
+		_fail("Incomplete daily task state should be visible")
+		return
+	if open_state is Button and not (open_state as Button).disabled:
+		_fail("Incomplete daily task action should not be clickable")
 		return
 	main.queue_free()
 	for _frame in range(5):

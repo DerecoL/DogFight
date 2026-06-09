@@ -2050,6 +2050,7 @@ func _render_daily_task_panel(parent: VBoxContainer) -> VBoxContainer:
 	title_row.add_theme_constant_override("separation", 10)
 	card.add_child(title_row)
 	var title_label := Label.new()
+	title_label.name = "DailyTaskTitle"
 	title_label.text = "每日任务 %s" % str(daily_data.get("dateKey", ""))
 	title_label.custom_minimum_size = Vector2(0, 38)
 	title_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -2076,18 +2077,19 @@ func _render_daily_task_row(parent: VBoxContainer, task: Dictionary) -> void:
 	parent.add_child(row)
 	var def: Dictionary = _dict(task, "def")
 	var text_box := VBoxContainer.new()
+	text_box.name = "DailyTaskInfo_%s" % task_id
 	text_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	text_box.add_theme_constant_override("separation", 4)
 	row.add_child(text_box)
-	_add_plain_line(text_box, _fallback(str(def.get("title", "")), task_id))
-	_add_plain_line(text_box, str(def.get("description", "")))
-	var progress_text := Label.new()
-	progress_text.text = "%d/%d" % [int(task.get("progress", 0)), int(task.get("target", 0))]
-	progress_text.custom_minimum_size = Vector2(88, 38)
-	progress_text.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	progress_text.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	progress_text.add_theme_color_override("font_color", UiTokens.ink_color())
-	row.add_child(progress_text)
+	_named_plain_line(text_box, "DailyTaskTitle_%s" % task_id, _fallback(str(def.get("title", "")), task_id))
+	_named_plain_line(text_box, "DailyTaskDescription_%s" % task_id, str(def.get("description", "")))
+	var progress_bar := ProgressBar.new()
+	progress_bar.name = "DailyTaskProgress_%s" % task_id
+	progress_bar.custom_minimum_size = Vector2(120, 24)
+	progress_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	progress_bar.max_value = max(1, int(task.get("target", 0)))
+	progress_bar.value = clamp(int(task.get("progress", 0)), 0, int(progress_bar.max_value))
+	row.add_child(progress_bar)
 	var ready := int(task.get("progress", 0)) >= int(task.get("target", 0))
 	var claimed := not str(task.get("claimedAt", "")).is_empty()
 	var action: Button
@@ -2097,8 +2099,15 @@ func _render_daily_task_row(parent: VBoxContainer, task: Dictionary) -> void:
 	elif ready and not task_id.is_empty():
 		action = _action_button("领取 %d" % _reward_amount(task, def), _claim_daily.bind(task_id))
 	else:
-		action = _button("%d/%d" % [int(task.get("progress", 0)), int(task.get("target", 0))], 96)
-		action.disabled = true
+		var state := Label.new()
+		state.name = "DailyTaskAction_%s" % task_id
+		state.text = "%d/%d" % [int(task.get("progress", 0)), int(task.get("target", 0))]
+		state.custom_minimum_size = Vector2(96, UiTokens.touch_target_height())
+		state.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		state.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		state.add_theme_color_override("font_color", UiTokens.ink_color())
+		row.add_child(state)
+		return
 	action.name = "DailyTaskAction_%s" % task_id
 	row.add_child(action)
 
