@@ -13,15 +13,18 @@ func _run() -> void:
 	await process_frame
 
 	var text := _collect_text(screen)
-	for part in ["模式大厅", "选择本次要进入的竞技方式", "新手引导", "休闲模式", "天梯模式", "斗狗模式", "巅峰模式", "退出登录"]:
-		if not text.contains(str(part)):
-			_fail("ModeLobbyScreen text missing: %s" % str(part))
+	for part in ["模式大厅", "选择本次要进入的竞技方式", "新手引导", "休闲模式", "天梯模式", "斗狗模式", "巅峰模式"]:
+		if not text.contains(part):
+			_fail("ModeLobbyScreen text missing: %s" % part)
 			return
 	if screen.get_node_or_null("ModeLobbyPanel") == null:
 		_fail("ModeLobbyScreen must have stable panel root")
 		return
 	if screen.find_child("StartRunButton", true, false) != null:
 		_fail("ModeLobbyScreen must not expose direct start form controls")
+		return
+	if _has_visible_button_text(screen, "退出登录"):
+		_fail("ModeLobby component must not include logout; Web keeps it in TopBar")
 		return
 	for button_name in ["TutorialReplayButton", "CasualModeButton", "LadderModeButton", "DogfightModeButton", "PeakModeButton"]:
 		if screen.find_child(button_name, true, false) == null:
@@ -60,6 +63,14 @@ func _count_option_buttons(node: Node) -> int:
 	for child in node.get_children():
 		count += _count_option_buttons(child)
 	return count
+
+func _has_visible_button_text(node: Node, text: String) -> bool:
+	if node is Button and (node as Button).is_visible_in_tree() and (node as Button).text.contains(text):
+		return true
+	for child in node.get_children():
+		if _has_visible_button_text(child, text):
+			return true
+	return false
 
 func _fail(message: String) -> void:
 	push_error(message)

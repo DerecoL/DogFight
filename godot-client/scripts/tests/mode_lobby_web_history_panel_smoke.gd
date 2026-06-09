@@ -58,7 +58,7 @@ func _run() -> void:
 	await process_frame
 
 	var text := _collect_text(screen)
-	for part in ["个人战绩", "9胜 5败", "共 7 局", "胜率 64%", "完成 4 局", "天梯段位", "白银", "测试赛季 · 120 分", "最佳成绩", "最近对局"]:
+	for part in ["个人战绩", "9胜 5败", "共 7 局", "胜率 64%", "完成 4 局", "天梯段位", "白银", "测试赛季 · 120 分", "最佳成绩", "柴犬 · 5胜 1败 · 第 8 回合", "最近对局"]:
 		if not text.contains(str(part)):
 			_fail("ModeLobbyScreen history panel text missing: %s" % str(part))
 			return

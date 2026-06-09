@@ -22,15 +22,13 @@ func _on_payload_changed() -> void:
 	_refresh_content()
 
 func _build_lobby() -> void:
-	var tokens = load("res://scripts/ui/web/WebUiTokens.gd")
 	var panel := PanelContainer.new()
 	panel.name = "ModeLobbyPanel"
 	panel.set_anchors_preset(Control.PRESET_CENTER)
 	panel.custom_minimum_size = Vector2(960, 660)
 	panel.size = panel.custom_minimum_size
 	panel.position = -panel.custom_minimum_size / 2.0
-	if tokens != null:
-		panel.add_theme_stylebox_override("panel", tokens.paper_card_style())
+	panel.add_theme_stylebox_override("panel", WebUiTokens.paper_card_style())
 	add_child(panel)
 
 	var scroll := ScrollContainer.new()
@@ -52,43 +50,43 @@ func _build_lobby() -> void:
 	box.add_theme_constant_override("separation", 12)
 	margin.add_child(box)
 
-	var header := HBoxContainer.new()
-	header.add_theme_constant_override("separation", 12)
-	box.add_child(header)
-
-	var title_box := VBoxContainer.new()
-	title_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	header.add_child(title_box)
+	var heading := VBoxContainer.new()
+	heading.name = "ModeLobbyHeading"
+	heading.add_theme_constant_override("separation", 6)
+	box.add_child(heading)
 
 	var title := Label.new()
+	title.name = "ModeLobbyTitle"
 	title.text = "模式大厅"
-	title_box.add_child(title)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	heading.add_child(title)
 
 	var subtitle := Label.new()
+	subtitle.name = "ModeLobbySubtitle"
 	subtitle.text = "选择本次要进入的竞技方式。休闲或天梯完成后的狗可以送入巅峰竞技场。"
 	subtitle.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	subtitle.custom_minimum_size = Vector2(0, 46)
-	title_box.add_child(subtitle)
+	subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	subtitle.custom_minimum_size = Vector2(0, 42)
+	heading.add_child(subtitle)
 
 	account_label = Label.new()
-	account_label.custom_minimum_size = Vector2(0, 28)
-	title_box.add_child(account_label)
-
-	var logout_button := Button.new()
-	logout_button.text = "退出登录"
-	logout_button.custom_minimum_size = Vector2(110, 44)
-	logout_button.pressed.connect(_logout)
-	header.add_child(_track_action_button(logout_button))
+	account_label.name = "ModeLobbyAccountLabel"
+	account_label.custom_minimum_size = Vector2(0, 24)
+	account_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	box.add_child(account_label)
 
 	run_label = Label.new()
-	run_label.custom_minimum_size = Vector2(0, 52)
+	run_label.name = "ModeLobbyRunLabel"
+	run_label.custom_minimum_size = Vector2(0, 40)
 	run_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	run_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(run_label)
 
 	var tutorial_button := Button.new()
 	tutorial_button.name = "TutorialReplayButton"
 	tutorial_button.text = "新手引导"
-	tutorial_button.custom_minimum_size = Vector2(150, 44)
+	tutorial_button.custom_minimum_size = Vector2(150, WebUiTokens.touch_target_height())
+	tutorial_button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	tutorial_button.pressed.connect(_replay_tutorial)
 	box.add_child(_track_action_button(tutorial_button))
 
@@ -98,38 +96,27 @@ func _build_lobby() -> void:
 	mode_entries.add_theme_constant_override("h_separation", 10)
 	mode_entries.add_theme_constant_override("v_separation", 8)
 	box.add_child(mode_entries)
-	casual_button = _add_mode_button(mode_entries, "CasualModeButton", "休闲模式", "标准跑局，完成后的狗可提交巅峰竞技场。", "开始休闲模式", _enter_casual)
-	ladder_button = _add_mode_button(mode_entries, "LadderModeButton", "天梯模式", "进入独立匹配池，整局结算赛季积分。", "进入天梯模式", _enter_ladder)
-	_add_mode_button(mode_entries, "DogfightModeButton", "斗狗模式", "创建、匹配、加入房间", "进入斗狗模式", _open_screen.bind("dogfight_rooms"))
-	_add_mode_button(mode_entries, "PeakModeButton", "巅峰模式", "提交完成狗并查看榜单", "进入巅峰模式", _open_screen.bind("apex"))
+	casual_button = _add_mode_button(mode_entries, "CasualModeButton", "休闲模式", "当前经典构筑、商店、匹配和自动战斗流程", "开始休闲模式", _enter_casual)
+	ladder_button = _add_mode_button(mode_entries, "LadderModeButton", "天梯模式", "按整局表现结算积分，冲击大师与犬王排行榜", "进入天梯模式", _enter_ladder)
+	_add_mode_button(mode_entries, "DogfightModeButton", "斗狗模式", "实时房间，8 狗同场淘汰", "进入斗狗模式", _open_screen.bind("dogfight_rooms"))
+	_add_mode_button(mode_entries, "PeakModeButton", "巅峰模式", "战斗结束后的狗进入巅峰竞技场，自动挑战榜单冲击排名", "进入巅峰模式", _open_screen.bind("apex"))
 
-	_add_history_panel(box, tokens)
-
-	var shortcuts := GridContainer.new()
-	shortcuts.columns = 3
-	shortcuts.add_theme_constant_override("h_separation", 10)
-	shortcuts.add_theme_constant_override("v_separation", 8)
-	box.add_child(shortcuts)
-	_add_shortcut_button(shortcuts, "商城", "account_shop")
-	_add_shortcut_button(shortcuts, "成就", "achievements")
-	_add_shortcut_button(shortcuts, "排行", "leaderboards")
-	_add_shortcut_button(shortcuts, "赛季", "season")
-	_add_shortcut_button(shortcuts, "房间", "dogfight_rooms")
-	_add_shortcut_button(shortcuts, "设置", "account_settings")
+	_add_history_panel(box)
 
 	status_label = Label.new()
+	status_label.name = "ModeLobbyStatus"
 	status_label.custom_minimum_size = Vector2(0, 34)
 	status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	status_label.add_theme_color_override("font_color", WebUiTokens.danger_color())
 	box.add_child(status_label)
 
-func _add_history_panel(parent: Node, tokens: Variant) -> void:
+func _add_history_panel(parent: Node) -> void:
 	var panel := PanelContainer.new()
 	panel.name = "PlayerHistoryPanel"
 	panel.custom_minimum_size = Vector2(0, 190)
 	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	if tokens != null:
-		panel.add_theme_stylebox_override("panel", tokens.paper_card_style())
+	panel.add_theme_stylebox_override("panel", WebUiTokens.paper_card_style())
 	parent.add_child(panel)
 
 	var margin := MarginContainer.new()
@@ -187,6 +174,7 @@ func _add_history_panel(parent: Node, tokens: Variant) -> void:
 	_add_history_shortcut(actions, "HistoryDetailButton", "查看详情和装备", "account")
 
 	var recent_title := Label.new()
+	recent_title.name = "HistoryRecentTitle"
 	recent_title.text = "最近对局"
 	recent_title.custom_minimum_size = Vector2(0, 22)
 	box.add_child(recent_title)
@@ -212,14 +200,6 @@ func _add_history_shortcut(parent: Node, node_name: String, text: String, screen
 	button.name = node_name
 	button.text = text
 	button.custom_minimum_size = Vector2(0, 28)
-	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	button.pressed.connect(_open_screen.bind(screen_id))
-	parent.add_child(_track_action_button(button))
-
-func _add_shortcut_button(parent: Node, text: String, screen_id: String) -> void:
-	var button := Button.new()
-	button.text = text
-	button.custom_minimum_size = Vector2(0, 42)
 	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	button.pressed.connect(_open_screen.bind(screen_id))
 	parent.add_child(_track_action_button(button))
@@ -252,13 +232,12 @@ func _refresh_content() -> void:
 	var display_name = user.get("nickname", null)
 	if display_name == null or str(display_name).strip_edges().is_empty():
 		display_name = user.get("account", "未登录")
-	var account := str(display_name)
-	account_label.text = "当前账号：%s" % account
+	account_label.text = "当前账号：%s" % str(display_name)
 	var run: Dictionary = payload.get("run", {})
 	if run.is_empty():
 		run_label.text = "当前没有进行中的跑局。进入休闲模式后再选择狗狗并开始一局。"
 	else:
-		run_label.text = "当前跑局：%s · %d胜%d负 · 第%d回合" % [
+		run_label.text = "当前跑局：%s · %d胜 %d败 · 第 %d 回合" % [
 			_dog_label(str(run.get("dogType", ""))),
 			int(run.get("wins", 0)),
 			int(run.get("losses", 0)),
@@ -267,13 +246,13 @@ func _refresh_content() -> void:
 	if casual_button != null:
 		casual_button.text = "%s\n%s\n%s" % [
 			"休闲模式",
-			"标准跑局，完成后的狗可提交巅峰竞技场。",
+			"当前经典构筑、商店、匹配和自动战斗流程",
 			"继续休闲模式" if str(run.get("mode", "")) == "CASUAL" else "开始休闲模式",
 		]
 	if ladder_button != null:
 		ladder_button.text = "%s\n%s\n%s" % [
 			"天梯模式",
-			"进入独立匹配池，整局结算赛季积分。",
+			"按整局表现结算积分，冲击大师与犬王排行榜",
 			"继续天梯模式" if str(run.get("mode", "")) == "LADDER" else "进入天梯模式",
 		]
 	_refresh_history_panel()
@@ -425,7 +404,7 @@ func _dog_label(dog_type: String) -> String:
 		"MUTT":
 			return "土狗"
 		"BULLY":
-			return "恶霸"
+			return "恶霸犬"
 		"EMPEROR":
 			return "狗皇帝"
 		"FROG":
