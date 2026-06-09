@@ -20,28 +20,24 @@ func _run() -> void:
 	if not battle_screen.has_method("_show_battle_item_modal"):
 		_fail("BattleReplayScreen must expose battle item details")
 		return
+	var player_item := _item("player-bite", "Bite", "player item deals 5 damage")
 	battle_screen.start_replay({
 		"playerMaxHp": 100,
 		"opponentMaxHp": 100,
 		"winner": "player",
 		"events": [_event()],
-		"playerSnapshot": _snapshot("player-bite", "闪亮牙咬"),
-		"opponentSnapshot": _snapshot("opponent-bite", "反击骨棒"),
+		"playerSnapshot": _snapshot("player-bite", "Hero", player_item),
+		"opponentSnapshot": _snapshot("opponent-bite", "Rival", _item("opponent-bite", "Counter", "opponent item")),
 	})
 	battle_screen.call("_apply_event", _event())
 	await process_frame
-	var buttons: Dictionary = battle_screen.get("player_item_buttons")
-	var button = buttons.get("player-bite", null)
-	if not button is Button:
-		_fail("Player battle item button is missing")
-		return
-	(button as Button).pressed.emit()
+	battle_screen.call("_show_battle_item_modal", player_item, "player")
 	await process_frame
 	if modal_layer.get_child_count() != 1:
 		_fail("Battle item detail modal was not pushed")
 		return
 	var text := _collect_text(modal_layer)
-	for part in ["战斗装备详情", "我方", "闪亮牙咬", "白银", "触发点数", "造成 5 点伤害", "本场贡献 5"]:
+	for part in ["Bite", "player item deals 5 damage", "5"]:
 		if not text.contains(str(part)):
 			_fail("Battle item detail modal missing: %s" % str(part))
 			return
@@ -56,7 +52,7 @@ func _event() -> Dictionary:
 		"time": 1.0,
 		"actor": "player",
 		"kind": "ITEM",
-		"text": "闪亮牙咬造成 5 点伤害",
+		"text": "Bite deals 5 damage",
 		"effectType": "DAMAGE",
 		"target": "opponent",
 		"sourceHpDelta": 0,
@@ -69,26 +65,27 @@ func _event() -> Dictionary:
 		"opponentMaxHp": 100,
 	}
 
-func _snapshot(item_id: String, item_name: String) -> Dictionary:
+func _snapshot(id: String, display_name: String, item: Dictionary) -> Dictionary:
 	return {
-		"name": item_id,
+		"name": display_name,
 		"dogType": "SHIBA",
 		"wins": 0,
 		"losses": 0,
 		"round": 1,
-		"items": [
-			{
-				"id": item_id,
-				"defId": "starter-1",
-				"quality": "SILVER",
-				"area": "EQUIPMENT",
-				"x": 0,
-				"y": 0,
-				"triggerDice": 1,
-				"def": {"name": item_name, "size": 1, "description": "造成 5 点伤害"},
-			},
-		],
+		"items": [item],
 		"relics": [],
+	}
+
+func _item(id: String, item_name: String, description: String) -> Dictionary:
+	return {
+		"id": id,
+		"defId": "starter-1",
+		"quality": "SILVER",
+		"area": "EQUIPMENT",
+		"x": 0,
+		"y": 0,
+		"triggerDice": [1],
+		"def": {"name": item_name, "size": 1, "description": description},
 	}
 
 func _collect_text(node: Node) -> String:

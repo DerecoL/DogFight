@@ -84,6 +84,7 @@ var system_review_label: Label
 var restart_button: Button
 var continue_row: PanelContainer
 var continue_button: Button
+var battle_item_tip: PanelContainer
 var log_toggle_button: Button
 var log_filter_row: HBoxContainer
 
@@ -131,6 +132,7 @@ func start_replay(next_battle: Dictionary) -> void:
 	log_view.text = ""
 	if review_panel != null:
 		review_panel.visible = false
+	_close_battle_item_tip()
 	_render_initial_hp()
 	_render_snapshots()
 	_render_stage_snapshots()
@@ -244,6 +246,7 @@ func _on_restart_pressed() -> void:
 	log_view.visible = false
 	if review_panel != null:
 		review_panel.visible = false
+	_close_battle_item_tip()
 	_render_initial_hp()
 	_render_snapshots()
 	_render_stage_snapshots()
@@ -741,7 +744,7 @@ func _render_snapshot(name_label: Label, avatar: TextureRect, grid: GridContaine
 			button.name = "%sBattleItem_%s" % [prefix, item_id]
 			button_map[str(item.get("id", ""))] = button
 			button.set_meta("base_text", button.text)
-			button.pressed.connect(_show_battle_item_modal.bind(item, side))
+			button.pressed.connect(_show_battle_item_tip.bind(item, side))
 			_add_battle_item_card_nodes(button, prefix, item_id, item)
 		slot.add_child(button)
 		grid.add_child(slot)
@@ -1341,6 +1344,100 @@ func _status_detail_text(status: Dictionary) -> String:
 	if parts.is_empty():
 		return "持续生效"
 	return "；".join(parts)
+
+func _show_battle_item_tip(item: Dictionary, side: String) -> void:
+	if finish_in_progress:
+		return
+	_close_battle_item_tip()
+	var item_def: Dictionary = _dict(item, "def")
+	var item_name := _fallback(str(item_def.get("name", "")), str(item.get("defId", item.get("id", ""))))
+	var floating_tip := PanelContainer.new()
+	floating_tip.name = "FloatingTip"
+	floating_tip.custom_minimum_size = Vector2(0, 244)
+	floating_tip.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	root.add_child(floating_tip)
+	battle_item_tip = floating_tip
+
+	var tip := VBoxContainer.new()
+	tip.name = "BattleItemTip"
+	tip.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	tip.add_theme_constant_override("separation", 7)
+	floating_tip.add_child(tip)
+
+	var tags := HBoxContainer.new()
+	tags.name = "BattleItemTipTags"
+	tags.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	tags.add_theme_constant_override("separation", 6)
+	tip.add_child(tags)
+	_add_tip_label(tags, "BattleItemTipSizeTag", "%d格" % int(item_def.get("size", item.get("size", 1))), HORIZONTAL_ALIGNMENT_CENTER)
+	_add_tip_label(tags, "BattleItemTipQualityTag", _quality_label(str(item.get("quality", ""))), HORIZONTAL_ALIGNMENT_CENTER)
+	_add_tip_label(tags, "BattleItemTipSideTag", side, HORIZONTAL_ALIGNMENT_CENTER)
+
+	var identity := HBoxContainer.new()
+	identity.name = "BattleItemTipIdentity"
+	identity.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	identity.add_theme_constant_override("separation", 8)
+	tip.add_child(identity)
+	var icon := TextureRect.new()
+	icon.name = "BattleItemTipIcon"
+	icon.texture = _battle_item_texture(item)
+	icon.custom_minimum_size = Vector2(54, 54)
+	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	identity.add_child(icon)
+	var identity_text := VBoxContainer.new()
+	identity_text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	identity.add_child(identity_text)
+	_add_tip_label(identity_text, "BattleItemTipTitle", item_name)
+	_add_tip_label(identity_text, "BattleItemTipId", str(item.get("id", "")))
+
+	var size_preview := HBoxContainer.new()
+	size_preview.name = "BattleItemTipSizePreview"
+	size_preview.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	size_preview.add_theme_constant_override("separation", 8)
+	tip.add_child(size_preview)
+	_add_tip_label(size_preview, "BattleItemTipGridPreview", _battle_size_preview_text(item_def))
+	_add_tip_label(size_preview, "BattleItemTipSizeText", "占用 %d 格" % int(item_def.get("size", item.get("size", 1))))
+
+	_add_tip_label(tip, "BattleItemTipDice", "点数 %s" % _battle_trigger_dice_text(item))
+	_add_tip_label(tip, "BattleItemTipDescription", _fallback(str(item_def.get("description", "")), str(item.get("description", ""))))
+	_add_tip_label(tip, "BattleItemTipContribution", "本场贡献 %d" % _battle_item_contribution(str(item.get("id", "")), side))
+
+	var actions := HBoxContainer.new()
+	actions.name = "BattleItemTipActions"
+	actions.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	actions.add_theme_constant_override("separation", 8)
+	tip.add_child(actions)
+	var close_button := Button.new()
+	close_button.name = "CloseBattleItemTipButton"
+	close_button.text = "关闭"
+	close_button.custom_minimum_size = Vector2(108, 42)
+	close_button.pressed.connect(_close_battle_item_tip)
+	actions.add_child(close_button)
+
+func _close_battle_item_tip() -> void:
+	if battle_item_tip == null:
+		return
+	if battle_item_tip.get_parent() != null:
+		battle_item_tip.get_parent().remove_child(battle_item_tip)
+	battle_item_tip.queue_free()
+	battle_item_tip = null
+
+func _add_tip_label(parent: Node, node_name: String, text: String, align := HORIZONTAL_ALIGNMENT_LEFT) -> Label:
+	var label := Label.new()
+	label.name = node_name
+	label.text = text
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	label.horizontal_alignment = align
+	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	parent.add_child(label)
+	return label
+
+func _battle_size_preview_text(def: Dictionary) -> String:
+	var size := int(def.get("size", 0))
+	var text := ""
+	for index in range(4):
+		text += "■" if index < size else "□"
+	return text
 
 func _show_battle_item_modal(item: Dictionary, side: String) -> void:
 	if finish_in_progress:
