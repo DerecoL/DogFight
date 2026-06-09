@@ -145,6 +145,7 @@ func _render_reward_workbench(parent: Node, run: Dictionary) -> void:
 	inventory.add_theme_constant_override("separation", 8)
 	inventory_frame.add_child(inventory)
 	_render_inventory_board(inventory, run)
+	_render_selected_item_tip(workbench, run)
 
 func _render_class_reward(parent: HBoxContainer, run: Dictionary) -> void:
 	var selector := VBoxContainer.new()
@@ -372,6 +373,77 @@ func _render_relic_rail(parent: VBoxContainer, run: Dictionary) -> void:
 		button.disabled = relic.is_empty()
 		row.add_child(button)
 
+func _render_selected_item_tip(parent: HBoxContainer, run: Dictionary) -> void:
+	var item := _selected_item(run)
+	if item.is_empty():
+		return
+	var def: Dictionary = _dict(item, "def")
+	var title := _fallback(str(def.get("name", "")), str(item.get("defId", item.get("id", ""))))
+	var floating_tip := PanelContainer.new()
+	floating_tip.name = "FloatingTip"
+	floating_tip.custom_minimum_size = Vector2(320, 244)
+	floating_tip.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	floating_tip.add_theme_stylebox_override("panel", WebUiTokens.paper_card_style())
+	parent.add_child(floating_tip)
+
+	var tip := VBoxContainer.new()
+	tip.name = "RewardItemTip"
+	tip.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	tip.add_theme_constant_override("separation", 7)
+	floating_tip.add_child(tip)
+
+	var tags := HBoxContainer.new()
+	tags.name = "RewardItemTipTags"
+	tags.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	tags.add_theme_constant_override("separation", 6)
+	tip.add_child(tags)
+	_add_label(tags, "RewardItemTipSizeTag", "%s格" % _fallback(_detail_size_text(def), "?"), HORIZONTAL_ALIGNMENT_CENTER)
+	_add_label(tags, "RewardItemTipQualityTag", _quality_label(str(item.get("quality", ""))), HORIZONTAL_ALIGNMENT_CENTER)
+	_add_label(tags, "RewardItemTipAreaTag", _area_label(str(item.get("area", ""))), HORIZONTAL_ALIGNMENT_CENTER)
+
+	var identity := HBoxContainer.new()
+	identity.name = "RewardItemTipIdentity"
+	identity.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	identity.add_theme_constant_override("separation", 8)
+	tip.add_child(identity)
+	var art := Label.new()
+	art.name = "RewardItemTipArt"
+	art.text = ""
+	art.custom_minimum_size = Vector2(54, 54)
+	art.add_theme_stylebox_override("normal", WebUiTokens.resource_pill_style())
+	identity.add_child(art)
+	_add_label(identity, "RewardItemTipTitle", title)
+
+	var size_preview := HBoxContainer.new()
+	size_preview.name = "RewardItemTipSizePreview"
+	size_preview.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	size_preview.add_theme_constant_override("separation", 8)
+	tip.add_child(size_preview)
+	_add_label(size_preview, "RewardItemTipGridPreview", _shop_size_preview_text(def))
+	_add_label(size_preview, "RewardItemTipSizeText", "占用 %s 格" % _fallback(_detail_size_text(def), "?"))
+
+	var trigger := _trigger_dice_text(def)
+	if not trigger.is_empty():
+		_add_label(tip, "RewardItemTipDice", "触发点数 %s" % trigger)
+	else:
+		_add_label(tip, "RewardItemTipDice", "触发点数 -")
+
+	var description := _fallback(str(def.get("description", "")), str(item.get("description", "")))
+	_add_label(tip, "RewardItemTipDescription", description)
+
+	var actions := HBoxContainer.new()
+	actions.name = "RewardItemTipActions"
+	actions.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	actions.add_theme_constant_override("separation", 8)
+	tip.add_child(actions)
+	var apply_button := _action_button(_selected_item_action_label(run), _apply_selected_item_reward)
+	apply_button.name = "ApplyRewardItemButton"
+	apply_button.disabled = action_in_progress or not _selected_item_has_action(run)
+	actions.add_child(apply_button)
+	var close_button := _action_button("关闭", _close_item_tip)
+	close_button.name = "CloseRewardItemTipButton"
+	actions.add_child(close_button)
+
 func _choice_button(text: String, callback: Callable) -> Button:
 	var button := _action_button(text, callback)
 	button.add_theme_stylebox_override("normal", WebUiTokens.paper_card_style())
@@ -427,13 +499,27 @@ func _set_potion_choice(id: String) -> void:
 
 func _select_item(item_id: String) -> void:
 	selected_item_id = item_id
+	_render()
+
+func _close_item_tip() -> void:
+	selected_item_id = ""
+	_render()
+
+func _apply_selected_item_reward() -> void:
+	if selected_item_id.is_empty() or action_in_progress:
+		return
 	var phase := str(_run().get("phase", ""))
+	var item_id := selected_item_id
+	action_in_progress = true
 	if phase == "UPGRADE_CHOICE" and session != null and session.has_method("select_upgrade_item"):
 		await session.call("select_upgrade_item", item_id)
 	elif phase == "ENCHANT_CHOICE" and not selected_enchant_id.is_empty() and session != null and session.has_method("select_enchant"):
 		await session.call("select_enchant", selected_enchant_id, item_id)
 	elif phase == "POTION_CHOICE" and not selected_potion_id.is_empty() and session != null and session.has_method("select_potion"):
 		await session.call("select_potion", selected_potion_id, item_id)
+	selected_item_id = ""
+	action_in_progress = false
+	_render()
 
 func _noop() -> void:
 	pass
@@ -450,6 +536,14 @@ func _array(source: Dictionary, key: String) -> Array:
 	var value = source.get(key, [])
 	return value if value is Array else []
 
+func _selected_item(run: Dictionary) -> Dictionary:
+	if selected_item_id.is_empty():
+		return {}
+	for item_value in _array(run, "items"):
+		if item_value is Dictionary and str((item_value as Dictionary).get("id", "")) == selected_item_id:
+			return item_value
+	return {}
+
 func _fallback(value: String, fallback: String) -> String:
 	return fallback if value.strip_edges().is_empty() else value
 
@@ -457,6 +551,52 @@ func _detail_size_text(def: Dictionary) -> String:
 	if def.has("size"):
 		return str(int(def.get("size", 0)))
 	return ""
+
+func _shop_size_preview_text(def: Dictionary) -> String:
+	var size := int(def.get("size", 0))
+	var text := ""
+	for index in range(4):
+		text += "■" if index < size else "□"
+	return text
+
+func _trigger_dice_text(def: Dictionary) -> String:
+	var dice := _array(def, "triggerDice")
+	if dice.is_empty():
+		return ""
+	var parts: Array[String] = []
+	for value in dice:
+		parts.append(str(value))
+	return " / ".join(parts)
+
+func _selected_item_has_action(run: Dictionary) -> bool:
+	var phase := str(run.get("phase", ""))
+	if phase == "UPGRADE_CHOICE":
+		return true
+	if phase == "ENCHANT_CHOICE":
+		return not selected_enchant_id.is_empty()
+	if phase == "POTION_CHOICE":
+		return not selected_potion_id.is_empty()
+	return false
+
+func _selected_item_action_label(run: Dictionary) -> String:
+	match str(run.get("phase", "")):
+		"UPGRADE_CHOICE":
+			return "升级"
+		"ENCHANT_CHOICE":
+			return "附魔到选中装备" if not selected_enchant_id.is_empty() else "先选择附魔"
+		"POTION_CHOICE":
+			return "药水给选中装备" if not selected_potion_id.is_empty() else "先选择药水"
+		_:
+			return "仅查看"
+
+func _area_label(area: String) -> String:
+	match area:
+		"EQUIPMENT":
+			return "装备栏"
+		"BAG":
+			return "背包"
+		_:
+			return _fallback(area, "未放置")
 
 func _quality_label(quality: String) -> String:
 	match quality:

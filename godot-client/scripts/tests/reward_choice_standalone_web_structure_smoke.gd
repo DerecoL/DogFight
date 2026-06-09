@@ -9,8 +9,12 @@ func _run() -> void:
 		_fail("RewardChoiceScreen scene failed to load")
 		return
 	var screen = scene.instantiate()
+	var fake_session := FakeSession.new()
+	root.add_child(fake_session)
 	root.add_child(screen)
 	await process_frame
+	if screen.has_method("bind_session"):
+		screen.call("bind_session", fake_session)
 
 	if screen.has_method("set_payload"):
 		screen.call("set_payload", {"run": _run_payload("CHOICE")})
@@ -78,6 +82,38 @@ func _run() -> void:
 			_assert_has(screen, "UpgradeWorkbench")
 			_assert_has(screen, "UpgradePanel")
 			_assert_has(screen, "ChoiceSubmit")
+			var item_button := _find_by_name(screen, "EquipmentBoardItem_item-1") as Button
+			if item_button == null:
+				_fail("Upgrade reward inventory item button is missing")
+				return
+			item_button.pressed.emit()
+			await process_frame
+			if fake_session.upgrade_item_id != "":
+				_fail("Upgrade reward item click should inspect first instead of immediately applying")
+				return
+			for tip_node in [
+				"FloatingTip",
+				"RewardItemTip",
+				"RewardItemTipTags",
+				"RewardItemTipIdentity",
+				"RewardItemTipSizePreview",
+				"RewardItemTipDice",
+				"RewardItemTipDescription",
+				"RewardItemTipActions",
+				"ApplyRewardItemButton",
+				"CloseRewardItemTipButton",
+			]:
+				_assert_has(screen, tip_node)
+			var apply_button := _find_by_name(screen, "ApplyRewardItemButton") as Button
+			if apply_button == null or apply_button.disabled:
+				_fail("Upgrade reward selected item tip should expose an enabled apply button")
+				return
+			apply_button.pressed.emit()
+			await process_frame
+			await process_frame
+			if fake_session.upgrade_item_id != "item-1":
+				_fail("Upgrade reward apply button must call select_upgrade_item(item-1)")
+				return
 		elif phase == "ENCHANT_CHOICE":
 			_assert_has(screen, "EnchantWorkbench")
 			_assert_has(screen, "EnchantPanel")
@@ -94,10 +130,19 @@ func _run() -> void:
 			return
 
 	screen.queue_free()
+	fake_session.queue_free()
 	for _frame in range(3):
 		await process_frame
 	print("Godot standalone reward choice Web structure smoke passed")
 	quit(0)
+
+class FakeSession:
+	extends Node
+	var upgrade_item_id := ""
+
+	func select_upgrade_item(item_id: String) -> bool:
+		upgrade_item_id = item_id
+		return true
 
 func _assert_has(root_node: Node, node_name: String) -> void:
 	if _find_by_name(root_node, node_name) == null:
