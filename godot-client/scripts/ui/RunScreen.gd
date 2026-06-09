@@ -44,6 +44,23 @@ const QUALITY_NAMES := {
 	"DIAMOND": "钻石",
 }
 
+const DOG_TAGS := {
+	"SHIBA": ["小点", "连击"],
+	"SAMOYED": ["大点", "爆发"],
+	"MUTT": ["额外投掷", "循环"],
+	"BULLY": ["大型装备", "翻倍"],
+	"EMPEROR": ["天命", "爆发上限"],
+	"FROG": ["雨季", "蓄水"],
+}
+const DOG_STRATEGIES := {
+	"SHIBA": "更容易把低点数变成稳定触发，适合围绕小点数装备滚雪球。",
+	"SAMOYED": "偏向高点数触发和单次爆发，适合高品质伤害装备。",
+	"MUTT": "通过额外投掷获得更多触发机会，适合多件低门槛装备。",
+	"BULLY": "围绕大型装备与翻倍收益构筑，成型后爆发更高。",
+	"EMPEROR": "围绕一个幸运数字堆叠收益，需要提前选择天命数字。",
+	"FROG": "依靠雨季与蓄水逐步累积收益，越到后期越稳定。",
+}
+
 const TUTORIAL_STATUS_PATH := "user://dogfight_tutorial.cfg"
 const TUTORIAL_SECTION := "casual_tutorial"
 const SETTINGS_PATH := "user://dogfight_settings.cfg"
@@ -1143,26 +1160,136 @@ func _start_ladder_run() -> void:
 	await _on_create_run_pressed()
 
 func _render_dog_picker(parent: VBoxContainer) -> void:
-	_add_line(parent, "选择狗狗", "与网页版一致的 6 个犬种；狗皇帝需要天命数字")
-	var grid := GridContainer.new()
-	grid.columns = 3
-	grid.add_theme_constant_override("h_separation", 8)
-	grid.add_theme_constant_override("v_separation", 8)
-	parent.add_child(grid)
+	var screen := VBoxContainer.new()
+	screen.name = "DogSelectScreen"
+	screen.add_theme_constant_override("separation", 14)
+	screen.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	parent.add_child(screen)
+
+	var heading := VBoxContainer.new()
+	heading.name = "ScreenHeading"
+	heading.add_theme_constant_override("separation", 4)
+	screen.add_child(heading)
+	var title := Label.new()
+	title.text = "选择你的狗狗伙伴"
+	title.custom_minimum_size = Vector2(0, 32)
+	heading.add_child(title)
+	var subtitle := Label.new()
+	subtitle.text = "每个狗狗都有独特的被动特性和策略玩法"
+	subtitle.custom_minimum_size = Vector2(0, 28)
+	subtitle.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	heading.add_child(subtitle)
+
+	var dog_select := HBoxContainer.new()
+	dog_select.name = "DogSelect"
+	dog_select.add_theme_constant_override("separation", 18)
+	dog_select.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	screen.add_child(dog_select)
+
+	var dog_grid := GridContainer.new()
+	dog_grid.name = "DogCardGrid"
+	dog_grid.columns = 4
+	dog_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	dog_grid.add_theme_constant_override("h_separation", 12)
+	dog_grid.add_theme_constant_override("v_separation", 12)
+	dog_select.add_child(dog_grid)
 	for dog_type in DOG_TYPES:
-		grid.add_child(_dog_card_button(dog_type))
+		dog_grid.add_child(_dog_card_button(dog_type))
+
+	_render_dog_detail_panel(dog_select)
 
 func _dog_card_button(dog_type: String) -> Button:
 	var selected: bool = _selected_dog_type() == dog_type
-	var label := "%s\n%s" % [_dog_name(dog_type), str(DOG_TRAITS.get(dog_type, ""))]
+	var label := "%s\n%s\n%s" % [_dog_name(dog_type), str(DOG_TRAITS.get(dog_type, "")), " / ".join(_dog_tags(dog_type))]
 	var button := _button(label, 0)
-	button.custom_minimum_size = Vector2(180, 98)
+	button.name = "DogCard_%s" % dog_type
+	button.custom_minimum_size = Vector2(140, 150)
 	button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	button.toggle_mode = true
 	button.button_pressed = selected
 	_apply_button_icon(button, _dog_texture(dog_type))
 	button.pressed.connect(_select_dog_type.bind(dog_type))
 	return button
+
+func _render_dog_detail_panel(parent: Node) -> void:
+	var dog_type := _selected_dog_type()
+	var panel := PanelContainer.new()
+	panel.name = "DogDetailPanel"
+	panel.custom_minimum_size = Vector2(360, 0)
+	panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	panel.add_theme_stylebox_override("panel", UiTokens.paper_panel_style())
+	parent.add_child(panel)
+
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 10)
+	panel.add_child(box)
+
+	var art := TextureRect.new()
+	art.name = "DogDetailArt"
+	art.custom_minimum_size = Vector2(0, 120)
+	art.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
+	art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	art.texture = _dog_texture(dog_type)
+	box.add_child(art)
+
+	var title := Label.new()
+	title.name = "DogDetailName"
+	title.text = _dog_name(dog_type)
+	title.custom_minimum_size = Vector2(0, 32)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	box.add_child(title)
+
+	_add_detail_box(box, "被动特性", str(DOG_TRAITS.get(dog_type, "")))
+	_add_detail_box(box, "策略说明", str(DOG_STRATEGIES.get(dog_type, "")))
+
+	var tags := Label.new()
+	tags.name = "DogTagRow"
+	tags.text = " / ".join(_dog_tags(dog_type))
+	tags.custom_minimum_size = Vector2(0, 28)
+	tags.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	box.add_child(tags)
+
+	if dog_type == "EMPEROR":
+		var lucky := HBoxContainer.new()
+		lucky.name = "LuckyNumberPicker"
+		lucky.add_theme_constant_override("separation", 6)
+		box.add_child(lucky)
+		for number in range(1, 7):
+			var button := _button(str(number), 36)
+			button.name = "LuckyNumber%d" % number
+			button.toggle_mode = true
+			button.button_pressed = lucky_select != null and lucky_select.selected == number
+			button.pressed.connect(_select_lucky_number.bind(number))
+			lucky.add_child(button)
+
+	var start := _action_button("开始一局", _on_create_run_pressed)
+	start.name = "StartRunButton"
+	start.custom_minimum_size = Vector2(0, 44)
+	box.add_child(start)
+
+func _add_detail_box(parent: Node, title_text: String, body_text: String) -> void:
+	var box := VBoxContainer.new()
+	box.name = "DetailBox"
+	box.add_theme_constant_override("separation", 4)
+	parent.add_child(box)
+	var title := Label.new()
+	title.text = title_text
+	title.custom_minimum_size = Vector2(0, 24)
+	box.add_child(title)
+	var body := Label.new()
+	body.text = body_text
+	body.custom_minimum_size = Vector2(0, 44)
+	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(body)
+
+func _dog_tags(dog_type: String) -> Array:
+	var tags = DOG_TAGS.get(dog_type, [])
+	return tags if tags is Array else []
+
+func _select_lucky_number(number: int) -> void:
+	if lucky_select != null:
+		lucky_select.select(number)
+	_render_shell()
 
 func _select_dog_type(dog_type: String) -> void:
 	for index in range(dog_type_select.item_count):
