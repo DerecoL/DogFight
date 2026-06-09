@@ -26,7 +26,7 @@ func _run() -> void:
 		_fail("Login screen must contain a centered auth panel")
 		return
 	if (auth_panel as PanelContainer).get_theme_stylebox("panel") == null:
-		_fail("Auth panel must use the shared modal panel style")
+		_fail("Auth panel must use the shared paper panel style")
 		return
 	var quick_start = login.get_node_or_null("%QuickStartButton")
 	if not quick_start is Button:

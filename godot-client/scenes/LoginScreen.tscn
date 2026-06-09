@@ -1,7 +1,8 @@
-[gd_scene load_steps=3 format=3 uid="uid://dogfight_login_screen"]
+[gd_scene load_steps=4 format=3 uid="uid://dogfight_login_screen"]
 
 [ext_resource type="Script" path="res://scripts/ui/LoginScreen.gd" id="1_login"]
 [ext_resource type="Texture2D" path="res://assets/backgrounds/dog-brawl-town.jpg" id="2_bg"]
+[ext_resource type="Texture2D" path="res://assets/game-icon.png" id="3_icon"]
 
 [node name="LoginScreen" type="Control"]
 layout_mode = 3
@@ -35,7 +36,16 @@ grow_vertical = 2
 mouse_filter = 2
 color = Color(0.08, 0.07, 0.06, 0.52)
 
-[node name="AuthPanel" type="PanelContainer" parent="."]
+[node name="AuthShell" type="Control" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="AuthPanel" type="PanelContainer" parent="AuthShell"]
 unique_name_in_owner = true
 layout_mode = 1
 anchors_preset = 8
@@ -44,87 +54,147 @@ anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
 offset_left = -230.0
-offset_top = -246.0
+offset_top = -278.0
 offset_right = 230.0
-offset_bottom = 246.0
+offset_bottom = 278.0
 grow_horizontal = 2
 grow_vertical = 2
+custom_minimum_size = Vector2(460, 556)
 
-[node name="Margin" type="MarginContainer" parent="AuthPanel"]
+[node name="Margin" type="MarginContainer" parent="AuthShell/AuthPanel"]
 layout_mode = 2
-theme_override_constants/margin_left = 24
-theme_override_constants/margin_top = 24
-theme_override_constants/margin_right = 24
-theme_override_constants/margin_bottom = 24
+theme_override_constants/margin_left = 26
+theme_override_constants/margin_top = 26
+theme_override_constants/margin_right = 26
+theme_override_constants/margin_bottom = 26
 
-[node name="Form" type="VBoxContainer" parent="AuthPanel/Margin"]
+[node name="Form" type="VBoxContainer" parent="AuthShell/AuthPanel/Margin"]
 layout_mode = 2
-theme_override_constants/separation = 12
+theme_override_constants/separation = 14
 
-[node name="Title" type="Label" parent="AuthPanel/Margin/Form"]
+[node name="BrandBlock" type="VBoxContainer" parent="AuthShell/AuthPanel/Margin/Form"]
 layout_mode = 2
-text = "狗骰乱斗 Godot 客户端"
+theme_override_constants/separation = 10
+alignment = 1
+
+[node name="GameLogo" type="TextureRect" parent="AuthShell/AuthPanel/Margin/Form/BrandBlock"]
+layout_mode = 2
+custom_minimum_size = Vector2(96, 96)
+size_flags_horizontal = 4
+texture = ExtResource("3_icon")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="BrandText" type="VBoxContainer" parent="AuthShell/AuthPanel/Margin/Form/BrandBlock"]
+layout_mode = 2
+theme_override_constants/separation = 6
+alignment = 1
+
+[node name="AppTitle" type="Label" parent="AuthShell/AuthPanel/Margin/Form/BrandBlock/BrandText"]
+layout_mode = 2
+text = "狗骰对战"
 horizontal_alignment = 1
 
-[node name="Subtitle" type="Label" parent="AuthPanel/Margin/Form"]
+[node name="AppSubtitle" type="Label" parent="AuthShell/AuthPanel/Margin/Form/BrandBlock/BrandText"]
 layout_mode = 2
-text = "骰声响起，斗犬入场。"
+text = "摆好装备，掷骰触发，挑战异步狗狗对手。"
 horizontal_alignment = 1
 autowrap_mode = 3
 
-[node name="AccountInput" type="LineEdit" parent="AuthPanel/Margin/Form"]
+[node name="LanguageSelector" type="HBoxContainer" parent="AuthShell/AuthPanel/Margin/Form"]
+layout_mode = 2
+size_flags_horizontal = 4
+theme_override_constants/separation = 4
+alignment = 1
+
+[node name="LanguageLabel" type="Label" parent="AuthShell/AuthPanel/Margin/Form/LanguageSelector"]
+layout_mode = 2
+text = "语言"
+
+[node name="LanguageZhButton" type="Button" parent="AuthShell/AuthPanel/Margin/Form/LanguageSelector"]
+layout_mode = 2
+toggle_mode = true
+button_pressed = true
+text = "中文"
+
+[node name="LanguageEnButton" type="Button" parent="AuthShell/AuthPanel/Margin/Form/LanguageSelector"]
+layout_mode = 2
+toggle_mode = true
+text = "English"
+
+[node name="AccountField" type="VBoxContainer" parent="AuthShell/AuthPanel/Margin/Form"]
+layout_mode = 2
+theme_override_constants/separation = 7
+
+[node name="AccountLabel" type="Label" parent="AuthShell/AuthPanel/Margin/Form/AccountField"]
+layout_mode = 2
+text = "账号"
+
+[node name="AccountInput" type="LineEdit" parent="AuthShell/AuthPanel/Margin/Form/AccountField"]
 unique_name_in_owner = true
 layout_mode = 2
 placeholder_text = "账号"
 
-[node name="PasswordInput" type="LineEdit" parent="AuthPanel/Margin/Form"]
+[node name="PasswordField" type="VBoxContainer" parent="AuthShell/AuthPanel/Margin/Form"]
+layout_mode = 2
+theme_override_constants/separation = 7
+
+[node name="PasswordLabel" type="Label" parent="AuthShell/AuthPanel/Margin/Form/PasswordField"]
+layout_mode = 2
+text = "密码"
+
+[node name="PasswordInput" type="LineEdit" parent="AuthShell/AuthPanel/Margin/Form/PasswordField"]
 unique_name_in_owner = true
 layout_mode = 2
 placeholder_text = "密码"
 secret = true
 
-[node name="QuickStartButton" type="Button" parent="AuthPanel/Margin/Form"]
-unique_name_in_owner = true
+[node name="ErrorScroll" type="ScrollContainer" parent="AuthShell/AuthPanel/Margin/Form"]
 custom_minimum_size = Vector2(0, 42)
 layout_mode = 2
-text = "快速开始"
+horizontal_scroll_mode = 0
 
-[node name="AuthButtons" type="HBoxContainer" parent="AuthPanel/Margin/Form"]
+[node name="ErrorLabel" type="Label" parent="AuthShell/AuthPanel/Margin/Form/ErrorScroll"]
+unique_name_in_owner = true
 layout_mode = 2
-theme_override_constants/separation = 10
+size_flags_horizontal = 3
+autowrap_mode = 3
 
-[node name="LoginButton" type="Button" parent="AuthPanel/Margin/Form/AuthButtons"]
+[node name="AuthButtons" type="HBoxContainer" parent="AuthShell/AuthPanel/Margin/Form"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="LoginButton" type="Button" parent="AuthShell/AuthPanel/Margin/Form/AuthButtons"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 34)
 layout_mode = 2
 size_flags_horizontal = 3
 text = "登录"
 
-[node name="RegisterButton" type="Button" parent="AuthPanel/Margin/Form/AuthButtons"]
+[node name="RegisterButton" type="Button" parent="AuthShell/AuthPanel/Margin/Form/AuthButtons"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 34)
 layout_mode = 2
 size_flags_horizontal = 3
 text = "注册"
 
-[node name="TapTapCodeInput" type="LineEdit" parent="AuthPanel/Margin/Form"]
+[node name="DebugAuthGroup" type="VBoxContainer" parent="AuthShell/AuthPanel/Margin/Form"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="QuickStartButton" type="Button" parent="AuthShell/AuthPanel/Margin/Form/DebugAuthGroup"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 36)
+layout_mode = 2
+text = "快速开始"
+
+[node name="TapTapCodeInput" type="LineEdit" parent="AuthShell/AuthPanel/Margin/Form/DebugAuthGroup"]
 unique_name_in_owner = true
 layout_mode = 2
 placeholder_text = "TapTap 授权码"
 
-[node name="TapTapButton" type="Button" parent="AuthPanel/Margin/Form"]
+[node name="TapTapButton" type="Button" parent="AuthShell/AuthPanel/Margin/Form/DebugAuthGroup"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 34)
 layout_mode = 2
 text = "TapTap 授权码登录"
-
-[node name="ErrorScroll" type="ScrollContainer" parent="AuthPanel/Margin/Form"]
-custom_minimum_size = Vector2(0, 58)
-layout_mode = 2
-horizontal_scroll_mode = 0
-
-[node name="ErrorLabel" type="Label" parent="AuthPanel/Margin/Form/ErrorScroll"]
-unique_name_in_owner = true
-layout_mode = 2
-size_flags_horizontal = 3
-autowrap_mode = 3
