@@ -995,6 +995,10 @@ func _render_class_reward_select(parent: HBoxContainer, run: Dictionary) -> void
 			button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 			button.pressed.connect(_show_class_reward_modal.bind(choice))
 			grid.add_child(button)
+			_add_choice_label(button, "RewardChoiceName_%s" % def_id, _fallback(str(def.get("name", "")), def_id))
+			_add_choice_label(button, "RewardChoiceTag_%s" % def_id, _quality_label(str(choice.get("quality", ""))))
+			_add_choice_label(button, "RewardChoiceMeta_%s" % def_id, "%s格%s" % [_fallback(_detail_size_text(def), "?"), " · %s" % _map_preview_trigger_text(choice) if not _map_preview_trigger_text(choice).is_empty() else ""])
+			_add_choice_label(button, "RewardChoiceCopy_%s" % def_id, _fallback(str(def.get("description", "")), str(choice.get("quality", ""))))
 	var submit := _disabled_action_button("领取职业装备")
 	submit.name = "ChoiceSubmit"
 	if not choices.is_empty() and choices[0] is Dictionary:
@@ -1035,6 +1039,10 @@ func _render_relic_choice_select(parent: VBoxContainer, run: Dictionary) -> void
 			button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 			button.pressed.connect(_show_relic_choice_modal.bind(choice))
 			grid.add_child(button)
+			_add_choice_label(button, "RelicGlyph_%s" % relic_id, "遗物")
+			_add_choice_label(button, "RelicChoiceName_%s" % relic_id, _fallback(str(def.get("name", "")), relic_id))
+			_add_choice_label(button, "RelicChoiceTag_%s" % relic_id, _quality_label(str(choice.get("quality", ""))))
+			_add_choice_label(button, "RelicChoiceCopy_%s" % relic_id, _fallback(str(def.get("description", "")), str(choice.get("quality", ""))))
 	var submit := _disabled_action_button("获得遗物")
 	submit.name = "ChoiceSubmit"
 	if not choices.is_empty() and choices[0] is Dictionary:
@@ -1060,11 +1068,16 @@ func _render_upgrade_choice_select(parent: VBoxContainer, run: Dictionary) -> vo
 	card.custom_minimum_size = Vector2(220, 120)
 	card.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	grid.add_child(card)
+	var max_quality := _upgrade_shop_max_quality(str(run.get("shopType", "UPGRADE")))
+	_add_choice_label(card, "RewardChoiceIcon_upgrade", "升级")
+	_add_choice_label(card, "RewardChoiceName_upgrade", _shop_name(str(run.get("shopType", "UPGRADE"))))
+	_add_choice_label(card, "RewardChoiceTag_upgrade", "可升级 %d 件" % _upgradeable_item_count(run, max_quality))
+	_add_choice_label(card, "RewardChoiceCopy_upgrade", "%s及以上品质不能在本商店继续提升。" % _quality_label(max_quality))
 	if selected_item_id.is_empty():
 		panel.add_child(_disabled_action_button("先选中装备再升级"))
 	else:
 		panel.add_child(_run_action_button("升级选中装备", _select_upgrade_item))
-	var submit := _run_action_button("跳过升级", _call_session.bind("skip_upgrade_choice", []))
+	var submit := _run_action_button("放弃升级", _call_session.bind("skip_upgrade_choice", []))
 	submit.name = "ChoiceSubmit"
 	panel.add_child(submit)
 
@@ -1081,6 +1094,8 @@ func _render_enchant_choice_select(parent: VBoxContainer, run: Dictionary) -> vo
 	, func(choice: Dictionary) -> Callable:
 		return _show_enchant_choice_modal.bind(choice)
 	)
+	var selected_label := _enchant_choice_label(_array(run, "enchantChoices")[0]) if not _array(run, "enchantChoices").is_empty() and _array(run, "enchantChoices")[0] is Dictionary else "请选择附魔"
+	_add_choice_label(panel, "RewardDisabledReason", "当前选中：%s" % selected_label)
 
 func _render_potion_choice_select(parent: VBoxContainer, run: Dictionary) -> void:
 	var panel := _new_reward_panel(parent, "PotionPanel")
@@ -1095,6 +1110,7 @@ func _render_potion_choice_select(parent: VBoxContainer, run: Dictionary) -> voi
 	, func(choice: Dictionary) -> Callable:
 		return _show_potion_choice_modal.bind(choice)
 	)
+	_add_choice_label(panel, "RewardDisabledReason", "职业装备不可使用药水")
 
 func _render_named_choice_grid(parent: VBoxContainer, choices: Array, node_prefix: String, id_resolver: Callable, label_resolver: Callable, action_resolver: Callable) -> void:
 	var grid := GridContainer.new()
@@ -1114,6 +1130,54 @@ func _render_named_choice_grid(parent: VBoxContainer, choices: Array, node_prefi
 			button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 			button.pressed.connect(action_resolver.call(choice))
 			grid.add_child(button)
+			var is_enchant: bool = choice.has("enchant")
+			var is_potion: bool = choice.has("potion")
+			var choice_name := str(choice.get("description", "")) if is_potion else label
+			var choice_copy := "修改基础触发点数；之后仍会被遗物和其他道具影响。" if is_potion else str(choice.get("description", ""))
+			_add_choice_label(button, "%sIcon_%s" % [node_prefix.trim_suffix("_"), choice_id], "附魔" if is_enchant else "药水" if is_potion else "选择")
+			_add_choice_label(button, "%sName_%s" % [node_prefix.trim_suffix("_"), choice_id], choice_name)
+			_add_choice_label(button, "%sTag_%s" % [node_prefix.trim_suffix("_"), choice_id], "免费" if is_enchant else "药水" if is_potion else "选择")
+			_add_choice_label(button, "%sCopy_%s" % [node_prefix.trim_suffix("_"), choice_id], choice_copy)
+
+func _add_choice_label(parent: Node, node_name: String, text: String) -> Label:
+	var label := Label.new()
+	label.name = node_name
+	label.text = text
+	label.custom_minimum_size = Vector2(0, 22)
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	label.add_theme_color_override("font_color", UiTokens.ink_color())
+	parent.add_child(label)
+	return label
+
+func _upgrade_shop_max_quality(shop_type: String) -> String:
+	match shop_type:
+		"UPGRADE_GOLD":
+			return "GOLD"
+		"UPGRADE_DIAMOND":
+			return "DIAMOND"
+		_:
+			return "SILVER"
+
+func _upgradeable_item_count(run: Dictionary, max_quality: String) -> int:
+	var count := 0
+	var max_rank := _quality_rank(max_quality)
+	for item in _array(run, "items"):
+		if item is Dictionary and _quality_rank(str((item as Dictionary).get("quality", ""))) < max_rank:
+			count += 1
+	return count
+
+func _quality_rank(quality: String) -> int:
+	match quality:
+		"BRONZE":
+			return 0
+		"SILVER":
+			return 1
+		"GOLD":
+			return 2
+		"DIAMOND":
+			return 3
+		_:
+			return 0
 
 func _render_reward_empty_panel(parent: HBoxContainer) -> void:
 	var panel := VBoxContainer.new()
