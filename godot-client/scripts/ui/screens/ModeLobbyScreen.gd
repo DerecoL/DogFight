@@ -11,8 +11,10 @@ var history_rank_label: Label
 var history_rank_meta_label: Label
 var history_best_label: Label
 var history_run_list: VBoxContainer
+var tutorial_guide_panel: PanelContainer
 var action_buttons: Array[Button] = []
 var action_in_progress := false
+var tutorial_active := false
 
 func _ready() -> void:
 	_build_lobby()
@@ -89,6 +91,7 @@ func _build_lobby() -> void:
 	tutorial_button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	tutorial_button.pressed.connect(_replay_tutorial)
 	box.add_child(_track_action_button(tutorial_button))
+	_build_tutorial_guide()
 
 	var mode_entries := GridContainer.new()
 	mode_entries.name = "ModeGrid"
@@ -184,6 +187,68 @@ func _add_history_panel(parent: Node) -> void:
 	history_run_list.custom_minimum_size = Vector2(0, 74)
 	history_run_list.add_theme_constant_override("separation", 4)
 	box.add_child(history_run_list)
+
+func _build_tutorial_guide() -> void:
+	tutorial_guide_panel = PanelContainer.new()
+	tutorial_guide_panel.name = "CasualTutorialGuide"
+	tutorial_guide_panel.visible = false
+	tutorial_guide_panel.custom_minimum_size = Vector2(360, 220)
+	tutorial_guide_panel.anchor_left = 1.0
+	tutorial_guide_panel.anchor_top = 1.0
+	tutorial_guide_panel.anchor_right = 1.0
+	tutorial_guide_panel.anchor_bottom = 1.0
+	tutorial_guide_panel.offset_left = -388
+	tutorial_guide_panel.offset_top = -248
+	tutorial_guide_panel.offset_right = -28
+	tutorial_guide_panel.offset_bottom = -28
+	tutorial_guide_panel.add_theme_stylebox_override("panel", WebUiTokens.paper_card_style())
+	add_child(tutorial_guide_panel)
+
+	var margin := MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", 16)
+	margin.add_theme_constant_override("margin_top", 16)
+	margin.add_theme_constant_override("margin_right", 16)
+	margin.add_theme_constant_override("margin_bottom", 16)
+	tutorial_guide_panel.add_child(margin)
+
+	var card := VBoxContainer.new()
+	card.name = "TutorialCoachCard"
+	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	card.add_theme_constant_override("separation", 10)
+	margin.add_child(card)
+
+	var tag := Label.new()
+	tag.name = "TutorialTag"
+	tag.text = "新手引导"
+	card.add_child(tag)
+
+	var title := Label.new()
+	title.name = "TutorialTitle"
+	title.text = "新手引导"
+	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	card.add_child(title)
+
+	var body := Label.new()
+	body.name = "TutorialBody"
+	body.text = "先从休闲模式熟悉一局，不影响天梯。"
+	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	card.add_child(body)
+
+	var task := Label.new()
+	task.name = "TutorialTask"
+	task.text = "点击开始休闲模式。"
+	task.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	card.add_child(task)
+
+	var skip := Button.new()
+	skip.name = "TutorialSkipButton"
+	skip.text = "跳过引导"
+	skip.custom_minimum_size = Vector2(0, WebUiTokens.touch_target_height())
+	skip.add_theme_stylebox_override("normal", WebUiTokens.handdrawn_button_style())
+	skip.add_theme_stylebox_override("hover", WebUiTokens.handdrawn_button_hover_style())
+	skip.add_theme_stylebox_override("pressed", WebUiTokens.handdrawn_button_pressed_style())
+	skip.pressed.connect(_hide_tutorial_guide)
+	card.add_child(skip)
 
 func _history_cell(parent: Node, title: String) -> VBoxContainer:
 	var cell := VBoxContainer.new()
@@ -365,11 +430,21 @@ func _enter_ladder() -> void:
 func _replay_tutorial() -> void:
 	if action_in_progress:
 		return
-	if session != null and session.has_method("replay_tutorial"):
-		session.call("replay_tutorial")
-		return
-	if session != null and session.has_method("open_run_lobby"):
-		session.call("open_run_lobby", "CASUAL")
+	_show_tutorial_guide()
+
+func _show_tutorial_guide() -> void:
+	tutorial_active = true
+	if tutorial_guide_panel != null:
+		tutorial_guide_panel.visible = true
+	if casual_button != null:
+		casual_button.add_theme_stylebox_override("normal", WebUiTokens.handdrawn_button_pressed_style())
+
+func _hide_tutorial_guide() -> void:
+	tutorial_active = false
+	if tutorial_guide_panel != null:
+		tutorial_guide_panel.visible = false
+	if casual_button != null:
+		casual_button.add_theme_stylebox_override("normal", WebUiTokens.handdrawn_button_style())
 
 func _continue_run() -> void:
 	if action_in_progress:
