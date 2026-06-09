@@ -9,8 +9,12 @@ func _run() -> void:
 		_fail("RunShellScreen scene failed to load")
 		return
 	var screen = scene.instantiate()
+	var fake_session := FakeSession.new()
+	root.add_child(fake_session)
 	root.add_child(screen)
 	await process_frame
+	if screen.has_method("bind_session"):
+		screen.call("bind_session", fake_session)
 
 	if screen.has_method("set_payload"):
 		screen.call("set_payload", {"run": _run_payload("PREP")})
@@ -34,6 +38,38 @@ func _run() -> void:
 		if not prep_text.contains(part):
 			_fail("Standalone PREP run shell text missing: %s" % part)
 			return
+	var item_button := _find_by_name(screen, "EquipmentBoardItem_equip-1") as Button
+	if item_button == null:
+		_fail("PREP equipment item button is missing")
+		return
+	item_button.pressed.emit()
+	await process_frame
+	if fake_session.upgrade_item_id != "":
+		_fail("PREP equipment click should inspect first instead of immediately upgrading")
+		return
+	for tip_node in [
+		"FloatingTip",
+		"RunShellItemTip",
+		"RunShellItemTipTags",
+		"RunShellItemTipIdentity",
+		"RunShellItemTipSizePreview",
+		"RunShellItemTipDice",
+		"RunShellItemTipDescription",
+		"RunShellItemTipActions",
+		"UpgradeItemButton",
+		"CloseItemTipButton",
+	]:
+		_assert_has(screen, tip_node)
+	var upgrade_button := _find_by_name(screen, "UpgradeItemButton") as Button
+	if upgrade_button == null or upgrade_button.disabled:
+		_fail("PREP selected item tip should expose an enabled upgrade button")
+		return
+	upgrade_button.pressed.emit()
+	await process_frame
+	await process_frame
+	if fake_session.upgrade_item_id != "equip-1":
+		_fail("PREP upgrade button must call upgrade_item(equip-1)")
+		return
 
 	if screen.has_method("set_payload"):
 		screen.call("set_payload", {"run": _run_payload("MATCH")})
@@ -58,10 +94,19 @@ func _run() -> void:
 			return
 
 	screen.queue_free()
+	fake_session.queue_free()
 	for _frame in range(3):
 		await process_frame
 	print("Godot standalone PREP/MATCH run shell Web structure smoke passed")
 	quit(0)
+
+class FakeSession:
+	extends Node
+	var upgrade_item_id := ""
+
+	func upgrade_item(item_id: String) -> bool:
+		upgrade_item_id = item_id
+		return true
 
 func _assert_has(root_node: Node, node_name: String) -> void:
 	if _find_by_name(root_node, node_name) == null:
