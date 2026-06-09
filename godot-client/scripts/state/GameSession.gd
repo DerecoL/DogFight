@@ -30,6 +30,7 @@ var store: AppStore = AppStore.new()
 var run_store: RunStore = store.run
 var lobby_history_data: Dictionary = {}
 var lobby_ladder_data: Dictionary = {}
+var lobby_leaderboard_data: Dictionary = {}
 
 func _ready() -> void:
 	var override_url := OS.get_environment("DOGFIGHT_API_BASE_URL")
@@ -121,6 +122,7 @@ func logout() -> bool:
 	needs_nickname_setup = false
 	lobby_history_data = {}
 	lobby_ladder_data = {}
+	lobby_leaderboard_data = {}
 	api.cookie_header = ""
 	store.set_user({})
 	store.set_current_run({})
@@ -373,6 +375,9 @@ func open_screen(screen_id: String) -> bool:
 	if screen_id == WebUiScreenIds.MODE_LOBBY:
 		_show_mode_lobby_screen()
 		return true
+	if screen_id == WebUiScreenIds.LEADERBOARDS:
+		_show_leaderboards_screen()
+		return true
 	if screen_id == WebUiScreenIds.PLAYABLE_RUN or _screen_uses_playable_run_shell(screen_id):
 		_show_playable_run_screen()
 		return true
@@ -411,7 +416,6 @@ func _screen_uses_playable_shell(screen_id: String) -> bool:
 	return [
 		"account",
 		WebUiScreenIds.ACHIEVEMENTS,
-		WebUiScreenIds.LEADERBOARDS,
 		"apex",
 		WebUiScreenIds.SEASON,
 		WebUiScreenIds.DOGFIGHT_ROOMS,
@@ -634,6 +638,8 @@ func _screen_payload() -> Dictionary:
 	payload["ladderProfile"] = ladder_profile.duplicate(true) if ladder_profile is Dictionary else {}
 	var season = lobby_ladder_data.get("season", {})
 	payload["season"] = season.duplicate(true) if season is Dictionary else {}
+	payload["ladderData"] = lobby_ladder_data.duplicate(true)
+	payload["leaderboardData"] = lobby_leaderboard_data.duplicate(true)
 	return payload
 
 func _refresh_mode_lobby_payload() -> void:
@@ -654,6 +660,25 @@ func _show_mode_lobby_screen() -> void:
 	router.show_screen(WebUiScreenIds.MODE_LOBBY, false)
 	_apply_payload_to_screen(WebUiScreenIds.MODE_LOBBY)
 	call_deferred("_refresh_mode_lobby_payload")
+
+func _show_leaderboards_screen() -> void:
+	if router == null:
+		return
+	router.show_screen(WebUiScreenIds.LEADERBOARDS, false)
+	_apply_payload_to_screen(WebUiScreenIds.LEADERBOARDS)
+	call_deferred("_refresh_leaderboards_payload")
+
+func _refresh_leaderboards_payload() -> void:
+	if api == null or current_user.is_empty() or router == null or str(router.get("current_screen_id")) != WebUiScreenIds.LEADERBOARDS:
+		return
+	var ladder_response := await api.get_json(ApiRoutes.ladder_me())
+	if bool(ladder_response.get("ok", false)):
+		lobby_ladder_data = _response_data(ladder_response)
+	var leaderboard_response := await api.get_json(ApiRoutes.ladder_leaderboard())
+	if bool(leaderboard_response.get("ok", false)):
+		lobby_leaderboard_data = _response_data(leaderboard_response)
+	if router != null and str(router.get("current_screen_id")) == WebUiScreenIds.LEADERBOARDS:
+		_apply_payload_to_screen(WebUiScreenIds.LEADERBOARDS)
 
 func _response_data(response: Dictionary) -> Dictionary:
 	var value = response.get("data", {})

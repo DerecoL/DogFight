@@ -22,12 +22,12 @@ func _run() -> void:
 		_fail("Standalone mode lobby must expose LadderModeButton")
 		return
 	ladder_button.pressed.emit()
-	if not await _wait_for_screen(router, "legacy_run"):
-		_fail("Ladder entry should show leaderboard flow in LegacyRunScreen, got %s" % str(router.get("current_screen_id")))
+	if not await _wait_for_screen(router, "leaderboards"):
+		_fail("Ladder entry should show standalone LeaderboardsScreen, got %s" % str(router.get("current_screen_id")))
 		return
-	var legacy = main.get_node_or_null("ScreenRoot/LegacyRunScreen")
-	if legacy == null or not legacy.visible:
-		_fail("Ladder entry should show LegacyRunScreen leaderboard flow")
+	var leaderboards = main.get_node_or_null("ScreenRoot/LeaderboardsScreen")
+	if leaderboards == null or not leaderboards.visible:
+		_fail("Ladder entry should show LeaderboardsScreen leaderboard flow")
 		return
 	if main.get("run_store").has_run():
 		_fail("Ladder entry without ladder run must not create a run directly")
@@ -35,10 +35,10 @@ func _run() -> void:
 	if not await _wait_for_paths(["/ladder/me", "/ladder/leaderboard"]):
 		_fail("Ladder entry should refresh ladder profile and leaderboard; seen=%s" % str(seen_paths.keys()))
 		return
-	if not await _wait_for_idle(legacy):
+	if not await _wait_for_idle(leaderboards):
 		_fail("Ladder home should finish refreshing before interaction")
 		return
-	var start_ladder_button = legacy.find_child("StartLadderRunButton", true, false) as Button
+	var start_ladder_button = leaderboards.find_child("StartLadderRunButton", true, false) as Button
 	if start_ladder_button == null:
 		_fail("Ladder home must expose StartLadderRunButton")
 		return
@@ -47,7 +47,7 @@ func _run() -> void:
 	if not await _wait_for_path("/runs"):
 		_fail("StartLadderRunButton should POST /runs")
 		return
-	if not await _wait_for_idle(legacy):
+	if not await _wait_for_idle(leaderboards):
 		_fail("StartLadderRunButton should finish refreshing")
 		return
 	if not await _wait_for_run(main, "LADDER"):
@@ -61,6 +61,10 @@ func _run() -> void:
 		return
 	if main.get_node_or_null("ScreenRoot/ModeLobbyScreen").visible:
 		_fail("Created ladder run must hide ModeLobbyScreen")
+		return
+	var legacy = main.get_node_or_null("ScreenRoot/LegacyRunScreen")
+	if legacy == null or not legacy.visible:
+		_fail("Created ladder run must show LegacyRunScreen")
 		return
 	if legacy.find_child("PlaceholderPanel", true, false) != null:
 		_fail("Created ladder run must not show placeholder content")

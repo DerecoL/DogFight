@@ -22,16 +22,15 @@ func _run() -> void:
 		_fail("Main must expose router and playable LegacyRunScreen")
 		return
 
-	var cases := {
+	var legacy_cases := {
 		"account": "账号",
 		"achievements": "成就",
-		"leaderboards": "排行",
 		"apex": "巅峰",
 		"season": "赛季",
 		"dogfight_rooms": "房间",
 		"account_settings": "设置",
 	}
-	for screen_id in cases.keys():
+	for screen_id in legacy_cases.keys():
 		main.call("open_screen", screen_id)
 		await process_frame
 		await process_frame
@@ -44,9 +43,20 @@ func _run() -> void:
 		if legacy.find_child("PlaceholderPanel", true, false) != null:
 			_fail("%s must not show placeholder panel" % screen_id)
 			return
-		if not _collect_text(legacy).contains(str(cases[screen_id])):
-			_fail("%s should show section label %s" % [screen_id, str(cases[screen_id])])
-			return
+
+	main.call("open_screen", "leaderboards")
+	await process_frame
+	await process_frame
+	if str(router.get("current_screen_id")) != "leaderboards":
+		_fail("leaderboards should route to standalone LeaderboardsScreen, got %s" % str(router.get("current_screen_id")))
+		return
+	var leaderboards = main.get_node_or_null("ScreenRoot/LeaderboardsScreen")
+	if leaderboards == null or not leaderboards.visible:
+		_fail("leaderboards should show LeaderboardsScreen")
+		return
+	if leaderboards.find_child("LadderScreen", true, false) == null:
+		_fail("leaderboards should render the Web ladder screen")
+		return
 
 	main.call("open_screen", "account_shop")
 	await process_frame
@@ -67,16 +77,6 @@ func _run() -> void:
 		await process_frame
 	print("Godot peripheral screen routing smoke passed")
 	quit(0)
-
-func _collect_text(node: Node) -> String:
-	var text := ""
-	if node is Label:
-		text += (node as Label).text + "\n"
-	if node is Button:
-		text += (node as Button).text + "\n"
-	for child in node.get_children():
-		text += _collect_text(child)
-	return text
 
 func _fail(message: String) -> void:
 	push_error(message)

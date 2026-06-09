@@ -40,7 +40,6 @@ func _run() -> void:
 		"reward_choice",
 		"run_settlement",
 		"achievements",
-		"leaderboards",
 		"season",
 		"dogfight_rooms",
 		"dogfight_room_detail",
@@ -60,6 +59,22 @@ func _run() -> void:
 		if _any_visible_placeholder(main):
 			_fail("%s must not show any visible placeholder panel" % screen_id)
 			return
+
+	if not main.call("open_screen", "leaderboards"):
+		_fail("open_screen should accept standalone leaderboards")
+		return
+	await process_frame
+	await process_frame
+	if str(router.get("current_screen_id")) != "leaderboards":
+		_fail("leaderboards should stay on standalone LeaderboardsScreen, got %s" % str(router.get("current_screen_id")))
+		return
+	var leaderboards = main.get_node_or_null("ScreenRoot/LeaderboardsScreen")
+	if leaderboards == null or not leaderboards.visible:
+		_fail("leaderboards should show LeaderboardsScreen")
+		return
+	if leaderboards.find_child("PlaceholderPanel", true, false) != null:
+		_fail("leaderboards must not show a placeholder panel")
+		return
 
 	if not main.call("open_screen", "account_shop"):
 		_fail("open_screen should accept standalone account_shop")

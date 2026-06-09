@@ -52,6 +52,23 @@ func _run() -> void:
 		_fail("Direct router display of account_shop must not show a placeholder panel")
 		return
 
+	router.call("show_screen", "leaderboards", false)
+	await process_frame
+	await process_frame
+	if str(router.get("current_screen_id")) != "leaderboards":
+		_fail("Direct router display of leaderboards should stay on standalone leaderboards, got %s" % str(router.get("current_screen_id")))
+		return
+	var leaderboards = main.get_node_or_null("ScreenRoot/LeaderboardsScreen")
+	if leaderboards == null or not leaderboards.visible:
+		_fail("Direct router display of leaderboards should show LeaderboardsScreen")
+		return
+	if leaderboards.find_child("LadderScreen", true, false) == null:
+		_fail("LeaderboardsScreen must show the Web ladder screen")
+		return
+	if _any_visible_placeholder(main):
+		_fail("Direct router display of leaderboards must not show a placeholder panel")
+		return
+
 	for screen_id in [
 		"run_shell",
 		"exploration_map",
@@ -59,7 +76,6 @@ func _run() -> void:
 		"reward_choice",
 		"run_settlement",
 		"achievements",
-		"leaderboards",
 		"season",
 		"dogfight_rooms",
 		"dogfight_room_detail",
