@@ -1602,32 +1602,126 @@ func _render_shop_tab() -> void:
 				card.add_child(_action_button(_shop_catalog_button_label(item), _show_cosmetic_modal.bind(item)))
 
 func _render_leaderboards_tab() -> void:
-	var ladder_card := _section("天梯排行榜")
+	var screen := VBoxContainer.new()
+	screen.name = "LadderScreen"
+	screen.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	screen.add_theme_constant_override("separation", 16)
+	content.add_child(screen)
+	var heading := VBoxContainer.new()
+	heading.name = "LadderHeading"
+	heading.add_theme_constant_override("separation", 4)
+	screen.add_child(heading)
+	var season: Dictionary = _dict(ladder_data, "season")
+	_add_plain_line(heading, "天梯模式")
+	_add_plain_line(heading, "天梯排行榜")
+	_add_plain_line(heading, "当前赛季：%s · 12 胜或 5 败结算积分，低段位更宽松，高段位按犬王积分榜竞争。" % str(season.get("name", "读取中")))
+	var layout := GridContainer.new()
+	layout.name = "LadderLayout"
+	layout.columns = 2
+	layout.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	layout.add_theme_constant_override("h_separation", 14)
+	layout.add_theme_constant_override("v_separation", 14)
+	screen.add_child(layout)
 	var player_profile: Dictionary = _dict(leaderboard_data, "playerProfile")
-	_add_line(ladder_card, "当前段位", "%d 局 · %d胜 %d负" % [int(player_profile.get("gamesPlayed", 0)), int(player_profile.get("totalWins", 0)), int(player_profile.get("totalLosses", 0))])
-	_add_line(ladder_card, _tier_display_label(player_profile), "%d分" % int(player_profile.get("score", 0)))
-	_add_line(ladder_card, "积分进度", _ladder_score_text(player_profile))
+	if player_profile.is_empty():
+		player_profile = _dict(ladder_data, "profile")
+	var tier_panel := _ladder_panel("CurrentTierPanel")
+	layout.add_child(tier_panel)
+	_add_line(tier_panel, "当前段位", "%d 局 · %d胜 %d负" % [int(player_profile.get("gamesPlayed", 0)), int(player_profile.get("totalWins", 0)), int(player_profile.get("totalLosses", 0))])
+	var rank := Label.new()
+	rank.name = "LadderRank"
+	rank.text = _tier_display_label(player_profile)
+	rank.custom_minimum_size = Vector2(0, 42)
+	rank.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	tier_panel.add_child(rank)
+	var progress := ProgressBar.new()
+	progress.name = "LadderProgress"
+	progress.custom_minimum_size = Vector2(0, 24)
+	progress.max_value = 100
+	progress.value = _ladder_progress_value(player_profile)
+	tier_panel.add_child(progress)
+	_add_line(tier_panel, _tier_display_label(player_profile), "%d分" % int(player_profile.get("score", 0)))
+	_add_line(tier_panel, "积分", _ladder_score_text(player_profile))
 	var player_rank = leaderboard_data.get("playerRank", null)
-	_add_line(ladder_card, "犬王积分榜", "你的犬王排名：第 %d 名" % int(player_rank) if player_rank != null else "进入犬王后参与排名")
+	var board_panel := _ladder_panel("DogKingLeaderboardPanel")
+	layout.add_child(board_panel)
+	_add_line(board_panel, "犬王积分榜", "你的犬王排名：第 %d 名" % int(player_rank) if player_rank != null else "进入犬王后参与排名")
+	var board := VBoxContainer.new()
+	board.name = "LadderBoard"
+	board.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	board.add_theme_constant_override("separation", 8)
+	board_panel.add_child(board)
 	var leaderboard := _array(leaderboard_data, "leaderboard")
 	if leaderboard.is_empty():
-		_add_line(ladder_card, "榜单", "还没有犬王，先冲上大师 500 分。")
+		_add_plain_line(board, "还没有犬王，先冲上大师 500 分。")
 	for entry in leaderboard:
 		if entry is Dictionary:
 			var entry_profile: Dictionary = _dict(entry, "profile")
-			_add_line(ladder_card, "#%d" % int(entry.get("rank", 0)), "%s  %s  %d" % [str(entry.get("title", "")), str(entry.get("name", "")), int(entry_profile.get("score", 0))])
-	var ladder_start := _section("选择天梯狗狗")
+			_ladder_row(board, "LadderRow_%d" % int(entry.get("rank", 0)), "#%d" % int(entry.get("rank", 0)), "%s  %s" % [str(entry.get("title", "")), str(entry.get("name", ""))], str(int(entry_profile.get("score", 0))))
+	var ladder_start := _ladder_panel("LadderStart")
+	screen.add_child(ladder_start)
+	_add_line(ladder_start, "选择天梯狗狗", "开始天梯会进入独立匹配池，并按整局表现结算。")
 	if _current_run_mode() == "LADDER":
 		_add_line(ladder_start, "当前天梯", "已有进行中的天梯跑局，继续当前跑局后再结算积分。")
 		var continue_ladder_button := _action_button("继续天梯模式", _switch_tab.bind(TAB_RUN))
 		continue_ladder_button.name = "ContinueLadderRunButton"
 		ladder_start.add_child(continue_ladder_button)
 	else:
-		_add_line(ladder_start, "说明", "开始天梯会进入独立匹配池，并按整局表现结算。")
 		_render_dog_picker(ladder_start)
 		var start_ladder_button := _action_button("开始天梯", _start_ladder_run)
 		start_ladder_button.name = "StartLadderRunButton"
 		ladder_start.add_child(start_ladder_button)
+	var recent := _array(ladder_data, "recentSettlements")
+	if not recent.is_empty():
+		var recent_panel := _ladder_panel("RecentSettlementsPanel")
+		screen.add_child(recent_panel)
+		_add_line(recent_panel, "最近结算", "积分变化按整局胜败统一计算。")
+		var recent_board := VBoxContainer.new()
+		recent_board.name = "RecentSettlementsBoard"
+		recent_board.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		recent_board.add_theme_constant_override("separation", 8)
+		recent_panel.add_child(recent_board)
+		for settlement in recent:
+			if settlement is Dictionary:
+				_ladder_row(recent_board, "LadderSettlementLine_%s" % str(settlement.get("id", "")), "%d胜%d败" % [int(settlement.get("wins", 0)), int(settlement.get("losses", 0))], "%s %d -> %s %d" % [_tier_label(str(settlement.get("beforeTier", ""))), int(settlement.get("beforeScore", 0)), _tier_label(str(settlement.get("afterTier", ""))), int(settlement.get("afterScore", 0))], _signed_int(int(settlement.get("delta", 0))))
+
+func _ladder_panel(node_name: String) -> VBoxContainer:
+	var panel := VBoxContainer.new()
+	panel.name = node_name
+	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	panel.add_theme_constant_override("separation", 12)
+	return panel
+
+func _ladder_row(parent: VBoxContainer, node_name: String, left: String, center: String, right: String) -> void:
+	var row := HBoxContainer.new()
+	row.name = node_name
+	row.custom_minimum_size = Vector2(0, 38)
+	row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_theme_constant_override("separation", 10)
+	parent.add_child(row)
+	var left_label := Label.new()
+	left_label.text = left
+	left_label.custom_minimum_size = Vector2(88, 0)
+	left_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	row.add_child(left_label)
+	var center_label := Label.new()
+	center_label.text = center
+	center_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	center_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	row.add_child(center_label)
+	var right_label := Label.new()
+	right_label.text = right
+	right_label.custom_minimum_size = Vector2(80, 0)
+	right_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	right_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	row.add_child(right_label)
+
+func _ladder_progress_value(profile: Dictionary) -> float:
+	var tier := str(profile.get("tier", ""))
+	var score := int(profile.get("score", 0))
+	if tier == "MASTER" or tier == "DOG_KING":
+		return clamp(float(score) / 500.0 * 100.0, 0.0, 100.0)
+	return clamp(float(score), 0.0, 100.0)
 func _render_apex_tab() -> void:
 	var apex_card := _section("巅峰竞技场")
 	var season: Dictionary = _dict(apex_data, "season")
