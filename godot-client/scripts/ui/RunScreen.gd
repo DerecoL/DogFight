@@ -2543,8 +2543,11 @@ func _render_season_history_list(parent: VBoxContainer, summaries: Array) -> voi
 	title.custom_minimum_size = Vector2(0, 32)
 	title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	title.add_theme_color_override("font_color", UiTokens.ink_color())
+	title.text = "赛季历史"
+	title.name = "SeasonHistoryTitle"
 	heading.add_child(title)
 	var subtitle := Label.new()
+	subtitle.name = "SeasonHistorySubtitle"
 	subtitle.text = "%d 个已结束赛季" % summaries.size() if summaries.size() > 0 else "赛季结束后会保存在这里"
 	subtitle.custom_minimum_size = Vector2(180, 32)
 	subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
@@ -2576,12 +2579,13 @@ func _render_season_history_card(parent: VBoxContainer, summary: Dictionary) -> 
 	row.add_theme_constant_override("separation", 12)
 	panel.add_child(row)
 	var text_box := VBoxContainer.new()
+	text_box.name = "SeasonHistoryCardText_%s" % summary_id
 	text_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	text_box.add_theme_constant_override("separation", 4)
 	row.add_child(text_box)
-	_add_plain_line(text_box, str(summary.get("seasonName", summary.get("seasonId", ""))))
-	_add_plain_line(text_box, _season_ladder_summary_text(summary))
-	_add_plain_line(text_box, _season_apex_summary_text(summary))
+	_named_plain_line(text_box, "SeasonHistoryName_%s" % summary_id, str(summary.get("seasonName", summary.get("seasonId", ""))))
+	_named_plain_line(text_box, "SeasonHistoryLadder_%s" % summary_id, _season_ladder_summary_text(summary))
+	_named_plain_line(text_box, "SeasonHistoryApex_%s" % summary_id, _season_apex_summary_text(summary))
 	var snapshot: Dictionary = _dict(summary, "apexSnapshot")
 	if not snapshot.is_empty():
 		var snapshot_button := _action_button("巅峰配置快照", _show_snapshot_modal.bind(snapshot, "赛季巅峰快照"))
