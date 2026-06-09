@@ -800,11 +800,22 @@ func _render_web_shop_run(run: Dictionary) -> void:
 	shelf.add_theme_constant_override("separation", 8)
 	workbench.add_child(shelf)
 	var shop_type := str(run.get("shopType", "GENERAL"))
-	_add_line(shelf, _shop_name(shop_type), _shop_description(shop_type))
+	var shelf_heading := HBoxContainer.new()
+	shelf_heading.name = "ShopShelfHeading"
+	shelf_heading.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	shelf_heading.add_theme_constant_override("separation", 12)
+	shelf.add_child(shelf_heading)
+	var shelf_title := VBoxContainer.new()
+	shelf_title.name = "ShopShelfTitle"
+	shelf_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	shelf_title.add_theme_constant_override("separation", 4)
+	shelf_heading.add_child(shelf_title)
+	_add_plain_line(shelf_title, _shop_name(shop_type))
+	_add_plain_line(shelf_title, "点击商品查看详情，确认后再购买。")
 	var shop_actions := HBoxContainer.new()
 	shop_actions.name = "ShopActions"
 	shop_actions.add_theme_constant_override("separation", 8)
-	shelf.add_child(shop_actions)
+	shelf_heading.add_child(shop_actions)
 	var sell_zone := Label.new()
 	sell_zone.name = "SellDropZone"
 	sell_zone.text = "拖到这里出售"
@@ -812,8 +823,9 @@ func _render_web_shop_run(run: Dictionary) -> void:
 	sell_zone.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	sell_zone.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	shop_actions.add_child(sell_zone)
-	shop_actions.add_child(_run_action_button("刷新 %d 金币" % int(run.get("refreshCost", 0)), _call_session.bind("reroll_shop", [])))
-	_add_line(shelf, "提示", "点击商品查看详情，确认后再购买。")
+	var reroll_button := _run_action_button("刷新 %d 金币" % int(run.get("refreshCost", 0)), _call_session.bind("reroll_shop", []))
+	reroll_button.name = "RerollButton"
+	shop_actions.add_child(reroll_button)
 	var offer_row := VBoxContainer.new()
 	offer_row.name = "OfferRow"
 	offer_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -822,8 +834,6 @@ func _render_web_shop_run(run: Dictionary) -> void:
 	for offer in _array(run, "shopItems"):
 		if offer is Dictionary:
 			_render_shop_offer_card(offer_row, run, offer)
-			var card := offer_row.get_child(offer_row.get_child_count() - 1)
-			card.name = "ShopCard_%s" % str((offer as Dictionary).get("offerId", offer_row.get_child_count()))
 	var match_button := _shop_progression_button(run)
 	match_button.name = "MatchButton"
 	shelf.add_child(match_button)
@@ -1552,26 +1562,84 @@ func _shop_progression_button(run: Dictionary) -> Button:
 
 func _render_shop_offer_card(parent: VBoxContainer, run: Dictionary, offer: Dictionary) -> void:
 	var def: Dictionary = _dict(offer, "def")
+	var offer_id := str(offer.get("offerId", parent.get_child_count() + 1))
 	var box := VBoxContainer.new()
+	box.name = "ShopCard_%s" % offer_id
 	box.custom_minimum_size = Vector2(0, 118)
 	box.add_theme_constant_override("separation", 4)
 	parent.add_child(box)
-	var header := _action_button("%s  %s格" % [_offer_label(offer), _detail_size_text(def)], _show_offer_modal.bind(offer))
-	_apply_button_icon(header, _offer_texture(offer))
-	box.add_child(header)
+	var quality_chip := Label.new()
+	quality_chip.name = "ShopQualityChip_%s" % offer_id
+	quality_chip.text = _quality_label(str(offer.get("quality", "")))
+	quality_chip.custom_minimum_size = Vector2(0, 24)
+	quality_chip.add_theme_color_override("font_color", UiTokens.ink_color())
+	box.add_child(quality_chip)
 	var owned_count := _shop_offer_owned_count(run, offer)
 	if owned_count > 0:
-		_add_plain_line(box, "已拥有 x%d" % owned_count)
-	_add_plain_line(box, "价格 %s" % _shop_offer_price_text(offer))
+		var owned_badge := Label.new()
+		owned_badge.name = "ShopOwnedBadge_%s" % offer_id
+		owned_badge.text = "已拥有 x%d" % owned_count
+		owned_badge.custom_minimum_size = Vector2(0, 24)
+		owned_badge.add_theme_color_override("font_color", UiTokens.ink_color())
+		box.add_child(owned_badge)
+	var art_button := _action_button("", _show_offer_modal.bind(offer))
+	art_button.name = "ShopCardArt_%s" % offer_id
+	art_button.custom_minimum_size = Vector2(0, 52)
+	_apply_button_icon(art_button, _offer_texture(offer))
+	box.add_child(art_button)
+	var main := HBoxContainer.new()
+	main.name = "ShopCardMain_%s" % offer_id
+	main.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	main.add_theme_constant_override("separation", 8)
+	box.add_child(main)
+	var name_button := _action_button(_fallback(str(def.get("name", "")), str(offer.get("defId", offer_id))), _show_offer_modal.bind(offer))
+	name_button.name = "ShopName_%s" % offer_id
+	main.add_child(name_button)
+	var size_badge := Label.new()
+	size_badge.name = "ShopSizeBadge_%s" % offer_id
+	size_badge.text = "%s格" % _fallback(_detail_size_text(def), "?")
+	size_badge.custom_minimum_size = Vector2(54, 32)
+	size_badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	size_badge.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	size_badge.add_theme_color_override("font_color", UiTokens.ink_color())
+	main.add_child(size_badge)
+	var meta := HBoxContainer.new()
+	meta.name = "ShopCardMeta_%s" % offer_id
+	meta.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	meta.add_theme_constant_override("separation", 8)
+	box.add_child(meta)
+	var size_preview := Label.new()
+	size_preview.name = "ShopSizePreview_%s" % offer_id
+	size_preview.text = _shop_size_preview_text(def)
+	size_preview.custom_minimum_size = Vector2(70, 28)
+	size_preview.add_theme_color_override("font_color", UiTokens.ink_color())
+	meta.add_child(size_preview)
+	var trigger := _map_preview_trigger_text(offer)
+	if not trigger.is_empty():
+		var dice_line := Label.new()
+		dice_line.name = "ShopDiceLine_%s" % offer_id
+		dice_line.text = "点数 %s" % trigger
+		dice_line.custom_minimum_size = Vector2(86, 28)
+		dice_line.add_theme_color_override("font_color", UiTokens.ink_color())
+		meta.add_child(dice_line)
+	var description := _fallback(str(def.get("description", "")), str(offer.get("description", "")))
+	if not description.is_empty():
+		var effect_line := Label.new()
+		effect_line.name = "ShopEffectLine_%s" % offer_id
+		effect_line.text = description
+		effect_line.custom_minimum_size = Vector2(0, 34)
+		effect_line.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		effect_line.add_theme_color_override("font_color", UiTokens.ink_color())
+		box.add_child(effect_line)
+	var price_tag := Label.new()
+	price_tag.name = "ShopPriceTag_%s" % offer_id
+	price_tag.text = "价格 %s" % _shop_offer_price_text(offer)
+	price_tag.custom_minimum_size = Vector2(0, 28)
+	price_tag.add_theme_color_override("font_color", UiTokens.ink_color())
+	box.add_child(price_tag)
 	var missing_gold := int(offer.get("price", 0)) - int(run.get("gold", 0))
 	if missing_gold > 0:
 		_add_plain_line(box, "金币不足，还差 %d 金币" % missing_gold)
-	var trigger := _map_preview_trigger_text(offer)
-	if not trigger.is_empty():
-		_add_line(box, "触发点数", trigger)
-	var description := _fallback(str(def.get("description", "")), str(offer.get("description", "")))
-	if not description.is_empty():
-		_add_line(box, "效果", description)
 
 func _shop_offer_owned_count(run: Dictionary, offer: Dictionary) -> int:
 	var def_id := str(offer.get("defId", ""))
@@ -1589,6 +1657,15 @@ func _shop_offer_price_text(offer: Dictionary) -> String:
 	if discount > 0.0 and discount < 1.0:
 		text += " · %d折" % int(round(discount * 10.0))
 	return text
+
+func _shop_size_preview_text(def: Dictionary) -> String:
+	var size := int(def.get("size", 0))
+	if size <= 0:
+		return "□□□□"
+	var cells := PackedStringArray()
+	for index in range(4):
+		cells.append("■" if index < size else "□")
+	return "".join(cells)
 
 func _render_map_or_shop(run: Dictionary) -> void:
 	var phase := str(run.get("phase", ""))
