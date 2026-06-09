@@ -22,14 +22,7 @@ func _run() -> void:
 		_fail("Main must expose router and playable LegacyRunScreen")
 		return
 
-	var legacy_cases := {
-		"account": "账号",
-		"achievements": "成就",
-		"apex": "巅峰",
-		"season": "赛季",
-		"account_settings": "设置",
-	}
-	for screen_id in legacy_cases.keys():
+	for screen_id in ["account", "apex", "season", "account_settings"]:
 		main.call("open_screen", screen_id)
 		await process_frame
 		await process_frame
@@ -43,53 +36,31 @@ func _run() -> void:
 			_fail("%s must not show placeholder panel" % screen_id)
 			return
 
-	main.call("open_screen", "leaderboards")
-	await process_frame
-	await process_frame
-	if str(router.get("current_screen_id")) != "leaderboards":
-		_fail("leaderboards should route to standalone LeaderboardsScreen, got %s" % str(router.get("current_screen_id")))
-		return
-	var leaderboards = main.get_node_or_null("ScreenRoot/LeaderboardsScreen")
-	if leaderboards == null or not leaderboards.visible:
-		_fail("leaderboards should show LeaderboardsScreen")
-		return
-	if leaderboards.find_child("LadderScreen", true, false) == null:
-		_fail("leaderboards should render the Web ladder screen")
-		return
-
-	main.call("open_screen", "dogfight_rooms")
-	await process_frame
-	await process_frame
-	if str(router.get("current_screen_id")) != "dogfight_rooms":
-		_fail("dogfight_rooms should route to standalone DogfightRoomsScreen, got %s" % str(router.get("current_screen_id")))
-		return
-	var dogfight_rooms = main.get_node_or_null("ScreenRoot/DogfightRoomsScreen")
-	if dogfight_rooms == null or not dogfight_rooms.visible:
-		_fail("dogfight_rooms should show DogfightRoomsScreen")
-		return
-	if dogfight_rooms.find_child("DogfightScreen", true, false) == null:
-		_fail("dogfight_rooms should render the Web dogfight room list")
-		return
-
-	main.call("open_screen", "account_shop")
-	await process_frame
-	await process_frame
-	if str(router.get("current_screen_id")) != "account_shop":
-		_fail("account_shop should route to standalone AccountShopScreen, got %s" % str(router.get("current_screen_id")))
-		return
-	var account_shop = main.get_node_or_null("ScreenRoot/AccountShopScreen")
-	if account_shop == null or not account_shop.visible:
-		_fail("account_shop should show AccountShopScreen")
-		return
-	if account_shop.find_child("AccountShopPanel", true, false) == null:
-		_fail("account_shop should render the Web account shop panel")
-		return
+	await _assert_standalone(main, router, "leaderboards", "LeaderboardsScreen", "LadderScreen")
+	await _assert_standalone(main, router, "dogfight_rooms", "DogfightRoomsScreen", "DogfightScreen")
+	await _assert_standalone(main, router, "account_shop", "AccountShopScreen", "AccountShopPanel")
+	await _assert_standalone(main, router, "achievements", "AchievementsScreen", "AchievementsScreen")
 
 	main.queue_free()
 	for _frame in range(2):
 		await process_frame
 	print("Godot peripheral screen routing smoke passed")
 	quit(0)
+
+func _assert_standalone(main: Node, router: Node, screen_id: String, node_name: String, required_child: String) -> void:
+	main.call("open_screen", screen_id)
+	await process_frame
+	await process_frame
+	if str(router.get("current_screen_id")) != screen_id:
+		_fail("%s should route to standalone %s, got %s" % [screen_id, node_name, str(router.get("current_screen_id"))])
+		return
+	var screen = main.get_node_or_null("ScreenRoot/%s" % node_name)
+	if screen == null or not screen.visible:
+		_fail("%s should show %s" % [screen_id, node_name])
+		return
+	if screen.find_child(required_child, true, false) == null:
+		_fail("%s should render required Web child %s" % [screen_id, required_child])
+		return
 
 func _fail(message: String) -> void:
 	push_error(message)

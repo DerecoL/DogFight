@@ -420,7 +420,6 @@ func _screen_uses_playable_run_shell(screen_id: String) -> bool:
 func _screen_uses_playable_shell(screen_id: String) -> bool:
 	return [
 		"account",
-		WebUiScreenIds.ACHIEVEMENTS,
 		"apex",
 		WebUiScreenIds.SEASON,
 		WebUiScreenIds.ACCOUNT_SETTINGS,

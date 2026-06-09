@@ -11,18 +11,29 @@ func _run() -> void:
 	var screen = screen_scene.instantiate()
 	root.add_child(screen)
 	await process_frame
-	screen.call("set_payload", {"achievementsData": _achievements_data(), "dailyData": _daily_data()})
+	screen.call("set_payload", {
+		"achievementsData": _achievements_data(),
+		"dailyData": _daily_data(),
+	})
 	await process_frame
+
+	if str(screen.get("playable_redirect_screen_id")) != "":
+		_fail("AchievementsScreen must render standalone UI instead of redirecting to playable shell")
+		return
 
 	for node_name in [
 		"AchievementsScreen",
 		"AchievementsHeading",
+		"AchievementsEyebrow",
+		"AchievementsTitle",
 		"AchievementsCurrencyPill",
 		"DailyTaskPanel",
 		"DailyTaskTitleRow",
 		"DailyTaskRefreshButton",
 		"DailyTaskRow_daily-ready",
 		"DailyTaskAction_daily-ready",
+		"DailyTaskRow_daily-open",
+		"DailyTaskAction_daily-open",
 		"AchievementTabs",
 		"AchievementTab_all",
 		"AchievementTab_combat",
@@ -46,21 +57,48 @@ func _run() -> void:
 	var text := _collect_text(screen)
 	for part in ["长期目标", "成就与每日任务", "500", "每日任务 2026-06-09", "刷新", "商店达人", "购买 5 件商品", "领取 20", "继续挑战", "1/4", "全部", "战斗", "收藏", "首胜", "赢下一场战斗", "1/1 · 30", "领取", "收藏大师", "2/5 · 20", "未完成"]:
 		if not text.contains(part):
-			_fail("Achievements Web text missing: %s" % part)
+			_fail("Achievements standalone Web text missing: %s" % part)
 			return
+
+	var collector_button := _find_by_name(screen, "AchievementAction_collector") as Button
+	if collector_button == null or not collector_button.disabled:
+		_fail("Unfinished achievement action must be disabled")
+		return
 
 	screen.queue_free()
 	for _frame in range(5):
 		await process_frame
-	print("Godot achievements Web structure smoke passed")
+	print("Godot achievements standalone Web structure smoke passed")
 	quit(0)
 
 func _achievements_data() -> Dictionary:
 	return {
 		"wallet": {"balance": 500, "dailyEarned": 60},
 		"achievements": [
-			{"id": "first-win", "title": "首胜", "description": "赢下一场战斗", "category": "战斗", "hidden": false, "progress": 1, "target": 1, "reward": 30, "claimable": true, "claimed": false},
-			{"id": "collector", "title": "收藏大师", "description": "拥有 5 件外观", "category": "收藏", "hidden": true, "progress": 2, "target": 5, "reward": 20, "claimable": false, "claimed": false},
+			{
+				"id": "first-win",
+				"title": "首胜",
+				"description": "赢下一场战斗",
+				"category": "战斗",
+				"hidden": false,
+				"progress": 1,
+				"target": 1,
+				"reward": 30,
+				"claimable": true,
+				"claimed": false,
+			},
+			{
+				"id": "collector",
+				"title": "收藏大师",
+				"description": "拥有 5 件外观",
+				"category": "收藏",
+				"hidden": true,
+				"progress": 2,
+				"target": 5,
+				"reward": 20,
+				"claimable": false,
+				"claimed": false,
+			},
 		],
 	}
 
@@ -70,14 +108,28 @@ func _daily_data() -> Dictionary:
 		"refreshUsed": false,
 		"wallet": {"balance": 500},
 		"tasks": [
-			{"taskId": "daily-ready", "progress": 5, "target": 5, "reward": 20, "claimedAt": "", "def": {"title": "商店达人", "description": "购买 5 件商品"}},
-			{"taskId": "daily-open", "progress": 1, "target": 4, "reward": 10, "claimedAt": "", "def": {"title": "继续挑战", "description": "完成 4 个回合"}},
+			{
+				"taskId": "daily-ready",
+				"progress": 5,
+				"target": 5,
+				"reward": 20,
+				"claimedAt": "",
+				"def": {"title": "商店达人", "description": "购买 5 件商品"},
+			},
+			{
+				"taskId": "daily-open",
+				"progress": 1,
+				"target": 4,
+				"reward": 10,
+				"claimedAt": "",
+				"def": {"title": "继续挑战", "description": "完成 4 个回合"},
+			},
 		],
 	}
 
 func _assert_has(root_node: Node, node_name: String) -> void:
 	if _find_by_name(root_node, node_name) == null:
-		_fail("Missing achievements Web node: %s" % node_name)
+		_fail("Missing achievements standalone Web node: %s" % node_name)
 
 func _find_by_name(node: Node, node_name: String) -> Node:
 	if node.name == node_name:

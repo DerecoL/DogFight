@@ -53,8 +53,26 @@ func _run() -> void:
 		_fail("run_settlement must render a Web settlement surface")
 		return
 
+	if not main.call("open_screen", "achievements"):
+		_fail("open_screen should accept standalone achievements")
+		return
+	await process_frame
+	await process_frame
+	if str(router.get("current_screen_id")) != "achievements":
+		_fail("achievements should stay on standalone AchievementsScreen, got %s" % str(router.get("current_screen_id")))
+		return
+	var achievements = main.get_node_or_null("ScreenRoot/AchievementsScreen")
+	if achievements == null or not achievements.visible:
+		_fail("achievements should show AchievementsScreen")
+		return
+	if achievements.find_child("PlaceholderPanel", true, false) != null:
+		_fail("achievements must not show a placeholder panel")
+		return
+	if achievements.find_child("AchievementsScreen", true, false) == null:
+		_fail("achievements must render a Web achievements surface")
+		return
+
 	for screen_id in [
-		"achievements",
 		"season",
 		"account_settings",
 	]:

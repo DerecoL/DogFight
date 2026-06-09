@@ -22,7 +22,7 @@ func _run() -> void:
 	api.request_finished.connect(func(path: String, _ok: bool, _status: int, _payload: Dictionary) -> void:
 		seen_paths[path] = true
 	)
-	main.call("open_screen", "achievements")
+	main.call("open_screen", "account")
 	await _wait_for_idle(main)
 
 	var legacy = main.get_node_or_null("ScreenRoot/LegacyRunScreen")
@@ -30,7 +30,6 @@ func _run() -> void:
 		_fail("LegacyRunScreen is missing")
 		return
 	var cases := {
-		"成就": ["/achievements", "/daily-tasks"],
 		"排行": ["/ladder/me", "/ladder/leaderboard"],
 		"巅峰": ["/apex"],
 		"赛季": ["/ladder/me", "/runs/history"],

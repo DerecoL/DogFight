@@ -4,78 +4,36 @@ func _init() -> void:
 	_run()
 
 func _run() -> void:
-	var main_scene := load("res://scenes/Main.tscn")
-	if main_scene == null:
-		_fail("Main scene failed to load")
+	var screen_scene := load("res://scenes/screens/AchievementsScreen.tscn")
+	if screen_scene == null:
+		_fail("AchievementsScreen scene failed to load")
 		return
-	var main = main_scene.instantiate()
-	root.add_child(main)
+	var screen = screen_scene.instantiate()
+	root.add_child(screen)
 	await process_frame
-	await process_frame
-
-	var run_screen = main.get_node_or_null("ScreenRoot/LegacyRunScreen")
-	if run_screen == null:
-		_fail("RunScreen is missing")
-		return
-	if run_screen.has_method("bind_session"):
-		run_screen.bind_session(main)
-
-	run_screen.set("achievements_data", {
-		"wallet": {"balance": 500, "dailyEarned": 60},
-		"achievements": [
-			{
-				"id": "first-win",
-				"title": "首胜",
-				"description": "赢下一场战斗",
-				"category": "战斗",
-				"hidden": false,
-				"progress": 1,
-				"target": 1,
-				"reward": 30,
-				"claimable": true,
-				"claimed": false,
-			},
-			{
-				"id": "collector",
-				"title": "收藏大师",
-				"description": "拥有 5 件外观",
-				"category": "收藏",
-				"hidden": true,
-				"progress": 2,
-				"target": 5,
-				"reward": 20,
-				"claimable": false,
-				"claimed": false,
-			},
-			{
-				"id": "claimed-one",
-				"title": "已经领取",
-				"description": "验证已领取状态",
-				"category": "战斗",
-				"hidden": false,
-				"progress": 3,
-				"target": 3,
-				"reward": 10,
-				"claimable": false,
-				"claimed": true,
-			},
-		],
+	screen.call("set_payload", {
+		"achievementsData": {
+			"wallet": {"balance": 500, "dailyEarned": 60},
+			"achievements": [
+				{"id": "first-win", "title": "首胜", "description": "赢下一场战斗", "category": "战斗", "hidden": false, "progress": 1, "target": 1, "reward": 30, "claimable": true, "claimed": false},
+				{"id": "collector", "title": "收藏大师", "description": "拥有 5 件外观", "category": "收藏", "hidden": true, "progress": 2, "target": 5, "reward": 20, "claimable": false, "claimed": false},
+				{"id": "claimed-one", "title": "已经领取", "description": "验证已领取状态", "category": "战斗", "hidden": false, "progress": 3, "target": 3, "reward": 10, "claimable": false, "claimed": true},
+			],
+		},
+		"dailyData": {"dateKey": "2026-06-09", "refreshUsed": false, "tasks": []},
 	})
-	run_screen.set("daily_data", {"dateKey": "2026-06-09", "refreshUsed": false, "tasks": []})
-	run_screen.set("current_tab", "成就")
-	run_screen.call("_render_current_tab")
 	await process_frame
 
-	_assert_achievement_card(run_screen, "first-win", "首胜", "战斗", "赢下一场战斗", 1, 1, "1/1 · 30", "领取", false)
-	_assert_achievement_card(run_screen, "collector", "收藏大师", "收藏", "拥有 5 件外观", 2, 5, "2/5 · 20", "未完成", true)
-	_assert_achievement_card(run_screen, "claimed-one", "已经领取", "战斗", "验证已领取状态", 3, 3, "3/3 · 10", "已领取", true)
+	_assert_achievement_card(screen, "first-win", "首胜", "战斗", "赢下一场战斗", 1, 1, "1/1 · 30", "领取", false)
+	_assert_achievement_card(screen, "collector", "收藏大师", "收藏", "拥有 5 件外观", 2, 5, "2/5 · 20", "未完成", true)
+	_assert_achievement_card(screen, "claimed-one", "已经领取", "战斗", "验证已领取状态", 3, 3, "3/3 · 10", "已领取", true)
 
-	var text := _collect_text(run_screen)
+	var text := _collect_text(screen)
 	if text.contains("隐藏成就"):
 		_fail("Achievement hidden state should be a card style, not visible category text")
 		return
 
-	main.queue_free()
+	screen.queue_free()
 	for _frame in range(5):
 		await process_frame
 	print("Godot achievement card Web detail structure smoke passed")

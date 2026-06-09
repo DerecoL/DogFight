@@ -188,8 +188,24 @@ func _run() -> void:
 		_fail("Direct router display of run_settlement must not show a placeholder panel")
 		return
 
+	router.call("show_screen", "achievements", false)
+	await process_frame
+	await process_frame
+	if str(router.get("current_screen_id")) != "achievements":
+		_fail("Direct router display of achievements should stay on standalone achievements, got %s" % str(router.get("current_screen_id")))
+		return
+	var achievements = main.get_node_or_null("ScreenRoot/AchievementsScreen")
+	if achievements == null or not achievements.visible:
+		_fail("Direct router display of achievements should show AchievementsScreen")
+		return
+	if achievements.find_child("AchievementsScreen", true, false) == null:
+		_fail("AchievementsScreen must render a Web achievements surface")
+		return
+	if _any_visible_placeholder(main):
+		_fail("Direct router display of achievements must not show a placeholder panel")
+		return
+
 	for screen_id in [
-		"achievements",
 		"season",
 		"account_settings",
 	]:
