@@ -23,8 +23,8 @@ func _init() -> void:
 		"RELIC_CHOICE": "reward_choice",
 		"UPGRADE_CHOICE": "reward_choice",
 		"POTION_CHOICE": "reward_choice",
-		"PREP": "legacy_run",
-		"MATCH": "legacy_run",
+		"PREP": "run_shell",
+		"MATCH": "run_shell",
 		"BATTLE": "legacy_run",
 		"COMPLETE": "legacy_run",
 	}

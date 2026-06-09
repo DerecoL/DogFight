@@ -35,16 +35,16 @@ func _init() -> void:
 			return
 
 	var phase_expectations := {
-		"MAP": "legacy_run",
-		"CHOICE": "legacy_run",
-		"CLASS_REWARD": "legacy_run",
-		"ENCHANT_CHOICE": "legacy_run",
-		"RELIC_CHOICE": "legacy_run",
-		"UPGRADE_CHOICE": "legacy_run",
-		"POTION_CHOICE": "legacy_run",
-		"SHOP": "legacy_run",
-		"PREP": "legacy_run",
-		"MATCH": "legacy_run",
+		"MAP": "exploration_map",
+		"CHOICE": "reward_choice",
+		"CLASS_REWARD": "reward_choice",
+		"ENCHANT_CHOICE": "reward_choice",
+		"RELIC_CHOICE": "reward_choice",
+		"UPGRADE_CHOICE": "reward_choice",
+		"POTION_CHOICE": "reward_choice",
+		"SHOP": "run_shop",
+		"PREP": "run_shell",
+		"MATCH": "run_shell",
 		"BATTLE": "battle_replay",
 		"COMPLETE": "legacy_run",
 	}

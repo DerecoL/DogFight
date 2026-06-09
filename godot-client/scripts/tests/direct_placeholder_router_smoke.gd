@@ -154,8 +154,24 @@ func _run() -> void:
 		_fail("Direct router display of reward_choice must not show a placeholder panel")
 		return
 
+	router.call("show_screen", "run_shell", false)
+	await process_frame
+	await process_frame
+	if str(router.get("current_screen_id")) != "run_shell":
+		_fail("Direct router display of run_shell should stay on standalone run_shell, got %s" % str(router.get("current_screen_id")))
+		return
+	var run_shell = main.get_node_or_null("ScreenRoot/RunShellScreen")
+	if run_shell == null or not run_shell.visible:
+		_fail("Direct router display of run_shell should show RunShellScreen")
+		return
+	if run_shell.find_child("RunShellEmpty", true, false) == null and run_shell.find_child("MatchPanel", true, false) == null:
+		_fail("RunShellScreen must render a Web run shell surface")
+		return
+	if _any_visible_placeholder(main):
+		_fail("Direct router display of run_shell must not show a placeholder panel")
+		return
+
 	for screen_id in [
-		"run_shell",
 		"run_settlement",
 		"achievements",
 		"season",

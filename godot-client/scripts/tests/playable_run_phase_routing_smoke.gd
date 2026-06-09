@@ -59,6 +59,21 @@ func _run() -> void:
 				_fail("%s should render standalone RewardPanel" % phase)
 				return
 			continue
+		if ["PREP", "MATCH"].has(phase):
+			if str(router.get("current_screen_id")) != "run_shell":
+				_fail("%s should show standalone RunShellScreen, got %s" % [phase, str(router.get("current_screen_id"))])
+				return
+			var run_shell = main.get_node_or_null("ScreenRoot/RunShellScreen")
+			if run_shell == null or not run_shell.visible or run_shell.find_child("MatchPanel", true, false) == null:
+				_fail("%s should render standalone MatchPanel" % phase)
+				return
+			if phase == "PREP" and run_shell.find_child("MatchActionButton", true, false) == null:
+				_fail("PREP should render MatchActionButton")
+				return
+			if phase == "MATCH" and run_shell.find_child("BattleStartButton", true, false) == null:
+				_fail("MATCH should render BattleStartButton")
+				return
+			continue
 		if not legacy.visible:
 			_fail("Phase %s should show playable LegacyRunScreen, got %s" % [phase, str(router.get("current_screen_id"))])
 			return

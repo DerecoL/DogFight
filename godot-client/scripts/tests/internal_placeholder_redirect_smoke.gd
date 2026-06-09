@@ -34,7 +34,6 @@ func _run() -> void:
 		_fail("mode_lobby must not show a placeholder panel")
 		return
 	for screen_id in [
-		"run_shell",
 		"run_settlement",
 		"achievements",
 		"season",
@@ -149,6 +148,22 @@ func _run() -> void:
 		return
 	if reward_choice.find_child("PlaceholderPanel", true, false) != null:
 		_fail("reward_choice must not show a placeholder panel")
+		return
+
+	if not main.call("open_screen", "run_shell"):
+		_fail("open_screen should accept standalone run_shell")
+		return
+	await process_frame
+	await process_frame
+	if str(router.get("current_screen_id")) != "run_shell":
+		_fail("run_shell should stay on standalone RunShellScreen, got %s" % str(router.get("current_screen_id")))
+		return
+	var run_shell = main.get_node_or_null("ScreenRoot/RunShellScreen")
+	if run_shell == null or not run_shell.visible:
+		_fail("run_shell should show RunShellScreen")
+		return
+	if run_shell.find_child("PlaceholderPanel", true, false) != null:
+		_fail("run_shell must not show a placeholder panel")
 		return
 
 	if not main.call("open_screen", "account_shop"):
