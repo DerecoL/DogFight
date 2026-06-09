@@ -25,7 +25,6 @@ func _run() -> void:
 
 	var expectations := {
 		"account": ["/me", "/runs/history"],
-		"account_shop": ["/shop", "/cosmetics/me"],
 		"achievements": ["/achievements", "/daily-tasks"],
 		"leaderboards": ["/ladder/me", "/ladder/leaderboard"],
 		"apex": ["/apex"],

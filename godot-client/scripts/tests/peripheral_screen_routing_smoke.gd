@@ -24,7 +24,6 @@ func _run() -> void:
 
 	var cases := {
 		"account": "账号",
-		"account_shop": "商城",
 		"achievements": "成就",
 		"leaderboards": "排行",
 		"apex": "巅峰",
@@ -48,6 +47,20 @@ func _run() -> void:
 		if not _collect_text(legacy).contains(str(cases[screen_id])):
 			_fail("%s should show section label %s" % [screen_id, str(cases[screen_id])])
 			return
+
+	main.call("open_screen", "account_shop")
+	await process_frame
+	await process_frame
+	if str(router.get("current_screen_id")) != "account_shop":
+		_fail("account_shop should route to standalone AccountShopScreen, got %s" % str(router.get("current_screen_id")))
+		return
+	var account_shop = main.get_node_or_null("ScreenRoot/AccountShopScreen")
+	if account_shop == null or not account_shop.visible:
+		_fail("account_shop should show AccountShopScreen")
+		return
+	if account_shop.find_child("AccountShopPanel", true, false) == null:
+		_fail("account_shop should render the Web account shop panel")
+		return
 
 	main.queue_free()
 	for _frame in range(2):

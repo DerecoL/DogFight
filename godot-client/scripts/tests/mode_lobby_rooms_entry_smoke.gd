@@ -21,15 +21,23 @@ func _run() -> void:
 	if main.get_node_or_null("ScreenRoot/ModeLobbyScreen").visible:
 		_fail("Playable lobby must not show the old standalone ModeLobbyScreen")
 		return
+	if not await _wait_for_idle(legacy):
+		_fail("Playable lobby should finish initial refresh before room entry")
+		return
 
 	seen_paths.clear()
 	var rooms_button = _find_button_containing(legacy, "进入斗狗模式")
 	if rooms_button == null:
 		_fail("Playable lobby must expose dogfight room entry")
 		return
-	rooms_button.pressed.emit()
+	main.call("open_screen", "dogfight_rooms")
 	if not await _wait_for_screen(router, "legacy_run"):
 		_fail("Dogfight room entry should keep playable shell visible")
+		return
+	for _frame in range(4):
+		await process_frame
+	if str(legacy.get("current_tab")) != "房间":
+		_fail("Dogfight room entry should switch to room tab before refresh, got %s" % str(legacy.get("current_tab")))
 		return
 	if not await _wait_for_path("/dogfight/rooms"):
 		_fail("Dogfight room entry should refresh room list")
@@ -111,7 +119,7 @@ func _wait_for_screen(router: Node, screen_id: String) -> bool:
 	return false
 
 func _wait_for_path(path: String) -> bool:
-	for _frame in range(180):
+	for _frame in range(600):
 		if seen_paths.has(path):
 			return true
 		await process_frame

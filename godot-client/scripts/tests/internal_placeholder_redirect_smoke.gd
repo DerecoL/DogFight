@@ -25,7 +25,6 @@ func _run() -> void:
 		"run_shop",
 		"reward_choice",
 		"run_settlement",
-		"account_shop",
 		"achievements",
 		"leaderboards",
 		"season",
@@ -47,6 +46,22 @@ func _run() -> void:
 		if _any_visible_placeholder(main):
 			_fail("%s must not show any visible placeholder panel" % screen_id)
 			return
+
+	if not main.call("open_screen", "account_shop"):
+		_fail("open_screen should accept standalone account_shop")
+		return
+	await process_frame
+	await process_frame
+	if str(router.get("current_screen_id")) != "account_shop":
+		_fail("account_shop should stay on standalone AccountShopScreen, got %s" % str(router.get("current_screen_id")))
+		return
+	var account_shop = main.get_node_or_null("ScreenRoot/AccountShopScreen")
+	if account_shop == null or not account_shop.visible:
+		_fail("account_shop should show AccountShopScreen")
+		return
+	if account_shop.find_child("PlaceholderPanel", true, false) != null:
+		_fail("account_shop must not show a placeholder panel")
+		return
 
 	main.queue_free()
 	for _frame in range(2):

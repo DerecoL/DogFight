@@ -35,13 +35,29 @@ func _run() -> void:
 		_fail("Direct router display of mode_lobby must not show a placeholder panel")
 		return
 
+	router.call("show_screen", "account_shop", false)
+	await process_frame
+	await process_frame
+	if str(router.get("current_screen_id")) != "account_shop":
+		_fail("Direct router display of account_shop should stay on standalone account_shop, got %s" % str(router.get("current_screen_id")))
+		return
+	var account_shop = main.get_node_or_null("ScreenRoot/AccountShopScreen")
+	if account_shop == null or not account_shop.visible:
+		_fail("Direct router display of account_shop should show AccountShopScreen")
+		return
+	if account_shop.find_child("AccountShopPanel", true, false) == null:
+		_fail("AccountShopScreen must show the Web account shop panel")
+		return
+	if _any_visible_placeholder(main):
+		_fail("Direct router display of account_shop must not show a placeholder panel")
+		return
+
 	for screen_id in [
 		"run_shell",
 		"exploration_map",
 		"run_shop",
 		"reward_choice",
 		"run_settlement",
-		"account_shop",
 		"achievements",
 		"leaderboards",
 		"season",
