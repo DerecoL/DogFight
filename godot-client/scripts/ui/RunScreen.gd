@@ -545,6 +545,9 @@ func _render_run_tab() -> void:
 		_render_web_reward_run(run)
 		_maybe_show_reward_ceremony(run)
 		return
+	if phase == "COMPLETE" or str(run.get("status", "")) == "COMPLETE":
+		_render_web_settlement_run(run)
+		return
 	var summary := _section("当前跑局")
 	_add_line(summary, "阶段", "%s / %s" % [_run_phase_label(str(run.get("phase", ""))), _run_status_label(str(run.get("status", "")))])
 	_add_line(summary, "犬种", "%s  幸运号 %s" % [_dog_name(str(run.get("dogType", ""))), str(run.get("luckyNumber", "-"))])
@@ -1051,6 +1054,131 @@ func _render_reward_empty_panel(parent: HBoxContainer) -> void:
 	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	parent.add_child(panel)
 	_render_screen_heading(panel, "奖励", "暂无可选奖励。")
+
+func _render_web_settlement_run(run: Dictionary) -> void:
+	var root := _render_playable_root()
+	var page := VBoxContainer.new()
+	page.name = "SettlementPage"
+	page.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	page.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	page.add_theme_constant_override("separation", 12)
+	root.add_child(page)
+	var hide_button := _button("隐藏结算", 96)
+	hide_button.name = "SettlementHideButton"
+	hide_button.disabled = true
+	page.add_child(hide_button)
+	var card := VBoxContainer.new()
+	card.name = "SettlementCard"
+	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	card.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	card.add_theme_constant_override("separation", 12)
+	page.add_child(card)
+	var icon := Label.new()
+	icon.name = "SettlementIcon"
+	icon.text = "Trophy"
+	icon.custom_minimum_size = Vector2(0, 38)
+	icon.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	icon.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	card.add_child(icon)
+	var title := Label.new()
+	title.name = "SettlementTitle"
+	title.text = "跑局结束"
+	title.custom_minimum_size = Vector2(0, 40)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	title.add_theme_color_override("font_color", UiTokens.ink_color())
+	card.add_child(title)
+	var legacy_summary := VBoxContainer.new()
+	legacy_summary.name = "SettlementLegacySummary"
+	legacy_summary.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	legacy_summary.add_theme_constant_override("separation", 4)
+	card.add_child(legacy_summary)
+	_add_plain_line(legacy_summary, "跑局结算")
+	_add_line(legacy_summary, "最终战绩", "%d 胜 / %d 负 · 第 %d 回合" % [int(run.get("wins", 0)), int(run.get("losses", 0)), int(run.get("round", 0))])
+	_add_line(legacy_summary, "最终分数", str(int(run.get("score", _run_score(run)))))
+	_add_line(legacy_summary, "资源", "金币 %d · 装备 %d · 遗物 %d" % [int(run.get("gold", 0)), _array(run, "items").size(), _array(run, "relics").size()])
+	var score_grid := GridContainer.new()
+	score_grid.name = "SettlementScoreGrid"
+	score_grid.columns = 3
+	score_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	score_grid.add_theme_constant_override("h_separation", 10)
+	score_grid.add_theme_constant_override("v_separation", 10)
+	card.add_child(score_grid)
+	_add_settlement_metric(score_grid, "SettlementWins", "胜场", str(int(run.get("wins", 0))))
+	_add_settlement_metric(score_grid, "SettlementLosses", "败场", str(int(run.get("losses", 0))))
+	_add_settlement_metric(score_grid, "SettlementScore", "积分", str(int(run.get("score", _run_score(run)))))
+	var settlement: Dictionary = _dict(run, "ladderSettlement")
+	if not settlement.is_empty():
+		_render_ladder_settlement_summary(card, settlement)
+	var battle: Dictionary = _dict(run, "lastBattle")
+	if not battle.is_empty():
+		_render_battle_review_dashboard(card, battle)
+	var return_button := _action_button("返回大厅", _switch_tab.bind(TAB_LOBBY))
+	return_button.name = "ReturnLobbyButton"
+	card.add_child(return_button)
+
+func _add_settlement_metric(parent: GridContainer, node_name: String, label: String, value: String) -> void:
+	var metric := VBoxContainer.new()
+	metric.name = node_name
+	metric.custom_minimum_size = Vector2(120, 74)
+	metric.add_theme_constant_override("separation", 3)
+	parent.add_child(metric)
+	var label_node := Label.new()
+	label_node.text = label
+	label_node.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label_node.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	label_node.custom_minimum_size = Vector2(0, 26)
+	metric.add_child(label_node)
+	var value_node := Label.new()
+	value_node.text = value
+	value_node.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	value_node.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	value_node.custom_minimum_size = Vector2(0, 36)
+	metric.add_child(value_node)
+
+func _render_ladder_settlement_summary(parent: VBoxContainer, settlement: Dictionary) -> void:
+	var summary := VBoxContainer.new()
+	summary.name = "LadderSettlementSummary"
+	summary.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	summary.add_theme_constant_override("separation", 4)
+	parent.add_child(summary)
+	_add_line(summary, "天梯结算", "%s %d -> %s %d  %s" % [_tier_label(str(settlement.get("beforeTier", ""))), int(settlement.get("beforeScore", 0)), _tier_label(str(settlement.get("afterTier", ""))), int(settlement.get("afterScore", 0)), _signed_int(int(settlement.get("delta", 0)))])
+	summary.add_child(_action_button("查看天梯结算详情", _show_ladder_settlement_modal.bind(settlement)))
+
+func _render_battle_review_dashboard(parent: VBoxContainer, battle: Dictionary) -> void:
+	var dashboard := VBoxContainer.new()
+	dashboard.name = "BattleReviewDashboard"
+	dashboard.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	dashboard.add_theme_constant_override("separation", 8)
+	parent.add_child(dashboard)
+	_add_plain_line(dashboard, "战斗复盘")
+	var side_grid := GridContainer.new()
+	side_grid.name = "BattleReviewSideGrid"
+	side_grid.columns = 2
+	side_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	side_grid.add_theme_constant_override("h_separation", 10)
+	dashboard.add_child(side_grid)
+	_render_battle_review_side(side_grid, "BattleReviewPlayer", "我方", _battle_review_damage(battle, ["player", "PLAYER", "我方"]))
+	_render_battle_review_side(side_grid, "BattleReviewOpponent", "对手", _battle_review_damage(battle, ["opponent", "OPPONENT", "对手"]))
+
+func _render_battle_review_side(parent: GridContainer, node_name: String, label: String, damage: int) -> void:
+	var card := VBoxContainer.new()
+	card.name = node_name
+	card.custom_minimum_size = Vector2(180, 86)
+	card.add_theme_constant_override("separation", 4)
+	parent.add_child(card)
+	_add_plain_line(card, label)
+	_add_line(card, "伤害", str(damage))
+
+func _battle_review_damage(battle: Dictionary, side_aliases: Array) -> int:
+	var total := 0
+	for event in _array(battle, "events"):
+		if not event is Dictionary:
+			continue
+		var side := str((event as Dictionary).get("side", ""))
+		if side_aliases.has(side):
+			total += int((event as Dictionary).get("amount", 0))
+	return total
 
 func _render_inventory_board(parent: VBoxContainer, run: Dictionary, include_toolbar: bool) -> void:
 	parent.name = "InventoryBoard"
