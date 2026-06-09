@@ -1277,29 +1277,233 @@ func _render_ladder_settlement_summary(parent: VBoxContainer, settlement: Dictio
 	summary.add_child(_action_button("查看天梯结算详情", _show_ladder_settlement_modal.bind(settlement)))
 
 func _render_battle_review_dashboard(parent: VBoxContainer, battle: Dictionary) -> void:
+	var review := _battle_review_stats(battle)
 	var dashboard := VBoxContainer.new()
 	dashboard.name = "BattleReviewDashboard"
 	dashboard.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	dashboard.add_theme_constant_override("separation", 8)
 	parent.add_child(dashboard)
-	_add_plain_line(dashboard, "战斗复盘")
+	var heading := HBoxContainer.new()
+	heading.name = "BattleReviewHeading"
+	heading.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	heading.add_theme_constant_override("separation", 8)
+	dashboard.add_child(heading)
+	var title := Label.new()
+	title.text = "战斗数据看板"
+	title.custom_minimum_size = Vector2(0, 30)
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	heading.add_child(title)
+	if int(review.get("systemDamage", 0)) > 0:
+		var system_tag := Label.new()
+		system_tag.name = "BattleReviewSystemDamageTag"
+		system_tag.text = "系统伤害 %d" % int(review.get("systemDamage", 0))
+		system_tag.custom_minimum_size = Vector2(126, 30)
+		system_tag.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		system_tag.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		heading.add_child(system_tag)
 	var side_grid := GridContainer.new()
 	side_grid.name = "BattleReviewSideGrid"
 	side_grid.columns = 2
 	side_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	side_grid.add_theme_constant_override("h_separation", 10)
 	dashboard.add_child(side_grid)
-	_render_battle_review_side(side_grid, "BattleReviewPlayer", "我方", _battle_review_damage(battle, ["player", "PLAYER", "我方"]))
-	_render_battle_review_side(side_grid, "BattleReviewOpponent", "对手", _battle_review_damage(battle, ["opponent", "OPPONENT", "对手"]))
+	_render_battle_review_side(side_grid, "BattleReviewPlayer", "我方", _dict(review, "player"))
+	_render_battle_review_side(side_grid, "BattleReviewOpponent", "对手", _dict(review, "opponent"))
 
-func _render_battle_review_side(parent: GridContainer, node_name: String, label: String, damage: int) -> void:
+func _render_battle_review_side(parent: GridContainer, node_name: String, side_label: String, stats: Dictionary) -> void:
 	var card := VBoxContainer.new()
 	card.name = node_name
-	card.custom_minimum_size = Vector2(180, 86)
-	card.add_theme_constant_override("separation", 4)
+	card.custom_minimum_size = Vector2(240, 152)
+	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	card.add_theme_constant_override("separation", 6)
 	parent.add_child(card)
-	_add_plain_line(card, label)
-	_add_line(card, "伤害", str(damage))
+	var header := VBoxContainer.new()
+	header.name = "%sHeader" % node_name
+	header.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	header.add_theme_constant_override("separation", 2)
+	card.add_child(header)
+	_add_plain_line(header, side_label)
+	_add_plain_line(header, _fallback(str(stats.get("label", "")), side_label))
+	var metrics := GridContainer.new()
+	metrics.name = "%sMetrics" % node_name
+	metrics.columns = 5
+	metrics.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	metrics.add_theme_constant_override("h_separation", 6)
+	metrics.add_theme_constant_override("v_separation", 6)
+	card.add_child(metrics)
+	_add_battle_review_metric(metrics, "%sMetricDamage" % node_name, "总伤害", int(stats.get("damage", 0)))
+	_add_battle_review_metric(metrics, "%sMetricHealing" % node_name, "治疗", int(stats.get("healing", 0)))
+	_add_battle_review_metric(metrics, "%sMetricShield" % node_name, "护盾", int(stats.get("shield", 0)))
+	_add_battle_review_metric(metrics, "%sMetricPoison" % node_name, "毒伤", int(stats.get("poisonDamage", 0)))
+	_add_battle_review_metric(metrics, "%sMetricStatuses" % node_name, "状态", int(stats.get("statusEvents", 0)))
+	var top_item := Label.new()
+	top_item.name = "%sTopItem" % node_name
+	top_item.custom_minimum_size = Vector2(0, 36)
+	top_item.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	var top: Dictionary = _dict(stats, "topItem")
+	if top.is_empty():
+		top_item.text = "最高贡献\n暂无明确装备贡献"
+	else:
+		top_item.text = "最高贡献\n%s · %d" % [_fallback(str(top.get("name", "")), str(top.get("itemId", ""))), int(top.get("contribution", 0))]
+	card.add_child(top_item)
+
+func _add_battle_review_metric(parent: GridContainer, node_name: String, label: String, value: int) -> void:
+	var metric := Label.new()
+	metric.name = node_name
+	metric.text = "%s %d" % [label, value]
+	metric.custom_minimum_size = Vector2(82, 42)
+	metric.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	metric.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	metric.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	parent.add_child(metric)
+
+func _battle_review_stats(battle: Dictionary) -> Dictionary:
+	var player := _battle_review_side_stats("player", _dict(battle, "playerSnapshot"))
+	var opponent := _battle_review_side_stats("opponent", _dict(battle, "opponentSnapshot"))
+	var system_damage := 0
+	for raw_event in _array(battle, "events"):
+		if not raw_event is Dictionary:
+			continue
+		var event: Dictionary = raw_event
+		var actor := _battle_review_normalize_side(str(event.get("actor", "")))
+		var kind := str(event.get("kind", ""))
+		var effect_type := str(event.get("effectType", ""))
+		if kind == "POISON" or effect_type == "POISON":
+			if kind == "POISON":
+				var target := str(event.get("target", ""))
+				if target == "both":
+					system_damage += abs(min(0, _battle_review_hp_delta_for_side(event, "player")))
+					system_damage += abs(min(0, _battle_review_hp_delta_for_side(event, "opponent")))
+				elif target == "player":
+					opponent["poisonDamage"] = int(opponent.get("poisonDamage", 0)) + abs(min(0, _battle_review_hp_delta_for_side(event, "player")))
+				elif target == "opponent":
+					player["poisonDamage"] = int(player.get("poisonDamage", 0)) + abs(min(0, _battle_review_hp_delta_for_side(event, "opponent")))
+			elif not actor.is_empty():
+				var poison_stats := _battle_review_stats_for_side(actor, player, opponent)
+				poison_stats["statusEvents"] = int(poison_stats.get("statusEvents", 0)) + 1
+			continue
+		if actor.is_empty():
+			continue
+		var actor_stats := _battle_review_stats_for_side(actor, player, opponent)
+		var actor_delta := _battle_review_hp_delta_for_side(event, actor)
+		var target_side := str(event.get("target", ""))
+		if target_side != "player" and target_side != "opponent":
+			target_side = _battle_review_opposite_side(actor)
+		var target_delta := _battle_review_hp_delta_for_side(event, target_side)
+		if effect_type == "DAMAGE":
+			var damage: int = abs(min(0, target_delta))
+			actor_stats["damage"] = int(actor_stats.get("damage", 0)) + damage
+			_battle_review_add_item_contribution(actor_stats, event, damage)
+			continue
+		if effect_type == "HEAL":
+			var healing: int = max(0, actor_delta)
+			actor_stats["healing"] = int(actor_stats.get("healing", 0)) + healing
+			_battle_review_add_item_contribution(actor_stats, event, healing)
+			continue
+		if _battle_review_is_shield_event(event):
+			var shield: int = max(0, int(event.get("amount", 0)))
+			actor_stats["shield"] = int(actor_stats.get("shield", 0)) + shield
+			_battle_review_add_item_contribution(actor_stats, event, shield)
+			continue
+		if _battle_review_is_status_event(event):
+			actor_stats["statusEvents"] = int(actor_stats.get("statusEvents", 0)) + 1
+	return {
+		"systemDamage": system_damage,
+		"player": _battle_review_finalize_side(player),
+		"opponent": _battle_review_finalize_side(opponent),
+	}
+
+func _battle_review_side_stats(side: String, snapshot: Dictionary) -> Dictionary:
+	var item_names := {}
+	for raw_item in _array(snapshot, "items"):
+		if raw_item is Dictionary:
+			var item: Dictionary = raw_item
+			var def: Dictionary = _dict(item, "def")
+			item_names[str(item.get("id", ""))] = _fallback(str(def.get("name", "")), str(item.get("defId", item.get("id", ""))))
+	return {
+		"side": side,
+		"label": _fallback(str(snapshot.get("name", "")), "我方" if side == "player" else "对手"),
+		"damage": 0,
+		"healing": 0,
+		"shield": 0,
+		"poisonDamage": 0,
+		"statusEvents": 0,
+		"itemContribution": {},
+		"itemNames": item_names,
+	}
+
+func _battle_review_finalize_side(stats: Dictionary) -> Dictionary:
+	var top_item := {}
+	var contributions: Dictionary = _dict(stats, "itemContribution")
+	var names: Dictionary = _dict(stats, "itemNames")
+	for item_id in contributions.keys():
+		var contribution := int(contributions[item_id])
+		if top_item.is_empty() or contribution > int(top_item.get("contribution", 0)):
+			top_item = {
+				"itemId": str(item_id),
+				"name": _fallback(str(names.get(item_id, "")), str(item_id)),
+				"contribution": contribution,
+			}
+	var result := stats.duplicate(true)
+	result["topItem"] = top_item
+	result.erase("itemContribution")
+	result.erase("itemNames")
+	return result
+
+func _battle_review_stats_for_side(side: String, player: Dictionary, opponent: Dictionary) -> Dictionary:
+	return player if side == "player" else opponent
+
+func _battle_review_normalize_side(side: String) -> String:
+	if side == "player" or side == "opponent":
+		return side
+	return ""
+
+func _battle_review_opposite_side(side: String) -> String:
+	return "opponent" if side == "player" else "player"
+
+func _battle_review_hp_delta_for_side(event: Dictionary, side: String) -> int:
+	if str(event.get("target", "")) == "both":
+		return int(event.get("sourceHpDelta", 0)) if side == "player" else int(event.get("targetHpDelta", 0))
+	if str(event.get("actor", "")) == "system":
+		if str(event.get("target", "")) == side:
+			return int(event.get("sourceHpDelta", 0)) if side == "player" else int(event.get("targetHpDelta", 0))
+		return 0
+	if str(event.get("actor", "")) == side:
+		return int(event.get("sourceHpDelta", 0))
+	if str(event.get("target", "")) == side:
+		return int(event.get("targetHpDelta", 0))
+	return 0
+
+func _battle_review_add_item_contribution(stats: Dictionary, event: Dictionary, amount: int) -> void:
+	var item_id := str(event.get("itemId", ""))
+	if item_id.is_empty() or amount <= 0:
+		return
+	var contributions: Dictionary = _dict(stats, "itemContribution")
+	contributions[item_id] = int(contributions.get(item_id, 0)) + amount
+	stats["itemContribution"] = contributions
+
+func _battle_review_is_shield_event(event: Dictionary) -> bool:
+	var status_changed = event.get("statusChanged", [])
+	return str(event.get("effectType", "")) == "UTILITY" and (
+		(status_changed is Array and (status_changed as Array).has("shield"))
+		or str(event.get("text", "")).contains("护盾")
+		or str(event.get("text", "")).to_lower().contains("shield")
+	)
+
+func _battle_review_is_status_event(event: Dictionary) -> bool:
+	var text := str(event.get("text", ""))
+	var status_changed = event.get("statusChanged", [])
+	return (
+		(status_changed is Array and not (status_changed as Array).is_empty())
+		or str(event.get("effectType", "")) == "POISON"
+		or text.contains("中毒")
+		or text.contains("虚弱")
+		or text.contains("冻结")
+		or text.to_lower().contains("poison")
+		or text.to_lower().contains("weak")
+		or text.to_lower().contains("freeze")
+	)
 
 func _battle_review_damage(battle: Dictionary, side_aliases: Array) -> int:
 	var total := 0
