@@ -2821,7 +2821,7 @@ func _render_cosmetic_group(parent: VBoxContainer, cosmetic_type: String) -> voi
 	group.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	group.add_theme_constant_override("separation", 10)
 	parent.add_child(group)
-	_add_plain_line(group, _cosmetic_type_label(cosmetic_type))
+	_named_plain_line(group, "CosmeticGroupHeading_%s" % cosmetic_type, _cosmetic_type_label(cosmetic_type))
 	var grid := GridContainer.new()
 	grid.name = "CosmeticGrid_%s" % cosmetic_type
 	grid.columns = 3
@@ -2846,14 +2846,20 @@ func _render_cosmetic_group(parent: VBoxContainer, cosmetic_type: String) -> voi
 
 func _render_default_cosmetic_card(parent: GridContainer, cosmetic_type: String) -> void:
 	var card := _cosmetic_card_container(parent, "CosmeticDefaultCard_%s" % cosmetic_type)
+	_named_plain_line(card, "CosmeticDefaultBadge_%s" % cosmetic_type, _cosmetic_type_label(cosmetic_type))
 	_add_plain_line(card, _default_cosmetic_name(cosmetic_type))
 	_add_plain_line(card, _default_cosmetic_description(cosmetic_type))
 	_add_plain_line(card, "默认 · 免费")
 	var action_row := HBoxContainer.new()
+	(card.get_child(1) as Label).name = "CosmeticDefaultName_%s" % cosmetic_type
+	(card.get_child(2) as Label).name = "CosmeticDefaultDescription_%s" % cosmetic_type
+	(card.get_child(3) as Label).name = "CosmeticDefaultMeta_%s" % cosmetic_type
+	action_row.name = "CosmeticDefaultActions_%s" % cosmetic_type
 	action_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	action_row.add_theme_constant_override("separation", 8)
 	card.add_child(action_row)
 	var state := Label.new()
+	state.name = "CosmeticDefaultState_%s" % cosmetic_type
 	var default_equipped := _is_default_cosmetic_equipped(cosmetic_type)
 	state.text = "当前默认" if default_equipped else "初始外观"
 	state.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -2872,16 +2878,22 @@ func _render_default_cosmetic_card(parent: GridContainer, cosmetic_type: String)
 func _render_owned_cosmetic_card(parent: GridContainer, raw_item: Dictionary) -> void:
 	var catalog_item_id := _cosmetic_catalog_id(raw_item)
 	var card := _cosmetic_card_container(parent, "CosmeticCard_%s" % catalog_item_id)
+	_named_plain_line(card, "CosmeticBadge_%s" % catalog_item_id, _cosmetic_type_label(_cosmetic_type(raw_item)))
 	_add_plain_line(card, _cosmetic_display_name(raw_item))
 	var item := _cosmetic_item(raw_item)
 	_add_plain_line(card, str(item.get("description", "")))
 	_add_plain_line(card, "%s · 已拥有" % _rarity_label(str(item.get("rarity", ""))))
 	var action_row := HBoxContainer.new()
+	(card.get_child(1) as Label).name = "CosmeticName_%s" % catalog_item_id
+	(card.get_child(2) as Label).name = "CosmeticDescription_%s" % catalog_item_id
+	(card.get_child(3) as Label).name = "CosmeticMeta_%s" % catalog_item_id
+	action_row.name = "CosmeticActions_%s" % catalog_item_id
 	action_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	action_row.add_theme_constant_override("separation", 8)
 	card.add_child(action_row)
 	var is_equipped := _is_cosmetic_equipped(raw_item)
 	var state := Label.new()
+	state.name = "CosmeticState_%s" % catalog_item_id
 	state.text = "当前装备" if is_equipped else "可装备"
 	state.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	state.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -5558,7 +5570,7 @@ func _add_line(parent: VBoxContainer, label: String, value: String) -> void:
 	row.add_theme_color_override("font_color", UiTokens.ink_color())
 	parent.add_child(row)
 
-func _add_plain_line(parent: Node, text: String) -> void:
+func _add_plain_line(parent: Node, text: String) -> Label:
 	var row := Label.new()
 	row.custom_minimum_size = Vector2(0, 24)
 	row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -5566,6 +5578,12 @@ func _add_plain_line(parent: Node, text: String) -> void:
 	row.text = text
 	row.add_theme_color_override("font_color", UiTokens.ink_color())
 	parent.add_child(row)
+	return row
+
+func _named_plain_line(parent: Node, node_name: String, text: String) -> Label:
+	var row := _add_plain_line(parent, text)
+	row.name = node_name
+	return row
 
 func _apply_button_style(button: Button) -> void:
 	button.custom_minimum_size.y = max(button.custom_minimum_size.y, UiTokens.touch_target_height())
