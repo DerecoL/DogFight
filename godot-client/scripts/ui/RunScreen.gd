@@ -1723,34 +1723,154 @@ func _ladder_progress_value(profile: Dictionary) -> float:
 		return clamp(float(score) / 500.0 * 100.0, 0.0, 100.0)
 	return clamp(float(score), 0.0, 100.0)
 func _render_apex_tab() -> void:
-	var apex_card := _section("巅峰竞技场")
+	var screen := VBoxContainer.new()
+	screen.name = "ApexScreen"
+	screen.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	screen.add_theme_constant_override("separation", 14)
+	content.add_child(screen)
+	var heading := VBoxContainer.new()
+	heading.name = "ApexHeading"
+	heading.add_theme_constant_override("separation", 4)
+	screen.add_child(heading)
 	var season: Dictionary = _dict(apex_data, "season")
-	_add_line(apex_card, "巅峰赛季", str(season.get("name", "读取中")))
-	_add_line(apex_card, "说明", "保存战斗结束后的死数据，自动从榜尾向上挑战，失败后固定在当前名次。")
+	_add_plain_line(heading, "巅峰竞技场")
+	_add_plain_line(heading, "巅峰赛季：%s · 保存战斗结束后的死数据，自动从榜尾向上挑战，失败后固定在当前名次。" % str(season.get("name", "读取中")))
+	var toolbar := HBoxContainer.new()
+	toolbar.name = "ApexToolbar"
+	toolbar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	toolbar.add_theme_constant_override("separation", 8)
+	screen.add_child(toolbar)
+	var refresh_button := _action_button("刷新", _refresh_current_section)
+	refresh_button.name = "ApexRefreshButton"
+	toolbar.add_child(refresh_button)
 	var leaderboards: Dictionary = _dict(apex_data, "leaderboards")
 	var reports: Dictionary = _dict(apex_data, "reports")
 	var submitted_entries: Dictionary = _dict(apex_data, "entries")
 	var submitted_overall: Dictionary = _dict(submitted_entries, "overall")
 	if not submitted_overall.is_empty() and not reports.is_empty():
-		_add_line(apex_card, "提交结果", "%s 已投入巅峰榜" % str(submitted_overall.get("name", "巅峰记录")))
-		_add_line(apex_card, "排名", "总榜%s，当日榜%s。新记录防守连胜从 %d 开始" % [_apex_rank_text(_dict(reports, "overall").get("placementRank", null)), _apex_rank_text(_dict(reports, "daily").get("placementRank", null)), int(submitted_overall.get("challengeWins", 0))])
+		var report := _apex_panel("ApexReport")
+		screen.add_child(report)
+		_add_line(report, "%s 已投入巅峰榜" % str(submitted_overall.get("name", "巅峰记录")), "总榜%s，当日榜%s。新记录防守连胜从 %d 开始" % [_apex_rank_text(_dict(reports, "overall").get("placementRank", null)), _apex_rank_text(_dict(reports, "daily").get("placementRank", null)), int(submitted_overall.get("challengeWins", 0))])
+	var layout := GridContainer.new()
+	layout.name = "ApexLayout"
+	layout.columns = 2
+	layout.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	layout.add_theme_constant_override("h_separation", 14)
+	layout.add_theme_constant_override("v_separation", 14)
+	screen.add_child(layout)
+	var candidates_panel := _apex_panel("ApexCandidates")
+	layout.add_child(candidates_panel)
 	var candidates := _array(apex_data, "candidates")
-	_add_line(apex_card, "可提交完成局", str(candidates.size()) if not candidates.is_empty() else "先在休闲模式完成一局，再回来冲榜。")
+	var candidate_hint := "暂无可提交的完成局。"
+	if not candidates.is_empty():
+		candidate_hint = "选择一只狗进入巅峰竞技场。每只完成局只能提交一次。"
+	_add_line(candidates_panel, "可投入的完成狗", candidate_hint)
+	_add_line(candidates_panel, "可提交完成局", str(candidates.size()) if not candidates.is_empty() else "先在休闲模式完成一局，再回来冲榜。")
+	var candidate_list := VBoxContainer.new()
+	candidate_list.name = "ApexCandidateList"
+	candidate_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	candidate_list.add_theme_constant_override("separation", 8)
+	candidates_panel.add_child(candidate_list)
+	if candidates.is_empty():
+		_add_plain_line(candidate_list, "先在休闲模式完成一局，再回来冲榜。")
 	for candidate in candidates:
 		if candidate is Dictionary:
 			var run_id := str(candidate.get("id", ""))
-			var candidate_text := _apex_run_summary_label(candidate)
-			apex_card.add_child(_action_button("提交巅峰 " + candidate_text, _submit_apex_candidate.bind(run_id)))
+			_render_apex_candidate(candidate_list, candidate, run_id)
+	var leaderboard_panel := _apex_panel("ApexLeaderboard")
+	layout.add_child(leaderboard_panel)
+	var tabs := HBoxContainer.new()
+	tabs.name = "ApexTabs"
+	tabs.add_theme_constant_override("separation", 8)
+	leaderboard_panel.add_child(tabs)
+	var overall_tab := _button("总榜", 72)
+	overall_tab.name = "ApexTab_overall"
+	tabs.add_child(overall_tab)
+	var daily_tab := _button("当日榜", 84)
+	daily_tab.name = "ApexTab_daily"
+	tabs.add_child(daily_tab)
+	_add_line(leaderboard_panel, "总榜", "初始种子会随玩家提交逐步下移")
+	_add_line(leaderboard_panel, "当日榜", "每日 %02d:00 更新 · %s" % [int(apex_data.get("dailyResetHour", 5)), str(apex_data.get("dailyBoardKey", ""))])
+	var rank_list := VBoxContainer.new()
+	rank_list.name = "ApexRankList"
+	rank_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	rank_list.add_theme_constant_override("separation", 8)
+	leaderboard_panel.add_child(rank_list)
 	for board_name in ["overall", "daily"]:
-		if board_name == "daily":
-			_add_line(apex_card, "当日榜", "每日 %02d:00 更新 · %s" % [int(apex_data.get("dailyResetHour", 5)), str(apex_data.get("dailyBoardKey", ""))])
-		else:
-			_add_line(apex_card, "总榜", "初始种子会随玩家提交逐步下移")
 		for entry in _array(leaderboards, board_name).slice(0, 20):
 			if entry is Dictionary:
-				var marker := "我的记录" if bool(entry.get("isMine", false)) else ("种子" if bool(entry.get("isSeed", false)) else "防守连胜 %d" % int(entry.get("challengeWins", 0)))
-				var entry_label := "查看配置  #%s  %s  %s  %s" % [str(entry.get("rank", "-")), str(entry.get("name", "")), _apex_run_summary_label(entry), marker]
-				apex_card.add_child(_action_button(entry_label, _show_snapshot_modal.bind(entry, "巅峰配置详情")))
+				_render_apex_rank_entry(rank_list, entry)
+
+func _apex_panel(node_name: String) -> VBoxContainer:
+	var panel := VBoxContainer.new()
+	panel.name = node_name
+	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	panel.add_theme_constant_override("separation", 10)
+	return panel
+
+func _render_apex_candidate(parent: VBoxContainer, candidate: Dictionary, run_id: String) -> void:
+	var row := HBoxContainer.new()
+	row.name = "ApexCandidate_%s" % run_id
+	row.custom_minimum_size = Vector2(0, 64)
+	row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_theme_constant_override("separation", 10)
+	parent.add_child(row)
+	var avatar := TextureRect.new()
+	avatar.custom_minimum_size = Vector2(54, 54)
+	avatar.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	avatar.texture = _dog_texture(str(candidate.get("dogType", "")))
+	row.add_child(avatar)
+	var text_box := VBoxContainer.new()
+	text_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	text_box.add_theme_constant_override("separation", 2)
+	row.add_child(text_box)
+	_add_plain_line(text_box, "%s · %d胜%d负" % [_dog_name(str(candidate.get("dogType", ""))), int(candidate.get("wins", 0)), int(candidate.get("losses", 0))])
+	_add_plain_line(text_box, "第 %d 回合 · 遗物 %d · 装备 %d" % [int(candidate.get("round", 0)), _array(candidate, "relics").size(), _array(candidate, "items").size()])
+	_add_plain_line(text_box, "提交巅峰 " + _apex_run_summary_label(candidate))
+	var submit_button := _action_button("投入巅峰", _submit_apex_candidate.bind(run_id))
+	submit_button.name = "ApexSubmit_%s" % run_id
+	row.add_child(submit_button)
+
+func _render_apex_rank_entry(parent: VBoxContainer, entry: Dictionary) -> void:
+	var row := HBoxContainer.new()
+	row.name = "ApexRankEntry_%s" % str(entry.get("id", ""))
+	row.custom_minimum_size = Vector2(0, 58)
+	row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_theme_constant_override("separation", 10)
+	parent.add_child(row)
+	var rank_label := Label.new()
+	rank_label.text = "#%s" % str(entry.get("rank", "未上榜"))
+	rank_label.custom_minimum_size = Vector2(72, 0)
+	rank_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	row.add_child(rank_label)
+	var avatar := TextureRect.new()
+	avatar.custom_minimum_size = Vector2(46, 46)
+	avatar.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	avatar.texture = _dog_texture(str(entry.get("dogType", "")))
+	row.add_child(avatar)
+	var text_box := VBoxContainer.new()
+	text_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	text_box.add_theme_constant_override("separation", 2)
+	row.add_child(text_box)
+	_add_plain_line(text_box, str(entry.get("name", "")))
+	_add_plain_line(text_box, "%s · %d胜%d负 · 第 %d 回合" % [_dog_name(str(entry.get("dogType", ""))), int(entry.get("wins", 0)), int(entry.get("losses", 0)), int(entry.get("round", 0))])
+	var marker := "防守连胜 %d" % int(entry.get("challengeWins", 0))
+	if bool(entry.get("isSeed", false)):
+		marker = "种子"
+	if bool(entry.get("isMine", false)):
+		var self_label := Label.new()
+		self_label.text = "我的记录"
+		self_label.custom_minimum_size = Vector2(84, 0)
+		self_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		row.add_child(self_label)
+	var marker_label := Label.new()
+	marker_label.text = marker
+	marker_label.custom_minimum_size = Vector2(108, 0)
+	marker_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	row.add_child(marker_label)
+	var config_button := _action_button("查看配置", _show_snapshot_modal.bind(entry, "巅峰配置详情"))
+	config_button.name = "ApexConfig_%s" % str(entry.get("id", ""))
+	row.add_child(config_button)
 
 func _render_season_tab() -> void:
 	var card := _section("赛季")
