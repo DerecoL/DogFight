@@ -31,6 +31,7 @@ var run_store: RunStore = store.run
 var lobby_history_data: Dictionary = {}
 var lobby_ladder_data: Dictionary = {}
 var lobby_leaderboard_data: Dictionary = {}
+var lobby_apex_data: Dictionary = {}
 var lobby_dogfight_rooms_data: Dictionary = {}
 var lobby_dogfight_active_room_data: Dictionary = {}
 
@@ -125,6 +126,7 @@ func logout() -> bool:
 	lobby_history_data = {}
 	lobby_ladder_data = {}
 	lobby_leaderboard_data = {}
+	lobby_apex_data = {}
 	lobby_dogfight_rooms_data = {}
 	lobby_dogfight_active_room_data = {}
 	api.cookie_header = ""
@@ -382,6 +384,9 @@ func open_screen(screen_id: String) -> bool:
 	if screen_id == WebUiScreenIds.LEADERBOARDS:
 		_show_leaderboards_screen()
 		return true
+	if screen_id == WebUiScreenIds.APEX:
+		_show_apex_screen()
+		return true
 	if screen_id == WebUiScreenIds.DOGFIGHT_ROOMS:
 		_show_dogfight_rooms_screen()
 		return true
@@ -423,7 +428,6 @@ func _screen_uses_playable_run_shell(screen_id: String) -> bool:
 func _screen_uses_playable_shell(screen_id: String) -> bool:
 	return [
 		"account",
-		"apex",
 	].has(screen_id)
 
 func _bind_screen_by_name(node_name: String) -> void:
@@ -643,6 +647,7 @@ func _screen_payload() -> Dictionary:
 	payload["season"] = season.duplicate(true) if season is Dictionary else {}
 	payload["ladderData"] = lobby_ladder_data.duplicate(true)
 	payload["leaderboardData"] = lobby_leaderboard_data.duplicate(true)
+	payload["apexData"] = lobby_apex_data.duplicate(true)
 	payload["dogfightRoomsData"] = lobby_dogfight_rooms_data.duplicate(true)
 	payload["dogfightRoomData"] = lobby_dogfight_active_room_data.duplicate(true)
 	return payload
@@ -672,6 +677,36 @@ func _show_leaderboards_screen() -> void:
 	router.show_screen(WebUiScreenIds.LEADERBOARDS, false)
 	_apply_payload_to_screen(WebUiScreenIds.LEADERBOARDS)
 	call_deferred("_refresh_leaderboards_payload")
+
+func _show_apex_screen() -> void:
+	if router == null:
+		return
+	router.show_screen(WebUiScreenIds.APEX, false)
+	_apply_payload_to_screen(WebUiScreenIds.APEX)
+	call_deferred("refresh_apex_payload")
+
+func refresh_apex_payload() -> void:
+	if api == null or current_user.is_empty() or router == null or str(router.get("current_screen_id")) != WebUiScreenIds.APEX:
+		return
+	var apex_response := await api.get_json(ApiRoutes.apex())
+	if bool(apex_response.get("ok", false)):
+		lobby_apex_data = _response_data(apex_response)
+	if router != null and str(router.get("current_screen_id")) == WebUiScreenIds.APEX:
+		_apply_payload_to_screen(WebUiScreenIds.APEX)
+
+func submit_apex_candidate(run_id: String) -> bool:
+	if api == null or run_id.strip_edges().is_empty():
+		return false
+	var response := await api.post_json(ApiRoutes.apex_submit(), {"runId": run_id})
+	if not bool(response.get("ok", false)):
+		_raise_error(str(response.get("error", "巅峰提交失败")))
+		return false
+	lobby_apex_data = _response_data(response)
+	if router != null and str(router.get("current_screen_id")) == WebUiScreenIds.APEX:
+		_apply_payload_to_screen(WebUiScreenIds.APEX)
+	if toast_bus != null:
+		toast_bus.push("巅峰记录已提交", "success")
+	return true
 
 func _refresh_leaderboards_payload() -> void:
 	if api == null or current_user.is_empty() or router == null or str(router.get("current_screen_id")) != WebUiScreenIds.LEADERBOARDS:

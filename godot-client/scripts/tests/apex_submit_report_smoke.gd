@@ -4,21 +4,29 @@ func _init() -> void:
 	_run()
 
 func _run() -> void:
-	var main_scene := load("res://scenes/Main.tscn")
-	if main_scene == null:
-		_fail("Main scene failed to load")
+	var screen_scene := load("res://scenes/screens/ApexScreen.tscn")
+	if screen_scene == null:
+		_fail("ApexScreen scene failed to load")
 		return
-	var main = main_scene.instantiate()
-	root.add_child(main)
+	var screen = screen_scene.instantiate()
+	root.add_child(screen)
 	await process_frame
+	screen.call("set_payload", {"apexData": _apex_data()})
 	await process_frame
-	var run_screen = main.get_node_or_null("ScreenRoot/LegacyRunScreen")
-	if run_screen != null and run_screen.has_method("bind_session"):
-		run_screen.bind_session(main)
-	if run_screen == null:
-		_fail("RunScreen is missing")
-		return
-	run_screen.set("apex_data", {
+
+	var text := _collect_text(screen)
+	for part in ["巅峰玩家 已投入巅峰榜", "总榜第 7 名", "当日榜未上榜", "防守连胜从 3 开始", "每日 05:00 更新", "我的记录", "查看配置"]:
+		if not text.contains(part):
+			_fail("Apex submit report missing: %s" % part)
+			return
+	screen.queue_free()
+	for _frame in range(5):
+		await process_frame
+	print("Godot apex submit report smoke passed")
+	quit(0)
+
+func _apex_data() -> Dictionary:
+	return {
 		"season": {"name": "第一赛季"},
 		"dailyBoardKey": "2026-06-02",
 		"dailyResetHour": 5,
@@ -65,20 +73,7 @@ func _run() -> void:
 			],
 			"daily": [],
 		},
-	})
-	run_screen.set("current_tab", "巅峰")
-	run_screen.call("_render_current_tab")
-	await process_frame
-	var text := _collect_text(run_screen)
-	for part in ["巅峰玩家 已投入巅峰榜", "总榜第 7 名", "当日榜未上榜", "防守连胜从 3 开始", "每日 05:00 更新", "我的记录", "查看配置"]:
-		if not text.contains(part):
-			_fail("Apex submit report missing: %s" % part)
-			return
-	main.queue_free()
-	for _frame in range(5):
-		await process_frame
-	print("Godot apex submit report smoke passed")
-	quit(0)
+	}
 
 func _collect_text(node: Node) -> String:
 	var text := ""

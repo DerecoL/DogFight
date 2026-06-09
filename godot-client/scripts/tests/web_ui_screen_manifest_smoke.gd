@@ -19,6 +19,7 @@ func _init() -> void:
 		"account_shop": "AccountShopScreen",
 		"achievements": "AchievementsScreen",
 		"leaderboards": "LeaderboardsScreen",
+		"apex": "ApexScreen",
 		"season": "SeasonScreen",
 		"dogfight_rooms": "DogfightRoomsScreen",
 		"dogfight_room_detail": "DogfightRoomDetailScreen",

@@ -4,25 +4,33 @@ func _init() -> void:
 	_run()
 
 func _run() -> void:
-	var main_scene := load("res://scenes/Main.tscn")
-	if main_scene == null:
-		_fail("Main scene failed to load")
+	var screen_scene := load("res://scenes/screens/ApexScreen.tscn")
+	if screen_scene == null:
+		_fail("ApexScreen scene failed to load")
 		return
-	var main = main_scene.instantiate()
-	root.add_child(main)
+	var screen = screen_scene.instantiate()
+	root.add_child(screen)
 	await process_frame
+	screen.call("set_payload", {"apexData": _apex_data()})
 	await process_frame
-	var run_screen = main.get_node_or_null("ScreenRoot/LegacyRunScreen")
-	if run_screen != null and run_screen.has_method("bind_session"):
-		run_screen.bind_session(main)
-	if run_screen == null:
-		_fail("RunScreen is missing")
-		return
-	run_screen.set("leaderboard_data", {
-		"playerProfile": {"tierLabel": "青铜", "score": 0},
-		"leaderboard": [],
-	})
-	run_screen.set("apex_data", {
+
+	var text := _collect_text(screen)
+	for part in ["巅峰竞技场", "巅峰赛季", "可投入的完成狗", "提交巅峰 柴犬", "12胜2负", "第16回合", "遗物 1", "装备 2", "查看配置", "巅峰柴", "柴犬", "我的记录", "雪原萨摩", "萨摩耶", "种子"]:
+		if not text.contains(str(part)):
+			_fail("Apex candidate label missing: %s" % str(part))
+			return
+	for raw in ["SHIBA", "SAMOYED"]:
+		if text.contains(raw):
+			_fail("Apex page leaked raw dog type: %s" % raw)
+			return
+	screen.queue_free()
+	for _frame in range(5):
+		await process_frame
+	print("Godot apex candidate labels smoke passed")
+	quit(0)
+
+func _apex_data() -> Dictionary:
+	return {
 		"season": {"name": "巅峰赛季"},
 		"dailyBoardKey": "2026-06-02",
 		"dailyResetHour": 5,
@@ -45,24 +53,7 @@ func _run() -> void:
 				{"id": "daily-1", "rank": 8, "name": "雪原萨摩", "dogType": "SAMOYED", "wins": 10, "losses": 3, "round": 14, "challengeWins": 1, "isSeed": true, "isMine": false, "items": [], "relics": []},
 			],
 		},
-	})
-	run_screen.set("current_tab", "巅峰")
-	run_screen.call("_render_current_tab")
-	await process_frame
-	var text := _collect_text(run_screen)
-	for part in ["巅峰竞技场", "巅峰赛季", "可提交完成局", "提交巅峰 柴犬", "12胜2负", "第16回合", "遗物 1", "装备 2", "查看配置", "巅峰柴", "柴犬", "我的记录", "雪原萨摩", "萨摩耶", "种子"]:
-		if not text.contains(str(part)):
-			_fail("Apex candidate label missing: %s" % str(part))
-			return
-	for raw in ["SHIBA", "SAMOYED"]:
-		if text.contains(raw):
-			_fail("Apex page leaked raw dog type: %s" % raw)
-			return
-	main.queue_free()
-	for _frame in range(5):
-		await process_frame
-	print("Godot apex candidate labels smoke passed")
-	quit(0)
+	}
 
 func _collect_text(node: Node) -> String:
 	var text := ""

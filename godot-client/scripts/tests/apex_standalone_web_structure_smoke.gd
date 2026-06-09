@@ -4,6 +4,17 @@ func _init() -> void:
 	_run()
 
 func _run() -> void:
+	var manifest = load("res://scripts/ui/web/WebUiScreenIds.gd")
+	if manifest == null:
+		_fail("WebUiScreenIds.gd must load")
+		return
+	if not manifest.screen_ids().has("apex"):
+		_fail("Web UI manifest must expose standalone apex screen")
+		return
+	if str(manifest.node_name_for("apex")) != "ApexScreen":
+		_fail("apex screen must map to ApexScreen")
+		return
+
 	var screen_scene := load("res://scenes/screens/ApexScreen.tscn")
 	if screen_scene == null:
 		_fail("ApexScreen scene failed to load")
@@ -13,6 +24,10 @@ func _run() -> void:
 	await process_frame
 	screen.call("set_payload", {"apexData": _apex_data()})
 	await process_frame
+
+	if str(screen.get("playable_redirect_screen_id")) != "":
+		_fail("ApexScreen must render standalone UI instead of redirecting to playable shell")
+		return
 
 	for node_name in [
 		"ApexScreen",
@@ -46,13 +61,13 @@ func _run() -> void:
 	var text := _collect_text(screen)
 	for part in ["巅峰竞技场", "刷新", "已投入巅峰榜", "可投入的完成狗", "投入巅峰", "总榜", "当日榜", "查看配置", "我的记录", "防守连胜 4"]:
 		if not text.contains(part):
-			_fail("Apex Web text missing: %s" % part)
+			_fail("Apex standalone Web text missing: %s" % part)
 			return
 
 	screen.queue_free()
 	for _frame in range(5):
 		await process_frame
-	print("Godot apex home Web structure smoke passed")
+	print("Godot apex standalone Web structure smoke passed")
 	quit(0)
 
 func _apex_data() -> Dictionary:
@@ -82,7 +97,7 @@ func _apex_data() -> Dictionary:
 
 func _assert_has(root_node: Node, node_name: String) -> void:
 	if _find_by_name(root_node, node_name) == null:
-		_fail("Missing apex Web node: %s" % node_name)
+		_fail("Missing apex standalone Web node: %s" % node_name)
 
 func _find_by_name(node: Node, node_name: String) -> Node:
 	if node.name == node_name:

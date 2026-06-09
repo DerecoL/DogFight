@@ -90,6 +90,25 @@ func _run() -> void:
 		_fail("account_settings must render a Web settings surface")
 		return
 
+	if not main.call("open_screen", "apex"):
+		_fail("open_screen should accept standalone apex")
+		return
+	await process_frame
+	await process_frame
+	if str(router.get("current_screen_id")) != "apex":
+		_fail("apex should stay on standalone ApexScreen, got %s" % str(router.get("current_screen_id")))
+		return
+	var apex = main.get_node_or_null("ScreenRoot/ApexScreen")
+	if apex == null or not apex.visible:
+		_fail("apex should show ApexScreen")
+		return
+	if apex.find_child("PlaceholderPanel", true, false) != null:
+		_fail("apex must not show a placeholder panel")
+		return
+	if apex.find_child("ApexScreen", true, false) == null:
+		_fail("apex must render a Web apex surface")
+		return
+
 	if not main.call("open_screen", "season"):
 		_fail("open_screen should accept standalone season")
 		return

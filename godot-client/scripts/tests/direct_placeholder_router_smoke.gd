@@ -69,6 +69,23 @@ func _run() -> void:
 		_fail("Direct router display of leaderboards must not show a placeholder panel")
 		return
 
+	router.call("show_screen", "apex", false)
+	await process_frame
+	await process_frame
+	if str(router.get("current_screen_id")) != "apex":
+		_fail("Direct router display of apex should stay on standalone apex, got %s" % str(router.get("current_screen_id")))
+		return
+	var apex = main.get_node_or_null("ScreenRoot/ApexScreen")
+	if apex == null or not apex.visible:
+		_fail("Direct router display of apex should show ApexScreen")
+		return
+	if apex.find_child("ApexScreen", true, false) == null:
+		_fail("ApexScreen must show the Web apex screen")
+		return
+	if _any_visible_placeholder(main):
+		_fail("Direct router display of apex must not show a placeholder panel")
+		return
+
 	router.call("show_screen", "dogfight_rooms", false)
 	await process_frame
 	await process_frame

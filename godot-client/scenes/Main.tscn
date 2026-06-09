@@ -1,4 +1,4 @@
-[gd_scene load_steps=20 format=3 uid="uid://dogfight_main"]
+[gd_scene load_steps=21 format=3 uid="uid://dogfight_main"]
 
 [ext_resource type="Script" path="res://scripts/state/GameSession.gd" id="1_session"]
 [ext_resource type="PackedScene" path="res://scenes/LoginScreen.tscn" id="2_login"]
@@ -19,6 +19,7 @@
 [ext_resource type="PackedScene" path="res://scenes/screens/DogfightRoomDetailScreen.tscn" id="17_room_detail"]
 [ext_resource type="PackedScene" path="res://scenes/screens/AccountSettingsScreen.tscn" id="18_settings"]
 [ext_resource type="PackedScene" path="res://scenes/screens/NicknameSetupScreen.tscn" id="19_nickname_setup"]
+[ext_resource type="PackedScene" path="res://scenes/screens/ApexScreen.tscn" id="20_apex"]
 
 [node name="Main" type="Control"]
 layout_mode = 3
@@ -74,6 +75,9 @@ layout_mode = 1
 layout_mode = 1
 
 [node name="LeaderboardsScreen" parent="ScreenRoot" instance=ExtResource("14_leaderboards")]
+layout_mode = 1
+
+[node name="ApexScreen" parent="ScreenRoot" instance=ExtResource("20_apex")]
 layout_mode = 1
 
 [node name="SeasonScreen" parent="ScreenRoot" instance=ExtResource("15_season")]

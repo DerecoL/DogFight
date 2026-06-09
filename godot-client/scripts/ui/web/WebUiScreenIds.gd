@@ -14,6 +14,7 @@ const RUN_SETTLEMENT := "run_settlement"
 const ACCOUNT_SHOP := "account_shop"
 const ACHIEVEMENTS := "achievements"
 const LEADERBOARDS := "leaderboards"
+const APEX := "apex"
 const SEASON := "season"
 const DOGFIGHT_ROOMS := "dogfight_rooms"
 const DOGFIGHT_ROOM_DETAIL := "dogfight_room_detail"
@@ -32,6 +33,7 @@ const SCREEN_NODES := {
 	ACCOUNT_SHOP: "AccountShopScreen",
 	ACHIEVEMENTS: "AchievementsScreen",
 	LEADERBOARDS: "LeaderboardsScreen",
+	APEX: "ApexScreen",
 	SEASON: "SeasonScreen",
 	DOGFIGHT_ROOMS: "DogfightRoomsScreen",
 	DOGFIGHT_ROOM_DETAIL: "DogfightRoomDetailScreen",

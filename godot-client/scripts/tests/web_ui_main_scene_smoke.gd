@@ -12,6 +12,7 @@ func _init() -> void:
 		"account_shop": "res://scenes/screens/AccountShopScreen.tscn",
 		"achievements": "res://scenes/screens/AchievementsScreen.tscn",
 		"leaderboards": "res://scenes/screens/LeaderboardsScreen.tscn",
+		"apex": "res://scenes/screens/ApexScreen.tscn",
 		"season": "res://scenes/screens/SeasonScreen.tscn",
 		"dogfight_rooms": "res://scenes/screens/DogfightRoomsScreen.tscn",
 		"dogfight_room_detail": "res://scenes/screens/DogfightRoomDetailScreen.tscn",
