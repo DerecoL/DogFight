@@ -3691,9 +3691,105 @@ func _show_history_modal() -> void:
 	detail.add_theme_constant_override("separation", 6)
 	layout.add_child(detail)
 	_render_history_run_details(detail, selected_run)
+	for child in box.get_children():
+		box.remove_child(child)
+		child.queue_free()
+	box.name = "HistoryPage"
+	_render_history_modal_web(box, runs, selected_run)
 	_push_modal(modal["panel"])
 
+func _render_history_modal_web(box: VBoxContainer, runs: Array, selected_run: Dictionary) -> void:
+	var header := HBoxContainer.new()
+	header.name = "HistoryPageHeader"
+	header.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	header.add_theme_constant_override("separation", 12)
+	box.add_child(header)
+	var summary := VBoxContainer.new()
+	summary.name = "HistoryHeaderSummary"
+	summary.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	summary.add_theme_constant_override("separation", 4)
+	header.add_child(summary)
+	_named_plain_line(summary, "HistoryHeaderKicker", "个人战绩")
+	_named_plain_line(summary, "HistoryHeaderTitle", "%d胜 %d败" % [int(history_data.get("totalWins", 0)), int(history_data.get("totalLosses", 0))])
+	_named_plain_line(summary, "HistoryHeaderSubtitle", "共 %d 局 · 进行中 %d 局 · 已完成 %d 局" % [int(history_data.get("totalRuns", 0)), int(history_data.get("activeRuns", 0)), int(history_data.get("completedRuns", 0))])
+	var best := VBoxContainer.new()
+	best.name = "HistoryPageBest"
+	best.custom_minimum_size = Vector2(180, 0)
+	best.add_theme_constant_override("separation", 4)
+	header.add_child(best)
+	_named_plain_line(best, "HistoryBestLabel", "最佳成绩")
+	var best_run: Dictionary = _dict(history_data, "bestRun")
+	var best_text := "暂无对局"
+	if not best_run.is_empty():
+		best_text = "%s · %d胜 %d败" % [_dog_name(str(best_run.get("dogType", ""))), int(best_run.get("wins", 0)), int(best_run.get("losses", 0))]
+	_named_plain_line(best, "HistoryBestValue", best_text)
+	var tabs := HBoxContainer.new()
+	tabs.name = "HistoryModeTabs"
+	tabs.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	tabs.add_theme_constant_override("separation", 6)
+	box.add_child(tabs)
+	for tab in _history_mode_tabs():
+		if tab is Dictionary:
+			var tab_id := str(tab.get("id", "ALL"))
+			var count := _history_tab_count(tab_id)
+			var button := _button("%s %d" % [str(tab.get("label", tab_id)), count], 108)
+			button.name = "HistoryTab_%s" % tab_id
+			button.toggle_mode = true
+			button.button_pressed = history_tab == tab_id
+			button.pressed.connect(_select_history_tab.bind(tab_id))
+			tabs.add_child(button)
+	var layout := HBoxContainer.new()
+	layout.name = "HistoryDetailLayout"
+	layout.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	layout.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	layout.add_theme_constant_override("separation", 10)
+	box.add_child(layout)
+	var browser := VBoxContainer.new()
+	browser.name = "HistoryRunBrowser"
+	browser.custom_minimum_size = Vector2(300, 0)
+	browser.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	browser.add_theme_constant_override("separation", 6)
+	layout.add_child(browser)
+	if runs.is_empty():
+		var empty := VBoxContainer.new()
+		empty.name = "HistoryEmptyState"
+		empty.add_theme_constant_override("separation", 4)
+		browser.add_child(empty)
+		_named_plain_line(empty, "HistoryEmptyTitle", "%s暂无记录" % _history_tab_label(history_tab))
+		_named_plain_line(empty, "HistoryEmptyBody", "这个页签已经预留，后续模式接入历史数据后会显示详情。")
+	for run in runs.slice(0, 16):
+		if run is Dictionary:
+			var run_id := str(run.get("id", ""))
+			var row_text := "%s %d胜 %d败 %s · 第 %d 回合 · 装备 %d" % [
+				_dog_name(str(run.get("dogType", ""))),
+				int(run.get("wins", 0)),
+				int(run.get("losses", 0)),
+				_run_status_label(str(run.get("status", ""))),
+				int(run.get("round", 0)),
+				_array(run, "items").size(),
+			]
+			var row := _button(row_text, 292)
+			row.name = "HistoryDetailRow_%s" % run_id
+			row.toggle_mode = true
+			row.button_pressed = run_id == selected_history_run_id
+			row.pressed.connect(_select_history_run.bind(run_id))
+			browser.add_child(row)
+	var detail := VBoxContainer.new()
+	detail.name = "HistorySelectedRun"
+	detail.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	detail.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	detail.add_theme_constant_override("separation", 8)
+	layout.add_child(detail)
+	_render_history_run_details(detail, selected_run)
+
 func _history_mode_tabs() -> Array:
+	return [
+		{"id": "ALL", "label": "全部"},
+		{"id": "CASUAL", "label": "休闲"},
+		{"id": "DOGFIGHT", "label": "斗狗"},
+		{"id": "PEAK", "label": "巅峰"},
+		{"id": "LADDER", "label": "天梯"},
+	]
 	return [
 		{"id": "ALL", "label": "全部"},
 		{"id": "CASUAL", "label": "休闲"},
@@ -3744,6 +3840,48 @@ func _select_history_run(run_id: String) -> void:
 	_show_history_modal()
 
 func _render_history_run_details(parent: VBoxContainer, run: Dictionary) -> void:
+	if run.is_empty():
+		var empty := VBoxContainer.new()
+		empty.name = "HistorySelectedEmpty"
+		empty.add_theme_constant_override("separation", 4)
+		parent.add_child(empty)
+		_named_plain_line(empty, "HistorySelectedEmptyTitle", "没有可查看的对局")
+		_named_plain_line(empty, "HistorySelectedEmptyBody", "开始或完成一局后，会在这里显示装备和遗物详情。")
+		return
+	var title_box := VBoxContainer.new()
+	title_box.name = "HistoryRunTitleBlock"
+	title_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	title_box.add_theme_constant_override("separation", 4)
+	parent.add_child(title_box)
+	_named_plain_line(title_box, "HistoryRunMode", _history_tab_label(str(run.get("mode", ""))))
+	_named_plain_line(title_box, "HistoryRunTitle", "%s · %d胜 %d败" % [_dog_name(str(run.get("dogType", ""))), int(run.get("wins", 0)), int(run.get("losses", 0))])
+	_named_plain_line(title_box, "HistoryRunMeta", "%s · 第 %d 回合 · %s" % [_run_status_label(str(run.get("status", ""))), int(run.get("round", 0)), str(run.get("updatedAt", ""))])
+	var equipment_header := HBoxContainer.new()
+	equipment_header.name = "HistoryEquipmentHeader"
+	equipment_header.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	equipment_header.add_theme_constant_override("separation", 8)
+	parent.add_child(equipment_header)
+	var equipment_title := Label.new()
+	equipment_title.name = "HistoryEquipmentTitle"
+	equipment_title.text = "历史装备栏"
+	equipment_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	equipment_title.add_theme_color_override("font_color", UiTokens.ink_color())
+	equipment_header.add_child(equipment_title)
+	var equipment_hint := Label.new()
+	equipment_hint.name = "HistoryEquipmentHint"
+	equipment_hint.text = "点击查看装备"
+	equipment_hint.add_theme_color_override("font_color", UiTokens.ink_color())
+	equipment_header.add_child(equipment_hint)
+	_render_snapshot_items(parent, "历史装备栏", _filter_area(_array(run, "items"), "EQUIPMENT"))
+	var history_relics := _array(run, "relics")
+	var history_bag := _filter_area(_array(run, "items"), "BAG")
+	_named_plain_line(parent, "HistoryInventorySummary", "遗物 %d 个 · 背包物品 %d 个" % [history_relics.size(), history_bag.size()])
+	for relic in history_relics.slice(0, 6):
+		if relic is Dictionary:
+			var history_relic_def: Dictionary = _dict(relic, "def")
+			var history_relic_title := _fallback(str(history_relic_def.get("name", "")), str(relic.get("relicId", "")))
+			parent.add_child(_action_button("%s  %s" % [history_relic_title, _quality_label(str(relic.get("quality", "")))], _show_snapshot_relic_modal.bind(relic)))
+	return
 	_add_line(parent, "对局详情", "")
 	if run.is_empty():
 		_add_line(parent, "没有可查看的对局", "开始或完成一局后，会在这里显示装备和遗物详情。")

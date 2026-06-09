@@ -26,7 +26,7 @@ func _run() -> void:
 		_fail("History modal was not pushed")
 		return
 	var text := _collect_text(modal_layer)
-	for part in ["个人战绩详情", "全部 2", "休闲 1", "天梯 1", "历史对局列表", "对局详情", "历史装备栏", "遗物 1 个", "背包物品 1 个", "历史牙咬"]:
+	for part in ["个人战绩", "5胜 1败", "全部 2", "休闲 1", "天梯 1", "历史装备栏", "遗物 1 个", "背包物品 1 个", "历史牙咬"]:
 		if not text.contains(str(part)):
 			_fail("History browser missing: %s" % str(part))
 			return
@@ -86,33 +86,11 @@ func _run_entry(id: String, mode: String, dog_type: String, wins: int, losses: i
 		"phase": "COMPLETE",
 		"updatedAt": "2026-06-02T09:00:00.000Z",
 		"items": [
-			{
-				"id": "%s-equipment" % id,
-				"defId": "starter-1",
-				"quality": quality,
-				"area": "EQUIPMENT",
-				"x": 0,
-				"y": 0,
-				"triggerDice": 1,
-				"def": {"name": item_name, "size": 1, "description": description},
-			},
-			{
-				"id": "%s-bag" % id,
-				"defId": "starter-2",
-				"quality": "BRONZE",
-				"area": "BAG",
-				"x": 0,
-				"y": 0,
-				"def": {"name": "历史背包", "size": 1, "description": "背包留存"},
-			},
+			{"id": "%s-equipment" % id, "defId": "starter-1", "quality": quality, "area": "EQUIPMENT", "x": 0, "y": 0, "triggerDice": 1, "def": {"name": item_name, "size": 1, "description": description}},
+			{"id": "%s-bag" % id, "defId": "starter-2", "quality": "BRONZE", "area": "BAG", "x": 0, "y": 0, "def": {"name": "历史背包", "size": 1, "description": "背包留存"}},
 		],
 		"relics": [
-			{
-				"id": "%s-relic" % id,
-				"relicId": "extra-slot",
-				"quality": "GOLD",
-				"def": {"name": "历史遗物", "description": "额外装备槽", "effect": "EXTRA_EQUIPMENT_REDUCED_EFFECT"},
-			},
+			{"id": "%s-relic" % id, "relicId": "extra-slot", "quality": "GOLD", "def": {"name": "历史遗物", "description": "额外装备槽", "effect": "EXTRA_EQUIPMENT_REDUCED_EFFECT"}},
 		],
 	}
 
