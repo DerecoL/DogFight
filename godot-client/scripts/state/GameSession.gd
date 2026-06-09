@@ -422,7 +422,6 @@ func _screen_uses_playable_shell(screen_id: String) -> bool:
 		"account",
 		"apex",
 		WebUiScreenIds.SEASON,
-		WebUiScreenIds.ACCOUNT_SETTINGS,
 	].has(screen_id)
 
 func _bind_screen_by_name(node_name: String) -> void:

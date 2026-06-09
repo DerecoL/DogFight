@@ -72,9 +72,27 @@ func _run() -> void:
 		_fail("achievements must render a Web achievements surface")
 		return
 
+	if not main.call("open_screen", "account_settings"):
+		_fail("open_screen should accept standalone account_settings")
+		return
+	await process_frame
+	await process_frame
+	if str(router.get("current_screen_id")) != "account_settings":
+		_fail("account_settings should stay on standalone AccountSettingsScreen, got %s" % str(router.get("current_screen_id")))
+		return
+	var account_settings = main.get_node_or_null("ScreenRoot/AccountSettingsScreen")
+	if account_settings == null or not account_settings.visible:
+		_fail("account_settings should show AccountSettingsScreen")
+		return
+	if account_settings.find_child("PlaceholderPanel", true, false) != null:
+		_fail("account_settings must not show a placeholder panel")
+		return
+	if account_settings.find_child("AccountSettingsScreen", true, false) == null:
+		_fail("account_settings must render a Web settings surface")
+		return
+
 	for screen_id in [
 		"season",
-		"account_settings",
 	]:
 		if not main.call("open_screen", screen_id):
 			_fail("open_screen should accept internal run screen id: %s" % screen_id)

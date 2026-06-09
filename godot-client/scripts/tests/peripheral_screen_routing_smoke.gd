@@ -22,7 +22,7 @@ func _run() -> void:
 		_fail("Main must expose router and playable LegacyRunScreen")
 		return
 
-	for screen_id in ["account", "apex", "season", "account_settings"]:
+	for screen_id in ["account", "apex", "season"]:
 		main.call("open_screen", screen_id)
 		await process_frame
 		await process_frame
@@ -40,6 +40,7 @@ func _run() -> void:
 	await _assert_standalone(main, router, "dogfight_rooms", "DogfightRoomsScreen", "DogfightScreen")
 	await _assert_standalone(main, router, "account_shop", "AccountShopScreen", "AccountShopPanel")
 	await _assert_standalone(main, router, "achievements", "AchievementsScreen", "AchievementsScreen")
+	await _assert_standalone(main, router, "account_settings", "AccountSettingsScreen", "AccountSettingsScreen")
 
 	main.queue_free()
 	for _frame in range(2):

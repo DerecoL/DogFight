@@ -205,9 +205,25 @@ func _run() -> void:
 		_fail("Direct router display of achievements must not show a placeholder panel")
 		return
 
+	router.call("show_screen", "account_settings", false)
+	await process_frame
+	await process_frame
+	if str(router.get("current_screen_id")) != "account_settings":
+		_fail("Direct router display of account_settings should stay on standalone account_settings, got %s" % str(router.get("current_screen_id")))
+		return
+	var account_settings = main.get_node_or_null("ScreenRoot/AccountSettingsScreen")
+	if account_settings == null or not account_settings.visible:
+		_fail("Direct router display of account_settings should show AccountSettingsScreen")
+		return
+	if account_settings.find_child("AccountSettingsScreen", true, false) == null:
+		_fail("AccountSettingsScreen must render a Web settings surface")
+		return
+	if _any_visible_placeholder(main):
+		_fail("Direct router display of account_settings must not show a placeholder panel")
+		return
+
 	for screen_id in [
 		"season",
-		"account_settings",
 	]:
 		router.call("show_screen", screen_id, false)
 		if not await _wait_for_screen(router, "legacy_run"):

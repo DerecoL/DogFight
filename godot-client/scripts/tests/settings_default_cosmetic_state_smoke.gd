@@ -4,23 +4,29 @@ func _init() -> void:
 	_run()
 
 func _run() -> void:
-	var main_scene := load("res://scenes/Main.tscn")
-	if main_scene == null:
-		_fail("Main scene failed to load")
+	var screen_scene := load("res://scenes/screens/AccountSettingsScreen.tscn")
+	if screen_scene == null:
+		_fail("AccountSettingsScreen scene failed to load")
 		return
-	var main = main_scene.instantiate()
-	root.add_child(main)
+	var screen = screen_scene.instantiate()
+	root.add_child(screen)
 	await process_frame
+	screen.call("set_payload", {"cosmeticsData": _cosmetics_data()})
 	await process_frame
 
-	var run_screen = main.get_node_or_null("ScreenRoot/LegacyRunScreen")
-	if run_screen == null:
-		_fail("RunScreen is missing")
-		return
-	if run_screen.has_method("bind_session"):
-		run_screen.bind_session(main)
+	_assert_named_button_state(screen, "CosmeticDefaultAction_TITLE", false, "选择默认")
+	_assert_named_button_state(screen, "CosmeticDefaultAction_AVATAR", true, "已选择")
+	_assert_named_button_state(screen, "CosmeticAction_title-paper-crown", true, "已装备")
+	_assert_named_button_state(screen, "CosmeticAction_avatar-crown", false, "装备")
 
-	run_screen.set("cosmetics_data", {
+	screen.queue_free()
+	for _frame in range(5):
+		await process_frame
+	print("Godot settings default cosmetic state smoke passed")
+	quit(0)
+
+func _cosmetics_data() -> Dictionary:
+	return {
 		"equipped": [
 			{"slot": "TITLE", "catalogItemId": "title-paper-crown", "item": {"id": "title-paper-crown", "name": "纸冠头衔", "type": "TITLE", "rarity": "EPIC"}},
 		],
@@ -28,21 +34,7 @@ func _run() -> void:
 			{"catalogItemId": "title-paper-crown", "item": {"id": "title-paper-crown", "name": "纸冠头衔", "type": "TITLE", "rarity": "EPIC"}, "owned": true},
 			{"catalogItemId": "avatar-crown", "item": {"id": "avatar-crown", "name": "皇冠头像", "type": "AVATAR", "rarity": "RARE"}, "owned": true},
 		],
-	})
-	run_screen.set("current_tab", "设置")
-	run_screen.call("_render_current_tab")
-	await process_frame
-
-	_assert_named_button_state(run_screen, "CosmeticDefaultAction_TITLE", false, "选择默认")
-	_assert_named_button_state(run_screen, "CosmeticDefaultAction_AVATAR", true, "已选择")
-	_assert_named_button_state(run_screen, "CosmeticAction_title-paper-crown", true, "已装备")
-	_assert_named_button_state(run_screen, "CosmeticAction_avatar-crown", false, "装备")
-
-	main.queue_free()
-	for _frame in range(5):
-		await process_frame
-	print("Godot settings default cosmetic state smoke passed")
-	quit(0)
+	}
 
 func _assert_named_button_state(root_node: Node, node_name: String, expected_disabled: bool, expected_text: String) -> void:
 	var button := _find_by_name(root_node, node_name) as Button

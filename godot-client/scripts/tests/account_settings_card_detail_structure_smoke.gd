@@ -4,45 +4,14 @@ func _init() -> void:
 	_run()
 
 func _run() -> void:
-	var main_scene := load("res://scenes/Main.tscn")
-	if main_scene == null:
-		_fail("Main scene failed to load")
+	var screen_scene := load("res://scenes/screens/AccountSettingsScreen.tscn")
+	if screen_scene == null:
+		_fail("AccountSettingsScreen scene failed to load")
 		return
-	var main = main_scene.instantiate()
-	root.add_child(main)
+	var screen = screen_scene.instantiate()
+	root.add_child(screen)
 	await process_frame
-	await process_frame
-
-	var run_screen = main.get_node_or_null("ScreenRoot/LegacyRunScreen")
-	if run_screen == null:
-		_fail("RunScreen is missing")
-		return
-	if run_screen.has_method("bind_session"):
-		run_screen.bind_session(main)
-
-	run_screen.set("cosmetics_data", {
-		"equipped": [
-			{
-				"slot": "TITLE",
-				"catalogItemId": "title-paper-crown",
-				"item": {"id": "title-paper-crown", "name": "纸冠头衔", "type": "TITLE", "rarity": "EPIC"},
-			},
-		],
-		"inventory": [
-			{
-				"catalogItemId": "title-paper-crown",
-				"item": {"id": "title-paper-crown", "name": "纸冠头衔", "description": "在账号面板展示纸冠称号", "type": "TITLE", "rarity": "EPIC"},
-				"owned": true,
-			},
-			{
-				"catalogItemId": "avatar-crown",
-				"item": {"id": "avatar-crown", "name": "皇冠头像", "description": "展示皇冠头像", "type": "AVATAR", "rarity": "RARE"},
-				"owned": true,
-			},
-		],
-	})
-	run_screen.set("current_tab", "设置")
-	run_screen.call("_render_current_tab")
+	screen.call("set_payload", {"cosmeticsData": _cosmetics_data()})
 	await process_frame
 
 	for node_name in [
@@ -82,33 +51,44 @@ func _run() -> void:
 		"CosmeticState_avatar-crown",
 		"CosmeticEmpty_BACKGROUND",
 	]:
-		_assert_has(run_screen, node_name)
+		_assert_has(screen, node_name)
 
-	_assert_label_text(run_screen, "CosmeticGroupHeading_TITLE", "称号")
-	_assert_label_text(run_screen, "CosmeticDefaultBadge_TITLE", "称号")
-	_assert_label_text(run_screen, "CosmeticDefaultName_TITLE", "默认称号")
-	_assert_label_text(run_screen, "CosmeticDefaultDescription_TITLE", "不装备称号，显示账号原始样式。")
-	_assert_label_text(run_screen, "CosmeticDefaultMeta_TITLE", "默认 · 免费")
-	_assert_label_text(run_screen, "CosmeticDefaultState_TITLE", "初始外观")
-	_assert_button_text(run_screen, "CosmeticDefaultAction_TITLE", "选择默认", false)
-	_assert_label_text(run_screen, "CosmeticBadge_title-paper-crown", "称号")
-	_assert_label_text(run_screen, "CosmeticName_title-paper-crown", "纸冠头衔")
-	_assert_label_text(run_screen, "CosmeticDescription_title-paper-crown", "在账号面板展示纸冠称号")
-	_assert_label_text(run_screen, "CosmeticMeta_title-paper-crown", "史诗 · 已拥有")
-	_assert_label_text(run_screen, "CosmeticState_title-paper-crown", "当前装备")
-	_assert_button_text(run_screen, "CosmeticAction_title-paper-crown", "已装备", true)
-	_assert_label_text(run_screen, "CosmeticDefaultState_AVATAR", "当前默认")
-	_assert_button_text(run_screen, "CosmeticDefaultAction_AVATAR", "已选择", true)
-	_assert_label_text(run_screen, "CosmeticName_avatar-crown", "皇冠头像")
-	_assert_label_text(run_screen, "CosmeticMeta_avatar-crown", "稀有 · 已拥有")
-	_assert_label_text(run_screen, "CosmeticState_avatar-crown", "可装备")
-	_assert_button_text(run_screen, "CosmeticAction_avatar-crown", "装备", false)
+	_assert_label_text(screen, "CosmeticGroupHeading_TITLE", "称号")
+	_assert_label_text(screen, "CosmeticDefaultBadge_TITLE", "称号")
+	_assert_label_text(screen, "CosmeticDefaultName_TITLE", "默认称号")
+	_assert_label_text(screen, "CosmeticDefaultDescription_TITLE", "不装备称号，显示账号原始样式。")
+	_assert_label_text(screen, "CosmeticDefaultMeta_TITLE", "默认 · 免费")
+	_assert_label_text(screen, "CosmeticDefaultState_TITLE", "初始外观")
+	_assert_button_text(screen, "CosmeticDefaultAction_TITLE", "选择默认", false)
+	_assert_label_text(screen, "CosmeticBadge_title-paper-crown", "称号")
+	_assert_label_text(screen, "CosmeticName_title-paper-crown", "纸冠头衔")
+	_assert_label_text(screen, "CosmeticDescription_title-paper-crown", "在账号面板展示纸冠称号")
+	_assert_label_text(screen, "CosmeticMeta_title-paper-crown", "史诗 · 已拥有")
+	_assert_label_text(screen, "CosmeticState_title-paper-crown", "当前装备")
+	_assert_button_text(screen, "CosmeticAction_title-paper-crown", "已装备", true)
+	_assert_label_text(screen, "CosmeticDefaultState_AVATAR", "当前默认")
+	_assert_button_text(screen, "CosmeticDefaultAction_AVATAR", "已选择", true)
+	_assert_label_text(screen, "CosmeticName_avatar-crown", "皇冠头像")
+	_assert_label_text(screen, "CosmeticMeta_avatar-crown", "稀有 · 已拥有")
+	_assert_label_text(screen, "CosmeticState_avatar-crown", "可装备")
+	_assert_button_text(screen, "CosmeticAction_avatar-crown", "装备", false)
 
-	main.queue_free()
+	screen.queue_free()
 	for _frame in range(5):
 		await process_frame
 	print("Godot account settings card detail structure smoke passed")
 	quit(0)
+
+func _cosmetics_data() -> Dictionary:
+	return {
+		"equipped": [
+			{"slot": "TITLE", "catalogItemId": "title-paper-crown", "item": {"id": "title-paper-crown", "name": "纸冠头衔", "type": "TITLE", "rarity": "EPIC"}},
+		],
+		"inventory": [
+			{"catalogItemId": "title-paper-crown", "item": {"id": "title-paper-crown", "name": "纸冠头衔", "description": "在账号面板展示纸冠称号", "type": "TITLE", "rarity": "EPIC"}, "owned": true},
+			{"catalogItemId": "avatar-crown", "item": {"id": "avatar-crown", "name": "皇冠头像", "description": "展示皇冠头像", "type": "AVATAR", "rarity": "RARE"}, "owned": true},
+		],
+	}
 
 func _assert_has(root_node: Node, node_name: String) -> void:
 	if _find_by_name(root_node, node_name) == null:

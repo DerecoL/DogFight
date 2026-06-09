@@ -14,9 +14,15 @@ func _run() -> void:
 	screen.call("set_payload", {"cosmeticsData": _cosmetics_data()})
 	await process_frame
 
+	if str(screen.get("playable_redirect_screen_id")) != "":
+		_fail("AccountSettingsScreen must render standalone UI instead of redirecting to playable shell")
+		return
+
 	for node_name in [
 		"AccountSettingsScreen",
 		"AccountSettingsHeading",
+		"AccountSettingsEyebrow",
+		"AccountSettingsTitle",
 		"CosmeticGroup_TITLE",
 		"CosmeticGrid_TITLE",
 		"CosmeticDefaultCard_TITLE",
@@ -58,13 +64,13 @@ func _run() -> void:
 	var text := _collect_text(screen)
 	for part in ["个人设置", "时装与展示", "称号", "默认称号", "不装备称号，显示账号原始样式。", "初始外观", "选择默认", "纸冠头衔", "在账号面板展示纸冠称号", "史诗 · 已拥有", "当前装备", "已装备", "头像", "默认头像", "使用初始狗狗头像。", "当前默认", "已选择", "皇冠头像", "稀有 · 已拥有", "可装备", "装备", "主页背景", "暂无已拥有的主页背景", "狗狗皮肤", "暂无已拥有的狗狗皮肤", "战斗特效", "暂无已拥有的战斗特效"]:
 		if not text.contains(part):
-			_fail("Account settings Web text missing: %s" % part)
+			_fail("Account settings standalone Web text missing: %s" % part)
 			return
 
 	screen.queue_free()
 	for _frame in range(5):
 		await process_frame
-	print("Godot account settings Web structure smoke passed")
+	print("Godot account settings standalone Web structure smoke passed")
 	quit(0)
 
 func _cosmetics_data() -> Dictionary:
@@ -80,7 +86,7 @@ func _cosmetics_data() -> Dictionary:
 
 func _assert_has(root_node: Node, node_name: String) -> void:
 	if _find_by_name(root_node, node_name) == null:
-		_fail("Missing account settings Web node: %s" % node_name)
+		_fail("Missing account settings standalone Web node: %s" % node_name)
 
 func _find_by_name(node: Node, node_name: String) -> Node:
 	if node.name == node_name:
