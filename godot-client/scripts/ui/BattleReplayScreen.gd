@@ -328,7 +328,7 @@ func _build_web_battle_layout() -> void:
 	fx_stage.custom_minimum_size = Vector2(0, 1)
 	root.add_child(fx_stage)
 
-	var opponent_panel := _snapshot_panel("Opponent equipment")
+	var opponent_panel := _snapshot_panel("对手装备栏", "Opponent")
 	(opponent_panel["panel"] as PanelContainer).name = "OpponentEquipmentRow"
 	(opponent_panel["grid"] as GridContainer).name = "OpponentBattleSlotGrid"
 	opponent_name_label = opponent_panel["name"]
@@ -381,7 +381,7 @@ func _build_web_battle_layout() -> void:
 	player_stage_hp = player_dog["hp"]
 	battle_stage.add_child(player_dog["panel"])
 
-	var player_panel := _snapshot_panel("Player equipment")
+	var player_panel := _snapshot_panel("你的装备栏", "Player")
 	(player_panel["panel"] as PanelContainer).name = "PlayerEquipmentRow"
 	(player_panel["grid"] as GridContainer).name = "PlayerBattleSlotGrid"
 	player_name_label = player_panel["name"]
@@ -491,7 +491,7 @@ func _build_battle_layout() -> void:
 	root.add_child(stage_label)
 	root.move_child(stage_label, 1)
 
-	var opponent_panel := _snapshot_panel("对手装备栏")
+	var opponent_panel := _snapshot_panel("对手装备栏", "Opponent")
 	opponent_name_label = opponent_panel["name"]
 	opponent_avatar = opponent_panel["avatar"]
 	opponent_shield_label = opponent_panel["shield"]
@@ -505,7 +505,7 @@ func _build_battle_layout() -> void:
 	root.add_child(opponent_panel["panel"])
 	root.move_child(opponent_panel["panel"], 2)
 
-	var player_panel := _snapshot_panel("你的装备栏")
+	var player_panel := _snapshot_panel("你的装备栏", "Player")
 	player_name_label = player_panel["name"]
 	player_avatar = player_panel["avatar"]
 	player_shield_label = player_panel["shield"]
@@ -592,20 +592,23 @@ func _review_side_label(title: String) -> Label:
 	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	return label
 
-func _snapshot_panel(title: String) -> Dictionary:
+func _snapshot_panel(title: String, prefix: String) -> Dictionary:
 	var panel := PanelContainer.new()
 	panel.custom_minimum_size = Vector2(0, 126)
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 6)
 	panel.add_child(box)
 	var header := HBoxContainer.new()
+	header.name = "%sBattleRowTitle" % prefix
 	header.add_theme_constant_override("separation", 8)
 	box.add_child(header)
 	var avatar := TextureRect.new()
+	avatar.name = "%sBattleAvatar" % prefix
 	avatar.custom_minimum_size = Vector2(58, 58)
 	avatar.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	header.add_child(avatar)
 	var name_label := Label.new()
+	name_label.name = "%sBattleName" % prefix
 	name_label.text = title
 	name_label.custom_minimum_size = Vector2(0, 26)
 	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -613,31 +616,37 @@ func _snapshot_panel(title: String) -> Dictionary:
 	name_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	header.add_child(name_label)
 	var shield_label := Label.new()
+	shield_label.name = "%sBattleShield" % prefix
 	shield_label.text = "护盾 0"
 	shield_label.custom_minimum_size = Vector2(0, 24)
 	shield_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	box.add_child(shield_label)
 	var statuses := Label.new()
+	statuses.name = "%sBattleStatuses" % prefix
 	statuses.text = "状态：无"
 	statuses.custom_minimum_size = Vector2(0, 34)
 	statuses.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(statuses)
 	var status_button := Button.new()
+	status_button.name = "%sBattleStatusButton" % prefix
 	status_button.text = "状态详情"
 	status_button.custom_minimum_size = Vector2(132, 32)
 	status_button.disabled = true
 	box.add_child(status_button)
 	var reservoirs := Label.new()
+	reservoirs.name = "%sBattleReservoirs" % prefix
 	reservoirs.text = "蓄水池：无"
 	reservoirs.custom_minimum_size = Vector2(0, 28)
 	reservoirs.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(reservoirs)
 	var grid := GridContainer.new()
+	grid.name = "%sBattleSlotGrid" % prefix
 	grid.columns = 12
 	grid.add_theme_constant_override("h_separation", 4)
 	grid.add_theme_constant_override("v_separation", 4)
 	box.add_child(grid)
 	var relics := HBoxContainer.new()
+	relics.name = "%sBattleRelicRail" % prefix
 	relics.add_theme_constant_override("separation", 4)
 	box.add_child(relics)
 	return {"panel": panel, "name": name_label, "avatar": avatar, "shield": shield_label, "statuses": statuses, "status_button": status_button, "reservoirs": reservoirs, "grid": grid, "relics": relics}
@@ -651,6 +660,8 @@ func _render_snapshots() -> void:
 func _render_snapshot(name_label: Label, avatar: TextureRect, grid: GridContainer, relic_row: HBoxContainer, snapshot: Dictionary, fallback_name: String, button_map: Dictionary, side: String) -> void:
 	if name_label == null or grid == null or relic_row == null:
 		return
+	var prefix := "Player" if side == "player" else "Opponent"
+	var row_title := "你的装备栏" if side == "player" else "对手装备栏"
 	var dog_type := str(snapshot.get("dogType", ""))
 	name_label.text = "%s · %s · %d胜 %d负 · 第%d回合" % [
 		str(snapshot.get("name", fallback_name)),
@@ -659,6 +670,7 @@ func _render_snapshot(name_label: Label, avatar: TextureRect, grid: GridContaine
 		int(snapshot.get("losses", 0)),
 		int(snapshot.get("round", 0)),
 	]
+	name_label.text = "%s\n%s" % [row_title, name_label.text]
 	if avatar != null:
 		avatar.texture = _dog_texture(dog_type)
 		avatar.modulate = _dog_skin_tint(dog_type, side)
@@ -667,7 +679,12 @@ func _render_snapshot(name_label: Label, avatar: TextureRect, grid: GridContaine
 	var items: Array = _array(snapshot, "items")
 	for x in range(_battle_slot_count(snapshot)):
 		var item: Dictionary = _item_at_slot(items, "EQUIPMENT", x)
+		var slot := VBoxContainer.new()
+		slot.name = "%sBattleSlot_%d" % [prefix, x]
+		slot.custom_minimum_size = Vector2(54, 72)
+		slot.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 		var button := Button.new()
+		button.name = "%sBattleEmptySlot_%d" % [prefix, x]
 		button.custom_minimum_size = Vector2(54, 42)
 		button.clip_text = true
 		button.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
@@ -675,14 +692,38 @@ func _render_snapshot(name_label: Label, avatar: TextureRect, grid: GridContaine
 		button.disabled = item.is_empty()
 		_apply_button_icon(button, _battle_item_texture(item))
 		if not item.is_empty():
+			var item_id := _battle_node_key(str(item.get("id", "")))
+			button.name = "%sBattleItem_%s" % [prefix, item_id]
 			button_map[str(item.get("id", ""))] = button
 			button.set_meta("base_text", button.text)
 			button.pressed.connect(_show_battle_item_modal.bind(item, side))
-		grid.add_child(button)
+			_add_battle_item_card_nodes(button, prefix, item_id, item)
+		slot.add_child(button)
+		grid.add_child(slot)
 	_clear_children(relic_row)
-	for relic in _array(snapshot, "relics").slice(0, 8):
-		if relic is Dictionary:
+	var relic_grid := GridContainer.new()
+	relic_grid.name = "%sBattleRelicSlotGrid" % prefix
+	relic_grid.columns = 6
+	relic_grid.add_theme_constant_override("h_separation", 4)
+	relic_grid.add_theme_constant_override("v_separation", 4)
+	relic_row.add_child(relic_grid)
+	var relics := _array(snapshot, "relics")
+	for slot_index in range(6):
+		var relic := _battle_relic_at_slot(relics, slot_index)
+		var relic_slot := VBoxContainer.new()
+		relic_slot.name = "%sBattleRelicSlot_%d" % [prefix, slot_index]
+		relic_slot.custom_minimum_size = Vector2(44, 44)
+		relic_slot.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+		if relic.is_empty():
+			var empty_mark := Label.new()
+			empty_mark.name = "%sBattleRelicEmptyMark_%d" % [prefix, slot_index]
+			empty_mark.text = ""
+			empty_mark.custom_minimum_size = Vector2(44, 32)
+			relic_slot.add_child(empty_mark)
+		else:
+			var relic_id := _battle_node_key(str(relic.get("id", relic.get("relicId", slot_index))))
 			var relic_button := Button.new()
+			relic_button.name = "%sBattleRelicButton_%s" % [prefix, relic_id]
 			var relic_def: Dictionary = _dict(relic, "def")
 			relic_button.text = _fallback(str(relic_def.get("name", "")), str(relic.get("relicId", "")))
 			relic_button.custom_minimum_size = Vector2(92, 32)
@@ -690,7 +731,78 @@ func _render_snapshot(name_label: Label, avatar: TextureRect, grid: GridContaine
 			relic_button.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 			_apply_button_icon(relic_button, _battle_sticker_texture(str(relic.get("relicId", ""))))
 			relic_button.pressed.connect(_show_battle_relic_modal.bind(relic, side))
-			relic_row.add_child(relic_button)
+			relic_slot.add_child(relic_button)
+		relic_grid.add_child(relic_slot)
+
+func _battle_node_key(value: String) -> String:
+	var key := value
+	for part in ["/", "\\", ":", " ", ".", "\n", "\t"]:
+		key = key.replace(part, "_")
+	return key
+
+func _add_battle_item_card_nodes(button: Button, prefix: String, item_id: String, item: Dictionary) -> void:
+	var def: Dictionary = _dict(item, "def")
+	var item_name := _fallback(str(def.get("name", "")), str(item.get("defId", item.get("id", ""))))
+	var icon := TextureRect.new()
+	icon.name = "%sBattleItemIcon_%s" % [prefix, item_id]
+	icon.texture = _battle_item_texture(item)
+	icon.custom_minimum_size = Vector2(1, 1)
+	icon.visible = false
+	button.add_child(icon)
+	var name_label := Label.new()
+	name_label.name = "%sBattleItemName_%s" % [prefix, item_id]
+	name_label.text = item_name
+	name_label.custom_minimum_size = Vector2(0, 1)
+	name_label.visible = false
+	button.add_child(name_label)
+	var info := Label.new()
+	info.name = "%sBattleItemInfo_%s" % [prefix, item_id]
+	info.text = "%s · %s" % [_quality_label(str(item.get("quality", ""))), _fallback(str(def.get("description", "")), "")]
+	info.custom_minimum_size = Vector2(0, 1)
+	info.visible = false
+	button.add_child(info)
+	var dice := Label.new()
+	dice.name = "%sBattleItemDice_%s" % [prefix, item_id]
+	dice.text = "点数 %s" % _battle_trigger_dice_text(item)
+	dice.custom_minimum_size = Vector2(0, 1)
+	dice.visible = false
+	button.add_child(dice)
+	var trigger_count := Label.new()
+	trigger_count.name = "%sBattleTriggerCount_%s" % [prefix, item_id]
+	trigger_count.text = "x%d" % max(1, _battle_item_trigger_count(str(item.get("id", "")), prefix.to_lower()))
+	trigger_count.custom_minimum_size = Vector2(0, 1)
+	trigger_count.visible = false
+	button.add_child(trigger_count)
+
+func _battle_trigger_dice_text(item: Dictionary) -> String:
+	var raw = item.get("triggerDice", null)
+	var def: Dictionary = _dict(item, "def")
+	if raw == null:
+		raw = def.get("triggerDice", def.get("dice", []))
+	if raw is Array:
+		var parts: Array[String] = []
+		for entry in raw:
+			parts.append(str(entry))
+		return " / ".join(parts) if not parts.is_empty() else "无"
+	return _fallback(str(raw), "无")
+
+func _battle_item_trigger_count(item_id: String, side: String) -> int:
+	var count := 0
+	for raw_event in displayed_events:
+		if not raw_event is Dictionary:
+			continue
+		var event: Dictionary = raw_event
+		if str(event.get("kind", "")) == "ITEM" and str(event.get("actor", "")) == side and str(event.get("itemId", "")) == item_id:
+			count += 1
+	return count
+
+func _battle_relic_at_slot(relics: Array, slot: int) -> Dictionary:
+	for raw_relic in relics:
+		if raw_relic is Dictionary and (raw_relic as Dictionary).has("slot") and int((raw_relic as Dictionary).get("slot", -1)) == slot:
+			return raw_relic as Dictionary
+	if slot < relics.size() and relics[slot] is Dictionary and not (relics[slot] as Dictionary).has("slot"):
+		return relics[slot] as Dictionary
+	return {}
 
 func _render_stage_snapshots() -> void:
 	_render_stage_snapshot(player_stage_name_label, player_stage_avatar, _dict(battle, "playerSnapshot"), "Your dog", "player")
