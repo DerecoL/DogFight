@@ -385,6 +385,9 @@ func open_screen(screen_id: String) -> bool:
 	if screen_id == WebUiScreenIds.DOGFIGHT_ROOMS:
 		_show_dogfight_rooms_screen()
 		return true
+	if screen_id == WebUiScreenIds.DOGFIGHT_ROOM_DETAIL:
+		_show_dogfight_room_detail_screen()
+		return true
 	if screen_id == WebUiScreenIds.PLAYABLE_RUN or _screen_uses_playable_run_shell(screen_id):
 		_show_playable_run_screen()
 		return true
@@ -425,7 +428,6 @@ func _screen_uses_playable_shell(screen_id: String) -> bool:
 		WebUiScreenIds.ACHIEVEMENTS,
 		"apex",
 		WebUiScreenIds.SEASON,
-		WebUiScreenIds.DOGFIGHT_ROOM_DETAIL,
 		WebUiScreenIds.ACCOUNT_SETTINGS,
 	].has(screen_id)
 
@@ -695,6 +697,13 @@ func _show_dogfight_rooms_screen() -> void:
 	_apply_payload_to_screen(WebUiScreenIds.DOGFIGHT_ROOMS)
 	call_deferred("_refresh_dogfight_rooms_payload")
 
+func _show_dogfight_room_detail_screen() -> void:
+	if router == null:
+		return
+	router.show_screen(WebUiScreenIds.DOGFIGHT_ROOM_DETAIL, false)
+	_apply_payload_to_screen(WebUiScreenIds.DOGFIGHT_ROOM_DETAIL)
+	call_deferred("_refresh_dogfight_room_detail_payload")
+
 func _refresh_dogfight_rooms_payload() -> void:
 	if api == null or router == null or str(router.get("current_screen_id")) != WebUiScreenIds.DOGFIGHT_ROOMS:
 		return
@@ -703,6 +712,22 @@ func _refresh_dogfight_rooms_payload() -> void:
 		lobby_dogfight_rooms_data = _response_data(rooms_response)
 	if router != null and str(router.get("current_screen_id")) == WebUiScreenIds.DOGFIGHT_ROOMS:
 		_apply_payload_to_screen(WebUiScreenIds.DOGFIGHT_ROOMS)
+
+func _refresh_dogfight_room_detail_payload() -> void:
+	if api == null or router == null or str(router.get("current_screen_id")) != WebUiScreenIds.DOGFIGHT_ROOM_DETAIL:
+		return
+	var room_id := str(lobby_dogfight_active_room_data.get("id", ""))
+	if room_id.is_empty():
+		_apply_payload_to_screen(WebUiScreenIds.DOGFIGHT_ROOM_DETAIL)
+		return
+	var room_response := await api.get_json(ApiRoutes.dogfight_room(room_id))
+	if bool(room_response.get("ok", false)):
+		var data := _response_data(room_response)
+		var room: Variant = data.get("room", {})
+		if room is Dictionary:
+			lobby_dogfight_active_room_data = room.duplicate(true)
+	if router != null and str(router.get("current_screen_id")) == WebUiScreenIds.DOGFIGHT_ROOM_DETAIL:
+		_apply_payload_to_screen(WebUiScreenIds.DOGFIGHT_ROOM_DETAIL)
 
 func dogfight_room_request(path: String, method := "GET", body: Dictionary = {}) -> Dictionary:
 	if api == null:
@@ -717,6 +742,8 @@ func dogfight_room_request(path: String, method := "GET", body: Dictionary = {})
 		var room: Variant = data.get("room", {})
 		if room is Dictionary:
 			lobby_dogfight_active_room_data = room.duplicate(true)
+		elif path.ends_with("/leave"):
+			lobby_dogfight_active_room_data = {}
 		if data.has("rooms"):
 			lobby_dogfight_rooms_data = data
 		elif path == ApiRoutes.dogfight_rooms():
