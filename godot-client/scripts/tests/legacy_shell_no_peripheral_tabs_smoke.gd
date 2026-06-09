@@ -21,14 +21,14 @@ func _run() -> void:
 		_fail("LegacyRunScreen must expose its navigation list for shell structure checks")
 		return
 	var tab_texts := _button_texts(nav_list)
-	if tab_texts.size() > 2:
+	if tab_texts.size() > 1:
 		_fail("LegacyRunScreen should only expose playable shell tabs, got %s" % ", ".join(tab_texts))
 		return
-	for peripheral in ["账号", "成就", "每日", "商城", "排行", "巅峰", "赛季", "房间", "设置"]:
+	for peripheral in ["大厅", "账号", "成就", "每日", "商城", "排行", "巅峰", "赛季", "房间", "设置"]:
 		if tab_texts.has(peripheral):
 			_fail("LegacyRunScreen must not expose peripheral Web page tab: %s" % peripheral)
 			return
-	for required in ["大厅", "跑局"]:
+	for required in ["跑局"]:
 		if not tab_texts.has(required):
 			_fail("LegacyRunScreen should keep playable tab: %s" % required)
 			return

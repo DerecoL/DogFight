@@ -362,7 +362,7 @@ func _build_layout() -> void:
 func _render_shell() -> void:
 	_apply_equipped_cosmetic_shell()
 	_clear_children(nav_list)
-	for tab in [TAB_LOBBY, TAB_RUN]:
+	for tab in [TAB_RUN]:
 		var button := _button(tab, 0)
 		button.custom_minimum_size = Vector2(0, 42)
 		button.disabled = action_in_progress
