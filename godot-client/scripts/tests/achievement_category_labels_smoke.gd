@@ -86,7 +86,7 @@ func _run() -> void:
 	run_screen.call("_render_current_tab")
 	await process_frame
 	var text := _collect_text(run_screen)
-	for part in ["长期目标", "成就与每日任务", "每日任务 2026-06-02", "刷新", "商店达人", "购买 5 件商品", "领取 20", "继续挑战", "1/4", "全部", "战斗", "收藏", "任务", "首胜", "赢下一场战斗", "1/1 · 30", "收藏大师", "隐藏成就 · 收藏", "2/5 · 20", "任务常客", "已领取"]:
+	for part in ["长期目标", "成就与每日任务", "每日任务 2026-06-02", "刷新", "商店达人", "购买 5 件商品", "领取 20", "继续挑战", "1/4", "全部", "战斗", "收藏", "任务", "首胜", "赢下一场战斗", "1/1 · 30", "收藏大师", "2/5 · 20", "任务常客", "已领取"]:
 		if not text.contains(str(part)):
 			_fail("Achievement Web label missing: %s" % str(part))
 			return

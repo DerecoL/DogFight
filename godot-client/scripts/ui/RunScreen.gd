@@ -2125,27 +2125,33 @@ func _render_achievement_card(parent: GridContainer, achievement: Dictionary) ->
 	card.add_theme_constant_override("separation", 8)
 	panel.add_child(card)
 	var title_box := VBoxContainer.new()
+	title_box.name = "AchievementCardHeader_%s" % achievement_id
 	title_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	title_box.add_theme_constant_override("separation", 2)
 	card.add_child(title_box)
-	_add_plain_line(title_box, str(achievement.get("title", achievement_id)))
+	_named_plain_line(title_box, "AchievementTitle_%s" % achievement_id, str(achievement.get("title", achievement_id)))
 	var category_text := str(achievement.get("category", ""))
-	if bool(achievement.get("hidden", false)):
-		category_text = "隐藏成就 · %s" % category_text
-	_add_plain_line(title_box, category_text)
-	_add_plain_line(card, str(achievement.get("description", "")))
-	var progress_line := Label.new()
-	progress_line.text = "%d/%d · %d" % [int(achievement.get("progress", 0)), int(achievement.get("target", 0)), int(achievement.get("reward", 0))]
-	progress_line.custom_minimum_size = Vector2(0, 28)
-	progress_line.add_theme_color_override("font_color", UiTokens.ink_color())
-	card.add_child(progress_line)
+	_named_plain_line(title_box, "AchievementCategory_%s" % achievement_id, category_text)
+	_named_plain_line(card, "AchievementDescription_%s" % achievement_id, str(achievement.get("description", "")))
+	var progress := ProgressBar.new()
+	progress.name = "AchievementProgress_%s" % achievement_id
+	progress.custom_minimum_size = Vector2(0, 24)
+	progress.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	progress.max_value = max(1, int(achievement.get("target", 0)))
+	progress.value = clamp(int(achievement.get("progress", 0)), 0, int(progress.max_value))
+	card.add_child(progress)
 	var action_row := HBoxContainer.new()
+	action_row.name = "AchievementActions_%s" % achievement_id
 	action_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	action_row.add_theme_constant_override("separation", 8)
 	card.add_child(action_row)
-	var spacer := Control.new()
-	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	action_row.add_child(spacer)
+	var state := Label.new()
+	state.name = "AchievementState_%s" % achievement_id
+	state.text = "%d/%d · %d" % [int(achievement.get("progress", 0)), int(achievement.get("target", 0)), int(achievement.get("reward", 0))]
+	state.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	state.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	state.add_theme_color_override("font_color", UiTokens.ink_color())
+	action_row.add_child(state)
 	var action: Button
 	if bool(achievement.get("claimed", false)):
 		action = _button("已领取", 96)
