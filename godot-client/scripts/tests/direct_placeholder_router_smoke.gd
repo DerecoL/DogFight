@@ -103,10 +103,26 @@ func _run() -> void:
 		_fail("Direct router display of dogfight_room_detail must not show a placeholder panel")
 		return
 
+	router.call("show_screen", "run_shop", false)
+	await process_frame
+	await process_frame
+	if str(router.get("current_screen_id")) != "run_shop":
+		_fail("Direct router display of run_shop should stay on standalone run_shop, got %s" % str(router.get("current_screen_id")))
+		return
+	var run_shop = main.get_node_or_null("ScreenRoot/RunShopScreen")
+	if run_shop == null or not run_shop.visible:
+		_fail("Direct router display of run_shop should show RunShopScreen")
+		return
+	if run_shop.find_child("RunShopEmpty", true, false) == null and run_shop.find_child("ShopWorkbench", true, false) == null:
+		_fail("RunShopScreen must render a Web shop surface")
+		return
+	if _any_visible_placeholder(main):
+		_fail("Direct router display of run_shop must not show a placeholder panel")
+		return
+
 	for screen_id in [
 		"run_shell",
 		"exploration_map",
-		"run_shop",
 		"reward_choice",
 		"run_settlement",
 		"achievements",

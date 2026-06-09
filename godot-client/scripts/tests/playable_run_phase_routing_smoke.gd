@@ -26,6 +26,15 @@ func _run() -> void:
 		main.call("set_current_run", _run_payload(phase))
 		await process_frame
 		await process_frame
+		if phase == "SHOP":
+			if str(router.get("current_screen_id")) != "run_shop":
+				_fail("SHOP should show standalone RunShopScreen, got %s" % str(router.get("current_screen_id")))
+				return
+			var run_shop = main.get_node_or_null("ScreenRoot/RunShopScreen")
+			if run_shop == null or not run_shop.visible or run_shop.find_child("ShopWorkbench", true, false) == null:
+				_fail("SHOP should render standalone ShopWorkbench")
+				return
+			continue
 		if not legacy.visible:
 			_fail("Phase %s should show playable LegacyRunScreen, got %s" % [phase, str(router.get("current_screen_id"))])
 			return

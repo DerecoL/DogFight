@@ -36,7 +36,6 @@ func _run() -> void:
 	for screen_id in [
 		"run_shell",
 		"exploration_map",
-		"run_shop",
 		"reward_choice",
 		"run_settlement",
 		"achievements",
@@ -104,6 +103,22 @@ func _run() -> void:
 		return
 	if dogfight_room_detail.find_child("PlaceholderPanel", true, false) != null:
 		_fail("dogfight_room_detail must not show a placeholder panel")
+		return
+
+	if not main.call("open_screen", "run_shop"):
+		_fail("open_screen should accept standalone run_shop")
+		return
+	await process_frame
+	await process_frame
+	if str(router.get("current_screen_id")) != "run_shop":
+		_fail("run_shop should stay on standalone RunShopScreen, got %s" % str(router.get("current_screen_id")))
+		return
+	var run_shop = main.get_node_or_null("ScreenRoot/RunShopScreen")
+	if run_shop == null or not run_shop.visible:
+		_fail("run_shop should show RunShopScreen")
+		return
+	if run_shop.find_child("PlaceholderPanel", true, false) != null:
+		_fail("run_shop must not show a placeholder panel")
 		return
 
 	if not main.call("open_screen", "account_shop"):
