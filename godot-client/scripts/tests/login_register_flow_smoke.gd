@@ -40,9 +40,9 @@ func _run() -> void:
 	if nickname_input == null:
 		_fail("NicknameSetupScreen must expose nickname input")
 		return
-	nickname_input.text = "登录烟测"
+	nickname_input.text = "LoginFlowSmoke"
 	await nickname_screen.call("_submit_nickname")
-	if not await _assert_playable_lobby(main, router, "Nickname submit"):
+	if not await _assert_standalone_mode_lobby(main, router, "Nickname submit"):
 		return
 
 	if not await main.call("logout"):
@@ -55,21 +55,26 @@ func _run() -> void:
 	account_input.text = account
 	password_input.text = "dogdice"
 	await login_screen.call("_on_login_pressed")
-	if not await _assert_playable_lobby(main, router, "Login with saved nickname"):
+	if not await _assert_standalone_mode_lobby(main, router, "Login with saved nickname"):
 		return
-	var legacy_run_screen = main.get_node_or_null("ScreenRoot/LegacyRunScreen")
-	var casual_button = _find_button_containing(legacy_run_screen, "开始休闲模式")
+	var mode_lobby = main.get_node_or_null("ScreenRoot/ModeLobbyScreen")
+	var casual_button = mode_lobby.find_child("CasualModeButton", true, false) as Button
 	if casual_button == null:
-		_fail("Playable lobby must expose casual mode entry")
+		_fail("Standalone mode lobby must expose CasualModeButton")
 		return
 	casual_button.pressed.emit()
-	await process_frame
-	await process_frame
+	if not await _wait_for_screen(router, "legacy_run"):
+		_fail("Entering casual mode should open the playable dog-selection shell, got %s" % str(router.get("current_screen_id")))
+		return
+	var legacy_run_screen = main.get_node_or_null("ScreenRoot/LegacyRunScreen")
+	if legacy_run_screen == null or not legacy_run_screen.visible:
+		_fail("Casual mode entry should show LegacyRunScreen dog-selection flow")
+		return
 	if main.get("run_store").has_run():
 		_fail("Entering casual mode without a run must not create a run directly")
 		return
 	if str(legacy_run_screen.get("current_tab")) != "跑局":
-		_fail("Entering casual mode should open the playable dog-selection screen")
+		_fail("Entering casual mode should open the run tab, got %s" % str(legacy_run_screen.get("current_tab")))
 		return
 	var run_text := _collect_text(legacy_run_screen)
 	if not run_text.contains("选择狗狗") or not run_text.contains("开始一局"):
@@ -82,42 +87,32 @@ func _run() -> void:
 	print("Godot login/register flow smoke passed")
 	quit(0)
 
-func _assert_playable_lobby(main: Node, router: Node, context: String) -> bool:
-	if not await _wait_for_screen(router, "legacy_run"):
-		_fail("%s should route to playable lobby, got %s" % [context, str(router.get("current_screen_id"))])
-		return false
-	var legacy_run_screen = main.get_node_or_null("ScreenRoot/LegacyRunScreen")
-	if legacy_run_screen == null or not legacy_run_screen.visible:
-		_fail("%s should show LegacyRunScreen" % context)
+func _assert_standalone_mode_lobby(main: Node, router: Node, context: String) -> bool:
+	if not await _wait_for_screen(router, "mode_lobby"):
+		_fail("%s should route to standalone mode lobby, got %s" % [context, str(router.get("current_screen_id"))])
 		return false
 	var mode_lobby = main.get_node_or_null("ScreenRoot/ModeLobbyScreen")
-	if mode_lobby == null:
-		_fail("Main scene should still keep ModeLobbyScreen registered for compatibility")
+	if mode_lobby == null or not mode_lobby.visible:
+		_fail("%s should show ModeLobbyScreen" % context)
 		return false
-	if mode_lobby.visible:
-		_fail("%s must not show the old standalone ModeLobbyScreen" % context)
+	var legacy_run_screen = main.get_node_or_null("ScreenRoot/LegacyRunScreen")
+	if legacy_run_screen != null and legacy_run_screen.visible:
+		_fail("%s must not render mode lobby inside LegacyRunScreen" % context)
 		return false
-	if str(legacy_run_screen.get("current_tab")) != "大厅":
-		_fail("%s should open the playable mode lobby tab" % context)
-		return false
-	if _has_visible_placeholder(legacy_run_screen):
+	if mode_lobby.find_child("PlaceholderPanel", true, false) != null:
 		_fail("%s must not show placeholder content" % context)
 		return false
-	var lobby_text := _collect_text(legacy_run_screen)
-	if lobby_text.contains("Web 对齐目标"):
-		_fail("%s must not show the old Web alignment placeholder" % context)
-		return false
-	for part in ["模式大厅", "竞技方式", "休闲模式", "天梯模式", "多人房间", "巅峰竞技场"]:
-		if not lobby_text.contains(part):
-			_fail("%s playable lobby text missing: %s" % [context, part])
+	for node_name in ["ModeLobbyPanel", "ModeLobbyScroll", "ModeGrid", "CasualModeButton", "LadderModeButton", "DogfightModeButton", "PeakModeButton"]:
+		if mode_lobby.find_child(node_name, true, false) == null:
+			_fail("%s mode lobby missing Web node: %s" % [context, node_name])
 			return false
-	if legacy_run_screen.find_child("StartRunButton", true, false) != null:
-		_fail("%s playable lobby should not expose direct start form controls before choosing the run tab" % context)
+	if mode_lobby.find_child("StartRunButton", true, false) != null:
+		_fail("%s mode lobby should not expose direct start form controls before choosing casual mode" % context)
 		return false
 	return true
 
 func _wait_for_screen(router: Node, screen_id: String) -> bool:
-	for _frame in range(180):
+	for _frame in range(240):
 		if str(router.get("current_screen_id")) == screen_id:
 			return true
 		await process_frame
@@ -143,23 +138,6 @@ func _collect_text(node: Node) -> String:
 	for child in node.get_children():
 		text += _collect_text(child)
 	return text
-
-func _has_visible_placeholder(node: Node) -> bool:
-	if node.name == "PlaceholderPanel" and node is CanvasItem and (node as CanvasItem).is_visible_in_tree():
-		return true
-	for child in node.get_children():
-		if _has_visible_placeholder(child):
-			return true
-	return false
-
-func _find_button_containing(node: Node, text: String) -> Button:
-	if node is Button and (node as Button).text.contains(text):
-		return node as Button
-	for child in node.get_children():
-		var result := _find_button_containing(child, text)
-		if result != null:
-			return result
-	return null
 
 func _fail(message: String) -> void:
 	push_error(message)

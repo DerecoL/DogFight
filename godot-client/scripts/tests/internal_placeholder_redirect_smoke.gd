@@ -18,8 +18,22 @@ func _run() -> void:
 	if router == null or legacy == null:
 		_fail("Main must expose router and LegacyRunScreen")
 		return
+	if not main.call("open_screen", "mode_lobby"):
+		_fail("open_screen should accept standalone mode_lobby")
+		return
+	await process_frame
+	await process_frame
+	if str(router.get("current_screen_id")) != "mode_lobby":
+		_fail("mode_lobby should stay on standalone ModeLobbyScreen, got %s" % str(router.get("current_screen_id")))
+		return
+	var mode_lobby = main.get_node_or_null("ScreenRoot/ModeLobbyScreen")
+	if mode_lobby == null or not mode_lobby.visible:
+		_fail("mode_lobby should show ModeLobbyScreen")
+		return
+	if mode_lobby.find_child("PlaceholderPanel", true, false) != null:
+		_fail("mode_lobby must not show a placeholder panel")
+		return
 	for screen_id in [
-		"mode_lobby",
 		"run_shell",
 		"exploration_map",
 		"run_shop",

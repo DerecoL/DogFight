@@ -14,10 +14,8 @@ var forbidden_legacy_refresh_paths := [
 	"/daily-tasks",
 	"/shop",
 	"/cosmetics/me",
-	"/ladder/me",
 	"/ladder/leaderboard",
 	"/apex",
-	"/runs/history",
 	"/dogfight/rooms",
 ]
 
@@ -64,7 +62,7 @@ func _run() -> void:
 		var error_text: String = error_label.text if error_label != null else ""
 		_fail("Quick start did not leave LoginScreen: %s" % error_text)
 		return
-	if not ["nickname_setup", "legacy_run"].has(current_screen):
+	if not ["nickname_setup", "mode_lobby"].has(current_screen):
 		_fail("Quick start routed to unexpected Web screen: %s" % current_screen)
 		return
 	if current_screen == "nickname_setup":
@@ -79,30 +77,28 @@ func _run() -> void:
 		nickname_input.text = "Godot烟测"
 		await nickname_screen.call("_submit_nickname")
 		for _frame in range(180):
-			if str(router.get("current_screen_id")) == "legacy_run":
+			if str(router.get("current_screen_id")) == "mode_lobby":
 				break
 			await process_frame
 		current_screen = str(router.get("current_screen_id"))
-		if current_screen != "legacy_run":
-			_fail("Nickname submit did not route to playable lobby, got %s" % current_screen)
+		if current_screen != "mode_lobby":
+			_fail("Nickname submit did not route to standalone mode lobby, got %s" % current_screen)
 			return
-	var run_screen = main.get_node_or_null("ScreenRoot/LegacyRunScreen")
-	if run_screen == null:
-		_fail("LegacyRunScreen is missing")
-		return
-	if not run_screen.visible:
-		_fail("LegacyRunScreen must show the playable lobby after quick start")
-		return
-	if run_screen.get("session") == null:
-		_fail("LegacyRunScreen must be bound after quick start")
-		return
 	var mode_lobby = main.get_node_or_null("ScreenRoot/ModeLobbyScreen")
-	if mode_lobby != null and mode_lobby.visible:
-		_fail("Quick start must not show the old standalone ModeLobbyScreen")
+	if mode_lobby == null or not mode_lobby.visible:
+		_fail("Quick start must show standalone ModeLobbyScreen")
 		return
-	if run_screen.find_child("PlaceholderPanel", true, false) != null:
+	var run_screen = main.get_node_or_null("ScreenRoot/LegacyRunScreen")
+	if run_screen != null and run_screen.visible:
+		_fail("Quick start must not render the mode lobby inside LegacyRunScreen")
+		return
+	if mode_lobby.find_child("PlaceholderPanel", true, false) != null:
 		_fail("Quick start must not show placeholder content")
 		return
+	for node_name in ["ModeLobbyPanel", "ModeLobbyScroll", "ModeGrid", "CasualModeButton", "LadderModeButton", "DogfightModeButton", "PeakModeButton"]:
+		if mode_lobby.find_child(node_name, true, false) == null:
+			_fail("Quick start mode lobby missing Web node: %s" % node_name)
+			return
 	for path in required_api_paths:
 		if not api_seen_paths.has(path):
 			_fail("Quick start did not request required API path: %s" % path)

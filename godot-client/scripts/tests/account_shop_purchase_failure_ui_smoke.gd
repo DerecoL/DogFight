@@ -12,8 +12,8 @@ func _run() -> void:
 	if main == null:
 		return
 	var router = main.get("router")
-	if not await _wait_for_screen(router, "legacy_run"):
-		_fail("Login should route to playable lobby")
+	if not await _wait_for_screen(router, "mode_lobby"):
+		_fail("Login should route to standalone mode lobby")
 		return
 
 	seen_paths.clear()

@@ -371,7 +371,7 @@ func sync_current_run_without_routing(run: Dictionary) -> void:
 
 func open_screen(screen_id: String) -> bool:
 	if screen_id == WebUiScreenIds.MODE_LOBBY:
-		_show_playable_mode_lobby_screen()
+		_show_mode_lobby_screen()
 		return true
 	if screen_id == WebUiScreenIds.PLAYABLE_RUN or _screen_uses_playable_run_shell(screen_id):
 		_show_playable_run_screen()
@@ -602,7 +602,7 @@ func _show_run_screen() -> void:
 	elif run_store != null and run_store.has_run():
 		target_screen = WebUiScreenIds.screen_for_run_phase(run_store.phase())
 	if target_screen == WebUiScreenIds.MODE_LOBBY:
-		_show_playable_mode_lobby_screen()
+		_show_mode_lobby_screen()
 		return
 	if target_screen == WebUiScreenIds.PLAYABLE_RUN:
 		_show_playable_run_screen()
@@ -648,6 +648,13 @@ func _refresh_mode_lobby_payload() -> void:
 	if router != null and str(router.get("current_screen_id")) == WebUiScreenIds.MODE_LOBBY:
 		_apply_payload_to_screen(WebUiScreenIds.MODE_LOBBY)
 
+func _show_mode_lobby_screen() -> void:
+	if router == null:
+		return
+	router.show_screen(WebUiScreenIds.MODE_LOBBY, false)
+	_apply_payload_to_screen(WebUiScreenIds.MODE_LOBBY)
+	call_deferred("_refresh_mode_lobby_payload")
+
 func _response_data(response: Dictionary) -> Dictionary:
 	var value = response.get("data", {})
 	return value if value is Dictionary else {}
@@ -688,6 +695,8 @@ func _show_playable_section(screen_id: String) -> void:
 		router.show_screen(WebUiScreenIds.PLAYABLE_RUN, false)
 	if run_screen != null and run_screen.has_method("show_named_section"):
 		run_screen.call("show_named_section", screen_id)
+	if run_screen != null and screen_id in [WebUiScreenIds.DOGFIGHT_ROOMS, WebUiScreenIds.DOGFIGHT_ROOM_DETAIL] and run_screen.has_method("refresh_rooms_section"):
+		run_screen.call("refresh_rooms_section")
 
 func _show_battle_screen(battle: Dictionary) -> void:
 	if router != null:

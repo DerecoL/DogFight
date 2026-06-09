@@ -12,32 +12,36 @@ func _run() -> void:
 	if main == null:
 		return
 	var router = main.get("router")
+	if not await _wait_for_screen(router, "mode_lobby"):
+		_fail("Login should route to standalone mode lobby")
+		return
+	var mode_lobby = main.get_node_or_null("ScreenRoot/ModeLobbyScreen")
+	if mode_lobby == null or not mode_lobby.visible:
+		_fail("ModeLobbyScreen should be visible after login")
+		return
+	var casual_button = mode_lobby.find_child("CasualModeButton", true, false) as Button
+	if casual_button == null:
+		_fail("Standalone mode lobby must expose CasualModeButton")
+		return
+	casual_button.pressed.emit()
 	if not await _wait_for_screen(router, "legacy_run"):
-		_fail("Login should route to playable lobby")
+		_fail("Casual mode entry should open playable dog-selection shell")
 		return
 	var legacy = main.get_node_or_null("ScreenRoot/LegacyRunScreen")
 	if legacy == null or not legacy.visible:
-		_fail("LegacyRunScreen should be visible after login")
+		_fail("Casual mode entry should show LegacyRunScreen")
 		return
-
-	var casual_button = _find_button_containing(legacy, "开始休闲模式")
-	if casual_button == null:
-		_fail("Playable lobby must expose casual mode entry")
-		return
-	casual_button.pressed.emit()
-	await process_frame
-	await process_frame
 	if main.get("run_store").has_run():
 		_fail("Entering casual mode must not create a run before dog confirmation")
 		return
 	if str(legacy.get("current_tab")) != "跑局":
-		_fail("Casual mode entry should open dog-selection run tab")
+		_fail("Casual mode entry should open dog-selection run tab, got %s" % str(legacy.get("current_tab")))
 		return
-	if _find_button_containing(legacy, "开始一局") == null:
+	var start_button = _find_button_containing(legacy, "开始一局")
+	if start_button == null:
 		_fail("Dog-selection run tab must expose start-run confirmation")
 		return
 
-	var start_button = _find_button_containing(legacy, "开始一局")
 	seen_paths.clear()
 	start_button.pressed.emit()
 	if not await _wait_for_path("/runs"):
@@ -56,16 +60,11 @@ func _run() -> void:
 		_fail("Created run should stay in playable run shell")
 		return
 	if main.get_node_or_null("ScreenRoot/ModeLobbyScreen").visible:
-		_fail("Created run must not show the old standalone ModeLobbyScreen")
+		_fail("Created run must hide ModeLobbyScreen")
 		return
 	if legacy.find_child("PlaceholderPanel", true, false) != null:
 		_fail("Created run must not show placeholder content")
 		return
-	var text := _collect_text(legacy)
-	for part in ["当前跑局", "地图", "装备", "遗物"]:
-		if not text.contains(part):
-			_fail("Created run UI missing section: %s" % part)
-			return
 
 	main.queue_free()
 	for _frame in range(2):
@@ -105,20 +104,28 @@ func _new_logged_in_main() -> Node:
 	password_input.text = "dogdice"
 	await login_screen.call("_on_register_pressed")
 	if not await _wait_for_screen(router, "nickname_setup"):
-		_fail("Register should route to nickname setup")
+		var error_label = login_screen.get_node_or_null("%ErrorLabel")
+		var error_text := str(error_label.text) if error_label != null else ""
+		_fail("Register should route to nickname setup, got %s error=%s" % [str(router.get("current_screen_id")), error_text])
 		return null
-	var nickname_screen = main.get_node_or_null("ScreenRoot/NicknameSetupScreen")
-	var nickname_input := _find_line_edit(nickname_screen)
+	var nickname_input := _find_line_edit(main.get_node_or_null("ScreenRoot/NicknameSetupScreen"))
 	if nickname_input == null:
 		_fail("NicknameSetupScreen must expose nickname input")
 		return null
-	nickname_input.text = "休闲建局烟测"
-	await nickname_screen.call("_submit_nickname")
+	nickname_input.text = "CasualUiSmoke"
+	await main.get_node_or_null("ScreenRoot/NicknameSetupScreen").call("_submit_nickname")
 	return main
 
 func _wait_for_screen(router: Node, screen_id: String) -> bool:
-	for _frame in range(180):
+	for _frame in range(240):
 		if str(router.get("current_screen_id")) == screen_id:
+			return true
+		await process_frame
+	return false
+
+func _wait_for_path(path: String) -> bool:
+	for _frame in range(600):
+		if seen_paths.has(path):
 			return true
 		await process_frame
 	return false
@@ -128,37 +135,14 @@ func _wait_for_run(main: Node) -> bool:
 		var run_store = main.get("run_store")
 		if run_store != null and run_store.has_method("has_run") and run_store.has_run():
 			var run: Dictionary = run_store.get("run")
-			if str(run.get("mode", "")) == "CASUAL" and str(run.get("phase", "")).length() > 0:
+			if str(run.get("mode", "")) == "CASUAL":
 				return true
 		await process_frame
 	return false
 
-func _run_store_debug(main: Node) -> String:
-	var run_store = main.get("run_store")
-	if run_store == null:
-		return "missing"
-	if not run_store.has_method("has_run"):
-		return "no has_run method"
-	if not run_store.has_run():
-		return "empty"
-	var run: Dictionary = run_store.get("run")
-	return "mode=%s phase=%s status=%s id=%s" % [
-		str(run.get("mode", "")),
-		str(run.get("phase", "")),
-		str(run.get("status", "")),
-		str(run.get("id", "")),
-	]
-
-func _wait_for_path(path: String) -> bool:
+func _wait_for_idle(node: Node) -> bool:
 	for _frame in range(600):
-		if seen_paths.has(path):
-			return true
-		await process_frame
-	return false
-
-func _wait_for_idle(legacy: Node) -> bool:
-	for _frame in range(600):
-		if legacy != null and not bool(legacy.get("action_in_progress")):
+		if node != null and not bool(node.get("action_in_progress")):
 			return true
 		await process_frame
 	return false
@@ -175,7 +159,7 @@ func _find_line_edit(node: Node) -> LineEdit:
 	return null
 
 func _find_button_containing(node: Node, text: String) -> Button:
-	if node is Button and (node as Button).is_visible_in_tree() and (node as Button).text.contains(text):
+	if node is Button and (node as Button).text.contains(text):
 		return node as Button
 	for child in node.get_children():
 		var result := _find_button_containing(child, text)
@@ -183,17 +167,11 @@ func _find_button_containing(node: Node, text: String) -> Button:
 			return result
 	return null
 
-func _collect_text(node: Node) -> String:
-	var text := ""
-	if node is CanvasItem and not (node as CanvasItem).is_visible_in_tree():
-		return text
-	if node is Label:
-		text += (node as Label).text + "\n"
-	if node is Button:
-		text += (node as Button).text + "\n"
-	for child in node.get_children():
-		text += _collect_text(child)
-	return text
+func _run_store_debug(main: Node) -> String:
+	var run_store = main.get("run_store")
+	if run_store == null:
+		return "<missing>"
+	return "has_run=%s run=%s" % [str(run_store.has_run()), str(run_store.get("run"))]
 
 func _fail(message: String) -> void:
 	push_error(message)

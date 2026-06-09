@@ -14,42 +14,41 @@ func _run() -> void:
 	await process_frame
 
 	if not main.call("open_screen", "mode_lobby"):
-		_fail("Main should open playable mode lobby")
+		_fail("Main should open standalone mode lobby")
 		return
 	await process_frame
 	await process_frame
 
+	var router = main.get("router")
+	if router == null or str(router.get("current_screen_id")) != "mode_lobby":
+		_fail("open_screen(mode_lobby) should route to mode_lobby, got %s" % (str(router.get("current_screen_id")) if router != null else "<missing>"))
+		return
+	var mode_lobby = main.get_node_or_null("ScreenRoot/ModeLobbyScreen")
+	if mode_lobby == null or not mode_lobby.visible:
+		_fail("open_screen(mode_lobby) should show ModeLobbyScreen")
+		return
 	var legacy = main.get_node_or_null("ScreenRoot/LegacyRunScreen")
-	if legacy == null:
-		_fail("LegacyRunScreen is missing")
+	if legacy != null and legacy.visible:
+		_fail("open_screen(mode_lobby) must not show LegacyRunScreen")
 		return
-	if not legacy.visible:
-		_fail("LegacyRunScreen should be visible for playable mode lobby")
-		return
-
-	var header = legacy.find_child("Header", true, false)
-	if header == null:
-		_fail("LegacyRunScreen must expose stable Header")
-		return
-	if _visible_option_button_count(header) > 0:
-		_fail("Playable shell header must not expose old dog/mode/lucky dropdowns")
-		return
-	if _has_visible_button_text(header, "新建跑局"):
-		_fail("Playable shell header must not expose old global create-run button")
-		return
-	if _has_visible_button_text(header, "刷新全部"):
-		_fail("Playable shell header must not expose old global refresh button")
-		return
-	var text := _collect_visible_text(legacy)
-	for part in ["模式大厅", "休闲模式", "天梯模式", "多人房间", "巅峰竞技场"]:
-		if not text.contains(part):
-			_fail("Playable lobby must still render mode entry: %s" % part)
+	for node_name in ["ModeLobbyPanel", "ModeLobbyScroll", "ModeGrid", "CasualModeButton", "LadderModeButton", "DogfightModeButton", "PeakModeButton"]:
+		if mode_lobby.find_child(node_name, true, false) == null:
+			_fail("Standalone mode lobby missing Web node: %s" % node_name)
 			return
+	if _visible_option_button_count(mode_lobby) > 0:
+		_fail("Standalone mode lobby must not expose old dog/mode/lucky dropdowns")
+		return
+	if _has_visible_button_text(mode_lobby, "新建跑局"):
+		_fail("Standalone mode lobby must not expose old global create-run button")
+		return
+	if _has_visible_button_text(mode_lobby, "刷新全部"):
+		_fail("Standalone mode lobby must not expose old global refresh button")
+		return
 
 	main.queue_free()
 	for _frame in range(2):
 		await process_frame
-	print("Godot legacy shell header Web mode smoke passed")
+	print("Godot standalone mode lobby Web mode smoke passed")
 	quit(0)
 
 func _visible_option_button_count(node: Node) -> int:
@@ -67,18 +66,6 @@ func _has_visible_button_text(node: Node, text: String) -> bool:
 		if _has_visible_button_text(child, text):
 			return true
 	return false
-
-func _collect_visible_text(node: Node) -> String:
-	var text := ""
-	if node is CanvasItem and not (node as CanvasItem).is_visible_in_tree():
-		return text
-	if node is Label:
-		text += (node as Label).text + "\n"
-	if node is Button:
-		text += (node as Button).text + "\n"
-	for child in node.get_children():
-		text += _collect_visible_text(child)
-	return text
 
 func _fail(message: String) -> void:
 	push_error(message)

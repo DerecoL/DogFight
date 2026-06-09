@@ -93,6 +93,7 @@ func _build_lobby() -> void:
 	box.add_child(_track_action_button(tutorial_button))
 
 	var mode_entries := GridContainer.new()
+	mode_entries.name = "ModeGrid"
 	mode_entries.columns = 2
 	mode_entries.add_theme_constant_override("h_separation", 10)
 	mode_entries.add_theme_constant_override("v_separation", 8)

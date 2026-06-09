@@ -186,7 +186,13 @@ func show_named_section(section_id: String) -> void:
 		_:
 			current_tab = TAB_LOBBY
 	_render_shell()
-	call_deferred("_refresh_current_section")
+	if current_tab == TAB_ROOMS:
+		call_deferred("_refresh_rooms_payload")
+	else:
+		call_deferred("_refresh_current_section")
+
+func refresh_rooms_section() -> void:
+	await _refresh_rooms_payload()
 
 func _build_layout() -> void:
 	var background := TextureRect.new()

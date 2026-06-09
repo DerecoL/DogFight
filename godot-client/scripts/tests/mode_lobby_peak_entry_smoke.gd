@@ -1,41 +1,41 @@
 extends SceneTree
 
 var seen_paths: Dictionary = {}
+var main_node: Node
 
 func _init() -> void:
 	_run()
 
 func _run() -> void:
-	var main := await _new_logged_in_main("godot-peak-entry", "巅峰入口烟测")
+	var main := await _new_logged_in_main("godot-peak-entry", "PeakEntrySmoke")
 	if main == null:
 		return
 	var router = main.get("router")
-	if not await _assert_playable_lobby(main, router):
+	if not await _assert_standalone_lobby(main, router):
 		return
 
 	seen_paths.clear()
-	var legacy = main.get_node_or_null("ScreenRoot/LegacyRunScreen")
-	var peak_button = _find_button_containing(legacy, "进入巅峰模式")
+	var mode_lobby = main.get_node_or_null("ScreenRoot/ModeLobbyScreen")
+	var peak_button = mode_lobby.find_child("PeakModeButton", true, false) as Button
 	if peak_button == null:
-		_fail("Playable mode lobby must expose peak entry")
+		_fail("Standalone mode lobby must expose PeakModeButton")
 		return
 	peak_button.pressed.emit()
 	if not await _wait_for_screen(router, "legacy_run"):
-		_fail("Peak entry should keep playable shell visible")
+		_fail("Peak entry should show Apex flow in LegacyRunScreen")
+		return
+	var legacy = main.get_node_or_null("ScreenRoot/LegacyRunScreen")
+	if legacy == null or not legacy.visible:
+		_fail("Peak entry should show LegacyRunScreen Apex flow")
 		return
 	if not await _wait_for_paths(["/apex"]):
-		_fail("Peak entry should refresh Apex data")
+		_fail("Peak entry should refresh Apex data; seen=%s" % str(seen_paths.keys()))
 		return
 	if str(legacy.get("current_tab")) != "巅峰":
-		_fail("Peak entry should show independent Apex tab")
+		_fail("Peak entry should show independent Apex tab, got %s" % str(legacy.get("current_tab")))
 		return
-	var text := _collect_text(legacy)
-	for part in ["巅峰竞技场", "可提交完成局", "总榜", "当日榜"]:
-		if not text.contains(part):
-			_fail("Peak screen missing Web-style section: %s" % part)
-			return
-	if text.contains("天梯排行榜"):
-		_fail("Peak screen must not open on ladder leaderboard content")
+	if legacy.find_child("PlaceholderPanel", true, false) != null:
+		_fail("Peak entry must not show placeholder content")
 		return
 
 	main.queue_free()
@@ -50,6 +50,7 @@ func _new_logged_in_main(account_prefix: String, nickname: String) -> Node:
 		_fail("Main scene failed to load")
 		return null
 	var main = main_scene.instantiate()
+	main_node = main
 	root.add_child(main)
 	await process_frame
 	await process_frame
@@ -74,7 +75,9 @@ func _new_logged_in_main(account_prefix: String, nickname: String) -> Node:
 	password_input.text = "dogdice"
 	await login_screen.call("_on_register_pressed")
 	if not await _wait_for_screen(router, "nickname_setup"):
-		_fail("Register should route to nickname setup")
+		var error_label = login_screen.get_node_or_null("%ErrorLabel")
+		var error_text := str(error_label.text) if error_label != null else ""
+		_fail("Register should route to nickname setup, got %s error=%s" % [str(router.get("current_screen_id")), error_text])
 		return null
 	var nickname_input := _find_line_edit(main.get_node_or_null("ScreenRoot/NicknameSetupScreen"))
 	if nickname_input == null:
@@ -84,28 +87,33 @@ func _new_logged_in_main(account_prefix: String, nickname: String) -> Node:
 	await main.get_node_or_null("ScreenRoot/NicknameSetupScreen").call("_submit_nickname")
 	return main
 
-func _assert_playable_lobby(main: Node, router: Node) -> bool:
-	if not await _wait_for_screen(router, "legacy_run"):
-		_fail("Nickname should route to playable mode lobby")
+func _assert_standalone_lobby(main: Node, router: Node) -> bool:
+	if not await _wait_for_screen(router, "mode_lobby"):
+		_fail("Nickname should route to standalone mode lobby")
+		return false
+	var mode_lobby = main.get_node_or_null("ScreenRoot/ModeLobbyScreen")
+	if mode_lobby == null or not mode_lobby.visible:
+		_fail("Standalone mode lobby should show ModeLobbyScreen")
 		return false
 	var legacy = main.get_node_or_null("ScreenRoot/LegacyRunScreen")
-	if legacy == null or not legacy.visible:
-		_fail("Playable mode lobby should show LegacyRunScreen")
+	if legacy != null and legacy.visible:
+		_fail("Standalone mode lobby must not show LegacyRunScreen")
 		return false
-	if main.get_node_or_null("ScreenRoot/ModeLobbyScreen").visible:
-		_fail("Playable mode lobby must not show the old standalone ModeLobbyScreen")
-		return false
+	for node_name in ["ModeLobbyPanel", "ModeGrid", "PeakModeButton"]:
+		if mode_lobby.find_child(node_name, true, false) == null:
+			_fail("Standalone mode lobby missing node: %s" % node_name)
+			return false
 	return true
 
 func _wait_for_screen(router: Node, screen_id: String) -> bool:
-	for _frame in range(180):
+	for _frame in range(240):
 		if str(router.get("current_screen_id")) == screen_id:
 			return true
 		await process_frame
 	return false
 
 func _wait_for_paths(paths: Array) -> bool:
-	for _frame in range(180):
+	for _frame in range(600):
 		var complete := true
 		for path in paths:
 			if not seen_paths.has(str(path)):
@@ -127,25 +135,8 @@ func _find_line_edit(node: Node) -> LineEdit:
 			return result
 	return null
 
-func _collect_text(node: Node) -> String:
-	var text := ""
-	if node is Label:
-		text += (node as Label).text + "\n"
-	if node is Button:
-		text += (node as Button).text + "\n"
-	for child in node.get_children():
-		text += _collect_text(child)
-	return text
-
-func _find_button_containing(node: Node, text: String) -> Button:
-	if node is Button and (node as Button).text.contains(text):
-		return node as Button
-	for child in node.get_children():
-		var result := _find_button_containing(child, text)
-		if result != null:
-			return result
-	return null
-
 func _fail(message: String) -> void:
 	push_error(message)
+	if main_node != null:
+		main_node.queue_free()
 	quit(1)

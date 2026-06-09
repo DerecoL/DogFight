@@ -1,30 +1,33 @@
 extends SceneTree
 
+var main_node: Node
+
 func _init() -> void:
 	_run()
 
 func _run() -> void:
-	var main := await _new_logged_in_main("godot-tutorial-entry", "引导入口烟测")
+	var main := await _new_logged_in_main("godot-tutorial-entry", "TutorialEntrySmoke")
 	if main == null:
 		return
 	var router = main.get("router")
-	if not await _assert_playable_lobby(main, router):
+	if not await _assert_standalone_lobby(main, router):
 		return
 
-	var legacy = main.get_node_or_null("ScreenRoot/LegacyRunScreen")
-	var tutorial_button = _find_button_containing(legacy, "重播新手引导")
+	var mode_lobby = main.get_node_or_null("ScreenRoot/ModeLobbyScreen")
+	var tutorial_button = mode_lobby.find_child("TutorialReplayButton", true, false) as Button
 	if tutorial_button == null:
-		_fail("Playable mode lobby must expose tutorial entry")
+		_fail("Standalone mode lobby must expose TutorialReplayButton")
 		return
 	tutorial_button.pressed.emit()
 	if not await _wait_for_screen(router, "legacy_run"):
-		_fail("Tutorial entry should keep playable run shell visible")
+		_fail("Tutorial entry should open playable tutorial shell")
+		return
+	var legacy = main.get_node_or_null("ScreenRoot/LegacyRunScreen")
+	if legacy == null or not legacy.visible:
+		_fail("Tutorial entry should show LegacyRunScreen tutorial flow")
 		return
 	if main.get("run_store").has_run():
 		_fail("Tutorial entry must not create a run directly")
-		return
-	if str(legacy.get("current_tab")) != "大厅":
-		_fail("Tutorial entry should keep the run shell on lobby guidance")
 		return
 	var modal_layer = main.get_node_or_null("OverlayRoot/ModalLayer")
 	if modal_layer == null:
@@ -51,6 +54,7 @@ func _new_logged_in_main(account_prefix: String, nickname: String) -> Node:
 		_fail("Main scene failed to load")
 		return null
 	var main = main_scene.instantiate()
+	main_node = main
 	root.add_child(main)
 	await process_frame
 	await process_frame
@@ -68,7 +72,9 @@ func _new_logged_in_main(account_prefix: String, nickname: String) -> Node:
 	password_input.text = "dogdice"
 	await login_screen.call("_on_register_pressed")
 	if not await _wait_for_screen(router, "nickname_setup"):
-		_fail("Register should route to nickname setup")
+		var error_label = login_screen.get_node_or_null("%ErrorLabel")
+		var error_text := str(error_label.text) if error_label != null else ""
+		_fail("Register should route to nickname setup, got %s error=%s" % [str(router.get("current_screen_id")), error_text])
 		return null
 	var nickname_input := _find_line_edit(main.get_node_or_null("ScreenRoot/NicknameSetupScreen"))
 	if nickname_input == null:
@@ -78,21 +84,26 @@ func _new_logged_in_main(account_prefix: String, nickname: String) -> Node:
 	await main.get_node_or_null("ScreenRoot/NicknameSetupScreen").call("_submit_nickname")
 	return main
 
-func _assert_playable_lobby(main: Node, router: Node) -> bool:
-	if not await _wait_for_screen(router, "legacy_run"):
-		_fail("Nickname should route to playable mode lobby")
+func _assert_standalone_lobby(main: Node, router: Node) -> bool:
+	if not await _wait_for_screen(router, "mode_lobby"):
+		_fail("Nickname should route to standalone mode lobby")
+		return false
+	var mode_lobby = main.get_node_or_null("ScreenRoot/ModeLobbyScreen")
+	if mode_lobby == null or not mode_lobby.visible:
+		_fail("Standalone mode lobby should show ModeLobbyScreen")
 		return false
 	var legacy = main.get_node_or_null("ScreenRoot/LegacyRunScreen")
-	if legacy == null or not legacy.visible:
-		_fail("Playable mode lobby should show LegacyRunScreen")
+	if legacy != null and legacy.visible:
+		_fail("Standalone mode lobby must not show LegacyRunScreen")
 		return false
-	if main.get_node_or_null("ScreenRoot/ModeLobbyScreen").visible:
-		_fail("Playable mode lobby must not show the old standalone ModeLobbyScreen")
-		return false
+	for node_name in ["ModeLobbyPanel", "ModeGrid", "TutorialReplayButton"]:
+		if mode_lobby.find_child(node_name, true, false) == null:
+			_fail("Standalone mode lobby missing node: %s" % node_name)
+			return false
 	return true
 
 func _wait_for_screen(router: Node, screen_id: String) -> bool:
-	for _frame in range(180):
+	for _frame in range(240):
 		if str(router.get("current_screen_id")) == screen_id:
 			return true
 		await process_frame
@@ -126,15 +137,8 @@ func _collect_text(node: Node) -> String:
 		text += _collect_text(child)
 	return text
 
-func _find_button_containing(node: Node, text: String) -> Button:
-	if node is Button and (node as Button).text.contains(text):
-		return node as Button
-	for child in node.get_children():
-		var result := _find_button_containing(child, text)
-		if result != null:
-			return result
-	return null
-
 func _fail(message: String) -> void:
 	push_error(message)
+	if main_node != null:
+		main_node.queue_free()
 	quit(1)

@@ -35,24 +35,19 @@ func _run() -> void:
 	if legacy == null or not legacy.has_method("open_mode_lobby"):
 		_fail("LegacyRunScreen must expose open_mode_lobby")
 		return
-	var text := _collect_text(legacy)
-	if not text.contains("返回大厅"):
-		_fail("LegacyRunScreen must render a return-to-lobby button")
-		return
 	legacy.call("open_mode_lobby")
-	await process_frame
-	await process_frame
-	if str(router.get("current_screen_id")) != "legacy_run":
-		_fail("open_mode_lobby should keep the playable shell visible, got %s" % str(router.get("current_screen_id")))
+	if not await _wait_for_screen(router, "mode_lobby"):
+		_fail("open_mode_lobby should route to standalone mode_lobby, got %s" % str(router.get("current_screen_id")))
 		return
-	if main.get_node_or_null("ScreenRoot/ModeLobbyScreen").visible:
-		_fail("open_mode_lobby must not show the old standalone ModeLobbyScreen")
+	var mode_lobby = main.get_node_or_null("ScreenRoot/ModeLobbyScreen")
+	if mode_lobby == null or not mode_lobby.visible:
+		_fail("open_mode_lobby should show ModeLobbyScreen")
 		return
-	if str(legacy.get("current_tab")) != "大厅":
-		_fail("open_mode_lobby should route to the playable lobby tab")
+	if legacy.visible:
+		_fail("open_mode_lobby must hide LegacyRunScreen")
 		return
-	if not _collect_text(legacy).contains("竞技方式"):
-		_fail("open_mode_lobby should render playable mode entries")
+	if mode_lobby.find_child("ModeGrid", true, false) == null:
+		_fail("open_mode_lobby should render standalone Web mode grid")
 		return
 
 	main.queue_free()
@@ -61,15 +56,12 @@ func _run() -> void:
 	print("Godot legacy shell lobby return smoke passed")
 	quit(0)
 
-func _collect_text(node: Node) -> String:
-	var text := ""
-	if node is Label:
-		text += (node as Label).text + "\n"
-	if node is Button:
-		text += (node as Button).text + "\n"
-	for child in node.get_children():
-		text += _collect_text(child)
-	return text
+func _wait_for_screen(router: Node, screen_id: String) -> bool:
+	for _frame in range(180):
+		if str(router.get("current_screen_id")) == screen_id:
+			return true
+		await process_frame
+	return false
 
 func _fail(message: String) -> void:
 	push_error(message)
