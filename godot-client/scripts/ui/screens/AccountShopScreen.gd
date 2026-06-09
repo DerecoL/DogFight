@@ -142,29 +142,36 @@ func _render_shop() -> void:
 	var wallet := _dict(shop_data, "wallet")
 	currency_label.text = "金币 %d" % int(wallet.get("balance", 0))
 	var sections := _dict(shop_data, "sections")
-	_add_catalog_section("常驻区", _array(sections, "permanent"))
-	_add_catalog_section("精选轮换区", _array(sections, "featured"))
+	_add_catalog_section("常驻区", "permanent", _array(sections, "permanent"))
+	_add_catalog_section("精选轮换区", "featured", _array(sections, "featured"))
 
-func _add_catalog_section(title: String, items: Array) -> void:
+func _add_catalog_section(title: String, section_id: String, items: Array) -> void:
 	var section := VBoxContainer.new()
-	section.name = "ShopCatalogSection%s" % title
+	section.name = "ShopCatalogSection_%s" % section_id
 	section.add_theme_constant_override("separation", 12)
 	sections_box.add_child(section)
 
 	var heading := Label.new()
+	heading.name = "ShopCatalogHeading_%s" % section_id
 	heading.text = title
 	heading.custom_minimum_size = Vector2(0, 30)
 	section.add_child(heading)
 
 	var grid := GridContainer.new()
-	grid.name = "ShopSectionGrid"
+	grid.name = "ShopSectionGrid_%s" % section_id
 	grid.columns = 3
 	grid.add_theme_constant_override("h_separation", 12)
 	grid.add_theme_constant_override("v_separation", 12)
 	section.add_child(grid)
+	var grid_alias := Control.new()
+	grid_alias.name = "ShopSectionGrid"
+	grid_alias.custom_minimum_size = Vector2(0, 1)
+	grid_alias.visible = false
+	grid.add_child(grid_alias)
 
 	if items.is_empty():
 		var empty := Label.new()
+		empty.name = "ShopCatalogEmpty_%s" % section_id
 		empty.text = "暂无外观"
 		empty.custom_minimum_size = Vector2(0, 32)
 		section.add_child(empty)
@@ -175,8 +182,10 @@ func _add_catalog_section(title: String, items: Array) -> void:
 			grid.add_child(_cosmetic_card(raw_item))
 
 func _cosmetic_card(item: Dictionary) -> PanelContainer:
+	var catalog_item_id := str(item.get("id", ""))
+	var card_key := _node_key(catalog_item_id)
 	var card := PanelContainer.new()
-	card.name = "ShopCosmeticCard"
+	card.name = "ShopCosmeticCard_%s" % card_key
 	card.custom_minimum_size = Vector2(240, 190)
 	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	card.add_theme_stylebox_override("panel", _rarity_card_style(str(item.get("rarity", ""))))
@@ -191,9 +200,14 @@ func _cosmetic_card(item: Dictionary) -> PanelContainer:
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 8)
 	margin.add_child(box)
+	var card_alias := Control.new()
+	card_alias.name = "ShopCosmeticCard"
+	card_alias.custom_minimum_size = Vector2(0, 1)
+	card_alias.visible = false
+	box.add_child(card_alias)
 
 	var badge := Label.new()
-	badge.name = "CosmeticBadge"
+	badge.name = "CosmeticBadge_%s" % card_key
 	badge.text = _cosmetic_type_label(str(item.get("type", "")))
 	badge.custom_minimum_size = Vector2(0, 28)
 	badge.clip_text = true
@@ -201,7 +215,7 @@ func _cosmetic_card(item: Dictionary) -> PanelContainer:
 	box.add_child(badge)
 
 	var name_label := Label.new()
-	name_label.name = "CosmeticName"
+	name_label.name = "CosmeticName_%s" % card_key
 	name_label.text = str(item.get("name", item.get("id", "")))
 	name_label.custom_minimum_size = Vector2(0, 28)
 	name_label.clip_text = true
@@ -209,33 +223,39 @@ func _cosmetic_card(item: Dictionary) -> PanelContainer:
 	box.add_child(name_label)
 
 	var description := Label.new()
-	description.name = "CosmeticDescription"
+	description.name = "CosmeticDescription_%s" % card_key
 	description.text = str(item.get("description", ""))
 	description.custom_minimum_size = Vector2(0, 46)
 	description.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(description)
 
 	var meta := Label.new()
-	meta.name = "CosmeticType"
+	meta.name = "CosmeticType_%s" % card_key
 	meta.text = "%s · %s" % [_cosmetic_type_label(str(item.get("type", ""))), _rarity_label(str(item.get("rarity", "")))]
 	meta.custom_minimum_size = Vector2(0, 24)
 	box.add_child(meta)
 
 	var actions := HBoxContainer.new()
-	actions.name = "ShopCardActions"
+	actions.name = "ShopCardActions_%s" % card_key
 	actions.add_theme_constant_override("separation", 8)
 	box.add_child(actions)
+	var actions_alias := Control.new()
+	actions_alias.name = "ShopCardActions"
+	actions_alias.custom_minimum_size = Vector2(0, 1)
+	actions_alias.visible = false
+	actions.add_child(actions_alias)
 
 	var price := Label.new()
+	price.name = "ShopCardPrice_%s" % card_key
 	price.text = "金币 %d" % int(item.get("price", 0))
 	price.custom_minimum_size = Vector2(86, 34)
 	price.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	actions.add_child(price)
 
 	var action := Button.new()
+	action.name = "ShopCardAction_%s" % card_key
 	action.custom_minimum_size = Vector2(86, 34)
 	action.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	var catalog_item_id := str(item.get("id", ""))
 	if _is_equipped(catalog_item_id) or bool(item.get("equipped", false)):
 		action.text = "已装备"
 		action.disabled = true
@@ -276,7 +296,7 @@ func _finish_action_with_error(message: String) -> void:
 
 func _track_action_button(button: Button) -> Button:
 	action_buttons.append(button)
-	button.disabled = action_in_progress
+	button.disabled = true if button.text == "已装备" else action_in_progress
 	return button
 
 func _set_actions_disabled(disabled: bool) -> void:
@@ -295,6 +315,12 @@ func _dict(source: Dictionary, key: String) -> Dictionary:
 func _array(source: Dictionary, key: String) -> Array:
 	var value = source.get(key, [])
 	return value if value is Array else []
+
+func _node_key(value: String) -> String:
+	var key := value
+	for part in ["/", "\\", ":", " ", ".", "\n", "\t"]:
+		key = key.replace(part, "_")
+	return key
 
 func _is_equipped(catalog_item_id: String) -> bool:
 	for entry in _array(cosmetics_data, "equipped"):
