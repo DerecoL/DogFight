@@ -12,45 +12,46 @@ func _run() -> void:
 	root.add_child(main)
 	await process_frame
 	await process_frame
-	var run_screen = main.get_node_or_null("ScreenRoot/LegacyRunScreen")
-	if run_screen == null:
-		_fail("RunScreen is missing")
-		return
 	if not main.has_method("set_current_run"):
 		_fail("Main session does not expose set_current_run")
 		return
 
 	main.call("set_current_run", _map_run("", {}, null))
-	run_screen.set("current_tab", "跑局")
-	run_screen.call("_render_current_tab")
 	await process_frame
-	var text := _collect_text(run_screen)
-	for forbidden in ["处理事件", "完成节点", "领取怪物奖励", "跳过怪物奖励"]:
-		if text.contains(str(forbidden)):
-			_fail("Map without current action must not expose: %s" % str(forbidden))
+	await process_frame
+	var map_screen := _current_map_screen(main)
+	if map_screen == null:
+		return
+	for forbidden in ["ResolveMapEventButton", "ClaimMonsterRewardButton", "SkipMonsterRewardButton"]:
+		if _find_by_name(map_screen, forbidden) != null:
+			_fail("Map without current action must not expose: %s" % forbidden)
 			return
 
 	main.call("set_current_run", _map_run("event-1", _event_node(), null))
-	run_screen.call("_render_current_tab")
 	await process_frame
-	text = _collect_text(run_screen)
-	if not text.contains("处理事件"):
+	await process_frame
+	map_screen = _current_map_screen(main)
+	if map_screen == null:
+		return
+	if _find_by_name(map_screen, "ResolveMapEventButton") == null:
 		_fail("Current event node should expose resolve action")
 		return
-	for forbidden in ["领取怪物奖励", "跳过怪物奖励"]:
-		if text.contains(str(forbidden)):
-			_fail("Event node must not expose reward action: %s" % str(forbidden))
+	for forbidden in ["ClaimMonsterRewardButton", "SkipMonsterRewardButton"]:
+		if _find_by_name(map_screen, forbidden) != null:
+			_fail("Event node must not expose reward action: %s" % forbidden)
 			return
 
 	main.call("set_current_run", _map_run("monster-1", _monster_node(), {"defId": "starter-1", "quality": "SILVER"}))
-	run_screen.call("_render_current_tab")
 	await process_frame
-	text = _collect_text(run_screen)
-	for required in ["领取怪物奖励", "跳过怪物奖励"]:
-		if not text.contains(str(required)):
-			_fail("Pending reward should expose action: %s" % str(required))
+	await process_frame
+	map_screen = _current_map_screen(main)
+	if map_screen == null:
+		return
+	for required in ["ClaimMonsterRewardButton", "SkipMonsterRewardButton"]:
+		if _find_by_name(map_screen, required) == null:
+			_fail("Pending reward should expose action: %s" % required)
 			return
-	if text.contains("处理事件"):
+	if _find_by_name(map_screen, "ResolveMapEventButton") != null:
 		_fail("Pending reward must not expose event action")
 		return
 
@@ -119,15 +120,25 @@ func _monster_node() -> Dictionary:
 	}
 	return node
 
-func _collect_text(node: Node) -> String:
-	var text := ""
-	if node is Label:
-		text += (node as Label).text + "\n"
-	if node is Button:
-		text += (node as Button).text + "\n"
+func _current_map_screen(main: Node) -> Node:
+	var router = main.get("router")
+	if router != null and str(router.get("current_screen_id")) != "exploration_map":
+		_fail("MAP should route to standalone ExplorationMapScreen, got %s" % str(router.get("current_screen_id")))
+		return null
+	var map_screen = main.get_node_or_null("ScreenRoot/ExplorationMapScreen")
+	if map_screen == null or not map_screen.visible:
+		_fail("Standalone ExplorationMapScreen is missing or hidden")
+		return null
+	return map_screen
+
+func _find_by_name(node: Node, node_name: String) -> Node:
+	if node.name == node_name:
+		return node
 	for child in node.get_children():
-		text += _collect_text(child)
-	return text
+		var found := _find_by_name(child, node_name)
+		if found != null:
+			return found
+	return null
 
 func _fail(message: String) -> void:
 	push_error(message)

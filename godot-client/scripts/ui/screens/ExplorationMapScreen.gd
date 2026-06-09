@@ -1,6 +1,7 @@
 extends BaseWebScreen
 
 var action_in_progress := false
+var selected_item_id := ""
 
 func _ready() -> void:
 	_render()
@@ -114,6 +115,7 @@ func _render_map_run(parent: Node, run: Dictionary) -> void:
 		inventory.add_theme_constant_override("separation", 8)
 		reward_inventory.add_child(inventory)
 		_render_inventory_board(inventory, run)
+		_render_selected_item_tip(inventory, run)
 
 func _render_topbar(parent: VBoxContainer, run: Dictionary, map_state: Dictionary, layer_count: int) -> void:
 	var topbar := HBoxContainer.new()
@@ -359,10 +361,81 @@ func _render_grid_panel(parent: VBoxContainer, node_name: String, title: String,
 		if item_value is Dictionary and str(item_value.get("area", "")) == area:
 			var item: Dictionary = item_value
 			var def := _dict(item, "def")
-			var button := _action_button(_fallback(str(def.get("name", "")), str(item.get("defId", ""))), _noop)
+			var button := _action_button(_fallback(str(def.get("name", "")), str(item.get("defId", ""))), _select_item.bind(str(item.get("id", ""))))
 			button.name = "%sItem_%s" % [node_name, str(item.get("id", ""))]
 			button.custom_minimum_size = Vector2(90, 52)
 			item_line.add_child(button)
+
+func _render_selected_item_tip(parent: VBoxContainer, run: Dictionary) -> void:
+	var item := _selected_item(run)
+	if item.is_empty():
+		return
+	var def: Dictionary = _dict(item, "def")
+	var title := _fallback(str(def.get("name", "")), str(item.get("defId", item.get("id", ""))))
+	var floating_tip := PanelContainer.new()
+	floating_tip.name = "FloatingTip"
+	floating_tip.custom_minimum_size = Vector2(0, 244)
+	floating_tip.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	floating_tip.add_theme_stylebox_override("panel", WebUiTokens.paper_card_style())
+	parent.add_child(floating_tip)
+
+	var tip := VBoxContainer.new()
+	tip.name = "MapItemTip"
+	tip.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	tip.add_theme_constant_override("separation", 7)
+	floating_tip.add_child(tip)
+
+	var tags := HBoxContainer.new()
+	tags.name = "MapItemTipTags"
+	tags.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	tags.add_theme_constant_override("separation", 6)
+	tip.add_child(tags)
+	_add_label(tags, "MapItemTipSizeTag", "%s格" % _fallback(_detail_size_text(def), "?"), HORIZONTAL_ALIGNMENT_CENTER)
+	_add_label(tags, "MapItemTipQualityTag", _quality_label(str(item.get("quality", ""))), HORIZONTAL_ALIGNMENT_CENTER)
+	_add_label(tags, "MapItemTipAreaTag", _area_label(str(item.get("area", ""))), HORIZONTAL_ALIGNMENT_CENTER)
+
+	var identity := HBoxContainer.new()
+	identity.name = "MapItemTipIdentity"
+	identity.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	identity.add_theme_constant_override("separation", 8)
+	tip.add_child(identity)
+	var art := Label.new()
+	art.name = "MapItemTipArt"
+	art.text = ""
+	art.custom_minimum_size = Vector2(54, 54)
+	art.add_theme_stylebox_override("normal", WebUiTokens.resource_pill_style())
+	identity.add_child(art)
+	_add_label(identity, "MapItemTipTitle", title)
+
+	var size_preview := HBoxContainer.new()
+	size_preview.name = "MapItemTipSizePreview"
+	size_preview.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	size_preview.add_theme_constant_override("separation", 8)
+	tip.add_child(size_preview)
+	_add_label(size_preview, "MapItemTipGridPreview", _shop_size_preview_text(def))
+	_add_label(size_preview, "MapItemTipSizeText", "占用 %s 格" % _fallback(_detail_size_text(def), "?"))
+
+	var trigger := _trigger_dice_text(def)
+	if not trigger.is_empty():
+		_add_label(tip, "MapItemTipDice", "触发点数 %s" % trigger)
+	else:
+		_add_label(tip, "MapItemTipDice", "触发点数 -")
+
+	var description := _fallback(str(def.get("description", "")), str(item.get("description", "")))
+	_add_label(tip, "MapItemTipDescription", description)
+
+	var actions := HBoxContainer.new()
+	actions.name = "MapItemTipActions"
+	actions.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	actions.add_theme_constant_override("separation", 8)
+	tip.add_child(actions)
+	var upgrade_button := _action_button("升级", _upgrade_selected_item)
+	upgrade_button.name = "UpgradeItemButton"
+	upgrade_button.disabled = action_in_progress or not _can_upgrade_selected_item(run)
+	actions.add_child(upgrade_button)
+	var close_button := _action_button("关闭", _close_item_tip)
+	close_button.name = "CloseItemTipButton"
+	actions.add_child(close_button)
 
 func _map_side_card(parent: VBoxContainer, node_name: String) -> VBoxContainer:
 	var card := VBoxContainer.new()
@@ -435,6 +508,25 @@ func _skip_monster_reward() -> void:
 	if session != null and session.has_method("skip_monster_reward"):
 		await session.call("skip_monster_reward")
 
+func _select_item(item_id: String) -> void:
+	selected_item_id = item_id
+	_render()
+
+func _close_item_tip() -> void:
+	selected_item_id = ""
+	_render()
+
+func _upgrade_selected_item() -> void:
+	if selected_item_id.is_empty() or action_in_progress:
+		return
+	if session != null and session.has_method("upgrade_item"):
+		var item_id := selected_item_id
+		action_in_progress = true
+		await session.call("upgrade_item", item_id)
+		selected_item_id = ""
+		action_in_progress = false
+		_render()
+
 func _noop() -> void:
 	pass
 
@@ -453,8 +545,50 @@ func _array(source: Dictionary, key: String) -> Array:
 func _variant_array(value: Variant) -> Array:
 	return value if value is Array else []
 
+func _selected_item(run: Dictionary) -> Dictionary:
+	if selected_item_id.is_empty():
+		return {}
+	for item_value in _array(run, "items"):
+		if item_value is Dictionary and str((item_value as Dictionary).get("id", "")) == selected_item_id:
+			return item_value
+	return {}
+
 func _fallback(value: String, fallback: String) -> String:
 	return fallback if value.strip_edges().is_empty() else value
+
+func _detail_size_text(def: Dictionary) -> String:
+	if def.has("size"):
+		return str(int(def.get("size", 0)))
+	return ""
+
+func _shop_size_preview_text(def: Dictionary) -> String:
+	var size := int(def.get("size", 0))
+	var text := ""
+	for index in range(4):
+		text += "■" if index < size else "□"
+	return text
+
+func _trigger_dice_text(def: Dictionary) -> String:
+	var dice := _array(def, "triggerDice")
+	if dice.is_empty():
+		return ""
+	var parts: Array[String] = []
+	for value in dice:
+		parts.append(str(value))
+	return " / ".join(parts)
+
+func _can_upgrade_selected_item(run: Dictionary) -> bool:
+	var selected := _selected_item(run)
+	if selected.is_empty():
+		return false
+	var def_id := str(selected.get("defId", ""))
+	if def_id.is_empty():
+		return false
+	var count := 0
+	for item_value in _array(run, "items"):
+		if item_value is Dictionary and str((item_value as Dictionary).get("defId", "")) == def_id:
+			count += 1
+	return count >= 2
 
 func _map_layer_count(map_state: Dictionary) -> int:
 	var count := 1
@@ -542,6 +676,15 @@ func _map_reward_label(reward: Dictionary) -> String:
 	var def: Dictionary = _dict(reward, "def")
 	var reward_name := _fallback(str(def.get("name", "")), str(reward.get("defId", "")))
 	return "%s · %s" % [reward_name, _quality_label(str(reward.get("quality", "")))]
+
+func _area_label(area: String) -> String:
+	match area:
+		"EQUIPMENT":
+			return "装备格"
+		"BAG":
+			return "背包"
+		_:
+			return _fallback(area, "未放置")
 
 func _quality_label(quality: String) -> String:
 	match quality:

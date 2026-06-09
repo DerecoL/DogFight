@@ -9,8 +9,12 @@ func _run() -> void:
 		_fail("ExplorationMapScreen scene failed to load")
 		return
 	var screen = scene.instantiate()
+	var fake_session := FakeSession.new()
+	root.add_child(fake_session)
 	root.add_child(screen)
 	await process_frame
+	if screen.has_method("bind_session"):
+		screen.call("bind_session", fake_session)
 	if screen.has_method("set_payload"):
 		screen.call("set_payload", {"run": _map_run(true)})
 	await process_frame
@@ -74,6 +78,38 @@ func _run() -> void:
 		if not text.contains(part):
 			_fail("Standalone exploration map Web text missing: %s" % part)
 			return
+	var item_button := _find_by_name(screen, "EquipmentGridPanelItem_item-1") as Button
+	if item_button == null:
+		_fail("MAP equipment item button is missing")
+		return
+	item_button.pressed.emit()
+	await process_frame
+	if fake_session.upgrade_item_id != "":
+		_fail("MAP equipment click should inspect first instead of immediately upgrading")
+		return
+	for tip_node in [
+		"FloatingTip",
+		"MapItemTip",
+		"MapItemTipTags",
+		"MapItemTipIdentity",
+		"MapItemTipSizePreview",
+		"MapItemTipDice",
+		"MapItemTipDescription",
+		"MapItemTipActions",
+		"UpgradeItemButton",
+		"CloseItemTipButton",
+	]:
+		_assert_has(screen, tip_node)
+	var upgrade_button := _find_by_name(screen, "UpgradeItemButton") as Button
+	if upgrade_button == null or upgrade_button.disabled:
+		_fail("MAP selected item tip should expose an enabled upgrade button")
+		return
+	upgrade_button.pressed.emit()
+	await process_frame
+	await process_frame
+	if fake_session.upgrade_item_id != "item-1":
+		_fail("MAP upgrade button must call upgrade_item(item-1)")
+		return
 
 	if screen.has_method("set_payload"):
 		screen.call("set_payload", {"run": _map_run(false)})
@@ -83,10 +119,19 @@ func _run() -> void:
 		return
 
 	screen.queue_free()
+	fake_session.queue_free()
 	for _frame in range(3):
 		await process_frame
 	print("Godot standalone exploration map Web structure smoke passed")
 	quit(0)
+
+class FakeSession:
+	extends Node
+	var upgrade_item_id := ""
+
+	func upgrade_item(item_id: String) -> bool:
+		upgrade_item_id = item_id
+		return true
 
 func _map_run(with_reward: bool) -> Dictionary:
 	var pending := {"nodeId": "monster-1", "defId": "starter-1", "quality": "SILVER", "def": {"name": "1点牙咬"}} if with_reward else {}
@@ -101,7 +146,7 @@ func _map_run(with_reward: bool) -> Dictionary:
 		"wins": 1,
 		"losses": 0,
 		"gold": 8,
-		"items": [_item("item-1", "EQUIPMENT", 0)],
+		"items": [_item("item-1", "EQUIPMENT", 0), _item("item-2", "BAG", 1)],
 		"relics": [],
 		"shopItems": [],
 		"choices": [],
