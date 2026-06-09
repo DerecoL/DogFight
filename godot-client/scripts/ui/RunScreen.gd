@@ -529,6 +529,15 @@ func _render_run_tab() -> void:
 		picker.add_child(_action_button("开始一局", _on_create_run_pressed))
 		return
 	var run: Dictionary = store.get("run")
+	var phase := str(run.get("phase", ""))
+	if phase == "MAP":
+		_render_web_map_run(run)
+		_maybe_show_reward_ceremony(run)
+		return
+	if phase == "SHOP":
+		_render_web_shop_run(run)
+		_maybe_show_reward_ceremony(run)
+		return
 	var summary := _section("当前跑局")
 	_add_line(summary, "阶段", "%s / %s" % [_run_phase_label(str(run.get("phase", ""))), _run_status_label(str(run.get("status", "")))])
 	_add_line(summary, "犬种", "%s  幸运号 %s" % [_dog_name(str(run.get("dogType", ""))), str(run.get("luckyNumber", "-"))])
@@ -539,6 +548,259 @@ func _render_run_tab() -> void:
 	_render_inventory(run)
 	_render_map_or_shop_detail(run)
 	_maybe_show_reward_ceremony(run)
+
+func _render_playable_root() -> VBoxContainer:
+	var root := VBoxContainer.new()
+	root.name = "PlayableRunScreen"
+	root.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	root.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	root.add_theme_constant_override("separation", 12)
+	content.add_child(root)
+	return root
+
+func _render_run_summary_topbar(parent: VBoxContainer, run: Dictionary) -> void:
+	var panel := PanelContainer.new()
+	panel.name = "RunSummaryTopbar"
+	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	panel.custom_minimum_size = Vector2(0, 92)
+	panel.add_theme_stylebox_override("panel", UiTokens.paper_panel_style())
+	parent.add_child(panel)
+	var row := HBoxContainer.new()
+	row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_theme_constant_override("separation", 12)
+	panel.add_child(row)
+	var identity := VBoxContainer.new()
+	identity.name = "RunIdentity"
+	identity.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	identity.add_theme_constant_override("separation", 4)
+	row.add_child(identity)
+	var title := Label.new()
+	title.text = "%s · %s" % [_dog_name(str(run.get("dogType", ""))), _run_phase_label(str(run.get("phase", "")))]
+	title.custom_minimum_size = Vector2(0, 30)
+	title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	title.add_theme_color_override("font_color", UiTokens.ink_color())
+	identity.add_child(title)
+	_add_plain_line(identity, "第 %d 回合 · 幸运骰 %s" % [int(run.get("round", 0)), str(run.get("luckyNumber", "-"))])
+	var stats := HBoxContainer.new()
+	stats.name = "RunResourcePills"
+	stats.add_theme_constant_override("separation", 8)
+	row.add_child(stats)
+	_add_resource_pill(stats, "胜场", "%d/12" % int(run.get("wins", 0)))
+	_add_resource_pill(stats, "容错", "%d/3" % max(0, 3 - int(run.get("losses", 0))))
+	_add_resource_pill(stats, "金币", str(int(run.get("gold", 0))))
+	var actions := VBoxContainer.new()
+	actions.name = "RunActionRail"
+	actions.custom_minimum_size = Vector2(220, 0)
+	actions.add_theme_constant_override("separation", 4)
+	row.add_child(actions)
+	_render_run_actions(run, actions)
+
+func _add_resource_pill(parent: HBoxContainer, label: String, value: String) -> void:
+	var pill := Label.new()
+	pill.custom_minimum_size = Vector2(82, 42)
+	pill.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	pill.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	pill.text = "%s\n%s" % [label, value]
+	pill.add_theme_color_override("font_color", UiTokens.ink_color())
+	parent.add_child(pill)
+
+func _render_web_map_run(run: Dictionary) -> void:
+	var root := _render_playable_root()
+	_render_run_summary_topbar(root, run)
+	var screen := VBoxContainer.new()
+	screen.name = "ExplorationMapScreen"
+	screen.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	screen.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	root.add_child(screen)
+	var overlay := PanelContainer.new()
+	overlay.name = "ExplorationMapOverlay"
+	overlay.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	overlay.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	overlay.add_theme_stylebox_override("panel", UiTokens.paper_panel_style())
+	screen.add_child(overlay)
+	var shell := VBoxContainer.new()
+	shell.name = "ExplorationMapShell"
+	shell.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	shell.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	shell.add_theme_constant_override("separation", 10)
+	overlay.add_child(shell)
+	var topbar := HBoxContainer.new()
+	topbar.name = "ExplorationMapTopbar"
+	topbar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	topbar.custom_minimum_size = Vector2(0, 64)
+	topbar.add_theme_constant_override("separation", 12)
+	shell.add_child(topbar)
+	var title := VBoxContainer.new()
+	title.name = "MapTitlePlacard"
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	topbar.add_child(title)
+	_add_plain_line(title, "探索地图")
+	var map_state: Dictionary = _dict(run, "mapState")
+	var layer_count := _map_layer_count(map_state)
+	_add_plain_line(title, "第 %d 张地图 · 共 %d 层" % [int(map_state.get("mapIndex", 0)) + 1, layer_count])
+	var stats := HBoxContainer.new()
+	stats.name = "MapRunStats"
+	stats.add_theme_constant_override("separation", 8)
+	topbar.add_child(stats)
+	_add_resource_pill(stats, "胜场", "%d/12" % int(run.get("wins", 0)))
+	_add_resource_pill(stats, "容错", "%d/3" % max(0, 3 - int(run.get("losses", 0))))
+	_add_resource_pill(stats, "金币", str(int(run.get("gold", 0))))
+	var route_board := HBoxContainer.new()
+	route_board.name = "ExplorationMapRouteBoard"
+	route_board.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	route_board.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	route_board.add_theme_constant_override("separation", 10)
+	shell.add_child(route_board)
+	var canvas := VBoxContainer.new()
+	canvas.name = "MapRouteCanvas"
+	canvas.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	canvas.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	canvas.custom_minimum_size = Vector2(520, 390)
+	canvas.add_theme_constant_override("separation", 8)
+	route_board.add_child(canvas)
+	var route_layer := VBoxContainer.new()
+	route_layer.name = "MapRouteLayer"
+	route_layer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	route_layer.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	canvas.add_child(route_layer)
+	_render_map_route(route_layer, map_state)
+	var toolbar := HBoxContainer.new()
+	toolbar.name = "MapDrawingToolbar"
+	toolbar.add_theme_constant_override("separation", 6)
+	canvas.add_child(toolbar)
+	for tool_label in ["查看节点", "画笔", "橡皮", "清空草稿"]:
+		var tool := _button(tool_label, 92)
+		tool.disabled = tool_label == "清空草稿"
+		toolbar.add_child(tool)
+	var detail := VBoxContainer.new()
+	detail.name = "MapNodeDetailPanel"
+	detail.custom_minimum_size = Vector2(300, 0)
+	detail.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	detail.add_theme_constant_override("separation", 8)
+	route_board.add_child(detail)
+	_render_map_detail_panel(detail, map_state)
+	var reward_inventory := VBoxContainer.new()
+	reward_inventory.name = "MapRewardInventory"
+	reward_inventory.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	reward_inventory.add_theme_constant_override("separation", 8)
+	shell.add_child(reward_inventory)
+	var inventory := VBoxContainer.new()
+	inventory.name = "InventoryBoard"
+	inventory.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	inventory.add_theme_constant_override("separation", 8)
+	reward_inventory.add_child(inventory)
+	_render_inventory_board(inventory, run, true)
+
+func _render_map_detail_panel(parent: VBoxContainer, map_state: Dictionary) -> void:
+	var current_node := _map_current_node(map_state)
+	if str(current_node.get("kind", "")) == "EVENT" and not _dict(current_node, "event").is_empty():
+		var event: Dictionary = _dict(current_node, "event")
+		_add_plain_line(parent, _fallback(str(event.get("title", "")), "事件"))
+		_add_plain_line(parent, str(event.get("description", "")))
+		parent.add_child(_run_action_button("处理事件", _call_session.bind("resolve_map_event", [])))
+	if not _dict(map_state, "pendingReward").is_empty():
+		_add_plain_line(parent, "待领取掉落")
+		parent.add_child(_run_action_button("领取怪物奖励", _call_session.bind("claim_monster_reward", [])))
+		parent.add_child(_run_action_button("跳过怪物奖励", _call_session.bind("skip_monster_reward", [])))
+	if not current_node.is_empty():
+		_add_plain_line(parent, _map_node_title(current_node))
+		var monster: Dictionary = _dict(current_node, "monster")
+		if not monster.is_empty():
+			_add_line(parent, "对手", "%s · %s" % [str(monster.get("name", "")), _dog_name(str(monster.get("dogType", "")))])
+			_render_map_monster_equipment(parent, monster)
+			_render_map_reward_preview(parent, _variant_array(monster.get("possibleRewards", [])))
+
+func _map_layer_count(map_state: Dictionary) -> int:
+	var count := 1
+	for node in _array(map_state, "nodes"):
+		if node is Dictionary:
+			count = max(count, int((node as Dictionary).get("layer", 0)) + 1)
+	return count
+
+func _render_web_shop_run(run: Dictionary) -> void:
+	var root := _render_playable_root()
+	_render_run_summary_topbar(root, run)
+	var workbench := HBoxContainer.new()
+	workbench.name = "ShopWorkbench"
+	workbench.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	workbench.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	workbench.add_theme_constant_override("separation", 12)
+	root.add_child(workbench)
+	var shelf := VBoxContainer.new()
+	shelf.name = "ShopShelf"
+	shelf.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	shelf.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	shelf.add_theme_constant_override("separation", 8)
+	workbench.add_child(shelf)
+	var shop_type := str(run.get("shopType", "GENERAL"))
+	_add_line(shelf, _shop_name(shop_type), _shop_description(shop_type))
+	var shop_actions := HBoxContainer.new()
+	shop_actions.name = "ShopActions"
+	shop_actions.add_theme_constant_override("separation", 8)
+	shelf.add_child(shop_actions)
+	var sell_zone := Label.new()
+	sell_zone.name = "SellDropZone"
+	sell_zone.text = "拖到这里出售"
+	sell_zone.custom_minimum_size = Vector2(128, 38)
+	sell_zone.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	sell_zone.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	shop_actions.add_child(sell_zone)
+	shop_actions.add_child(_run_action_button("刷新 %d 金币" % int(run.get("refreshCost", 0)), _call_session.bind("reroll_shop", [])))
+	_add_line(shelf, "提示", "点击商品查看详情，确认后再购买。")
+	var offer_row := VBoxContainer.new()
+	offer_row.name = "OfferRow"
+	offer_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	offer_row.add_theme_constant_override("separation", 8)
+	shelf.add_child(offer_row)
+	for offer in _array(run, "shopItems"):
+		if offer is Dictionary:
+			_render_shop_offer_card(offer_row, run, offer)
+			var card := offer_row.get_child(offer_row.get_child_count() - 1)
+			card.name = "ShopCard_%s" % str((offer as Dictionary).get("offerId", offer_row.get_child_count()))
+	var match_button := _shop_progression_button(run)
+	match_button.name = "MatchButton"
+	shelf.add_child(match_button)
+	var inventory := VBoxContainer.new()
+	inventory.name = "InventoryBoard"
+	inventory.custom_minimum_size = Vector2(420, 0)
+	inventory.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	inventory.add_theme_constant_override("separation", 8)
+	workbench.add_child(inventory)
+	_render_inventory_board(inventory, run, true)
+
+func _render_inventory_board(parent: VBoxContainer, run: Dictionary, include_toolbar: bool) -> void:
+	parent.name = "InventoryBoard"
+	if include_toolbar:
+		var toolbar := HBoxContainer.new()
+		toolbar.name = "InventoryToolbar"
+		toolbar.add_theme_constant_override("separation", 8)
+		parent.add_child(toolbar)
+		toolbar.add_child(_action_button("查看选中详情", _show_selected_detail_modal))
+		if _can_sell_item_action(run, selected_item_id):
+			toolbar.add_child(_run_action_button("出售选中装备", _call_selected_item.bind("sell_item")))
+		if _can_upgrade_item_action(run, selected_item_id):
+			toolbar.add_child(_run_action_button("合成升级选中", _call_selected_item.bind("upgrade_item")))
+		_add_line(parent, "当前选中", _fallback(selected_item_label, "无"))
+	var equipment := VBoxContainer.new()
+	equipment.name = "EquipmentBoard"
+	equipment.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	equipment.add_theme_constant_override("separation", 6)
+	parent.add_child(equipment)
+	_render_item_grid(equipment, "装备栏", "EQUIPMENT", run, _equipment_slot_count(run))
+	var relic_rail := VBoxContainer.new()
+	relic_rail.name = "RelicRail"
+	relic_rail.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	relic_rail.add_theme_constant_override("separation", 6)
+	parent.add_child(relic_rail)
+	_render_relic_rail(relic_rail, run)
+	var bag := VBoxContainer.new()
+	bag.name = "BagBoard"
+	bag.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	bag.add_theme_constant_override("separation", 6)
+	parent.add_child(bag)
+	_render_item_grid(bag, "背包", "BAG", run, 12)
+	if include_toolbar and not selected_relic_id.is_empty():
+		parent.add_child(_run_action_button("出售选中遗物", _call_session.bind("sell_relic", [selected_relic_id])))
 
 func _render_run_actions(run: Dictionary, card: VBoxContainer) -> void:
 	var phase := str(run.get("phase", ""))
