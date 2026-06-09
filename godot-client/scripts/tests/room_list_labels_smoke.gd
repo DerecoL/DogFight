@@ -44,7 +44,7 @@ func _run() -> void:
 			},
 			{
 				"id": "room-complete",
-				"hostName": "犬王",
+				"hostName": "狗王",
 				"status": "COMPLETE",
 				"phase": "COMPLETE",
 				"currentRound": 9,
@@ -59,7 +59,7 @@ func _run() -> void:
 	run_screen.call("_render_current_tab")
 	await process_frame
 	var text := _collect_text(run_screen)
-	for part in ["多人房间", "房间列表", "玩家席位先进入房间", "小白 的房间", "等待中", "真人 2/8", "存活 8/8", "加入房间", "阿柴 的房间", "商店阶段 · 第 3 回合", "观战", "犬王 的房间", "已结束"]:
+	for part in ["斗狗模式", "房间内同步推进回合", "房间列表", "玩家席位先进入房间", "小白 的房间", "等待中", "真人 2/8", "存活 8/8", "加入房间", "阿柴 的房间", "商店阶段 · 第 3 回合", "观战", "狗王 的房间", "已结束"]:
 		if not text.contains(str(part)):
 			_fail("Room list label missing: %s" % str(part))
 			return

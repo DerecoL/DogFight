@@ -1893,14 +1893,59 @@ func _render_season_tab() -> void:
 				card.add_child(_action_button("巅峰配置快照", _show_snapshot_modal.bind(snapshot, "赛季巅峰快照")))
 
 func _render_rooms_tab() -> void:
-	var card := _section("多人房间")
-	var room_toolbar := HBoxContainer.new()
-	room_toolbar.add_theme_constant_override("separation", 8)
-	card.add_child(room_toolbar)
-	room_toolbar.add_child(_action_button("创建房间", _create_room))
-	room_toolbar.add_child(_action_button("随机匹配", _match_room))
-	room_toolbar.add_child(_action_button("刷新房间", _refresh_rooms))
-	_add_line(card, "说明", "玩家席位先进入房间，开局后统一选择斗狗；不足 8 人由机器人补齐。")
+	var screen := VBoxContainer.new()
+	screen.name = "DogfightScreen"
+	screen.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	screen.add_theme_constant_override("separation", 18)
+	content.add_child(screen)
+	var heading := VBoxContainer.new()
+	heading.name = "DogfightHeading"
+	heading.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	heading.add_theme_constant_override("separation", 4)
+	screen.add_child(heading)
+	_add_plain_line(heading, "斗狗模式")
+	_add_plain_line(heading, "房间内同步推进回合，前三回合发育，之后玩家两两对战。")
+	var layout := GridContainer.new()
+	layout.name = "DogfightLayout"
+	layout.columns = 2
+	layout.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	layout.add_theme_constant_override("h_separation", 18)
+	layout.add_theme_constant_override("v_separation", 18)
+	screen.add_child(layout)
+	var actions := _dogfight_panel(layout, "DogfightActions")
+	actions.custom_minimum_size = Vector2(360, 0)
+	var create_button := _action_button("创建房间", _create_room)
+	create_button.name = "CreateRoomButton"
+	actions.add_child(create_button)
+	var join_button := _button("加入房间", 0)
+	join_button.name = "JoinRoomButton"
+	join_button.disabled = true
+	actions.add_child(join_button)
+	var match_button := _action_button("随机匹配", _match_room)
+	match_button.name = "MatchRoomButton"
+	actions.add_child(match_button)
+	_add_plain_line(actions, "玩家席位先进入房间，开局后统一 15 秒选择斗狗；不足 8 人由机器人补齐。")
+	var room_list := _dogfight_panel(layout, "DogfightRoomList")
+	var list_heading := HBoxContainer.new()
+	list_heading.name = "DogfightRoomListHeading"
+	list_heading.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	list_heading.add_theme_constant_override("separation", 10)
+	room_list.add_child(list_heading)
+	var list_title := Label.new()
+	list_title.text = "房间列表"
+	list_title.custom_minimum_size = Vector2(0, 38)
+	list_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	list_title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	list_heading.add_child(list_title)
+	var refresh_button := _action_button("刷新", _refresh_rooms)
+	refresh_button.name = "DogfightRefreshButton"
+	list_heading.add_child(refresh_button)
+	var rooms := _array(rooms_data, "rooms")
+	if rooms.is_empty():
+		_add_plain_line(room_list, "暂无房间，创建一个斗狗房间开始。")
+	for room in rooms:
+		if room is Dictionary:
+			_render_dogfight_room_card(room_list, room)
 	if not active_room.is_empty():
 		var detail := _section("当前房间")
 		_add_line(detail, "状态", _room_summary_label(active_room))
@@ -1926,16 +1971,47 @@ func _render_rooms_tab() -> void:
 			_render_room_current_run(room_run)
 		elif str(active_room.get("phase", "")) == "DOG_SELECT":
 			_render_room_dog_select()
-	_add_line(card, "房间列表", "")
-	for room in _array(rooms_data, "rooms"):
-		if room is Dictionary:
-			var room_id := str(room.get("id", ""))
-			var text := "%s 的房间  %s  真人 %d/%d  存活 %d/%d  %s" % [str(room.get("hostName", "")), _room_summary_label(room), int(room.get("memberCount", 0)), int(room.get("maxPlayers", 0)), int(room.get("aliveCount", 0)), int(room.get("targetPlayerCount", 0)), _room_list_action_label(room)]
-			card.add_child(_action_button(text, _enter_or_view_room.bind(room_id, str(room.get("status", "")))))
+
+func _dogfight_panel(parent: Node, node_name: String) -> VBoxContainer:
+	var panel := PanelContainer.new()
+	panel.name = "%sPanel" % node_name
+	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	panel.add_theme_stylebox_override("panel", UiTokens.paper_panel_style())
+	parent.add_child(panel)
+	var box := VBoxContainer.new()
+	box.name = node_name
+	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	box.add_theme_constant_override("separation", 12)
+	panel.add_child(box)
+	return box
+
+func _render_dogfight_room_card(parent: VBoxContainer, room: Dictionary) -> void:
+	var room_id := str(room.get("id", ""))
+	var panel := PanelContainer.new()
+	panel.name = "DogfightRoomCard_%s" % room_id
+	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	panel.add_theme_stylebox_override("panel", UiTokens.paper_panel_style())
+	parent.add_child(panel)
+	var card := HBoxContainer.new()
+	card.name = "DogfightRoomCardRow_%s" % room_id
+	card.custom_minimum_size = Vector2(0, 66)
+	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	card.add_theme_constant_override("separation", 12)
+	panel.add_child(card)
+	var info := VBoxContainer.new()
+	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	info.add_theme_constant_override("separation", 4)
+	card.add_child(info)
+	_add_plain_line(info, "%s 的房间" % str(room.get("hostName", "")))
+	_add_plain_line(info, "%s · 真人 %d/%d · 存活 %d/%d" % [_room_summary_label(room), int(room.get("memberCount", 0)), int(room.get("maxPlayers", 0)), int(room.get("aliveCount", 0)), int(room.get("targetPlayerCount", 0))])
+	var action := _action_button(_room_list_action_label(room), _enter_or_view_room.bind(room_id, str(room.get("status", ""))))
+	action.name = "DogfightRoomAction_%s" % room_id
+	card.add_child(action)
 
 func _render_room_dog_select() -> void:
 	var card := _section("选择斗狗")
 	_add_line(card, "说明", "15 秒内锁定狗狗；超时会自动随机。")
+	_add_plain_line(card, "选择狗狗")
 	_render_dog_picker(card)
 	var choice_button := _action_button("锁定斗狗", _choose_room_dog)
 	choice_button.name = "RoomDogChoiceButton"
