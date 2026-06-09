@@ -54,7 +54,7 @@ func _run() -> void:
 	run_screen.call("_render_current_tab")
 	await process_frame
 	var screen_text := _collect_text(run_screen)
-	for part in ["个人设置 / 时装展示", "称号", "纸冠头衔", "已装备"]:
+	for part in ["个人设置", "时装与展示", "称号", "纸冠头衔", "当前装备", "已装备"]:
 		if not screen_text.contains(str(part)):
 			_fail("Cosmetic settings missing equipped state: %s" % str(part))
 			return

@@ -123,6 +123,7 @@ var nav_list: VBoxContainer
 var content_scroll: ScrollContainer
 var content: VBoxContainer
 var music_player: AudioStreamPlayer
+var music_enabled_preference_cache: Variant = null
 
 var me_data: Dictionary = {}
 var achievements_data: Dictionary = {}
@@ -2247,28 +2248,145 @@ func _render_room_current_run(run: Dictionary) -> void:
 	_render_map_or_shop_detail(run)
 
 func _render_settings_tab() -> void:
-	var card := _section("个人设置 / 时装展示")
-	var equipped := _array(cosmetics_data, "equipped")
-	if equipped.is_empty():
-		_add_line(card, "当前外观", "全部使用默认外观")
-	else:
-		for entry in equipped:
-			if entry is Dictionary:
-				var cosmetic_type := str(entry.get("slot", entry.get("cosmeticType", _cosmetic_type(entry))))
-				_add_line(card, _cosmetic_type_label(cosmetic_type), "%s · 已装备" % _cosmetic_display_name(entry))
-	card.add_child(_action_button("音乐：" + ("开" if music_player != null and music_player.playing else "关"), _toggle_music))
-	card.add_child(_action_button("刷新个人外观", _refresh_cosmetics))
-	var groups := _section("按类型选择外观")
+	var screen := VBoxContainer.new()
+	screen.name = "AccountSettingsScreen"
+	screen.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	screen.add_theme_constant_override("separation", 18)
+	content.add_child(screen)
+	var heading := VBoxContainer.new()
+	heading.name = "AccountSettingsHeading"
+	heading.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	heading.add_theme_constant_override("separation", 4)
+	screen.add_child(heading)
+	_add_plain_line(heading, "个人设置")
+	_add_plain_line(heading, "时装与展示")
 	for cosmetic_type in ["TITLE", "AVATAR", "BACKGROUND", "DOG_SKIN", "BATTLE_EFFECT"]:
-		var cosmetic_label := _cosmetic_type_label(cosmetic_type)
-		_add_line(groups, cosmetic_label, "默认外观可直接恢复")
-		if _is_default_cosmetic_equipped(cosmetic_type):
-			groups.add_child(_disabled_action_button("已选择 默认 " + cosmetic_label))
-		else:
-			groups.add_child(_action_button("选择默认 " + cosmetic_label, _unequip_cosmetic.bind(cosmetic_type)))
-		for item in _array(cosmetics_data, "inventory"):
-			if item is Dictionary and _cosmetic_type(item) == cosmetic_type:
-				groups.add_child(_action_button(("%s %s" % ["已装备" if _is_cosmetic_equipped(item) else "查看", _cosmetic_display_name(item)]), _show_cosmetic_modal.bind(item)))
+		_render_cosmetic_group(screen, cosmetic_type)
+
+func _render_cosmetic_group(parent: VBoxContainer, cosmetic_type: String) -> void:
+	var group := VBoxContainer.new()
+	group.name = "CosmeticGroup_%s" % cosmetic_type
+	group.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	group.add_theme_constant_override("separation", 10)
+	parent.add_child(group)
+	_add_plain_line(group, _cosmetic_type_label(cosmetic_type))
+	var grid := GridContainer.new()
+	grid.name = "CosmeticGrid_%s" % cosmetic_type
+	grid.columns = 3
+	grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	grid.add_theme_constant_override("h_separation", 12)
+	grid.add_theme_constant_override("v_separation", 12)
+	group.add_child(grid)
+	_render_default_cosmetic_card(grid, cosmetic_type)
+	var owned_count := 0
+	for item in _array(cosmetics_data, "inventory"):
+		if item is Dictionary and _cosmetic_type(item) == cosmetic_type:
+			owned_count += 1
+			_render_owned_cosmetic_card(grid, item)
+	if owned_count == 0:
+		var empty := Label.new()
+		empty.name = "CosmeticEmpty_%s" % cosmetic_type
+		empty.text = "暂无已拥有的%s，可先去商城购买。" % _cosmetic_type_label(cosmetic_type)
+		empty.custom_minimum_size = Vector2(0, 30)
+		empty.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		empty.add_theme_color_override("font_color", UiTokens.ink_color())
+		group.add_child(empty)
+
+func _render_default_cosmetic_card(parent: GridContainer, cosmetic_type: String) -> void:
+	var card := _cosmetic_card_container(parent, "CosmeticDefaultCard_%s" % cosmetic_type)
+	_add_plain_line(card, _default_cosmetic_name(cosmetic_type))
+	_add_plain_line(card, _default_cosmetic_description(cosmetic_type))
+	_add_plain_line(card, "默认 · 免费")
+	var action_row := HBoxContainer.new()
+	action_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	action_row.add_theme_constant_override("separation", 8)
+	card.add_child(action_row)
+	var state := Label.new()
+	var default_equipped := _is_default_cosmetic_equipped(cosmetic_type)
+	state.text = "当前默认" if default_equipped else "初始外观"
+	state.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	state.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	state.add_theme_color_override("font_color", UiTokens.ink_color())
+	action_row.add_child(state)
+	var action: Button
+	if default_equipped:
+		action = _button("已选择", 96)
+		action.disabled = true
+	else:
+		action = _action_button("选择默认", _unequip_cosmetic.bind(cosmetic_type))
+	action.name = "CosmeticDefaultAction_%s" % cosmetic_type
+	action_row.add_child(action)
+
+func _render_owned_cosmetic_card(parent: GridContainer, raw_item: Dictionary) -> void:
+	var catalog_item_id := _cosmetic_catalog_id(raw_item)
+	var card := _cosmetic_card_container(parent, "CosmeticCard_%s" % catalog_item_id)
+	_add_plain_line(card, _cosmetic_display_name(raw_item))
+	var item := _cosmetic_item(raw_item)
+	_add_plain_line(card, str(item.get("description", "")))
+	_add_plain_line(card, "%s · 已拥有" % _rarity_label(str(item.get("rarity", ""))))
+	var action_row := HBoxContainer.new()
+	action_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	action_row.add_theme_constant_override("separation", 8)
+	card.add_child(action_row)
+	var is_equipped := _is_cosmetic_equipped(raw_item)
+	var state := Label.new()
+	state.text = "当前装备" if is_equipped else "可装备"
+	state.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	state.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	state.add_theme_color_override("font_color", UiTokens.ink_color())
+	action_row.add_child(state)
+	var action: Button
+	if is_equipped:
+		action = _button("已装备", 96)
+		action.disabled = true
+	else:
+		action = _action_button("装备", _equip_cosmetic.bind(catalog_item_id))
+	action.name = "CosmeticAction_%s" % catalog_item_id
+	action_row.add_child(action)
+
+func _cosmetic_card_container(parent: GridContainer, node_name: String) -> VBoxContainer:
+	var panel := PanelContainer.new()
+	panel.name = node_name
+	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	panel.custom_minimum_size = Vector2(220, 158)
+	panel.add_theme_stylebox_override("panel", UiTokens.paper_panel_style())
+	parent.add_child(panel)
+	var card := VBoxContainer.new()
+	card.name = "%sBody" % node_name
+	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	card.add_theme_constant_override("separation", 8)
+	panel.add_child(card)
+	return card
+
+func _default_cosmetic_name(cosmetic_type: String) -> String:
+	match cosmetic_type:
+		"TITLE":
+			return "默认称号"
+		"AVATAR":
+			return "默认头像"
+		"BACKGROUND":
+			return "默认主页"
+		"DOG_SKIN":
+			return "默认狗狗"
+		"BATTLE_EFFECT":
+			return "默认特效"
+		_:
+			return "默认外观"
+
+func _default_cosmetic_description(cosmetic_type: String) -> String:
+	match cosmetic_type:
+		"TITLE":
+			return "不装备称号，显示账号原始样式。"
+		"AVATAR":
+			return "使用初始狗狗头像。"
+		"BACKGROUND":
+			return "使用游戏初始主页背景。"
+		"DOG_SKIN":
+			return "使用狗狗原本的外观。"
+		"BATTLE_EFFECT":
+			return "使用基础战斗表现。"
+		_:
+			return "恢复默认外观。"
 
 func _on_create_run_pressed() -> void:
 	var dog_type := _selected_dog_type()
@@ -2675,12 +2793,15 @@ func _refresh_cosmetics() -> void:
 	_render_shell()
 
 func _music_enabled_preference() -> bool:
+	if music_enabled_preference_cache != null:
+		return bool(music_enabled_preference_cache)
 	var config := ConfigFile.new()
 	if config.load(SETTINGS_PATH) != OK:
 		return true
 	return bool(config.get_value(SETTINGS_SECTION, MUSIC_ENABLED_KEY, true))
 
 func _set_music_enabled_preference(enabled: bool) -> void:
+	music_enabled_preference_cache = enabled
 	var config := ConfigFile.new()
 	config.load(SETTINGS_PATH)
 	config.set_value(SETTINGS_SECTION, MUSIC_ENABLED_KEY, enabled)

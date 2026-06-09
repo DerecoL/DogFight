@@ -33,11 +33,10 @@ func _run() -> void:
 	run_screen.call("_render_current_tab")
 	await process_frame
 
-	_assert_button_state(run_screen, "选择默认 称号", false)
-	_assert_no_enabled_button(run_screen, "选择默认 头像")
-	_assert_button_state(run_screen, "已选择 默认 头像", true)
-	_assert_button_state(run_screen, "已装备 纸冠头衔", false)
-	_assert_button_state(run_screen, "查看 皇冠头像", false)
+	_assert_named_button_state(run_screen, "CosmeticDefaultAction_TITLE", false, "选择默认")
+	_assert_named_button_state(run_screen, "CosmeticDefaultAction_AVATAR", true, "已选择")
+	_assert_named_button_state(run_screen, "CosmeticAction_title-paper-crown", true, "已装备")
+	_assert_named_button_state(run_screen, "CosmeticAction_avatar-crown", false, "装备")
 
 	main.queue_free()
 	for _frame in range(5):
@@ -45,24 +44,21 @@ func _run() -> void:
 	print("Godot settings default cosmetic state smoke passed")
 	quit(0)
 
-func _assert_button_state(root_node: Node, text: String, expected_disabled: bool) -> void:
-	var button := _find_button(root_node, text)
+func _assert_named_button_state(root_node: Node, node_name: String, expected_disabled: bool, expected_text: String) -> void:
+	var button := _find_by_name(root_node, node_name) as Button
 	if button == null:
-		_fail("Missing button: %s" % text)
+		_fail("Missing button: %s" % node_name)
 		return
 	if button.disabled != expected_disabled:
-		_fail("Button %s disabled should be %s" % [text, str(expected_disabled)])
+		_fail("Button %s disabled should be %s" % [node_name, str(expected_disabled)])
+	if button.text != expected_text:
+		_fail("Button %s text should be %s, got %s" % [node_name, expected_text, button.text])
 
-func _assert_no_enabled_button(root_node: Node, text: String) -> void:
-	var button := _find_button(root_node, text)
-	if button != null and not button.disabled:
-		_fail("Button should not be enabled: %s" % text)
-
-func _find_button(node: Node, text: String) -> Button:
-	if node is Button and (node as Button).text == text:
-		return node as Button
+func _find_by_name(node: Node, node_name: String) -> Node:
+	if node.name == node_name:
+		return node
 	for child in node.get_children():
-		var found := _find_button(child, text)
+		var found := _find_by_name(child, node_name)
 		if found != null:
 			return found
 	return null
