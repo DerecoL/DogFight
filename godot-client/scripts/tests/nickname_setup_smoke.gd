@@ -21,7 +21,7 @@ func _run() -> void:
 		return
 
 	var text := _collect_text(screen)
-	for part in ["设置昵称", "2-16", "保存昵称", "退出登录"]:
+	for part in ["设置昵称", "昵称会显示在匹配和战斗记录里。", "昵称", "确认"]:
 		if not text.contains(str(part)):
 			_fail("NicknameSetupScreen text missing: %s" % str(part))
 			return
@@ -33,7 +33,7 @@ func _run() -> void:
 		"func _logout() -> void:",
 	]:
 		if not source.contains(str(needle)):
-			_fail("NicknameSetupScreen interaction wiring is missing: %s" % str(needle))
+			_fail("NicknameSetupScreen interaction wiring is missing: %s" % needle)
 			return
 
 	var session_source := FileAccess.get_file_as_string("res://scripts/state/GameSession.gd")
@@ -43,7 +43,7 @@ func _run() -> void:
 		"_show_run_screen()",
 	]:
 		if not session_source.contains(str(needle)):
-			_fail("GameSession nickname setup routing is missing: %s" % str(needle))
+			_fail("GameSession nickname setup routing is missing: %s" % needle)
 			return
 
 	screen.queue_free()

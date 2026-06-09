@@ -7,7 +7,7 @@ func _run() -> void:
 	var source := FileAccess.get_file_as_string("res://scripts/ui/screens/NicknameSetupScreen.gd")
 	for needle in [
 		"var action_in_progress := false",
-		"var logout_button: Button",
+		"var submit_button: Button",
 		"func _set_actions_disabled(disabled: bool) -> void:",
 	]:
 		if not source.contains(needle):
