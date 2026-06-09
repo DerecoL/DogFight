@@ -185,7 +185,30 @@ func _render_inventory_board(parent: Node, run: Dictionary) -> void:
 	inventory.add_theme_constant_override("separation", 8)
 	inventory_panel.add_child(inventory)
 	_render_grid_panel(inventory, "EquipmentGridPanel", "装备栏", "EQUIPMENT", run)
+	_render_relic_rail(inventory, run)
 	_render_grid_panel(inventory, "BagGridPanel", "背包", "BAG", run)
+
+func _render_relic_rail(parent: VBoxContainer, run: Dictionary) -> void:
+	var rail := VBoxContainer.new()
+	rail.name = "RelicRail"
+	rail.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	rail.add_theme_constant_override("separation", 4)
+	parent.add_child(rail)
+	_add_label(rail, "RelicRailTitle", "遗物")
+	var row := HBoxContainer.new()
+	row.name = "RelicRailItems"
+	row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_theme_constant_override("separation", 6)
+	rail.add_child(row)
+	var relics := _array(run, "relics")
+	for slot in range(6):
+		var relic: Dictionary = relics[slot] if slot < relics.size() and relics[slot] is Dictionary else {}
+		var def: Dictionary = _dict(relic, "def")
+		var button := _action_button(_fallback(str(def.get("name", "")), "遗物槽 %d" % (slot + 1)), _noop)
+		button.name = "RelicSlot_%d" % slot
+		button.custom_minimum_size = Vector2(74, 42)
+		button.disabled = relic.is_empty()
+		row.add_child(button)
 
 func _render_grid_panel(parent: VBoxContainer, node_name: String, title: String, area: String, run: Dictionary) -> void:
 	var panel := VBoxContainer.new()

@@ -42,6 +42,14 @@ func _run() -> void:
 		"MatchButton",
 		"InventoryBoard",
 		"EquipmentGridPanel",
+		"RelicRail",
+		"RelicRailTitle",
+		"RelicSlot_0",
+		"RelicSlot_1",
+		"RelicSlot_2",
+		"RelicSlot_3",
+		"RelicSlot_4",
+		"RelicSlot_5",
 		"BagGridPanel",
 	]:
 		_assert_has(screen, node_name)
@@ -94,7 +102,7 @@ func _shop_run() -> Dictionary:
 			_item("owned-1", "starter-1", "EQUIPMENT", 0),
 			_item("owned-2", "starter-1", "BAG", 0),
 		],
-		"relics": [],
+		"relics": [_relic("relic-1")],
 		"shopItems": [
 			{
 				"offerId": "offer-1",
@@ -156,3 +164,12 @@ func _collect_text(node: Node) -> String:
 func _fail(message: String) -> void:
 	push_error(message)
 	quit(1)
+
+func _relic(id: String) -> Dictionary:
+	return {
+		"id": id,
+		"relicId": "training-relic",
+		"quality": "SILVER",
+		"slot": 0,
+		"def": {"name": "训练徽章", "description": "测试遗物"},
+	}
