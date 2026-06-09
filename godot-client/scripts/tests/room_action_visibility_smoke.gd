@@ -25,6 +25,7 @@ func _run() -> void:
 	run_screen.call("_render_current_tab")
 	await process_frame
 	_assert_no_button(run_screen, "开始房间")
+	_assert_no_button(run_screen, "完成本回合")
 	_assert_no_button(run_screen, "准备 / 完成本回合")
 	_assert_no_button(run_screen, "选择当前狗狗")
 
@@ -32,6 +33,7 @@ func _run() -> void:
 	run_screen.call("_render_current_tab")
 	await process_frame
 	_assert_button(run_screen, "开始房间")
+	_assert_no_button(run_screen, "完成本回合")
 	_assert_no_button(run_screen, "准备 / 完成本回合")
 	_assert_no_button(run_screen, "选择当前狗狗")
 
@@ -39,6 +41,7 @@ func _run() -> void:
 	run_screen.call("_render_current_tab")
 	await process_frame
 	_assert_no_button(run_screen, "开始房间")
+	_assert_no_button(run_screen, "完成本回合")
 	_assert_no_button(run_screen, "准备 / 完成本回合")
 	_assert_no_button(run_screen, "选择当前狗狗")
 	_assert_button(run_screen, "锁定斗狗")
@@ -46,18 +49,21 @@ func _run() -> void:
 	run_screen.set("active_room", _room("ACTIVE", "SHOP", false, true, false, false))
 	run_screen.call("_render_current_tab")
 	await process_frame
-	_assert_button(run_screen, "准备 / 完成本回合")
+	_assert_button(run_screen, "完成本回合")
+	_assert_no_button(run_screen, "准备 / 完成本回合")
 	_assert_no_button(run_screen, "开始房间")
 	_assert_no_button(run_screen, "选择当前狗狗")
 
 	run_screen.set("active_room", _room("ACTIVE", "SHOP", false, true, true, false))
 	run_screen.call("_render_current_tab")
 	await process_frame
+	_assert_no_button(run_screen, "完成本回合")
 	_assert_no_button(run_screen, "准备 / 完成本回合")
 
 	run_screen.set("active_room", _room("ACTIVE", "BATTLE", false, true, false, true))
 	run_screen.call("_render_current_tab")
 	await process_frame
+	_assert_no_button(run_screen, "完成本回合")
 	_assert_no_button(run_screen, "准备 / 完成本回合")
 
 	main.queue_free()

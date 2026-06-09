@@ -66,6 +66,7 @@ const TUTORIAL_SECTION := "casual_tutorial"
 const SETTINGS_PATH := "user://dogfight_settings.cfg"
 const SETTINGS_SECTION := "settings"
 const MUSIC_ENABLED_KEY := "background_music_enabled"
+const DOGFIGHT_LOSS_LIMIT := 6
 const ROOM_LOCKED_RUN_METHODS := [
 	"buy_offer",
 	"claim_monster_reward",
@@ -2114,6 +2115,9 @@ func _render_season_history_card(parent: VBoxContainer, summary: Dictionary) -> 
 		row.add_child(snapshot_button)
 
 func _render_rooms_tab() -> void:
+	if not active_room.is_empty():
+		_render_dogfight_room_detail(active_room)
+		return
 	var screen := VBoxContainer.new()
 	screen.name = "DogfightScreen"
 	screen.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -2167,31 +2171,163 @@ func _render_rooms_tab() -> void:
 	for room in rooms:
 		if room is Dictionary:
 			_render_dogfight_room_card(room_list, room)
-	if not active_room.is_empty():
-		var detail := _section("当前房间")
-		_add_line(detail, "状态", _room_summary_label(active_room))
-		detail.add_child(_action_button("离开房间", _leave_active_room))
-		if _can_start_room_action(active_room):
-			detail.add_child(_action_button("开始房间", _room_action.bind("start", {})))
-		if _can_ready_room_action(active_room):
-			detail.add_child(_action_button("准备 / 完成本回合", _room_action.bind("ready", {})))
-		var current_battle_id := _current_room_battle_id(active_room)
-		if not current_battle_id.is_empty():
-			detail.add_child(_action_button("载入当前战报", _load_room_battle.bind(current_battle_id)))
-		for member in _array(active_room, "members"):
-			if member is Dictionary:
-				var member_name := str(member.get("nickname", member.get("kind", "")))
-				var member_kind := _room_member_kind_label(str(member.get("kind", "")))
-				var host_mark := " · 房主" if bool(member.get("isHost", false)) else ""
-				detail.add_child(_action_button("%s  %s%s  %d-%d  %s" % [member_name, member_kind, host_mark, int(member.get("wins", 0)), int(member.get("losses", 0)), _room_member_status(member)], _show_room_member_modal.bind(member)))
-		for battle in _array(active_room, "battles"):
-			if battle is Dictionary:
-				detail.add_child(_action_button("战报摘要 第%d回合 %s" % [int(battle.get("round", 0)), str(battle.get("id", ""))], _show_room_battle_modal.bind(battle)))
-		var room_run: Dictionary = _dict(active_room, "currentRun")
-		if not room_run.is_empty():
-			_render_room_current_run(room_run)
-		elif str(active_room.get("phase", "")) == "DOG_SELECT":
-			_render_room_dog_select()
+func _render_dogfight_room_detail(room: Dictionary) -> void:
+	var screen := VBoxContainer.new()
+	screen.name = "DogfightRoomDetailScreen"
+	screen.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	screen.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	screen.add_theme_constant_override("separation", 16)
+	content.add_child(screen)
+	var toolbar := HBoxContainer.new()
+	toolbar.name = "DogfightRoomToolbar"
+	toolbar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	toolbar.add_theme_constant_override("separation", 10)
+	screen.add_child(toolbar)
+	var back_button := _action_button("返回房间列表", _leave_active_room)
+	back_button.name = "DogfightRoomBackButton"
+	toolbar.add_child(back_button)
+	var refresh_room_button := _action_button("刷新房间", _refresh_rooms)
+	refresh_room_button.name = "DogfightRoomRefreshButton"
+	toolbar.add_child(refresh_room_button)
+	_render_dogfight_room_status(screen, room)
+	var columns := GridContainer.new()
+	columns.name = "DogfightRoomColumns"
+	columns.columns = 3
+	columns.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	columns.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	columns.add_theme_constant_override("h_separation", 14)
+	columns.add_theme_constant_override("v_separation", 14)
+	screen.add_child(columns)
+	_render_dogfight_survivor_board(columns, room)
+	_render_dogfight_play_area(columns, room)
+	_render_dogfight_battle_dock(columns, room)
+
+func _render_dogfight_room_status(parent: VBoxContainer, room: Dictionary) -> void:
+	var panel := PanelContainer.new()
+	panel.name = "DogfightRoomStatusPanel"
+	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	panel.add_theme_stylebox_override("panel", UiTokens.paper_panel_style())
+	parent.add_child(panel)
+	var status := GridContainer.new()
+	status.name = "DogfightRoomStatus"
+	status.columns = 4
+	status.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	status.add_theme_constant_override("h_separation", 12)
+	status.add_theme_constant_override("v_separation", 8)
+	panel.add_child(status)
+	var summary := VBoxContainer.new()
+	summary.name = "DogfightRoomSummary"
+	summary.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	status.add_child(summary)
+	_add_plain_line(summary, _room_summary_label(room))
+	if str(room.get("phase", "")) == "LOBBY":
+		_add_plain_line(summary, "玩家席位 %d/%d" % [_room_player_count(room), int(room.get("maxPlayers", 0))])
+	else:
+		_add_plain_line(summary, "阶段倒计时 %ds" % _room_deadline_seconds(room))
+	var phase_track := HBoxContainer.new()
+	phase_track.name = "DogfightPhaseTrack"
+	phase_track.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	phase_track.add_theme_constant_override("separation", 8)
+	status.add_child(phase_track)
+	for phase in ["DOG_SELECT", "SHOP", "BATTLE"]:
+		var phase_label := Label.new()
+		phase_label.name = "DogfightPhase_%s" % phase
+		phase_label.text = _room_phase_label(phase)
+		phase_label.custom_minimum_size = Vector2(104, 34)
+		phase_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		phase_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		phase_label.add_theme_color_override("font_color", UiTokens.ink_color())
+		phase_track.add_child(phase_label)
+	var run: Dictionary = _dict(room, "currentRun")
+	if not run.is_empty():
+		_render_dogfight_run_stats(status, room, run)
+	var current_member := _current_room_member(room)
+	if not current_member.is_empty():
+		_add_plain_line(status, "剩余存活 %d" % _dogfight_lives(current_member))
+	if _can_start_room_action(room):
+		var start_button := _action_button("开始房间", _room_action.bind("start", {}))
+		start_button.name = "DogfightStartButton"
+		status.add_child(start_button)
+	if _can_ready_room_action(room):
+		var ready_button := _action_button("完成本回合", _room_action.bind("ready", {}))
+		ready_button.name = "DogfightReadyButton"
+		status.add_child(ready_button)
+
+func _render_dogfight_run_stats(parent: GridContainer, room: Dictionary, run: Dictionary) -> void:
+	var current_member := _current_room_member(room)
+	var stats := HBoxContainer.new()
+	stats.name = "DogfightRunStats"
+	stats.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	stats.add_theme_constant_override("separation", 8)
+	parent.add_child(stats)
+	_add_plain_line(stats, "金币 %d" % int(run.get("gold", 0)))
+	_add_plain_line(stats, "%d胜 %d败" % [int(run.get("wins", 0)), int(run.get("losses", 0))])
+	_add_plain_line(stats, "第 %d 回合" % int(run.get("round", 0)))
+	if not current_member.is_empty():
+		var ready := bool(current_member.get("ready", false))
+		var phase := str(room.get("phase", ""))
+		var state_text := "已完成" if ready and phase == "BATTLE" else "已准备" if ready else "回放中" if phase == "BATTLE" else "调整中"
+		_add_plain_line(stats, state_text)
+
+func _render_dogfight_survivor_board(parent: GridContainer, room: Dictionary) -> void:
+	var board := _dogfight_panel(parent, "DogfightSurvivorBoard")
+	board.custom_minimum_size = Vector2(300, 420)
+	_add_plain_line(board, "房间玩家")
+	for member in _sorted_dogfight_members(_array(room, "members")):
+		if member is Dictionary:
+			_render_dogfight_member_card(board, member)
+
+func _render_dogfight_member_card(parent: VBoxContainer, member: Dictionary) -> void:
+	var member_id := str(member.get("id", ""))
+	var host_mark := " · 房主" if bool(member.get("isHost", false)) else ""
+	var dog_type := str(member.get("dogType", ""))
+	var dog_text := _dog_name(dog_type) if not dog_type.is_empty() else "等待选狗"
+	var kind_text := "参赛者" if str(member.get("kind", "")) == "BOT" else "玩家"
+	var button := _button("%s%s\n%s · %s · %d胜 %d败\n%d" % [
+		str(member.get("nickname", member.get("kind", ""))),
+		host_mark,
+		dog_text,
+		kind_text,
+		int(member.get("wins", 0)),
+		int(member.get("losses", 0)),
+		_dogfight_lives(member),
+	], 0)
+	button.name = "DogfightMember_%s" % member_id
+	button.custom_minimum_size = Vector2(0, 88)
+	button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	button.pressed.connect(_show_room_member_modal.bind(member))
+	parent.add_child(button)
+
+func _render_dogfight_play_area(parent: GridContainer, room: Dictionary) -> void:
+	var play_area := _dogfight_panel(parent, "DogfightPlayArea")
+	play_area.custom_minimum_size = Vector2(520, 420)
+	play_area.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	var run: Dictionary = _dict(room, "currentRun")
+	if str(room.get("phase", "")) == "DOG_SELECT" and run.is_empty():
+		_render_room_dog_select(play_area)
+	elif not run.is_empty() and str(room.get("phase", "")) == "SHOP":
+		_render_room_current_run(run, play_area)
+	else:
+		var empty_text := "战斗生成中，可以点击左侧玩家框或右侧场次切换观战。" if str(room.get("phase", "")) == "BATTLE" else "你正在观战这个房间。可以查看房间战况和历史战报。"
+		_add_plain_line(play_area, empty_text)
+
+func _render_dogfight_battle_dock(parent: GridContainer, room: Dictionary) -> void:
+	var dock := _dogfight_panel(parent, "DogfightBattleDock")
+	dock.custom_minimum_size = Vector2(300, 420)
+	_add_plain_line(dock, "本轮场次")
+	var battles := _array(room, "battles")
+	if battles.is_empty():
+		_add_plain_line(dock, "暂无战报")
+		return
+	var reversed_battles := battles.duplicate()
+	reversed_battles.reverse()
+	for battle in reversed_battles:
+		if battle is Dictionary:
+			var battle_id := str(battle.get("id", ""))
+			var opponent := "玩家对战" if str(battle.get("opponentKind", "")) == "PLAYER" else "离线训练"
+			var row := _action_button("第 %d 回合 · %s · 回放" % [int(battle.get("round", 0)), opponent], _load_room_battle.bind(battle_id))
+			row.name = "DogfightBattleRow_%s" % battle_id
+			dock.add_child(row)
 
 func _dogfight_panel(parent: Node, node_name: String) -> VBoxContainer:
 	var panel := PanelContainer.new()
@@ -2229,8 +2365,8 @@ func _render_dogfight_room_card(parent: VBoxContainer, room: Dictionary) -> void
 	action.name = "DogfightRoomAction_%s" % room_id
 	card.add_child(action)
 
-func _render_room_dog_select() -> void:
-	var card := _section("选择斗狗")
+func _render_room_dog_select(parent: VBoxContainer = null) -> void:
+	var card := _section("选择斗狗") if parent == null else _section_in_parent(parent, "选择斗狗")
 	_add_line(card, "说明", "15 秒内锁定狗狗；超时会自动随机。")
 	_add_plain_line(card, "选择狗狗")
 	_render_dog_picker(card)
@@ -2238,8 +2374,8 @@ func _render_room_dog_select() -> void:
 	choice_button.name = "RoomDogChoiceButton"
 	card.add_child(choice_button)
 
-func _render_room_current_run(run: Dictionary) -> void:
-	var card := _section("房间当前跑局")
+func _render_room_current_run(run: Dictionary, parent: VBoxContainer = null) -> void:
+	var card := _section("房间当前跑局") if parent == null else _section_in_parent(parent, "房间当前跑局")
 	_add_line(card, "阶段", "%s / %s" % [_room_phase_label(str(run.get("phase", ""))), _room_status_label(str(run.get("status", "")))])
 	_add_line(card, "犬种", "%s  幸运号 %s" % [_dog_name(str(run.get("dogType", ""))), str(run.get("luckyNumber", "-"))])
 	_add_line(card, "进度", "第 %d 回合 · %d 胜 %d 负 · 金币 %d" % [int(run.get("round", 0)), int(run.get("wins", 0)), int(run.get("losses", 0)), int(run.get("gold", 0))])
@@ -3684,6 +3820,48 @@ func _room_summary_label(room: Dictionary) -> String:
 func _room_list_action_label(room: Dictionary) -> String:
 	return "加入房间" if str(room.get("status", "")) == "WAITING" else "观战"
 
+func _room_player_count(room: Dictionary) -> int:
+	var count := 0
+	for member in _array(room, "members"):
+		if member is Dictionary and str(member.get("kind", "")) == "PLAYER":
+			count += 1
+	return count
+
+func _room_deadline_seconds(room: Dictionary) -> int:
+	var deadline_text := str(room.get("phaseDeadline", ""))
+	if deadline_text.is_empty():
+		return 0
+	var unix := Time.get_unix_time_from_datetime_string(deadline_text)
+	if unix <= 0:
+		return 0
+	return max(0, int(ceil(unix - Time.get_unix_time_from_system())))
+
+func _dogfight_lives(member: Dictionary) -> int:
+	return 0 if bool(member.get("eliminated", false)) else max(0, DOGFIGHT_LOSS_LIMIT - int(member.get("losses", 0)))
+
+func _sorted_dogfight_members(members: Array) -> Array:
+	var sorted := members.duplicate(true)
+	sorted.sort_custom(func(left, right) -> bool:
+		if not left is Dictionary or not right is Dictionary:
+			return false
+		var left_member: Dictionary = left
+		var right_member: Dictionary = right
+		var left_lives := _dogfight_lives(left_member)
+		var right_lives := _dogfight_lives(right_member)
+		if left_lives != right_lives:
+			return left_lives > right_lives
+		var left_wins := int(left_member.get("wins", 0))
+		var right_wins := int(right_member.get("wins", 0))
+		if left_wins != right_wins:
+			return left_wins > right_wins
+		var left_kind := str(left_member.get("kind", ""))
+		var right_kind := str(right_member.get("kind", ""))
+		if left_kind != right_kind:
+			return left_kind == "PLAYER"
+		return str(left_member.get("nickname", "")).naturalnocasecmp_to(str(right_member.get("nickname", ""))) < 0
+	)
+	return sorted
+
 func _can_start_room_action(room: Dictionary) -> bool:
 	return bool(room.get("isHost", false)) and str(room.get("status", "")) == "WAITING"
 
@@ -4819,10 +4997,13 @@ func _apply_button_icon(button: Button, texture: Texture2D) -> void:
 	button.expand_icon = true
 
 func _section(title: String) -> VBoxContainer:
+	return _section_in_parent(content, title)
+
+func _section_in_parent(parent: Node, title: String) -> VBoxContainer:
 	var panel := PanelContainer.new()
 	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	panel.add_theme_stylebox_override("panel", UiTokens.paper_panel_style())
-	content.add_child(panel)
+	parent.add_child(panel)
 	var box := VBoxContainer.new()
 	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	box.add_theme_constant_override("separation", 8)
@@ -4843,7 +5024,7 @@ func _add_line(parent: VBoxContainer, label: String, value: String) -> void:
 	row.add_theme_color_override("font_color", UiTokens.ink_color())
 	parent.add_child(row)
 
-func _add_plain_line(parent: VBoxContainer, text: String) -> void:
+func _add_plain_line(parent: Node, text: String) -> void:
 	var row := Label.new()
 	row.custom_minimum_size = Vector2(0, 24)
 	row.size_flags_horizontal = Control.SIZE_EXPAND_FILL

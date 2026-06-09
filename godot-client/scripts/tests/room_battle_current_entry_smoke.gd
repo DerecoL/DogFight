@@ -25,8 +25,12 @@ func _run() -> void:
 	run_screen.call("_render_current_tab")
 	await process_frame
 
+	for node_name in ["DogfightRoomDetailScreen", "DogfightRoomStatus", "DogfightPhaseTrack", "DogfightPlayArea", "DogfightBattleDock", "DogfightReadyButton"]:
+		if _find_by_name(run_screen, node_name) == null:
+			_fail("Room battle phase current entry missing Web node: %s" % node_name)
+			return
 	var text := _collect_text(run_screen)
-	for part in ["当前房间", "战斗阶段", "载入当前战报", "准备 / 完成本回合"]:
+	for part in ["战斗阶段 · 第 4 回合", "阶段倒计时", "回放中", "完成本回合", "战斗生成中，可以点击左侧玩家框或右侧场次切换观战。"]:
 		if not text.contains(part):
 			_fail("Room battle phase current entry missing: %s" % part)
 			return
@@ -84,6 +88,15 @@ func _collect_text(node: Node) -> String:
 	for child in node.get_children():
 		text += _collect_text(child)
 	return text
+
+func _find_by_name(node: Node, node_name: String) -> Node:
+	if node.name == node_name:
+		return node
+	for child in node.get_children():
+		var found := _find_by_name(child, node_name)
+		if found != null:
+			return found
+	return null
 
 func _fail(message: String) -> void:
 	push_error(message)
