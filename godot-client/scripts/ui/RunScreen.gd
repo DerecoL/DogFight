@@ -2014,24 +2014,103 @@ func _render_apex_rank_entry(parent: VBoxContainer, entry: Dictionary) -> void:
 	row.add_child(config_button)
 
 func _render_season_tab() -> void:
-	var card := _section("赛季")
+	var screen := VBoxContainer.new()
+	screen.name = "SeasonScreen"
+	screen.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	screen.add_theme_constant_override("separation", 14)
+	content.add_child(screen)
+	var card := _season_panel(screen, "CurrentSeasonPanel")
 	var season: Dictionary = _dict(ladder_data, "season")
 	var profile: Dictionary = _dict(ladder_data, "profile")
 	_add_line(card, "当前赛季", "%s  %s - %s" % [str(season.get("name", season.get("id", ""))), str(season.get("startsAt", "")), str(season.get("endsAt", ""))])
-	_add_line(card, "我的天梯", "%s  %d分  胜负 %d/%d" % [_tier_display_label(profile), int(profile.get("score", 0)), int(profile.get("wins", 0)), int(profile.get("losses", 0))])
+	_add_line(card, "我的天梯", "%s  %d 分  胜负 %d/%d" % [_tier_display_label(profile), int(profile.get("score", 0)), int(profile.get("wins", 0)), int(profile.get("losses", 0))])
+	var settlement_list := VBoxContainer.new()
+	settlement_list.name = "SeasonSettlementList"
+	settlement_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	settlement_list.add_theme_constant_override("separation", 8)
+	card.add_child(settlement_list)
 	for settlement in _array(ladder_data, "recentSettlements"):
 		if settlement is Dictionary:
-			card.add_child(_action_button("结算 %s -> %s  %+d" % [_tier_label(str(settlement.get("beforeTier", ""))), _tier_label(str(settlement.get("afterTier", ""))), int(settlement.get("delta", 0))], _show_ladder_settlement_modal.bind(settlement)))
+			var settlement_button := _action_button("结算 %s -> %s  %+d" % [_tier_label(str(settlement.get("beforeTier", ""))), _tier_label(str(settlement.get("afterTier", ""))), int(settlement.get("delta", 0))], _show_ladder_settlement_modal.bind(settlement))
+			settlement_button.name = "SeasonSettlement_%s_%s" % [str(settlement.get("beforeTier", "")), str(settlement.get("afterTier", ""))]
+			settlement_list.add_child(settlement_button)
 	var summaries := _array(history_data, "seasonSummaries")
-	_add_line(card, "赛季历史", "%d 个已结束赛季" % summaries.size() if summaries.size() > 0 else "赛季结束后会保存在这里")
+	_render_season_history_list(screen, summaries)
+
+func _season_panel(parent: VBoxContainer, node_name: String) -> VBoxContainer:
+	var panel := PanelContainer.new()
+	panel.name = "%sFrame" % node_name
+	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	panel.add_theme_stylebox_override("panel", UiTokens.paper_panel_style())
+	parent.add_child(panel)
+	var box := VBoxContainer.new()
+	box.name = node_name
+	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	box.add_theme_constant_override("separation", 10)
+	panel.add_child(box)
+	return box
+
+func _render_season_history_list(parent: VBoxContainer, summaries: Array) -> void:
+	var list := VBoxContainer.new()
+	list.name = "SeasonHistoryList"
+	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	list.add_theme_constant_override("separation", 10)
+	parent.add_child(list)
+	var heading := HBoxContainer.new()
+	heading.name = "SeasonHistoryHeading"
+	heading.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	heading.add_theme_constant_override("separation", 12)
+	list.add_child(heading)
+	var title := Label.new()
+	title.text = "赛季历史"
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	title.custom_minimum_size = Vector2(0, 32)
+	title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	title.add_theme_color_override("font_color", UiTokens.ink_color())
+	heading.add_child(title)
+	var subtitle := Label.new()
+	subtitle.text = "%d 个已结束赛季" % summaries.size() if summaries.size() > 0 else "赛季结束后会保存在这里"
+	subtitle.custom_minimum_size = Vector2(180, 32)
+	subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	subtitle.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	subtitle.add_theme_color_override("font_color", UiTokens.ink_color())
+	heading.add_child(subtitle)
 	if summaries.is_empty():
-		_add_line(card, "暂无赛季历史", "")
-	for summary in summaries:
+		var empty := Label.new()
+		empty.name = "SeasonHistoryEmpty"
+		empty.text = "暂无赛季历史"
+		empty.custom_minimum_size = Vector2(0, 32)
+		empty.add_theme_color_override("font_color", UiTokens.ink_color())
+		list.add_child(empty)
+	for summary in summaries.slice(0, 3):
 		if summary is Dictionary:
-			card.add_child(_action_button(_season_summary_button_label(summary), _show_season_summary_modal.bind(summary)))
-			var snapshot: Dictionary = _dict(summary, "apexSnapshot")
-			if not snapshot.is_empty():
-				card.add_child(_action_button("巅峰配置快照", _show_snapshot_modal.bind(snapshot, "赛季巅峰快照")))
+			_render_season_history_card(list, summary)
+
+func _render_season_history_card(parent: VBoxContainer, summary: Dictionary) -> void:
+	var summary_id := str(summary.get("id", ""))
+	var panel := PanelContainer.new()
+	panel.name = "SeasonHistoryCard_%s" % summary_id
+	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	panel.add_theme_stylebox_override("panel", UiTokens.paper_panel_style())
+	parent.add_child(panel)
+	var row := HBoxContainer.new()
+	row.name = "SeasonHistoryCardRow_%s" % summary_id
+	row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.custom_minimum_size = Vector2(0, 78)
+	row.add_theme_constant_override("separation", 12)
+	panel.add_child(row)
+	var text_box := VBoxContainer.new()
+	text_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	text_box.add_theme_constant_override("separation", 4)
+	row.add_child(text_box)
+	_add_plain_line(text_box, str(summary.get("seasonName", summary.get("seasonId", ""))))
+	_add_plain_line(text_box, _season_ladder_summary_text(summary))
+	_add_plain_line(text_box, _season_apex_summary_text(summary))
+	var snapshot: Dictionary = _dict(summary, "apexSnapshot")
+	if not snapshot.is_empty():
+		var snapshot_button := _action_button("巅峰配置快照", _show_snapshot_modal.bind(snapshot, "赛季巅峰快照"))
+		snapshot_button.name = "SeasonSnapshotAction_%s" % summary_id
+		row.add_child(snapshot_button)
 
 func _render_rooms_tab() -> void:
 	var screen := VBoxContainer.new()
@@ -3439,6 +3518,22 @@ func _season_summary_button_label(summary: Dictionary) -> String:
 	if int(summary.get("apexRank", 0)) > 0:
 		apex_text = "巅峰第 %d 名 · %d胜%d败" % [int(summary.get("apexRank", 0)), int(summary.get("apexWins", 0)), int(summary.get("apexLosses", 0))]
 	return "%s  天梯 %s%s%s  %s" % [name, tier, score_text, dog_king, apex_text]
+
+func _season_ladder_summary_text(summary: Dictionary) -> String:
+	var tier := _fallback(str(summary.get("ladderTierLabel", "")), "未参赛")
+	var text := "天梯 %s" % tier
+	if summary.has("ladderScore") and str(summary.get("ladderScore", "")).length() > 0:
+		text += " · %d 分" % int(summary.get("ladderScore", 0))
+	var dog_king_rank := int(summary.get("dogKingRank", 0))
+	if dog_king_rank > 0:
+		text += " · 犬王第 %d 名" % dog_king_rank
+	return text
+
+func _season_apex_summary_text(summary: Dictionary) -> String:
+	var apex_rank := int(summary.get("apexRank", 0))
+	if apex_rank <= 0:
+		return "巅峰未入榜"
+	return "巅峰第 %d 名 · %d胜%d败" % [apex_rank, int(summary.get("apexWins", 0)), int(summary.get("apexLosses", 0))]
 
 func _apex_run_summary_label(run_like: Dictionary) -> String:
 	var item_count := _array(run_like, "items").size()
