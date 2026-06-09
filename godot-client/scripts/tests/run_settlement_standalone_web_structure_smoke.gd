@@ -4,32 +4,18 @@ func _init() -> void:
 	_run()
 
 func _run() -> void:
-	var main_scene := load("res://scenes/Main.tscn")
-	if main_scene == null:
-		_fail("Main scene failed to load")
+	var screen_scene := load("res://scenes/screens/RunSettlementScreen.tscn")
+	if screen_scene == null:
+		_fail("RunSettlementScreen scene failed to load")
 		return
-	var main = main_scene.instantiate()
-	root.add_child(main)
+	var screen = screen_scene.instantiate()
+	root.add_child(screen)
 	await process_frame
-	await process_frame
-	if not main.has_method("set_current_run"):
-		_fail("Main session does not expose set_current_run")
-		return
-
-	main.call("set_current_run", _settled_run())
-	await process_frame
+	screen.call("set_payload", {"run": _settled_run()})
 	await process_frame
 
-	var router = main.get("router")
-	if router == null:
-		_fail("Main session must expose router")
-		return
-	if str(router.get("current_screen_id")) != "run_settlement":
-		_fail("COMPLETE should route to standalone run_settlement, got %s" % str(router.get("current_screen_id")))
-		return
-	var run_screen = main.get_node_or_null("ScreenRoot/RunSettlementScreen")
-	if run_screen == null or not run_screen.visible:
-		_fail("RunSettlementScreen is missing or hidden")
+	if str(screen.get("playable_redirect_screen_id")) != "":
+		_fail("RunSettlementScreen must render standalone UI instead of redirecting to playable shell")
 		return
 
 	for node_name in [
@@ -49,23 +35,23 @@ func _run() -> void:
 		"BattleReviewOpponent",
 		"ReturnLobbyButton",
 	]:
-		_assert_has(run_screen, node_name)
+		_assert_has(screen, node_name)
 
-	var text := _collect_text(run_screen)
-	for part in ["跑局结束", "12", "2", "1202", "+34", "返回大厅"]:
+	var text := _collect_text(screen)
+	for part in ["跑局结束", "12", "2", "1202", "黄金 82", "铂金 16", "+34", "战斗数据看板", "返回大厅"]:
 		if not text.contains(part):
-			_fail("Settlement Web text missing: %s" % part)
+			_fail("Settlement standalone text missing: %s" % part)
 			return
 
-	main.queue_free()
-	for _frame in range(5):
+	screen.queue_free()
+	for _frame in range(2):
 		await process_frame
-	print("Godot main flow settlement Web structure smoke passed")
+	print("Godot run settlement standalone Web structure smoke passed")
 	quit(0)
 
 func _settled_run() -> Dictionary:
 	return {
-		"id": "settlement-web",
+		"id": "settlement-standalone",
 		"mode": "LADDER",
 		"phase": "COMPLETE",
 		"status": "COMPLETE",
@@ -100,6 +86,7 @@ func _settled_run() -> Dictionary:
 			"opponentSnapshot": {"name": "对手", "dogType": "MUTT", "items": [], "relics": []},
 			"events": [
 				{"kind": "DAMAGE", "side": "player", "text": "我方造成 8 点伤害", "amount": 8},
+				{"kind": "HEAL", "side": "player", "text": "我方治疗 2 点", "amount": 2},
 				{"kind": "DAMAGE", "side": "opponent", "text": "对手造成 5 点伤害", "amount": 5},
 			],
 		},
@@ -107,7 +94,7 @@ func _settled_run() -> Dictionary:
 
 func _assert_has(root_node: Node, node_name: String) -> void:
 	if _find_by_name(root_node, node_name) == null:
-		_fail("Missing settlement Web node: %s" % node_name)
+		_fail("Missing settlement standalone Web node: %s" % node_name)
 
 func _find_by_name(node: Node, node_name: String) -> Node:
 	if node.name == node_name:

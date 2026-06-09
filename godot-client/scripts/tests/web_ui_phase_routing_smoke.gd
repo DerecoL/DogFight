@@ -26,7 +26,7 @@ func _init() -> void:
 		"PREP": "run_shell",
 		"MATCH": "run_shell",
 		"BATTLE": "legacy_run",
-		"COMPLETE": "legacy_run",
+		"COMPLETE": "run_settlement",
 	}
 	for phase in cases.keys():
 		main.call("set_current_run", {

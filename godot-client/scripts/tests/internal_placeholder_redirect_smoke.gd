@@ -33,8 +33,27 @@ func _run() -> void:
 	if mode_lobby.find_child("PlaceholderPanel", true, false) != null:
 		_fail("mode_lobby must not show a placeholder panel")
 		return
+
+	if not main.call("open_screen", "run_settlement"):
+		_fail("open_screen should accept standalone run_settlement")
+		return
+	await process_frame
+	await process_frame
+	if str(router.get("current_screen_id")) != "run_settlement":
+		_fail("run_settlement should stay on standalone RunSettlementScreen, got %s" % str(router.get("current_screen_id")))
+		return
+	var run_settlement = main.get_node_or_null("ScreenRoot/RunSettlementScreen")
+	if run_settlement == null or not run_settlement.visible:
+		_fail("run_settlement should show RunSettlementScreen")
+		return
+	if run_settlement.find_child("PlaceholderPanel", true, false) != null:
+		_fail("run_settlement must not show a placeholder panel")
+		return
+	if run_settlement.find_child("SettlementPage", true, false) == null:
+		_fail("run_settlement must render a Web settlement surface")
+		return
+
 	for screen_id in [
-		"run_settlement",
 		"achievements",
 		"season",
 		"account_settings",

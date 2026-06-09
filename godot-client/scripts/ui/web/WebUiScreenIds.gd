@@ -50,7 +50,7 @@ const RUN_PHASE_SCREENS := {
 	"PREP": RUN_SHELL,
 	"MATCH": RUN_SHELL,
 	"BATTLE": BATTLE_REPLAY,
-	"COMPLETE": PLAYABLE_RUN,
+	"COMPLETE": RUN_SETTLEMENT,
 }
 
 static func screen_ids() -> Array[String]:

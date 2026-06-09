@@ -74,6 +74,15 @@ func _run() -> void:
 				_fail("MATCH should render BattleStartButton")
 				return
 			continue
+		if phase == "COMPLETE":
+			if str(router.get("current_screen_id")) != "run_settlement":
+				_fail("COMPLETE should show standalone RunSettlementScreen, got %s" % str(router.get("current_screen_id")))
+				return
+			var run_settlement = main.get_node_or_null("ScreenRoot/RunSettlementScreen")
+			if run_settlement == null or not run_settlement.visible or run_settlement.find_child("SettlementPage", true, false) == null:
+				_fail("COMPLETE should render standalone SettlementPage")
+				return
+			continue
 		if not legacy.visible:
 			_fail("Phase %s should show playable LegacyRunScreen, got %s" % [phase, str(router.get("current_screen_id"))])
 			return
@@ -130,6 +139,7 @@ func _run_payload(phase: String) -> Dictionary:
 		}
 	if phase == "COMPLETE":
 		run["status"] = "COMPLETE"
+		run["score"] = 100
 	return run
 
 func _fail(message: String) -> void:

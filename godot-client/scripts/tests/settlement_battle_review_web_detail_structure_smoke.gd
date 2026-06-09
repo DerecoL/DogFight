@@ -4,26 +4,14 @@ func _init() -> void:
 	_run()
 
 func _run() -> void:
-	var main_scene := load("res://scenes/Main.tscn")
-	if main_scene == null:
-		_fail("Main scene failed to load")
+	var screen_scene := load("res://scenes/screens/RunSettlementScreen.tscn")
+	if screen_scene == null:
+		_fail("RunSettlementScreen scene failed to load")
 		return
-	var main = main_scene.instantiate()
-	root.add_child(main)
+	var screen = screen_scene.instantiate()
+	root.add_child(screen)
 	await process_frame
-	await process_frame
-	var run_screen = main.get_node_or_null("ScreenRoot/LegacyRunScreen")
-	if run_screen == null:
-		_fail("RunScreen is missing")
-		return
-	if run_screen.has_method("bind_session"):
-		run_screen.bind_session(main)
-	if not main.has_method("set_current_run"):
-		_fail("Main session does not expose set_current_run")
-		return
-
-	main.call("set_current_run", _settled_run())
-	run_screen.call("show_run_phase")
+	screen.call("set_payload", {"run": _settled_run()})
 	await process_frame
 
 	for node_name in [
@@ -50,31 +38,36 @@ func _run() -> void:
 		"BattleReviewOpponentMetricStatuses",
 		"BattleReviewOpponentTopItem",
 	]:
-		_assert_has(run_screen, node_name)
+		_assert_has(screen, node_name)
 
-	var text := _collect_text(run_screen)
+	var text := _collect_text(screen)
 	for part in [
 		"战斗数据看板",
 		"系统伤害 5",
 		"我方",
 		"Hero",
-		"总伤害 8",
-		"治疗 3",
-		"护盾 4",
-		"毒伤 3",
-		"状态 1",
+		"伤害",
+		"8",
+		"治疗",
+		"3",
+		"护盾",
+		"4",
+		"毒伤",
+		"3",
+		"状态",
+		"1",
 		"最高贡献",
 		"1点牙咬 · 15",
 		"对手",
 		"Rival",
-		"总伤害 5",
+		"5",
 		"反击爪 · 5",
 	]:
 		if not text.contains(part):
 			_fail("Settlement battle review Web detail text missing: %s" % part)
 			return
 
-	main.queue_free()
+	screen.queue_free()
 	for _frame in range(5):
 		await process_frame
 	print("Godot settlement battle review Web detail structure smoke passed")

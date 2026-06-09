@@ -46,7 +46,7 @@ func _init() -> void:
 		"PREP": "run_shell",
 		"MATCH": "run_shell",
 		"BATTLE": "battle_replay",
-		"COMPLETE": "legacy_run",
+		"COMPLETE": "run_settlement",
 	}
 	for phase in phase_expectations.keys():
 		var actual := str(manifest.screen_for_run_phase(phase))

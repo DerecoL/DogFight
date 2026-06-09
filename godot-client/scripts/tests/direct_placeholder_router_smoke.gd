@@ -171,8 +171,24 @@ func _run() -> void:
 		_fail("Direct router display of run_shell must not show a placeholder panel")
 		return
 
+	router.call("show_screen", "run_settlement", false)
+	await process_frame
+	await process_frame
+	if str(router.get("current_screen_id")) != "run_settlement":
+		_fail("Direct router display of run_settlement should stay on standalone run_settlement, got %s" % str(router.get("current_screen_id")))
+		return
+	var run_settlement = main.get_node_or_null("ScreenRoot/RunSettlementScreen")
+	if run_settlement == null or not run_settlement.visible:
+		_fail("Direct router display of run_settlement should show RunSettlementScreen")
+		return
+	if run_settlement.find_child("SettlementPage", true, false) == null:
+		_fail("RunSettlementScreen must render a Web settlement surface")
+		return
+	if _any_visible_placeholder(main):
+		_fail("Direct router display of run_settlement must not show a placeholder panel")
+		return
+
 	for screen_id in [
-		"run_settlement",
 		"achievements",
 		"season",
 		"account_settings",
