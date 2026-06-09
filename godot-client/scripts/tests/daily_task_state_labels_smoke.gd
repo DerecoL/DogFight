@@ -53,16 +53,24 @@ func _run() -> void:
 	run_screen.call("_render_current_tab")
 	await process_frame
 	var text := _collect_text(run_screen)
-	for part in ["每日任务", "2026-06-02 · 余额 240", "今日已刷新", "已领取 每日战斗", "可领取 商店达人", "未完成 继续挑战", "1/4", "奖励 10"]:
+	for part in ["每日任务 2026-06-02", "今日已刷新", "每日战斗", "完成 3 场战斗", "已领取", "商店达人", "购买 5 件商品", "领取 20", "继续挑战", "完成 4 个回合", "1/4"]:
 		if not text.contains(str(part)):
-			_fail("Daily task state label missing: %s" % str(part))
+			_fail("Daily task Web label missing: %s" % str(part))
 			return
-	var refresh_button := _find_button(run_screen, "今日已刷新")
+	var refresh_button := _find_by_name(run_screen, "DailyTaskRefreshButton") as Button
 	if refresh_button == null:
-		_fail("Used refresh button is missing")
+		_fail("DailyTaskRefreshButton is missing")
 		return
 	if not refresh_button.disabled:
 		_fail("Used refresh button should be disabled")
+		return
+	var claimed_button := _find_by_name(run_screen, "DailyTaskAction_daily-claimed") as Button
+	if claimed_button == null or not claimed_button.disabled:
+		_fail("Claimed daily task action should be disabled")
+		return
+	var open_button := _find_by_name(run_screen, "DailyTaskAction_daily-open") as Button
+	if open_button == null or not open_button.disabled:
+		_fail("Incomplete daily task action should be disabled")
 		return
 	main.queue_free()
 	for _frame in range(5):
@@ -80,11 +88,11 @@ func _collect_text(node: Node) -> String:
 		text += _collect_text(child)
 	return text
 
-func _find_button(node: Node, needle: String) -> Button:
-	if node is Button and (node as Button).text.contains(needle):
-		return node as Button
+func _find_by_name(node: Node, node_name: String) -> Node:
+	if node.name == node_name:
+		return node
 	for child in node.get_children():
-		var found := _find_button(child, needle)
+		var found := _find_by_name(child, node_name)
 		if found != null:
 			return found
 	return null

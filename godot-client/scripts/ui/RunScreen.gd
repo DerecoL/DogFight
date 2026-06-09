@@ -1557,38 +1557,179 @@ func _render_map_or_shop(run: Dictionary) -> void:
 				shop_card.add_child(offer_button)
 
 func _render_achievements_tab() -> void:
-	_render_daily_tasks_section("每日任务")
-	var card := _section("成就与每日任务")
+	var screen := VBoxContainer.new()
+	screen.name = "AchievementsScreen"
+	screen.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	screen.add_theme_constant_override("separation", 18)
+	content.add_child(screen)
+	var heading := HBoxContainer.new()
+	heading.name = "AchievementsHeading"
+	heading.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	heading.add_theme_constant_override("separation", 12)
+	screen.add_child(heading)
+	var title_box := VBoxContainer.new()
+	title_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	title_box.add_theme_constant_override("separation", 4)
+	heading.add_child(title_box)
+	_add_plain_line(title_box, "长期目标")
+	_add_plain_line(title_box, "成就与每日任务")
 	var wallet: Dictionary = _dict(achievements_data, "wallet")
-	_add_line(card, "长期目标", "余额 %d / 今日获得 %d" % [int(wallet.get("balance", 0)), int(wallet.get("dailyEarned", 0))])
-	_add_line(card, "分类", _achievement_category_summary(_array(achievements_data, "achievements")))
-	for achievement in _array(achievements_data, "achievements"):
+	var currency := Label.new()
+	currency.name = "AchievementsCurrencyPill"
+	currency.text = str(int(wallet.get("balance", 0)))
+	currency.custom_minimum_size = Vector2(108, 42)
+	currency.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	currency.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	currency.add_theme_color_override("font_color", UiTokens.ink_color())
+	heading.add_child(currency)
+	_render_daily_task_panel(screen)
+	var achievements := _array(achievements_data, "achievements")
+	var tabs := HBoxContainer.new()
+	tabs.name = "AchievementTabs"
+	tabs.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	tabs.add_theme_constant_override("separation", 8)
+	screen.add_child(tabs)
+	var all_tab := _button("全部", 84)
+	all_tab.name = "AchievementTab_all"
+	tabs.add_child(all_tab)
+	for category in _achievement_categories(achievements):
+		var tab := _button(str(category), 84)
+		tab.name = "AchievementTab_%s" % _achievement_category_node_id(str(category))
+		tabs.add_child(tab)
+	var grid := GridContainer.new()
+	grid.name = "AchievementGrid"
+	grid.columns = 3
+	grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	grid.add_theme_constant_override("h_separation", 12)
+	grid.add_theme_constant_override("v_separation", 12)
+	screen.add_child(grid)
+	for achievement in achievements:
 		if achievement is Dictionary:
-			card.add_child(_action_button(_achievement_button_label(achievement), _show_achievement_modal.bind(achievement)))
+			_render_achievement_card(grid, achievement)
 
 func _render_daily_tab() -> void:
-	_render_daily_tasks_section("每日任务")
+	var screen := VBoxContainer.new()
+	screen.name = "DailyTasksScreen"
+	screen.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	screen.add_theme_constant_override("separation", 18)
+	content.add_child(screen)
+	_render_daily_task_panel(screen)
 
-func _render_daily_tasks_section(title: String) -> void:
-	var card := _section(title)
-	var wallet: Dictionary = _dict(daily_data, "wallet")
-	_add_line(card, "日期 / 钱包", "%s · 余额 %d" % [str(daily_data.get("dateKey", "")), int(wallet.get("balance", 0))])
+func _render_daily_task_panel(parent: VBoxContainer) -> VBoxContainer:
+	var panel := PanelContainer.new()
+	panel.name = "DailyTaskPanelFrame"
+	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	panel.add_theme_stylebox_override("panel", UiTokens.paper_panel_style())
+	parent.add_child(panel)
+	var card := VBoxContainer.new()
+	card.name = "DailyTaskPanel"
+	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	card.add_theme_constant_override("separation", 12)
+	panel.add_child(card)
+	var title_row := HBoxContainer.new()
+	title_row.name = "DailyTaskTitleRow"
+	title_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	title_row.add_theme_constant_override("separation", 10)
+	card.add_child(title_row)
+	var title_label := Label.new()
+	title_label.text = "每日任务 %s" % str(daily_data.get("dateKey", ""))
+	title_label.custom_minimum_size = Vector2(0, 38)
+	title_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	title_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	title_label.add_theme_color_override("font_color", UiTokens.ink_color())
+	title_row.add_child(title_label)
 	var refresh_used := bool(daily_data.get("refreshUsed", false))
-	var refresh_button := _action_button("今日已刷新" if refresh_used else "刷新每日任务", _refresh_daily)
+	var refresh_button := _action_button("今日已刷新" if refresh_used else "刷新", _refresh_daily)
+	refresh_button.name = "DailyTaskRefreshButton"
 	refresh_button.disabled = refresh_button.disabled or refresh_used
-	card.add_child(refresh_button)
+	title_row.add_child(refresh_button)
 	for task in _array(daily_data, "tasks"):
 		if task is Dictionary:
-			var def: Dictionary = _dict(task, "def")
-			var text := "%s  %d/%d  奖励 %d" % [_fallback(str(def.get("title", "")), str(task.get("taskId", ""))), int(task.get("progress", 0)), int(task.get("target", 0)), _reward_amount(task, def)]
-			var ready := int(task.get("progress", 0)) >= int(task.get("target", 0))
-			var claimed := not str(task.get("claimedAt", "")).is_empty()
-			if claimed:
-				card.add_child(_action_button("已领取 " + text, _show_daily_task_modal.bind(task)))
-			elif ready:
-				card.add_child(_action_button("可领取 " + text, _show_daily_task_modal.bind(task)))
-			else:
-				card.add_child(_action_button("未完成 " + text, _show_daily_task_modal.bind(task)))
+			_render_daily_task_row(card, task)
+	return card
+
+func _render_daily_task_row(parent: VBoxContainer, task: Dictionary) -> void:
+	var task_id := str(task.get("taskId", ""))
+	var row := HBoxContainer.new()
+	row.name = "DailyTaskRow_%s" % task_id
+	row.custom_minimum_size = Vector2(0, 68)
+	row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_theme_constant_override("separation", 12)
+	parent.add_child(row)
+	var def: Dictionary = _dict(task, "def")
+	var text_box := VBoxContainer.new()
+	text_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	text_box.add_theme_constant_override("separation", 4)
+	row.add_child(text_box)
+	_add_plain_line(text_box, _fallback(str(def.get("title", "")), task_id))
+	_add_plain_line(text_box, str(def.get("description", "")))
+	var progress_text := Label.new()
+	progress_text.text = "%d/%d" % [int(task.get("progress", 0)), int(task.get("target", 0))]
+	progress_text.custom_minimum_size = Vector2(88, 38)
+	progress_text.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	progress_text.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	progress_text.add_theme_color_override("font_color", UiTokens.ink_color())
+	row.add_child(progress_text)
+	var ready := int(task.get("progress", 0)) >= int(task.get("target", 0))
+	var claimed := not str(task.get("claimedAt", "")).is_empty()
+	var action: Button
+	if claimed:
+		action = _button("已领取", 96)
+		action.disabled = true
+	elif ready and not task_id.is_empty():
+		action = _action_button("领取 %d" % _reward_amount(task, def), _claim_daily.bind(task_id))
+	else:
+		action = _button("%d/%d" % [int(task.get("progress", 0)), int(task.get("target", 0))], 96)
+		action.disabled = true
+	action.name = "DailyTaskAction_%s" % task_id
+	row.add_child(action)
+
+func _render_achievement_card(parent: GridContainer, achievement: Dictionary) -> void:
+	var achievement_id := str(achievement.get("id", ""))
+	var panel := PanelContainer.new()
+	panel.name = "AchievementCard_%s" % achievement_id
+	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	panel.custom_minimum_size = Vector2(220, 166)
+	panel.add_theme_stylebox_override("panel", UiTokens.paper_panel_style())
+	parent.add_child(panel)
+	var card := VBoxContainer.new()
+	card.name = "AchievementCardBody_%s" % achievement_id
+	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	card.add_theme_constant_override("separation", 8)
+	panel.add_child(card)
+	var title_box := VBoxContainer.new()
+	title_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	title_box.add_theme_constant_override("separation", 2)
+	card.add_child(title_box)
+	_add_plain_line(title_box, str(achievement.get("title", achievement_id)))
+	var category_text := str(achievement.get("category", ""))
+	if bool(achievement.get("hidden", false)):
+		category_text = "隐藏成就 · %s" % category_text
+	_add_plain_line(title_box, category_text)
+	_add_plain_line(card, str(achievement.get("description", "")))
+	var progress_line := Label.new()
+	progress_line.text = "%d/%d · %d" % [int(achievement.get("progress", 0)), int(achievement.get("target", 0)), int(achievement.get("reward", 0))]
+	progress_line.custom_minimum_size = Vector2(0, 28)
+	progress_line.add_theme_color_override("font_color", UiTokens.ink_color())
+	card.add_child(progress_line)
+	var action_row := HBoxContainer.new()
+	action_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	action_row.add_theme_constant_override("separation", 8)
+	card.add_child(action_row)
+	var spacer := Control.new()
+	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	action_row.add_child(spacer)
+	var action: Button
+	if bool(achievement.get("claimed", false)):
+		action = _button("已领取", 96)
+		action.disabled = true
+	elif bool(achievement.get("claimable", false)) and not achievement_id.is_empty():
+		action = _action_button("领取", _claim_achievement.bind(achievement_id))
+	else:
+		action = _button("未完成", 96)
+		action.disabled = true
+	action.name = "AchievementAction_%s" % achievement_id
+	action_row.add_child(action)
 
 func _render_shop_tab() -> void:
 	var card := _section("账号商城 / 外观")
@@ -3461,6 +3602,26 @@ func _achievement_category_summary(achievements: Array) -> String:
 			if not category.is_empty() and not categories.has(category):
 				categories.append(category)
 	return " / ".join(categories)
+
+func _achievement_categories(achievements: Array) -> Array:
+	var categories := []
+	for achievement in achievements:
+		if achievement is Dictionary:
+			var category := str((achievement as Dictionary).get("category", ""))
+			if not category.is_empty() and not categories.has(category):
+				categories.append(category)
+	return categories
+
+func _achievement_category_node_id(category: String) -> String:
+	match category:
+		"战斗":
+			return "combat"
+		"收藏":
+			return "collection"
+		"任务":
+			return "task"
+		_:
+			return category.to_snake_case()
 
 func _achievement_button_label(achievement: Dictionary) -> String:
 	var claimed := bool(achievement.get("claimed", false))

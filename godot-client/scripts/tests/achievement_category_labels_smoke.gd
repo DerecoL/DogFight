@@ -86,37 +86,27 @@ func _run() -> void:
 	run_screen.call("_render_current_tab")
 	await process_frame
 	var text := _collect_text(run_screen)
-	for part in ["成就与每日任务", "每日任务", "2026-06-02 · 余额 500", "刷新每日任务", "可领取 商店达人", "未完成 继续挑战", "长期目标", "余额 500 / 今日获得 60", "分类", "全部 / 战斗 / 收藏 / 任务", "可领取 首胜", "战斗", "1/1", "奖励 30", "未完成 隐藏成就 收藏大师", "收藏", "2/5", "已领取 任务常客", "任务"]:
+	for part in ["长期目标", "成就与每日任务", "每日任务 2026-06-02", "刷新", "商店达人", "购买 5 件商品", "领取 20", "继续挑战", "1/4", "全部", "战斗", "收藏", "任务", "首胜", "赢下一场战斗", "1/1 · 30", "收藏大师", "隐藏成就 · 收藏", "2/5 · 20", "任务常客", "已领取"]:
 		if not text.contains(str(part)):
-			_fail("Achievement category label missing: %s" % str(part))
+			_fail("Achievement Web label missing: %s" % str(part))
 			return
-	var collector_button := _find_button(run_screen, "收藏大师")
-	if collector_button == null:
-		_fail("Hidden achievement button is missing")
+	for node_name in ["AchievementTab_combat", "AchievementTab_collection", "AchievementTab_task", "AchievementAction_first-win", "AchievementAction_collector", "AchievementAction_daily-hero"]:
+		if _find_by_name(run_screen, node_name) == null:
+			_fail("Achievement Web node missing: %s" % node_name)
+			return
+	var collector_button := _find_by_name(run_screen, "AchievementAction_collector") as Button
+	if collector_button == null or not collector_button.disabled:
+		_fail("Unfinished achievement action must be disabled")
 		return
-	collector_button.pressed.emit()
-	await process_frame
-	var modal_layer = main.get_node_or_null("OverlayRoot/ModalLayer")
-	if modal_layer == null:
-		_fail("ModalLayer is missing")
+	var claimed_button := _find_by_name(run_screen, "AchievementAction_daily-hero") as Button
+	if claimed_button == null or not claimed_button.disabled:
+		_fail("Claimed achievement action must be disabled")
 		return
-	_assert_modal_text(modal_layer, ["成就详情", "收藏大师", "分类", "收藏", "可见性", "隐藏成就", "未完成"])
 	main.queue_free()
 	for _frame in range(5):
 		await process_frame
 	print("Godot achievement category labels smoke passed")
 	quit(0)
-
-func _assert_modal_text(modal_layer: Node, expected: Array) -> void:
-	if modal_layer.get_child_count() != 1:
-		_fail("Expected exactly one modal, got %d" % modal_layer.get_child_count())
-		return
-	var text := _collect_text(modal_layer)
-	for part in expected:
-		var value := str(part)
-		if not text.contains(value):
-			_fail("Modal text missing: %s" % value)
-			return
 
 func _collect_text(node: Node) -> String:
 	var text := ""
@@ -128,11 +118,11 @@ func _collect_text(node: Node) -> String:
 		text += _collect_text(child)
 	return text
 
-func _find_button(node: Node, needle: String) -> Button:
-	if node is Button and (node as Button).text.contains(needle):
-		return node as Button
+func _find_by_name(node: Node, node_name: String) -> Node:
+	if node.name == node_name:
+		return node
 	for child in node.get_children():
-		var found := _find_button(child, needle)
+		var found := _find_by_name(child, node_name)
 		if found != null:
 			return found
 	return null
