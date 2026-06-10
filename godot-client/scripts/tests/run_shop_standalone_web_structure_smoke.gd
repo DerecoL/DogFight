@@ -125,6 +125,36 @@ func _run() -> void:
 	if fake_session.bought_offer_id != "offer-1" or fake_session.bought_area != "BAG":
 		_fail("BuyOfferButton must call buy_offer with offer-1 into BAG")
 		return
+	var inventory_item_button := _find_by_name(screen, "EquipmentGridPanelItem_owned-1") as Button
+	if inventory_item_button == null:
+		_fail("Shop inventory equipment item button is missing")
+		return
+	inventory_item_button.pressed.emit()
+	await process_frame
+	if fake_session.bought_offer_id != "offer-1":
+		_fail("Shop inventory item click should inspect, not trigger another shop action")
+		return
+	for item_tip_node in [
+		"FloatingTip",
+		"ShopItemTip",
+		"ShopItemTipTags",
+		"ShopItemTipIdentity",
+		"ShopItemTipSizePreview",
+		"ShopItemTipDice",
+		"ShopItemTipDescription",
+		"ShopItemTipActions",
+		"CloseShopItemTipButton",
+	]:
+		_assert_has(screen, item_tip_node)
+	var close_item_tip := _find_by_name(screen, "CloseShopItemTipButton") as Button
+	if close_item_tip == null:
+		_fail("Shop inventory item tip close button is missing")
+		return
+	close_item_tip.pressed.emit()
+	await process_frame
+	if _find_by_name(screen, "FloatingTip") != null:
+		_fail("Shop inventory item tip should close from its close button")
+		return
 	var text := _collect_text(screen)
 	for part in [
 		"装备店",

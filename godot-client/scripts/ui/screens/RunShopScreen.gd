@@ -2,6 +2,7 @@ extends BaseWebScreen
 
 var action_in_progress := false
 var selected_offer_id := ""
+var selected_item_id := ""
 
 func _ready() -> void:
 	_render()
@@ -224,6 +225,8 @@ func _render_inventory_board(parent: Node, run: Dictionary) -> void:
 	_render_relic_rail(bag_relic_row, run)
 	_render_grid_panel(bag_relic_row, "BagGridPanel", "背包", "BAG", run)
 
+	_render_selected_item_tip(inventory, run)
+
 func _render_relic_rail(parent: Node, run: Dictionary) -> void:
 	var rail := VBoxContainer.new()
 	rail.name = "RelicRail"
@@ -261,11 +264,10 @@ func _render_grid_panel(parent: Node, node_name: String, title: String, area: St
 		if item_value is Dictionary and str(item_value.get("area", "")) == area:
 			var item: Dictionary = item_value
 			var def := _dict(item, "def")
-			var button := _action_button(_fallback(str(def.get("name", "")), str(item.get("defId", ""))), _noop)
+			var button := _action_button(_fallback(str(def.get("name", "")), str(item.get("defId", ""))), _select_item.bind(str(item.get("id", ""))))
 			button.name = "%sItem_%s" % [node_name, str(item.get("id", ""))]
 			button.custom_minimum_size = Vector2(90, 52)
 			item_line.add_child(button)
-
 func _render_selected_offer_tip(parent: VBoxContainer, run: Dictionary) -> void:
 	var offer := _selected_offer(run)
 	if offer.is_empty():
@@ -339,6 +341,69 @@ func _render_selected_offer_tip(parent: VBoxContainer, run: Dictionary) -> void:
 	close_button.name = "CloseOfferTipButton"
 	actions.add_child(close_button)
 
+func _render_selected_item_tip(parent: VBoxContainer, run: Dictionary) -> void:
+	var item := _selected_item(run)
+	if item.is_empty():
+		return
+	var def: Dictionary = _dict(item, "def")
+	var title := _fallback(str(def.get("name", "")), str(item.get("defId", item.get("id", ""))))
+	var floating_tip := PanelContainer.new()
+	floating_tip.name = "FloatingTip"
+	floating_tip.custom_minimum_size = Vector2(0, 244)
+	floating_tip.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	floating_tip.add_theme_stylebox_override("panel", WebUiTokens.paper_card_style())
+	parent.add_child(floating_tip)
+
+	var tip := VBoxContainer.new()
+	tip.name = "ShopItemTip"
+	tip.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	tip.add_theme_constant_override("separation", 7)
+	floating_tip.add_child(tip)
+
+	var tags := HBoxContainer.new()
+	tags.name = "ShopItemTipTags"
+	tags.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	tags.add_theme_constant_override("separation", 6)
+	tip.add_child(tags)
+	_add_label(tags, "ShopItemTipSizeTag", "%s\u683c" % _fallback(_detail_size_text(def), "?"), HORIZONTAL_ALIGNMENT_CENTER)
+	_add_label(tags, "ShopItemTipQualityTag", _quality_label(str(item.get("quality", ""))), HORIZONTAL_ALIGNMENT_CENTER)
+	_add_label(tags, "ShopItemTipAreaTag", _area_label(str(item.get("area", ""))), HORIZONTAL_ALIGNMENT_CENTER)
+
+	var identity := HBoxContainer.new()
+	identity.name = "ShopItemTipIdentity"
+	identity.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	identity.add_theme_constant_override("separation", 8)
+	tip.add_child(identity)
+	var art := Label.new()
+	art.name = "ShopItemTipArt"
+	art.text = ""
+	art.custom_minimum_size = Vector2(54, 54)
+	art.add_theme_stylebox_override("normal", WebUiTokens.resource_pill_style())
+	identity.add_child(art)
+	_add_label(identity, "ShopItemTipTitle", title)
+
+	var size_preview := HBoxContainer.new()
+	size_preview.name = "ShopItemTipSizePreview"
+	size_preview.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	size_preview.add_theme_constant_override("separation", 8)
+	tip.add_child(size_preview)
+	_add_label(size_preview, "ShopItemTipGridPreview", _shop_size_preview_text(def))
+	_add_label(size_preview, "ShopItemTipSizeText", "\u5360\u7528 %s \u683c" % _fallback(_detail_size_text(def), "?"))
+
+	var trigger := _trigger_dice_text(def)
+	_add_label(tip, "ShopItemTipDice", "\u89e6\u53d1\u70b9\u6570 %s" % trigger if not trigger.is_empty() else "\u89e6\u53d1\u70b9\u6570 -")
+	var description := _fallback(str(def.get("description", "")), str(item.get("description", "")))
+	_add_label(tip, "ShopItemTipDescription", description)
+
+	var actions := HBoxContainer.new()
+	actions.name = "ShopItemTipActions"
+	actions.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	actions.add_theme_constant_override("separation", 8)
+	tip.add_child(actions)
+	var close_button := _action_button("\u5173\u95ed", _close_item_tip)
+	close_button.name = "CloseShopItemTipButton"
+	actions.add_child(close_button)
+
 func _action_button(text: String, callback: Callable) -> Button:
 	var button := Button.new()
 	button.text = text
@@ -371,6 +436,7 @@ func _match_battle() -> void:
 
 func _select_offer(offer_id: String) -> void:
 	selected_offer_id = offer_id
+	selected_item_id = ""
 	_render()
 
 func _close_offer_tip() -> void:
@@ -386,6 +452,15 @@ func _buy_selected_offer() -> void:
 		await session.call("buy_offer", offer_id, "BAG")
 	selected_offer_id = ""
 	action_in_progress = false
+	_render()
+
+func _select_item(item_id: String) -> void:
+	selected_item_id = item_id
+	selected_offer_id = ""
+	_render()
+
+func _close_item_tip() -> void:
+	selected_item_id = ""
 	_render()
 
 func _run() -> Dictionary:
@@ -406,6 +481,14 @@ func _selected_offer(run: Dictionary) -> Dictionary:
 	for offer_value in _array(run, "shopItems"):
 		if offer_value is Dictionary and str((offer_value as Dictionary).get("offerId", "")) == selected_offer_id:
 			return offer_value
+	return {}
+
+func _selected_item(run: Dictionary) -> Dictionary:
+	if selected_item_id.is_empty():
+		return {}
+	for item_value in _array(run, "items"):
+		if item_value is Dictionary and str((item_value as Dictionary).get("id", "")) == selected_item_id:
+			return item_value
 	return {}
 
 func _fallback(value: String, fallback: String) -> String:
@@ -438,6 +521,15 @@ func _quality_label(quality: String) -> String:
 			return "钻石"
 		_:
 			return quality
+
+func _area_label(area: String) -> String:
+	match area:
+		"EQUIPMENT":
+			return "\u88c5\u5907\u680f"
+		"BAG":
+			return "\u80cc\u5305"
+		_:
+			return area
 
 func _detail_size_text(def: Dictionary) -> String:
 	var size = def.get("size", "")
