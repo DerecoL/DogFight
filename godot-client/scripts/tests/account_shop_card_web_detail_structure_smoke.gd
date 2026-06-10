@@ -54,6 +54,8 @@ func _run() -> void:
 	]:
 		_assert_has(screen, node_name)
 
+	_assert_missing(screen, "RefreshShopButton")
+
 	var text := _collect_text(screen)
 	for part in [
 		"账号商城",
@@ -150,6 +152,10 @@ func _cosmetics_data() -> Dictionary:
 func _assert_has(root_node: Node, node_name: String) -> void:
 	if _find_by_name(root_node, node_name) == null:
 		_fail("Missing account shop Web detail node: %s" % node_name)
+
+func _assert_missing(root_node: Node, node_name: String) -> void:
+	if _find_by_name(root_node, node_name) != null:
+		_fail("Unexpected account shop Web detail node: %s" % node_name)
 
 func _find_by_name(node: Node, node_name: String) -> Node:
 	if node.name == node_name:

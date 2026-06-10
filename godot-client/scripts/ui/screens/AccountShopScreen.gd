@@ -6,7 +6,6 @@ const WebUiTokens := preload("res://scripts/ui/web/WebUiTokens.gd")
 var currency_label: Label
 var status_label: Label
 var sections_box: VBoxContainer
-var refresh_button: Button
 var action_buttons: Array[Button] = []
 var shop_data: Dictionary = {}
 var cosmetics_data: Dictionary = {}
@@ -83,13 +82,6 @@ func _build_screen() -> void:
 	currency_label.add_theme_stylebox_override("normal", WebUiTokens.resource_pill_style())
 	heading.add_child(currency_label)
 
-	refresh_button = Button.new()
-	refresh_button.name = "RefreshShopButton"
-	refresh_button.text = "刷新"
-	refresh_button.custom_minimum_size = Vector2(90, 44)
-	refresh_button.pressed.connect(_refresh_account_shop)
-	heading.add_child(_track_action_button(refresh_button))
-
 	status_label = Label.new()
 	status_label.name = "StatusLabel"
 	status_label.custom_minimum_size = Vector2(0, 28)
@@ -137,8 +129,6 @@ func _render_shop() -> void:
 		sections_box.remove_child(child)
 		child.free()
 	action_buttons = []
-	if refresh_button != null:
-		_track_action_button(refresh_button)
 	var wallet := _dict(shop_data, "wallet")
 	currency_label.text = "金币 %d" % int(wallet.get("balance", 0))
 	var sections := _dict(shop_data, "sections")
