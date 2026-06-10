@@ -112,6 +112,18 @@ func _render_ladder_start(parent: VBoxContainer) -> void:
 	var panel := _paper_panel("LadderStart")
 	parent.add_child(panel)
 	var title := _section_title(panel)
+	var run := _current_run()
+	if str(run.get("mode", "")) == "LADDER":
+		_add_label(title, "LadderStartTitle", "当前天梯")
+		_add_label(title, "LadderStartSubtitle", "已有进行中的天梯跑局，继续当前跑局后再结算积分。")
+		var continue_button := Button.new()
+		continue_button.name = "ContinueLadderRunButton"
+		continue_button.text = "继续天梯模式"
+		continue_button.custom_minimum_size = Vector2(0, WebUiTokens.touch_target_height())
+		continue_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		continue_button.pressed.connect(_continue_ladder_run)
+		panel.add_child(continue_button)
+		return
 	_add_label(title, "LadderStartTitle", "选择天梯狗狗")
 	_add_label(title, "LadderStartSubtitle", "开始天梯会进入独立匹配池，并按整局表现结算。")
 
@@ -138,13 +150,24 @@ func _render_ladder_start(parent: VBoxContainer) -> void:
 	detail.custom_minimum_size = Vector2(260, 0)
 	detail.add_theme_constant_override("separation", 8)
 	dog_select.add_child(detail)
-	var detail_art := TextureRect.new()
+	var detail_art := PanelContainer.new()
 	detail_art.name = "DogDetailArt"
 	detail_art.custom_minimum_size = Vector2(0, 122)
-	detail_art.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
-	detail_art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	detail_art.texture = _dog_texture(selected_dog)
+	detail_art.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	detail_art.add_theme_stylebox_override("panel", WebUiTokens.paper_card_style())
 	detail.add_child(detail_art)
+	var detail_badge := CenterContainer.new()
+	detail_badge.name = "DogDetailDogBadge"
+	detail_badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	detail_art.add_child(detail_badge)
+	var detail_avatar := TextureRect.new()
+	detail_avatar.name = "DogDetailAvatar"
+	detail_avatar.custom_minimum_size = Vector2(0, 108)
+	detail_avatar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	detail_avatar.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
+	detail_avatar.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	detail_avatar.texture = _dog_texture(selected_dog)
+	detail_badge.add_child(detail_avatar)
 	_add_label(detail, "DogDetailName", _dog_label(selected_dog), HORIZONTAL_ALIGNMENT_CENTER)
 	_add_label(detail, "DogDetailStrategy", _dog_strategy(selected_dog), HORIZONTAL_ALIGNMENT_CENTER)
 	if selected_dog == "EMPEROR":
@@ -197,13 +220,26 @@ func _ladder_dog_card_button(dog_type: String) -> Button:
 	art_frame.add_theme_stylebox_override("panel", WebUiTokens.paper_card_style())
 	content.add_child(art_frame)
 
+	var badge := CenterContainer.new()
+	badge.name = "LadderDogCardDogBadge_%s" % dog_type
+	badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	art_frame.add_child(badge)
+
+	var texture := _dog_texture(dog_type)
+	var avatar := TextureRect.new()
+	avatar.name = "LadderDogCardAvatar_%s" % dog_type
+	avatar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	avatar.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
+	avatar.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	avatar.texture = texture
+	badge.add_child(avatar)
+
 	var art := TextureRect.new()
 	art.name = "LadderDogCardArt_%s" % dog_type
+	art.visible = false
 	art.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	art.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
-	art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	art.texture = _dog_texture(dog_type)
-	art_frame.add_child(art)
+	art.texture = texture
+	badge.add_child(art)
 
 	_add_label(content, "LadderDogCardName_%s" % dog_type, _dog_label(dog_type), HORIZONTAL_ALIGNMENT_CENTER).mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_add_label(content, "LadderDogCardCopy_%s" % dog_type, _dog_trait(dog_type), HORIZONTAL_ALIGNMENT_CENTER).mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -288,6 +324,12 @@ func _start_ladder_run() -> void:
 	if start_button != null:
 		start_button.disabled = false
 
+func _continue_ladder_run() -> void:
+	if action_in_progress:
+		return
+	if session != null and session.has_method("set_current_run"):
+		session.call("set_current_run", _current_run())
+
 func _ladder_data() -> Dictionary:
 	var value = payload.get("ladderData", {})
 	if value is Dictionary and not value.is_empty():
@@ -311,6 +353,10 @@ func _dict(source: Dictionary, key: String) -> Dictionary:
 func _array(source: Dictionary, key: String) -> Array:
 	var value = source.get(key, [])
 	return value if value is Array else []
+
+func _current_run() -> Dictionary:
+	var value = payload.get("run", {})
+	return value if value is Dictionary else {}
 
 func _ladder_progress_value(profile: Dictionary) -> float:
 	var tier := str(profile.get("tier", ""))

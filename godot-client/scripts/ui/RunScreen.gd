@@ -2268,6 +2268,9 @@ func _render_leaderboards_tab() -> void:
 	screen.add_child(ladder_start)
 	_add_line(ladder_start, "选择天梯狗狗", "开始天梯会进入独立匹配池，并按整局表现结算。")
 	if _current_run_mode() == "LADDER":
+		for child in ladder_start.get_children():
+			ladder_start.remove_child(child)
+			child.queue_free()
 		_add_line(ladder_start, "当前天梯", "已有进行中的天梯跑局，继续当前跑局后再结算积分。")
 		var continue_ladder_button := _action_button("继续天梯模式", _switch_tab.bind(TAB_RUN))
 		continue_ladder_button.name = "ContinueLadderRunButton"
