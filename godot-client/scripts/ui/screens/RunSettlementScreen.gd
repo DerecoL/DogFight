@@ -42,10 +42,25 @@ func _render() -> void:
 	layout.add_theme_constant_override("separation", 12)
 	margin.add_child(layout)
 
-	var hide_button := _icon_button("隐藏结算", _hide_settlement)
+	var action_bar := HBoxContainer.new()
+	action_bar.name = "SettlementActionBar"
+	action_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	layout.add_child(action_bar)
+	var action_spacer := Control.new()
+	action_spacer.name = "SettlementActionSpacer"
+	action_spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	action_bar.add_child(action_spacer)
+	var hide_button := _icon_button("", _hide_settlement)
 	hide_button.name = "SettlementHideButton"
-	hide_button.custom_minimum_size = Vector2(132, WebUiTokens.touch_target_height())
-	layout.add_child(hide_button)
+	hide_button.custom_minimum_size = Vector2(WebUiTokens.touch_target_height(), WebUiTokens.touch_target_height())
+	var hide_icon := Label.new()
+	hide_icon.name = "SettlementHideIcon"
+	hide_icon.text = "×"
+	hide_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	hide_icon.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	hide_icon.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	hide_button.add_child(hide_icon)
+	action_bar.add_child(hide_button)
 
 	var card := PanelContainer.new()
 	card.name = "SettlementCard"

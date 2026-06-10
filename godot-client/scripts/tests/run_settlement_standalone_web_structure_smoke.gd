@@ -9,8 +9,12 @@ func _run() -> void:
 		_fail("RunSettlementScreen scene failed to load")
 		return
 	var screen = screen_scene.instantiate()
+	var fake_session := FakeSession.new()
+	root.add_child(fake_session)
 	root.add_child(screen)
 	await process_frame
+	if screen.has_method("bind_session"):
+		screen.call("bind_session", fake_session)
 	screen.call("set_payload", {"run": _settled_run()})
 	await process_frame
 
@@ -20,7 +24,9 @@ func _run() -> void:
 
 	for node_name in [
 		"SettlementPage",
+		"SettlementActionBar",
 		"SettlementHideButton",
+		"SettlementHideIcon",
 		"SettlementCard",
 		"SettlementIcon",
 		"SettlementTitle",
@@ -37,6 +43,27 @@ func _run() -> void:
 	]:
 		_assert_has(screen, node_name)
 
+	var hide_button := _find_by_name(screen, "SettlementHideButton") as Button
+	if hide_button == null:
+		_fail("Settlement hide button is missing")
+		return
+	hide_button.pressed.emit()
+	await process_frame
+	if screen.visible:
+		_fail("Settlement hide button should hide the settlement page like Web onHide")
+		return
+	screen.visible = true
+
+	var return_button := _find_by_name(screen, "ReturnLobbyButton") as Button
+	if return_button == null:
+		_fail("Settlement return button is missing")
+		return
+	return_button.pressed.emit()
+	await process_frame
+	if fake_session.opened_mode != "CASUAL":
+		_fail("ReturnLobbyButton must route back to the casual lobby")
+		return
+
 	var text := _collect_text(screen)
 	for part in ["跑局结束", "12", "2", "1202", "黄金 82", "铂金 16", "+34", "战斗数据看板", "返回大厅"]:
 		if not text.contains(part):
@@ -44,10 +71,18 @@ func _run() -> void:
 			return
 
 	screen.queue_free()
+	fake_session.queue_free()
 	for _frame in range(2):
 		await process_frame
 	print("Godot run settlement standalone Web structure smoke passed")
 	quit(0)
+
+class FakeSession:
+	extends Node
+	var opened_mode := ""
+
+	func open_run_lobby(mode := "CASUAL") -> void:
+		opened_mode = mode
 
 func _settled_run() -> Dictionary:
 	return {
