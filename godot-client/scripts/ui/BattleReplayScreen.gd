@@ -1028,7 +1028,7 @@ func _format_status_rows(rows: Dictionary) -> String:
 	return " · ".join(parts.slice(0, 5))
 
 func _format_status_entry(status: Dictionary) -> String:
-	var text := str(status.get("label", status.get("type", "状态")))
+	var text := _fallback(str(status.get("label", "")), _status_type_label(str(status.get("type", ""))))
 	var amount := int(status.get("amount", 0))
 	var stacks := int(status.get("stacks", 0))
 	var remaining := int(status.get("remaining", 0))
