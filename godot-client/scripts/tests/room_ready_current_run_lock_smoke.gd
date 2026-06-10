@@ -28,8 +28,9 @@ func _run() -> void:
 	await process_frame
 
 	_assert_enabled_button_contains(run_screen, "查看选中详情")
-	for part in ["出售选中装备", "合成升级选中", "刷新 1 金币", "匹配对手"]:
+	for part in ["出售选中装备", "合成升级选中", "匹配对手"]:
 		_assert_no_enabled_button_contains(run_screen, part)
+	_assert_reroll_button_locked_or_hidden(run_screen)
 
 	var offer_button := _find_button_contains(run_screen, "3点牙咬")
 	if offer_button == null:
@@ -102,11 +103,31 @@ func _assert_no_enabled_button_contains(root_node: Node, text: String) -> void:
 	if button != null and not button.disabled:
 		_fail("Button should be locked or hidden: %s" % button.text)
 
+func _assert_reroll_button_locked_or_hidden(root_node: Node) -> void:
+	var button := _find_by_name(root_node, "RerollButton") as Button
+	if button == null:
+		return
+	if not button.disabled:
+		_fail("RerollButton should be locked or hidden while room member is ready")
+		return
+	var price_tag := _find_by_name(root_node, "RerollPriceTag") as Label
+	if price_tag == null or price_tag.text != "1":
+		_fail("Locked RerollButton should keep the Web price tag value")
+
 func _find_button_contains(node: Node, text: String) -> Button:
 	if node is Button and (node as Button).text.contains(text):
 		return node as Button
 	for child in node.get_children():
 		var found := _find_button_contains(child, text)
+		if found != null:
+			return found
+	return null
+
+func _find_by_name(node: Node, node_name: String) -> Node:
+	if node.name == node_name:
+		return node
+	for child in node.get_children():
+		var found := _find_by_name(child, node_name)
 		if found != null:
 			return found
 	return null

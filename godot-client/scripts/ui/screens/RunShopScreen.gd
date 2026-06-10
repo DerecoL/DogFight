@@ -87,9 +87,10 @@ func _render_shop_shelf(parent: Node, run: Dictionary) -> void:
 	sell_zone.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	sell_zone.add_theme_stylebox_override("normal", WebUiTokens.resource_pill_style())
 	actions.add_child(sell_zone)
-	var reroll_button := _action_button("刷新 %d 金币" % int(run.get("refreshCost", 0)), _reroll_shop)
+	var reroll_button := _action_button("刷新", _reroll_shop)
 	reroll_button.name = "RerollButton"
 	reroll_button.disabled = action_in_progress or int(run.get("gold", 0)) < int(run.get("refreshCost", 0))
+	_add_reroll_price_tag(reroll_button, int(run.get("refreshCost", 0)))
 	actions.add_child(reroll_button)
 
 	var offer_row := VBoxContainer.new()
@@ -477,6 +478,29 @@ func _action_button(text: String, callback: Callable) -> Button:
 	button.add_theme_stylebox_override("pressed", WebUiTokens.handdrawn_button_pressed_style())
 	button.pressed.connect(callback)
 	return button
+
+func _add_reroll_price_tag(button: Button, refresh_cost: int) -> void:
+	button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	button.custom_minimum_size.x = max(button.custom_minimum_size.x, 124.0)
+	var tag := Label.new()
+	tag.name = "RerollPriceTag"
+	tag.text = str(refresh_cost)
+	tag.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	tag.custom_minimum_size = Vector2(36, 24)
+	tag.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	tag.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	tag.clip_text = true
+	tag.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	tag.anchor_left = 1.0
+	tag.anchor_right = 1.0
+	tag.anchor_top = 0.5
+	tag.anchor_bottom = 0.5
+	tag.offset_left = -44
+	tag.offset_right = -8
+	tag.offset_top = -12
+	tag.offset_bottom = 12
+	tag.add_theme_stylebox_override("normal", WebUiTokens.resource_pill_style())
+	button.add_child(tag)
 
 func _add_label(parent: Node, node_name: String, text: String, align := HORIZONTAL_ALIGNMENT_LEFT) -> Label:
 	var label := Label.new()

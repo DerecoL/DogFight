@@ -35,6 +35,7 @@ func _run() -> void:
 		"ShopActions",
 		"SellDropZone",
 		"RerollButton",
+		"RerollPriceTag",
 		"OfferRow",
 		"ShopCard_offer-1",
 		"ShopQualityChip_offer-1",
@@ -56,6 +57,8 @@ func _run() -> void:
 	if shop_card_button == null:
 		_fail("Legacy ShopCard root must be a clickable Button like Web ShopCard")
 		return
+	_assert_button_text(run_screen, "RerollButton", "刷新")
+	_assert_label_text(run_screen, "RerollPriceTag", "1")
 	var modal_layer = main.get_node_or_null("OverlayRoot/ModalLayer")
 	if modal_layer == null:
 		_fail("ModalLayer is missing")
@@ -93,6 +96,22 @@ func _run() -> void:
 func _assert_has(root_node: Node, node_name: String) -> void:
 	if _find_by_name(root_node, node_name) == null:
 		_fail("Missing run shop Web detail node: %s" % node_name)
+
+func _assert_button_text(root_node: Node, node_name: String, expected: String) -> void:
+	var button := _find_by_name(root_node, node_name) as Button
+	if button == null:
+		_fail("Missing run shop Web detail button: %s" % node_name)
+		return
+	if button.text != expected:
+		_fail("Run shop button %s should be %s, got %s" % [node_name, expected, button.text])
+
+func _assert_label_text(root_node: Node, node_name: String, expected: String) -> void:
+	var label := _find_by_name(root_node, node_name) as Label
+	if label == null:
+		_fail("Missing run shop Web detail label: %s" % node_name)
+		return
+	if label.text != expected:
+		_fail("Run shop label %s should be %s, got %s" % [node_name, expected, label.text])
 
 func _find_by_name(node: Node, node_name: String) -> Node:
 	if node.name == node_name:

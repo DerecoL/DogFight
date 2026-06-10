@@ -827,8 +827,9 @@ func _render_web_shop_run(run: Dictionary) -> void:
 	sell_zone.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	sell_zone.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	shop_actions.add_child(sell_zone)
-	var reroll_button := _run_action_button("刷新 %d 金币" % int(run.get("refreshCost", 0)), _call_session.bind("reroll_shop", []))
+	var reroll_button := _run_action_button("刷新", _call_session.bind("reroll_shop", []))
 	reroll_button.name = "RerollButton"
+	_add_reroll_price_tag(reroll_button, int(run.get("refreshCost", 0)))
 	shop_actions.add_child(reroll_button)
 	var offer_row := VBoxContainer.new()
 	offer_row.name = "OfferRow"
@@ -1840,7 +1841,10 @@ func _render_map_or_shop_detail(run: Dictionary) -> void:
 	var shop_card := _section("跑局商店")
 	var shop_type := str(run.get("shopType", "GENERAL"))
 	_add_line(shop_card, _shop_name(shop_type), _shop_description(shop_type))
-	shop_card.add_child(_run_action_button("刷新 %d 金币" % int(run.get("refreshCost", 0)), _call_session.bind("reroll_shop", [])))
+	var reroll_button := _run_action_button("刷新", _call_session.bind("reroll_shop", []))
+	reroll_button.name = "RerollButton"
+	_add_reroll_price_tag(reroll_button, int(run.get("refreshCost", 0)))
+	shop_card.add_child(reroll_button)
 	shop_card.add_child(_shop_progression_button(run))
 	_add_line(shop_card, "提示", "点击商品查看详情，确认后再购买。")
 	for offer in _array(run, "shopItems"):
@@ -6049,6 +6053,42 @@ func _run_action_button(text: String, handler: Callable) -> Button:
 	var button := _action_button(text, handler)
 	button.disabled = button.disabled or _room_current_run_action_locked()
 	return button
+
+func _add_reroll_price_tag(button: Button, refresh_cost: int) -> void:
+	button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	button.custom_minimum_size.x = max(button.custom_minimum_size.x, 124.0)
+	var tag := Label.new()
+	tag.name = "RerollPriceTag"
+	tag.text = str(refresh_cost)
+	tag.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	tag.custom_minimum_size = Vector2(36, 24)
+	tag.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	tag.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	tag.clip_text = true
+	tag.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	tag.anchor_left = 1.0
+	tag.anchor_right = 1.0
+	tag.anchor_top = 0.5
+	tag.anchor_bottom = 0.5
+	tag.offset_left = -44
+	tag.offset_right = -8
+	tag.offset_top = -12
+	tag.offset_bottom = 12
+	tag.add_theme_stylebox_override("normal", _reroll_price_tag_style())
+	tag.add_theme_color_override("font_color", UiTokens.ink_color())
+	button.add_child(tag)
+
+func _reroll_price_tag_style() -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(1.0, 0.96, 0.78, 0.98)
+	style.border_color = Color(0.34, 0.19, 0.09, 0.92)
+	style.set_border_width_all(1)
+	style.set_corner_radius_all(8)
+	style.content_margin_left = 6
+	style.content_margin_top = 2
+	style.content_margin_right = 6
+	style.content_margin_bottom = 2
+	return style
 
 func _disabled_action_button(text: String) -> Button:
 	var button := _button(text, 0)

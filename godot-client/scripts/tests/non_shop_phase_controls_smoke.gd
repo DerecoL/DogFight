@@ -16,6 +16,8 @@ func _run() -> void:
 	if run_screen == null:
 		_fail("RunScreen is missing")
 		return
+	if run_screen.has_method("bind_session"):
+		run_screen.bind_session(main)
 	if not main.has_method("set_current_run"):
 		_fail("Main session does not expose set_current_run")
 		return
@@ -26,7 +28,7 @@ func _run() -> void:
 		run_screen.call("_render_current_tab")
 		await process_frame
 		var text := _collect_text(run_screen)
-		if text.contains("跑局商店") or text.contains("刷新跑局商店") or text.contains("刷新 0 金币"):
+		if text.contains("跑局商店") or text.contains("刷新跑局商店") or _find_by_name(run_screen, "RerollButton") != null or _find_by_name(run_screen, "RerollPriceTag") != null:
 			_fail("Phase %s must not expose shop controls outside the SHOP phase" % phase)
 			return
 
@@ -34,10 +36,11 @@ func _run() -> void:
 	run_screen.set("current_tab", "跑局")
 	run_screen.call("_render_current_tab")
 	await process_frame
-	var shop_text := _collect_text(run_screen)
-	if not shop_text.contains("跑局商店") or not shop_text.contains("刷新 1 金币"):
+	if _find_by_name(run_screen, "RerollButton") == null or _find_by_name(run_screen, "RerollPriceTag") == null:
 		_fail("SHOP phase should expose shop controls")
 		return
+	_assert_button_text(run_screen, "RerollButton", "刷新")
+	_assert_label_text(run_screen, "RerollPriceTag", "1")
 
 	main.queue_free()
 	for _frame in range(5):
@@ -91,6 +94,31 @@ func _collect_text(node: Node) -> String:
 	for child in node.get_children():
 		text += _collect_text(child)
 	return text
+
+func _assert_button_text(root_node: Node, node_name: String, expected: String) -> void:
+	var button := _find_by_name(root_node, node_name) as Button
+	if button == null:
+		_fail("Missing non-shop phase button: %s" % node_name)
+		return
+	if button.text != expected:
+		_fail("Non-shop phase button %s should be %s, got %s" % [node_name, expected, button.text])
+
+func _assert_label_text(root_node: Node, node_name: String, expected: String) -> void:
+	var label := _find_by_name(root_node, node_name) as Label
+	if label == null:
+		_fail("Missing non-shop phase label: %s" % node_name)
+		return
+	if label.text != expected:
+		_fail("Non-shop phase label %s should be %s, got %s" % [node_name, expected, label.text])
+
+func _find_by_name(node: Node, node_name: String) -> Node:
+	if node.name == node_name:
+		return node
+	for child in node.get_children():
+		var found := _find_by_name(child, node_name)
+		if found != null:
+			return found
+	return null
 
 func _fail(message: String) -> void:
 	push_error(message)

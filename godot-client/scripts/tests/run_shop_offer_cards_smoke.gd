@@ -25,8 +25,10 @@ func _run() -> void:
 	run_screen.set("current_tab", "跑局")
 	run_screen.call("_render_current_tab")
 	await process_frame
+	_assert_button_text(run_screen, "RerollButton", "刷新")
+	_assert_label_text(run_screen, "RerollPriceTag", "1")
 	var text := _collect_text(run_screen)
-	for part in ["跑局商店", "装备店", "点击商品查看详情，确认后再购买。", "刷新 1 金币", "已拥有 x2", "价格 7 · 8折", "金币不足，还差 3 金币", "造成 5 点伤害"]:
+	for part in ["跑局商店", "装备店", "点击商品查看详情，确认后再购买。", "刷新", "已拥有 x2", "价格 7 · 8折", "金币不足，还差 3 金币", "造成 5 点伤害"]:
 		if not text.contains(str(part)):
 			_fail("Run shop offer card missing: %s" % str(part))
 			return
@@ -89,6 +91,31 @@ func _collect_text(node: Node) -> String:
 	for child in node.get_children():
 		text += _collect_text(child)
 	return text
+
+func _assert_button_text(root_node: Node, node_name: String, expected: String) -> void:
+	var button := _find_by_name(root_node, node_name) as Button
+	if button == null:
+		_fail("Missing run shop offer button: %s" % node_name)
+		return
+	if button.text != expected:
+		_fail("Run shop offer button %s should be %s, got %s" % [node_name, expected, button.text])
+
+func _assert_label_text(root_node: Node, node_name: String, expected: String) -> void:
+	var label := _find_by_name(root_node, node_name) as Label
+	if label == null:
+		_fail("Missing run shop offer label: %s" % node_name)
+		return
+	if label.text != expected:
+		_fail("Run shop offer label %s should be %s, got %s" % [node_name, expected, label.text])
+
+func _find_by_name(node: Node, node_name: String) -> Node:
+	if node.name == node_name:
+		return node
+	for child in node.get_children():
+		var found := _find_by_name(child, node_name)
+		if found != null:
+			return found
+	return null
 
 func _fail(message: String) -> void:
 	push_error(message)

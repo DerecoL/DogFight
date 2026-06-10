@@ -31,6 +31,7 @@ func _run() -> void:
 		"ShopActions",
 		"SellDropZone",
 		"RerollButton",
+		"RerollPriceTag",
 		"OfferRow",
 		"ShopCard_offer-1",
 		"ShopQualityChip_offer-1",
@@ -80,6 +81,8 @@ func _run() -> void:
 	if offer_icon == null or offer_icon.texture == null:
 		_fail("Shop offer art must render the Web ItemArt sticker texture")
 		return
+	_assert_button_text(screen, "RerollButton", "刷新")
+	_assert_label_text(screen, "RerollPriceTag", "1")
 	shop_card_button.pressed.emit()
 	await process_frame
 	for node_name in [
@@ -190,7 +193,7 @@ func _run() -> void:
 		"装备店",
 		"点击商品查看详情，确认后再购买。",
 		"拖到这里出售",
-		"刷新 1 金币",
+		"刷新",
 		"白银",
 		"已拥有 x2",
 		"1点牙咬",
@@ -302,6 +305,22 @@ func _item(id: String, def_id: String, area: String, x: int) -> Dictionary:
 func _assert_has(root_node: Node, node_name: String) -> void:
 	if _find_by_name(root_node, node_name) == null:
 		_fail("Missing standalone run shop Web node: %s" % node_name)
+
+func _assert_button_text(root_node: Node, node_name: String, expected: String) -> void:
+	var button := _find_by_name(root_node, node_name) as Button
+	if button == null:
+		_fail("Missing standalone run shop Web button: %s" % node_name)
+		return
+	if button.text != expected:
+		_fail("Standalone run shop button %s should be %s, got %s" % [node_name, expected, button.text])
+
+func _assert_label_text(root_node: Node, node_name: String, expected: String) -> void:
+	var label := _find_by_name(root_node, node_name) as Label
+	if label == null:
+		_fail("Missing standalone run shop Web label: %s" % node_name)
+		return
+	if label.text != expected:
+		_fail("Standalone run shop label %s should be %s, got %s" % [node_name, expected, label.text])
 
 func _find_by_name(node: Node, node_name: String) -> Node:
 	if node.name == node_name:
