@@ -46,6 +46,7 @@ func _run() -> void:
 		"MatchButton",
 		"InventoryBoard",
 		"EquipmentGridPanel",
+		"BagRelicRow",
 		"RelicRail",
 		"RelicRailTitle",
 		"RelicSlot_0",
@@ -61,6 +62,10 @@ func _run() -> void:
 	var workbench = _find_by_name(screen, "ShopWorkbench")
 	if not workbench is HBoxContainer:
 		_fail("ShopWorkbench must use a horizontal workbench matching the Web shop layout")
+		return
+	var bag_relic_row = _find_by_name(screen, "BagRelicRow")
+	if not bag_relic_row is HBoxContainer:
+		_fail("BagRelicRow must lay out relic rail and bag grid side by side like Web InventoryBoard")
 		return
 	var offer_button := _find_by_name(screen, "ShopCardArt_offer-1") as Button
 	if offer_button == null:
