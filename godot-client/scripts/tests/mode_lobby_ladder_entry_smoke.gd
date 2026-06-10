@@ -1,8 +1,88 @@
 extends SceneTree
 
+const ApiClientScript := preload("res://scripts/api/ApiClient.gd")
+
+class FakeApi:
+	extends ApiClientScript
+
+	var users: Dictionary = {}
+	var current_account := ""
+
+	func post_json(path: String, body: Dictionary = {}) -> Dictionary:
+		var response := _response_for_post(path, body)
+		request_finished.emit(path, bool(response.get("ok", false)), int(response.get("status", 0)), response)
+		return response
+
+	func get_json(path: String) -> Dictionary:
+		var response := _response_for_get(path)
+		request_finished.emit(path, bool(response.get("ok", false)), int(response.get("status", 0)), response)
+		return response
+
+	func _response_for_post(path: String, body: Dictionary) -> Dictionary:
+		match path:
+			"/auth/register":
+				var account := str(body.get("account", ""))
+				var user := {"id": "user-%s" % account, "account": account, "nickname": null}
+				users[account] = user
+				current_account = account
+				return _ok({"user": user.duplicate(true), "needsNickname": true})
+			"/profile/nickname":
+				if current_account.is_empty() or not users.has(current_account):
+					return _error("No active user")
+				var user: Dictionary = users[current_account]
+				user["nickname"] = str(body.get("nickname", ""))
+				users[current_account] = user
+				return _ok({"user": user.duplicate(true), "needsNickname": false})
+			"/runs":
+				return _ok({"run": _new_run(str(body.get("dogType", "SHIBA")), str(body.get("mode", "LADDER")))})
+			_:
+				return _ok({})
+
+	func _response_for_get(path: String) -> Dictionary:
+		match path:
+			"/me":
+				if current_account.is_empty() or not users.has(current_account):
+					return _error("Not logged in")
+				var user: Dictionary = users[current_account]
+				return _ok({"user": user.duplicate(true), "needsNickname": _needs_nickname(user), "activeRun": null})
+			"/runs/history":
+				return _ok({"history": {"runs": [], "stats": {"totalRuns": 0, "wins": 0, "losses": 0}}, "seasonSummaries": []})
+			"/ladder/me":
+				return _ok({"profile": {"tierLabel": "青铜", "score": 0}, "leaderboard": [], "bestRun": null})
+			"/ladder/leaderboard":
+				return _ok({"leaderboard": []})
+			_:
+				return _ok({})
+
+	func _new_run(dog_type: String, mode: String) -> Dictionary:
+		return {
+			"id": "ladder-entry-run",
+			"mode": mode,
+			"phase": "PREP",
+			"status": "ACTIVE",
+			"dogType": dog_type,
+			"round": 1,
+			"wins": 0,
+			"losses": 0,
+			"gold": 10,
+			"items": [],
+			"relics": [],
+			"shopItems": [],
+		}
+
+	func _needs_nickname(user: Dictionary) -> bool:
+		return user.get("nickname", null) == null or str(user.get("nickname", "")).strip_edges().is_empty()
+
+	func _ok(data: Dictionary) -> Dictionary:
+		return {"ok": true, "status": 200, "error": "", "data": data}
+
+	func _error(message: String) -> Dictionary:
+		return {"ok": false, "status": 400, "error": message, "data": {}}
+
 var main_node: Node
 var seen_paths: Dictionary = {}
 var seen_responses: Dictionary = {}
+var fake_api_node: FakeApi
 
 func _init() -> void:
 	_run()
@@ -56,17 +136,20 @@ func _run() -> void:
 			_run_store_debug(main),
 		])
 		return
-	if str(router.get("current_screen_id")) != "legacy_run":
-		_fail("Created ladder run should stay in playable run shell")
+	if str(router.get("current_screen_id")) != "run_shell":
+		_fail("Created ladder run should show standalone run_shell, got %s" % str(router.get("current_screen_id")))
 		return
 	if main.get_node_or_null("ScreenRoot/ModeLobbyScreen").visible:
 		_fail("Created ladder run must hide ModeLobbyScreen")
 		return
-	var legacy = main.get_node_or_null("ScreenRoot/LegacyRunScreen")
-	if legacy == null or not legacy.visible:
-		_fail("Created ladder run must show LegacyRunScreen")
+	var run_shell = main.get_node_or_null("ScreenRoot/RunShellScreen")
+	if run_shell == null or not run_shell.visible:
+		_fail("Created ladder run must show RunShellScreen")
 		return
-	if legacy.find_child("PlaceholderPanel", true, false) != null:
+	if run_shell.find_child("MatchPanel", true, false) == null:
+		_fail("Created ladder run must render Web run shell content")
+		return
+	if run_shell.find_child("PlaceholderPanel", true, false) != null:
 		_fail("Created ladder run must not show placeholder content")
 		return
 
@@ -86,7 +169,11 @@ func _new_logged_in_main(account_prefix: String, nickname: String) -> Node:
 	root.add_child(main)
 	await process_frame
 	await process_frame
-	var api = main.get("api")
+	var fake_api := FakeApi.new()
+	fake_api_node = fake_api
+	main.set("api", fake_api)
+	main.add_child(fake_api)
+	var api = fake_api
 	if api == null or not api.has_signal("request_finished"):
 		_fail("Main API client must emit request_finished")
 		return null

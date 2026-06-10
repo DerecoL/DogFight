@@ -52,6 +52,19 @@ func _run() -> void:
 	if grid.columns != 2:
 		_fail("ModeGrid must keep the Web two-column card grid")
 		return
+	for mode_id in ["CASUAL", "LADDER", "DOGFIGHT", "PEAK"]:
+		for child_name in [
+			"ModeCard_%s" % mode_id,
+			"ModeIcon_%s" % mode_id,
+			"ModeCopy_%s" % mode_id,
+			"ModeTitle_%s" % mode_id,
+			"ModeDescription_%s" % mode_id,
+		]:
+			if screen.find_child(child_name, true, false) == null:
+				_fail("ModeLobby mode card must mirror Web child: %s" % child_name)
+				return
+	for button_name in ["CasualModeButton", "LadderModeButton", "DogfightModeButton", "PeakModeButton"]:
+		_assert_mode_action_button(screen, button_name)
 
 	var text := _collect_text(screen)
 	for part in [
@@ -110,6 +123,15 @@ func _collect_text(node: Node) -> String:
 	for child in node.get_children():
 		text += _collect_text(child)
 	return text
+
+func _assert_mode_action_button(root_node: Node, node_name: String) -> void:
+	var node := root_node.find_child(node_name, true, false)
+	if not node is Button:
+		_fail("%s should be a Web mode-action Button" % node_name)
+		return
+	var button := node as Button
+	if button.text.contains("\n"):
+		_fail("%s should only contain Web action text, got multiline card text" % node_name)
 
 func _fail(message: String) -> void:
 	push_error(message)

@@ -270,15 +270,74 @@ func _add_history_shortcut(parent: Node, node_name: String, text: String, screen
 	parent.add_child(_track_action_button(button))
 
 func _add_mode_button(parent: Node, node_name: String, title: String, detail: String, action_label: String, action: Callable) -> Button:
+	var mode_id := node_name.replace("ModeButton", "").to_upper()
+	var card := PanelContainer.new()
+	card.name = "ModeCard_%s" % mode_id
+	card.custom_minimum_size = Vector2(0, 128)
+	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	card.add_theme_stylebox_override("panel", WebUiTokens.paper_card_style())
+	parent.add_child(card)
+
+	var margin := MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", 12)
+	margin.add_theme_constant_override("margin_top", 10)
+	margin.add_theme_constant_override("margin_right", 12)
+	margin.add_theme_constant_override("margin_bottom", 10)
+	card.add_child(margin)
+
+	var content := VBoxContainer.new()
+	content.name = "ModeCardContent_%s" % mode_id
+	content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	content.add_theme_constant_override("separation", 8)
+	margin.add_child(content)
+
+	var icon := Label.new()
+	icon.name = "ModeIcon_%s" % mode_id
+	icon.text = _mode_icon_text(mode_id)
+	icon.custom_minimum_size = Vector2(0, 30)
+	icon.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	content.add_child(icon)
+
+	var copy := VBoxContainer.new()
+	copy.name = "ModeCopy_%s" % mode_id
+	copy.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	copy.add_theme_constant_override("separation", 4)
+	content.add_child(copy)
+
+	var title_label := Label.new()
+	title_label.name = "ModeTitle_%s" % mode_id
+	title_label.text = title
+	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	copy.add_child(title_label)
+
+	var detail_label := Label.new()
+	detail_label.name = "ModeDescription_%s" % mode_id
+	detail_label.text = detail
+	detail_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	detail_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	copy.add_child(detail_label)
+
 	var button := Button.new()
 	button.name = node_name
-	button.text = "%s\n%s\n%s" % [title, detail, action_label]
-	button.custom_minimum_size = Vector2(0, 106)
+	button.text = action_label
+	button.custom_minimum_size = Vector2(0, WebUiTokens.touch_target_height())
 	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	button.pressed.connect(action)
-	parent.add_child(_track_action_button(button))
+	content.add_child(_track_action_button(button))
 	return button
+
+func _mode_icon_text(mode_id: String) -> String:
+	match mode_id:
+		"CASUAL":
+			return "🎮"
+		"LADDER":
+			return "🏅"
+		"DOGFIGHT":
+			return "📡"
+		"PEAK":
+			return "👑"
+		_:
+			return "●"
 
 func _track_action_button(button: Button) -> Button:
 	action_buttons.append(button)
@@ -309,17 +368,9 @@ func _refresh_content() -> void:
 			int(run.get("round", 0)),
 		]
 	if casual_button != null:
-		casual_button.text = "%s\n%s\n%s" % [
-			"休闲模式",
-			"当前经典构筑、商店、匹配和自动战斗流程",
-			"继续休闲模式" if str(run.get("mode", "")) == "CASUAL" else "开始休闲模式",
-		]
+		casual_button.text = "继续休闲模式" if str(run.get("mode", "")) == "CASUAL" else "开始休闲模式"
 	if ladder_button != null:
-		ladder_button.text = "%s\n%s\n%s" % [
-			"天梯模式",
-			"按整局表现结算积分，冲击大师与犬王排行榜",
-			"继续天梯模式" if str(run.get("mode", "")) == "LADDER" else "进入天梯模式",
-		]
+		ladder_button.text = "继续天梯模式" if str(run.get("mode", "")) == "LADDER" else "进入天梯模式"
 	_refresh_history_panel()
 
 func _refresh_history_panel() -> void:

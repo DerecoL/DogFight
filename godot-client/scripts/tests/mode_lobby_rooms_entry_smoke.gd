@@ -1,7 +1,69 @@
 extends SceneTree
 
+const ApiClientScript := preload("res://scripts/api/ApiClient.gd")
+
+class FakeApi:
+	extends ApiClientScript
+
+	var users: Dictionary = {}
+	var current_account := ""
+
+	func post_json(path: String, body: Dictionary = {}) -> Dictionary:
+		var response := _response_for_post(path, body)
+		request_finished.emit(path, bool(response.get("ok", false)), int(response.get("status", 0)), response)
+		return response
+
+	func get_json(path: String) -> Dictionary:
+		var response := _response_for_get(path)
+		request_finished.emit(path, bool(response.get("ok", false)), int(response.get("status", 0)), response)
+		return response
+
+	func _response_for_post(path: String, body: Dictionary) -> Dictionary:
+		match path:
+			"/auth/register":
+				var account := str(body.get("account", ""))
+				var user := {"id": "user-%s" % account, "account": account, "nickname": null}
+				users[account] = user
+				current_account = account
+				return _ok({"user": user.duplicate(true), "needsNickname": true})
+			"/profile/nickname":
+				if current_account.is_empty() or not users.has(current_account):
+					return _error("No active user")
+				var user: Dictionary = users[current_account]
+				user["nickname"] = str(body.get("nickname", ""))
+				users[current_account] = user
+				return _ok({"user": user.duplicate(true), "needsNickname": false})
+			_:
+				return _ok({})
+
+	func _response_for_get(path: String) -> Dictionary:
+		match path:
+			"/me":
+				if current_account.is_empty() or not users.has(current_account):
+					return _error("Not logged in")
+				var user: Dictionary = users[current_account]
+				return _ok({"user": user.duplicate(true), "needsNickname": _needs_nickname(user), "activeRun": null})
+			"/runs/history":
+				return _ok({"history": {"runs": [], "stats": {"totalRuns": 0, "wins": 0, "losses": 0}}, "seasonSummaries": []})
+			"/ladder/me":
+				return _ok({"profile": {}, "leaderboard": [], "bestRun": null})
+			"/dogfight/rooms":
+				return _ok({"rooms": [], "activeRoom": null})
+			_:
+				return _ok({})
+
+	func _needs_nickname(user: Dictionary) -> bool:
+		return user.get("nickname", null) == null or str(user.get("nickname", "")).strip_edges().is_empty()
+
+	func _ok(data: Dictionary) -> Dictionary:
+		return {"ok": true, "status": 200, "error": "", "data": data}
+
+	func _error(message: String) -> Dictionary:
+		return {"ok": false, "status": 400, "error": message, "data": {}}
+
 var seen_paths: Dictionary = {}
 var main_node: Node
+var fake_api_node: FakeApi
 
 func _init() -> void:
 	_run()
@@ -73,7 +135,11 @@ func _new_logged_in_main() -> Node:
 	root.add_child(main)
 	await process_frame
 	await process_frame
-	var api = main.get("api")
+	var fake_api := FakeApi.new()
+	fake_api_node = fake_api
+	main.set("api", fake_api)
+	main.add_child(fake_api)
+	var api = fake_api
 	if api == null or not api.has_signal("request_finished"):
 		_fail("Main API client must emit request_finished")
 		return null
