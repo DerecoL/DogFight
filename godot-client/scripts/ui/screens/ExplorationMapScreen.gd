@@ -344,9 +344,15 @@ func _render_map_reward_preview(parent: VBoxContainer, rewards: Array) -> void:
 
 func _render_inventory_board(parent: VBoxContainer, run: Dictionary) -> void:
 	_render_grid_panel(parent, "EquipmentGridPanel", "装备格", "EQUIPMENT", run)
-	_render_grid_panel(parent, "BagGridPanel", "背包", "BAG", run)
+	var bag_relic_row := HBoxContainer.new()
+	bag_relic_row.name = "BagRelicRow"
+	bag_relic_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	bag_relic_row.add_theme_constant_override("separation", 10)
+	parent.add_child(bag_relic_row)
+	_render_relic_rail(bag_relic_row, run)
+	_render_grid_panel(bag_relic_row, "BagGridPanel", "背包", "BAG", run)
 
-func _render_grid_panel(parent: VBoxContainer, node_name: String, title: String, area: String, run: Dictionary) -> void:
+func _render_grid_panel(parent: Node, node_name: String, title: String, area: String, run: Dictionary) -> void:
 	var panel := VBoxContainer.new()
 	panel.name = node_name
 	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -365,6 +371,27 @@ func _render_grid_panel(parent: VBoxContainer, node_name: String, title: String,
 			button.name = "%sItem_%s" % [node_name, str(item.get("id", ""))]
 			button.custom_minimum_size = Vector2(90, 52)
 			item_line.add_child(button)
+
+func _render_relic_rail(parent: Node, run: Dictionary) -> void:
+	var rail := VBoxContainer.new()
+	rail.name = "RelicRail"
+	rail.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	rail.add_theme_constant_override("separation", 4)
+	parent.add_child(rail)
+	_add_label(rail, "RelicRailTitle", "遗物")
+	var row := HBoxContainer.new()
+	row.name = "RelicRailItems"
+	row.add_theme_constant_override("separation", 6)
+	rail.add_child(row)
+	var relics := _array(run, "relics")
+	for slot in range(6):
+		var relic: Dictionary = relics[slot] if slot < relics.size() and relics[slot] is Dictionary else {}
+		var def: Dictionary = _dict(relic, "def")
+		var button := _action_button(_fallback(str(def.get("name", "")), "遗物槽 %d" % (slot + 1)), _noop)
+		button.name = "RelicSlot_%d" % slot
+		button.custom_minimum_size = Vector2(74, 42)
+		button.disabled = relic.is_empty()
+		row.add_child(button)
 
 func _render_selected_item_tip(parent: VBoxContainer, run: Dictionary) -> void:
 	var item := _selected_item(run)

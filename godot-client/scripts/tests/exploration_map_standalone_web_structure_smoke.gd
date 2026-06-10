@@ -51,6 +51,10 @@ func _run() -> void:
 		"MapRewardPreviewLinks",
 		"MapRewardInventory",
 		"InventoryBoard",
+		"EquipmentGridPanel",
+		"BagRelicRow",
+		"RelicRail",
+		"BagGridPanel",
 	]:
 		_assert_has(screen, node_name)
 
@@ -61,6 +65,10 @@ func _run() -> void:
 	var route_board = _find_by_name(screen, "ExplorationMapRouteBoard")
 	if not route_board is HBoxContainer:
 		_fail("ExplorationMapRouteBoard must use the Web two-column map layout")
+		return
+	var bag_relic_row = _find_by_name(screen, "BagRelicRow")
+	if not bag_relic_row is HBoxContainer:
+		_fail("ExplorationMap BagRelicRow must lay out relic rail and bag grid side by side like Web InventoryBoard")
 		return
 	var text := _collect_text(screen)
 	for part in [
