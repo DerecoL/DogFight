@@ -1,6 +1,14 @@
 extends BaseWebScreen
 
 const WebUiTokens := preload("res://scripts/ui/web/WebUiTokens.gd")
+const DOG_ASSETS := {
+	"SHIBA": "res://assets/dogs/shiba.webp",
+	"SAMOYED": "res://assets/dogs/samoyed.webp",
+	"MUTT": "res://assets/dogs/mutt.webp",
+	"BULLY": "res://assets/dogs/bully.webp",
+	"EMPEROR": "res://assets/dogs/emperor.webp",
+	"FROG": "res://assets/dogs/zuling.jpg",
+}
 
 var apex_data: Dictionary = {}
 var content_box: VBoxContainer
@@ -133,6 +141,8 @@ func _render_apex_candidate(parent: VBoxContainer, candidate: Dictionary) -> voi
 	row.add_theme_constant_override("separation", 10)
 	parent.add_child(row)
 
+	row.add_child(_dog_badge("ApexCandidate", run_id, str(candidate.get("dogType", ""))))
+
 	var text_box := VBoxContainer.new()
 	text_box.name = "ApexCandidateText_%s" % run_id
 	text_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -187,6 +197,8 @@ func _render_apex_rank_entry(parent: VBoxContainer, entry: Dictionary) -> void:
 	rank_label.custom_minimum_size = Vector2(72, 0)
 	rank_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	row.add_child(rank_label)
+
+	row.add_child(_dog_badge("ApexRank", entry_id, str(entry.get("dogType", ""))))
 
 	var text_box := VBoxContainer.new()
 	text_box.name = "ApexRankText_%s" % entry_id
@@ -244,6 +256,21 @@ func _plain_button(text: String, width: int) -> Button:
 	button.add_theme_stylebox_override("pressed", WebUiTokens.handdrawn_button_pressed_style())
 	return button
 
+func _dog_badge(prefix: String, id: String, dog_type: String) -> CenterContainer:
+	var badge := CenterContainer.new()
+	badge.name = "%sDogBadge_%s" % [prefix, id]
+	badge.custom_minimum_size = Vector2(48, 48)
+	badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var avatar := TextureRect.new()
+	avatar.name = "%sAvatar_%s" % [prefix, id]
+	avatar.custom_minimum_size = Vector2(44, 44)
+	avatar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	avatar.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
+	avatar.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	avatar.texture = _dog_texture(dog_type)
+	badge.add_child(avatar)
+	return badge
+
 func _add_label(parent: Node, node_name: String, text: String, align := HORIZONTAL_ALIGNMENT_LEFT) -> Label:
 	var label := Label.new()
 	label.name = node_name
@@ -282,6 +309,12 @@ func _apex_rank_text(rank_value) -> String:
 
 func _apex_run_summary_label(run_like: Dictionary) -> String:
 	return "%s  %d胜%d负 第%d回合 · 遗物 %d · 装备 %d" % [_dog_name(str(run_like.get("dogType", ""))), int(run_like.get("wins", 0)), int(run_like.get("losses", 0)), int(run_like.get("round", 0)), _array(run_like, "relics").size(), _array(run_like, "items").size()]
+
+func _dog_texture(dog_type: String) -> Texture2D:
+	var path := str(DOG_ASSETS.get(dog_type, ""))
+	if path.is_empty():
+		return null
+	return load(path) as Texture2D
 
 func _dog_name(dog_type: String) -> String:
 	match dog_type:

@@ -39,6 +39,8 @@ func _run() -> void:
 		"ApexCandidates",
 		"ApexCandidateList",
 		"ApexCandidate_candidate-1",
+		"ApexCandidateDogBadge_candidate-1",
+		"ApexCandidateAvatar_candidate-1",
 		"ApexSubmit_candidate-1",
 		"ApexLeaderboard",
 		"ApexTabs",
@@ -46,9 +48,17 @@ func _run() -> void:
 		"ApexTab_daily",
 		"ApexRankList",
 		"ApexRankEntry_overall-1",
+		"ApexRankDogBadge_overall-1",
+		"ApexRankAvatar_overall-1",
 		"ApexConfig_overall-1",
 	]:
 		_assert_has(screen, node_name)
+
+	for avatar_name in ["ApexCandidateAvatar_candidate-1", "ApexRankAvatar_overall-1"]:
+		var avatar := _find_by_name(screen, avatar_name) as TextureRect
+		if avatar == null or avatar.texture == null:
+			_fail("Apex Web DogBadge avatar missing texture: %s" % avatar_name)
+			return
 
 	var layout = _find_by_name(screen, "ApexLayout")
 	if not layout is GridContainer:
