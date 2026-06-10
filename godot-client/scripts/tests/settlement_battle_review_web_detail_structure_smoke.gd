@@ -21,6 +21,8 @@ func _run() -> void:
 		"BattleReviewSideGrid",
 		"BattleReviewPlayer",
 		"BattleReviewPlayerHeader",
+		"BattleReviewPlayerSideLabel",
+		"BattleReviewPlayerResultLabel",
 		"BattleReviewPlayerMetrics",
 		"BattleReviewPlayerMetricDamage",
 		"BattleReviewPlayerMetricHealing",
@@ -30,6 +32,8 @@ func _run() -> void:
 		"BattleReviewPlayerTopItem",
 		"BattleReviewOpponent",
 		"BattleReviewOpponentHeader",
+		"BattleReviewOpponentSideLabel",
+		"BattleReviewOpponentResultLabel",
 		"BattleReviewOpponentMetrics",
 		"BattleReviewOpponentMetricDamage",
 		"BattleReviewOpponentMetricHealing",
@@ -39,6 +43,12 @@ func _run() -> void:
 		"BattleReviewOpponentTopItem",
 	]:
 		_assert_has(screen, node_name)
+
+	_assert_grid_columns(screen, "BattleReviewSideGrid", 2)
+	_assert_grid_columns(screen, "BattleReviewPlayerMetrics", 2)
+	_assert_grid_columns(screen, "BattleReviewOpponentMetrics", 2)
+	_assert_label_text(screen, "BattleReviewPlayerResultLabel", "Hero")
+	_assert_label_text(screen, "BattleReviewOpponentResultLabel", "Rival")
 
 	var text := _collect_text(screen)
 	for part in [
@@ -125,6 +135,24 @@ func _item(id: String, name: String) -> Dictionary:
 func _assert_has(root_node: Node, node_name: String) -> void:
 	if _find_by_name(root_node, node_name) == null:
 		_fail("Missing settlement battle review Web detail node: %s" % node_name)
+
+func _assert_grid_columns(root_node: Node, node_name: String, expected_columns: int) -> void:
+	var node := _find_by_name(root_node, node_name)
+	if not node is GridContainer:
+		_fail("%s should mirror Web grid structure with GridContainer" % node_name)
+		return
+	var grid := node as GridContainer
+	if grid.columns != expected_columns:
+		_fail("%s should have %d columns, got %d" % [node_name, expected_columns, grid.columns])
+
+func _assert_label_text(root_node: Node, node_name: String, expected_text: String) -> void:
+	var node := _find_by_name(root_node, node_name)
+	if not node is Label:
+		_fail("%s should be a Label" % node_name)
+		return
+	var label := node as Label
+	if label.text != expected_text:
+		_fail("%s should match Web text '%s', got '%s'" % [node_name, expected_text, label.text])
 
 func _find_by_name(node: Node, node_name: String) -> Node:
 	if node.name == node_name:

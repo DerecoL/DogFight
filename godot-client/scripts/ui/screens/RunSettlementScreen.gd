@@ -145,15 +145,17 @@ func _render_battle_review_dashboard(parent: VBoxContainer, battle: Dictionary) 
 	var stats := _battle_review_stats(battle)
 	if int(stats.get("systemDamage", 0)) > 0:
 		_add_label(heading, "BattleReviewSystemDamageTag", "系统伤害 %d" % int(stats.get("systemDamage", 0)), HORIZONTAL_ALIGNMENT_RIGHT)
-	var grid := HBoxContainer.new()
+	var grid := GridContainer.new()
 	grid.name = "BattleReviewSideGrid"
+	grid.columns = 2
 	grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	grid.add_theme_constant_override("separation", 8)
+	grid.add_theme_constant_override("h_separation", 10)
+	grid.add_theme_constant_override("v_separation", 10)
 	dashboard.add_child(grid)
 	_render_battle_review_side(grid, "BattleReviewPlayer", "我方", stats["player"])
 	_render_battle_review_side(grid, "BattleReviewOpponent", "对手", stats["opponent"])
 
-func _render_battle_review_side(parent: HBoxContainer, node_name: String, label: String, stats: Dictionary) -> void:
+func _render_battle_review_side(parent: Node, node_name: String, label: String, stats: Dictionary) -> void:
 	var card := VBoxContainer.new()
 	card.name = node_name
 	card.custom_minimum_size = Vector2(220, 0)
@@ -161,10 +163,16 @@ func _render_battle_review_side(parent: HBoxContainer, node_name: String, label:
 	card.add_theme_constant_override("separation", 6)
 	card.add_theme_stylebox_override("normal", WebUiTokens.resource_pill_style())
 	parent.add_child(card)
-	_add_label(card, "%sHeader" % node_name, "%s · %s" % [label, str(stats.get("label", "平局"))])
+	var header := HBoxContainer.new()
+	header.name = "%sHeader" % node_name
+	header.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	header.add_theme_constant_override("separation", 8)
+	card.add_child(header)
+	_add_label(header, "%sSideLabel" % node_name, label)
+	_add_label(header, "%sResultLabel" % node_name, str(stats.get("label", label)), HORIZONTAL_ALIGNMENT_RIGHT)
 	var metrics := GridContainer.new()
 	metrics.name = "%sMetrics" % node_name
-	metrics.columns = 5
+	metrics.columns = 2
 	metrics.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	metrics.add_theme_constant_override("h_separation", 6)
 	metrics.add_theme_constant_override("v_separation", 6)
@@ -284,7 +292,7 @@ func _new_review_side(side: String, snapshot: Dictionary, result: String) -> Dic
 				item_names[item_id] = _snapshot_item_name(item)
 	return {
 		"side": side,
-		"label": "%s · %s" % [_fallback(str(snapshot.get("name", "")), "我方" if side == "player" else "对手"), result],
+		"label": _fallback(str(snapshot.get("name", "")), "我方" if side == "player" else "对手"),
 		"damage": 0,
 		"healing": 0,
 		"shield": 0,
