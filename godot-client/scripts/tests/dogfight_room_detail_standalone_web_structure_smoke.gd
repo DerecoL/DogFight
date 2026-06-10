@@ -8,9 +8,13 @@ func _run() -> void:
 	if scene == null:
 		_fail("DogfightRoomDetailScreen scene failed to load")
 		return
+	var fake_session := FakeSession.new()
 	var screen = scene.instantiate()
+	root.add_child(fake_session)
 	root.add_child(screen)
 	await process_frame
+	if screen.has_method("bind_session"):
+		screen.call("bind_session", fake_session)
 	if screen.has_method("set_payload"):
 		screen.call("set_payload", {"dogfightRoomData": _sample_room()})
 	await process_frame
@@ -85,11 +89,57 @@ func _run() -> void:
 			_fail("Standalone dogfight room detail Web text missing: %s" % part)
 			return
 
+	var battle_row = _find_by_name(screen, "DogfightBattleRow_battle-1") as Button
+	if battle_row == null:
+		_fail("Standalone dogfight battle row button missing")
+		return
+	battle_row.pressed.emit()
+	await process_frame
+	await process_frame
+	if fake_session.request_path != "/dogfight/battles/battle-1":
+		_fail("Standalone dogfight battle row must request Web battle detail, got: %s" % fake_session.request_path)
+		return
+	if fake_session.replay_battle_id != "battle-1":
+		_fail("Standalone dogfight battle row must emit battle replay result")
+		return
+	if fake_session.finish_context_room_id != "room-detail" or fake_session.finish_context_battle_id != "battle-1":
+		_fail("Standalone dogfight battle replay must keep dogfight room finish context")
+		return
+
 	screen.queue_free()
+	fake_session.queue_free()
 	for _frame in range(3):
 		await process_frame
 	print("Godot standalone dogfight room detail Web structure smoke passed")
 	quit(0)
+
+class FakeSession extends Node:
+	var request_path := ""
+	var replay_battle_id := ""
+	var finish_context_room_id := ""
+	var finish_context_battle_id := ""
+
+	func dogfight_room_request(path: String, _method := "GET", _body: Dictionary = {}) -> Dictionary:
+		request_path = path
+		return {
+			"ok": true,
+			"data": {
+				"battle": {
+					"id": "battle-1",
+					"result": {
+						"id": "battle-1",
+						"events": [],
+					},
+				},
+			},
+		}
+
+	func start_battle_replay(battle: Dictionary) -> void:
+		replay_battle_id = str(battle.get("id", ""))
+		var finish_context = battle.get("_finishContext", {})
+		if finish_context is Dictionary:
+			finish_context_room_id = str(finish_context.get("roomId", ""))
+			finish_context_battle_id = str(finish_context.get("battleId", ""))
 
 func _sample_room() -> Dictionary:
 	return {

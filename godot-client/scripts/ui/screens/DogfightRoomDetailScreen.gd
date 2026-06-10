@@ -338,8 +338,34 @@ func _room_action(action: String, body: Dictionary) -> void:
 		return
 	await _run_room_request(path, "POST", action)
 
-func _load_room_battle(_battle_id: String) -> void:
-	pass
+func _load_room_battle(battle_id: String) -> void:
+	if battle_id.is_empty() or action_in_progress:
+		return
+	if session == null or not session.has_method("dogfight_room_request"):
+		return
+	action_in_progress = true
+	error_message = ""
+	_render()
+	var response: Dictionary = await session.call("dogfight_room_request", ApiRoutes.dogfight_battle(battle_id), "GET", {})
+	action_in_progress = false
+	if not bool(response.get("ok", false)):
+		error_message = str(response.get("error", "Battle replay failed"))
+		_render()
+		return
+	var data = response.get("data", {})
+	var battle: Dictionary = data.get("battle", {}) if data is Dictionary else {}
+	var result: Dictionary = battle.get("result", {})
+	if result.is_empty():
+		error_message = "Battle replay failed"
+		_render()
+		return
+	result["_finishContext"] = _room_battle_finish_context(battle_id)
+	error_message = ""
+	_render()
+	if session.has_method("start_battle_replay"):
+		session.call("start_battle_replay", result)
+	elif session.has_signal("battle_started"):
+		session.emit_signal("battle_started", result)
 
 func _run_room_request(path: String, method: String, success_action: String) -> void:
 	if session == null or not session.has_method("dogfight_room_request"):
@@ -421,6 +447,22 @@ func _can_ready_room_action(room: Dictionary) -> bool:
 	var member := _current_room_member(room)
 	var phase := str(room.get("phase", ""))
 	return not run.is_empty() and phase in ["SHOP", "BATTLE"] and not bool(member.get("ready", false)) and not bool(member.get("eliminated", false))
+
+func _current_room_battle_id(room: Dictionary) -> String:
+	if str(room.get("phase", "")) != "BATTLE":
+		return ""
+	var member := _current_room_member(room)
+	if member.is_empty() or bool(member.get("eliminated", false)):
+		return ""
+	return str(member.get("currentBattleId", ""))
+
+func _room_battle_finish_context(battle_id: String) -> Dictionary:
+	var room := _room()
+	var room_id := str(room.get("id", ""))
+	if room_id.is_empty():
+		return {}
+	var kind := "DOGFIGHT_ROOM_READY" if _can_ready_room_action(room) and battle_id == _current_room_battle_id(room) else "DOGFIGHT_ROOM_VIEW"
+	return {"kind": kind, "roomId": room_id, "battleId": battle_id}
 
 func _dogfight_lives(member: Dictionary) -> int:
 	return 0 if bool(member.get("eliminated", false)) else max(0, DOGFIGHT_LOSS_LIMIT - int(member.get("losses", 0)))
