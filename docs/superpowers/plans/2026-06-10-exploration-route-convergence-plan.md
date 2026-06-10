@@ -1,0 +1,285 @@
+# Exploration Route Convergence Implementation Plan
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
+
+**Goal:** 调整探索地图相邻层连线生成，让地图常见局部汇合，低频出现“所有路线汇到同一个点后再分开”的瓶颈拓扑，同时减少补边交叉�?
+**Architecture:** 只修�?`src/server/game/map.ts` 的私有连线生成逻辑，不改变 `ExplorationMapNode`、存档结构或前端接口。测试集中在 `src/server/game/map.test.ts`，通过真实 `createExplorationMapState()` 采样多个 seed 验证拓扑特征、可达性和玩家战数量约束�?
+**Tech Stack:** TypeScript, Vitest, existing deterministic RNG helpers in `src/server/game/rng.ts`.
+
+---
+
+### Task 1: 写入路线拓扑失败测试
+
+**Files:**
+- Modify: `src/server/game/map.test.ts`
+
+- [x] **Step 1: Add topology helper functions in the test file**
+
+Add helpers near `enumerateMapPaths()`:
+
+```ts
+function incomingCounts(map: ReturnType<typeof createExplorationMapState>) {
+  const counts = new Map<string, number>()
+  for (const node of map.nodes) {
+    for (const nextId of node.nextNodeIds) counts.set(nextId, (counts.get(nextId) ?? 0) + 1)
+  }
+  return counts
+}
+
+function fullConvergenceLayers(map: ReturnType<typeof createExplorationMapState>) {
+  const byLayer = Array.from({ length: 10 }, (_, layer) => map.nodes.filter((node) => node.layer === layer))
+  const layers: Array<{ layer: number; targetId: string }> = []
+  for (let layer = 1; layer < 8; layer += 1) {
+    const currentLayer = byLayer[layer]
+    if (currentLayer.length < 2) continue
+    const targetIds = new Set(currentLayer.flatMap((node) => node.nextNodeIds))
+    if (targetIds.size === 1) layers.push({ layer, targetId: [...targetIds][0] })
+  }
+  return layers
+}
+
+function hasSplitAfterFullConvergence(map: ReturnType<typeof createExplorationMapState>) {
+  const byId = new Map(map.nodes.map((node) => [node.id, node]))
+  return fullConvergenceLayers(map).some(({ targetId }) => {
+    const target = byId.get(targetId)
+    if (!target) return false
+    if (target.nextNodeIds.length >= 2) return true
+    const next = target.nextNodeIds.map((id) => byId.get(id)).filter((node): node is NonNullable<typeof node> => node !== undefined)
+    return new Set(next.flatMap((node) => node.nextNodeIds)).size >= 2
+  })
+}
+
+function countLayerCrossings(map: ReturnType<typeof createExplorationMapState>, layer: number) {
+  const byId = new Map(map.nodes.map((node) => [node.id, node]))
+  const edges = map.nodes
+    .filter((node) => node.layer === layer)
+    .flatMap((source) => source.nextNodeIds.map((nextId) => ({ source, target: byId.get(nextId) })))
+    .filter((edge): edge is { source: (typeof map.nodes)[number]; target: (typeof map.nodes)[number] } => edge.target !== undefined)
+  let crossings = 0
+  for (let a = 0; a < edges.length; a += 1) {
+    for (let b = a + 1; b < edges.length; b += 1) {
+      const sourceDelta = (edges[a].source.x ?? 0.5) - (edges[b].source.x ?? 0.5)
+      const targetDelta = (edges[a].target.x ?? 0.5) - (edges[b].target.x ?? 0.5)
+      if (sourceDelta * targetDelta < 0) crossings += 1
+    }
+  }
+  return crossings
+}
+```
+
+- [x] **Step 2: Add a failing test for local and full convergence**
+
+Add this test inside `describe('exploration map generation', ...)`:
+
+```ts
+it('creates readable route convergence, including occasional full-route bottlenecks that split again', () => {
+  let foundLocalMerge = false
+  let foundFullConvergence = false
+  let foundSplitAfterFullConvergence = false
+
+  for (let index = 0; index < 500; index += 1) {
+    const map = createExplorationMapState(`route-convergence-${index}`, index % 3, index % 7, index % 3)
+    const incoming = incomingCounts(map)
+    if (map.nodes.some((node) => (incoming.get(node.id) ?? 0) >= 2)) foundLocalMerge = true
+    if (fullConvergenceLayers(map).length > 0) foundFullConvergence = true
+    if (hasSplitAfterFullConvergence(map)) foundSplitAfterFullConvergence = true
+  }
+
+  expect(foundLocalMerge).toBe(true)
+  expect(foundFullConvergence).toBe(true)
+  expect(foundSplitAfterFullConvergence).toBe(true)
+})
+```
+
+- [x] **Step 3: Add a failing test for crossing pressure**
+
+Add this test after the convergence test:
+
+```ts
+it('keeps generated route layers from accumulating heavy crossing pressure', () => {
+  for (let index = 0; index < 160; index += 1) {
+    const map = createExplorationMapState(`route-crossing-pressure-${index}`, index % 3, index % 7, index % 3)
+    for (let layer = 0; layer < 9; layer += 1) {
+      expect(countLayerCrossings(map, layer)).toBeLessThanOrEqual(1)
+    }
+  }
+})
+```
+
+- [x] **Step 4: Run tests and verify RED**
+
+Run:
+
+```bash
+npx vitest run src/server/game/map.test.ts
+```
+
+Expected: at least one new test fails because the current generator does not guarantee full-route convergence with re-splitting or low crossing pressure.
+
+### Task 2: Implement convergence-aware connection planning
+
+**Files:**
+- Modify: `src/server/game/map.ts`
+
+- [x] **Step 1: Add route mode helpers**
+
+Add private helper functions below `connectMapLayers()` or near the existing merge helpers:
+
+```ts
+type LayerConnectionMode =
+  | { type: 'normal' }
+  | { type: 'local_merge'; target: ExplorationMapNode; sourceLimit: number }
+  | { type: 'full_merge'; target: ExplorationMapNode }
+
+function fullRouteMergeLayer(byLayer: ExplorationMapNode[][], mapIndex: number) {
+  const eligibleLayers = byLayer
+    .slice(1, MAP_LAYER_COUNT - 2)
+    .map((nodes, offset) => ({ layer: offset + 1, nodes }))
+    .filter(({ layer, nodes }) => nodes.length >= 2 && byLayer[layer + 1].length >= 2)
+  if (eligibleLayers.length === 0) return null
+  const rng = createRng(`map-${mapIndex}-full-route-merge-${eligibleLayers.map(({ nodes }) => nodes.length).join('-')}`)
+  if (rng() >= 0.28) return null
+  return pick(rng, eligibleLayers).layer
+}
+
+function layerConnectionMode(
+  currentLayer: ExplorationMapNode[],
+  nextLayer: ExplorationMapNode[],
+  mapIndex: number,
+  layer: number,
+  fullMergeLayer: number | null,
+): LayerConnectionMode {
+  if (layer === fullMergeLayer) return { type: 'full_merge', target: centralMergeTarget(nextLayer, mapIndex, layer, 'full') }
+  const mergeTarget = preferredPlayerBattleMergeTarget(currentLayer, nextLayer, mapIndex, layer)
+  if (mergeTarget) {
+    const rng = createRng(`map-${mapIndex}-local-route-merge-${layer}-${currentLayer.length}-${nextLayer.length}`)
+    return { type: 'local_merge', target: mergeTarget, sourceLimit: currentLayer.length >= 3 && rng() < 0.35 ? 3 : 2 }
+  }
+  return { type: 'normal' }
+}
+
+function centralMergeTarget(nextLayer: ExplorationMapNode[], mapIndex: number, layer: number, variant: string) {
+  const candidates = nextLayer.filter((node) => node.kind === 'PLAYER_BATTLE')
+  const pool = candidates.length > 0 ? candidates : nextLayer
+  return [...pool].sort((a, b) => {
+    const distance = Math.abs((a.x ?? 0.5) - 0.5) - Math.abs((b.x ?? 0.5) - 0.5)
+    if (distance !== 0) return distance
+    return a.id.localeCompare(b.id)
+  })[Math.floor(createRng(`map-${mapIndex}-${variant}-central-target-${layer}`)() * Math.min(2, pool.length))] ?? pool[0]
+}
+```
+
+- [x] **Step 2: Replace the main `connectMapLayers()` loop with mode-aware assignment**
+
+Update the loop to compute `const fullMergeLayer = fullRouteMergeLayer(byLayer, mapIndex)` before iterating. In each layer:
+
+```ts
+const mode = layerConnectionMode(currentLayer, nextLayer, mapIndex, layer, fullMergeLayer)
+const mergeSources = mode.type === 'local_merge'
+  ? preferredPlayerBattleMergeSources(currentLayer, mode.target).slice(0, Math.min(mode.sourceLimit, currentLayer.length))
+  : []
+
+for (const node of currentLayer) {
+  const nearest = mode.type === 'full_merge'
+    ? [mode.target]
+    : mode.type === 'local_merge' && mergeSources.includes(node)
+      ? [mode.target]
+      : nearestNextNodes(node, nextLayer).slice(0, 1)
+  nextIdsByNodeId.set(node.id, nearest.map((next) => next.id))
+  for (const next of nearest) incoming.set(next.id, (incoming.get(next.id) ?? 0) + 1)
+}
+```
+
+- [x] **Step 3: Make full merge nodes split again**
+
+When `mode.type === 'full_merge'`, after assigning incoming edges, ensure `mode.target` has two outgoing options on its own layer by adding an extra next id during the following layer’s processing or by allowing the normal next-layer loop to give it two closest targets. Keep the out-edge limit at 2.
+
+- [x] **Step 4: Replace naive missing-node补边 with crossing-aware補边**
+
+Add helper:
+
+```ts
+function edgeCrossingCount(source: ExplorationMapNode, target: ExplorationMapNode, edges: Array<{ source: ExplorationMapNode; target: ExplorationMapNode }>) {
+  return edges.filter((edge) => {
+    const sourceDelta = (source.x ?? 0.5) - (edge.source.x ?? 0.5)
+    const targetDelta = (target.x ?? 0.5) - (edge.target.x ?? 0.5)
+    return sourceDelta * targetDelta < 0
+  }).length
+}
+```
+
+Use it when selecting补边来源:
+
+```ts
+const existingEdges = currentLayer.flatMap((source) =>
+  (nextIdsByNodeId.get(source.id) ?? [])
+    .map((nextId) => nextLayer.find((next) => next.id === nextId))
+    .filter((target): target is ExplorationMapNode => target !== undefined)
+    .map((target) => ({ source, target })),
+)
+const source = nearestNextSources(next, currentLayer)
+  .filter((node) => (nextIdsByNodeId.get(node.id)?.length ?? 0) < 2)
+  .sort((a, b) => edgeCrossingCount(a, next, existingEdges) - edgeCrossingCount(b, next, existingEdges)
+    || (nextIdsByNodeId.get(a.id)?.length ?? 0) - (nextIdsByNodeId.get(b.id)?.length ?? 0)
+    || Math.abs((a.x ?? 0.5) - (next.x ?? 0.5)) - Math.abs((b.x ?? 0.5) - (next.x ?? 0.5)))[0]
+```
+
+For full-merge layers, skip missing-node补边 when it would add crossings or visually break the single bottleneck.
+
+- [x] **Step 5: Run tests and verify GREEN**
+
+Run:
+
+```bash
+npx vitest run src/server/game/map.test.ts
+```
+
+Expected: all map tests pass.
+
+### Task 3: Verify build and commit implementation
+
+**Files:**
+- Modify: `src/server/game/map.ts`
+- Modify: `src/server/game/map.test.ts`
+- Verify generated artifact: `dist-click/DogFight-standalone.cmd`
+
+- [x] **Step 1: Run focused tests**
+
+Run:
+
+```bash
+npx vitest run src/server/game/map.test.ts
+```
+
+Expected: 1 test file passes with all tests passing.
+
+- [x] **Step 2: Run full build**
+
+Run:
+
+```bash
+npm run build
+```
+
+Expected: build exits 0 and regenerates `dist-click/DogFight-standalone.cmd`.
+
+- [x] **Step 3: Review diff**
+
+Run:
+
+```bash
+git diff -- src/server/game/map.ts src/server/game/map.test.ts docs/superpowers/plans/2026-06-10-exploration-route-convergence-plan.md
+```
+
+Expected: diff only contains route convergence implementation, tests, and this plan.
+
+- [x] **Step 4: Commit**
+
+Run:
+
+```bash
+git add docs/superpowers/plans/2026-06-10-exploration-route-convergence-plan.md src/server/game/map.ts src/server/game/map.test.ts dist-click/DogFight-standalone.cmd
+git commit -m "Tune exploration route convergence"
+```
+
+Expected: commit succeeds on `codex/exploration-route-convergence`.

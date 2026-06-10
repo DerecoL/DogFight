@@ -183,29 +183,48 @@ function connectMapLayers(nodes: ExplorationMapNode[], mapIndex: number) {
     nodes.filter((node) => node.layer === layer).sort((a, b) => (a.x ?? 0.5) - (b.x ?? 0.5)),
   )
   const nextIdsByNodeId = new Map<string, string[]>()
+  const fullMergeLayer = fullRouteMergeLayer(byLayer, mapIndex)
+  const splitAfterMergeNodeIds = new Set<string>()
 
   for (let layer = 0; layer < MAP_LAYER_COUNT - 1; layer += 1) {
     const currentLayer = byLayer[layer]
     const nextLayer = byLayer[layer + 1]
     const incoming = new Map(nextLayer.map((node) => [node.id, 0]))
-    const mergeTarget = preferredPlayerBattleMergeTarget(currentLayer, nextLayer, mapIndex, layer)
-    const mergeSources = mergeTarget
-      ? preferredPlayerBattleMergeSources(currentLayer, mergeTarget).slice(0, Math.min(3, currentLayer.length))
+    const mode = layerConnectionMode(currentLayer, nextLayer, mapIndex, layer, fullMergeLayer)
+    const mergeSources = mode.type === 'local_merge'
+      ? preferredPlayerBattleMergeSources(currentLayer, mode.target).slice(0, Math.min(mode.sourceLimit, currentLayer.length))
       : []
 
-    for (const node of currentLayer) {
-      const nearest = mergeTarget && mergeSources.includes(node)
-        ? [mergeTarget]
-        : nearestNextNodes(node, nextLayer).slice(0, 1)
-      nextIdsByNodeId.set(node.id, nearest.map((next) => next.id))
-      for (const next of nearest) incoming.set(next.id, (incoming.get(next.id) ?? 0) + 1)
+    for (let index = 0; index < currentLayer.length; index += 1) {
+      const node = currentLayer[index]
+      const nextNodes = mode.type === 'full_merge'
+        ? [mode.target]
+        : splitAfterMergeNodeIds.has(node.id)
+          ? nearestNextNodes(node, nextLayer).slice(0, Math.min(2, nextLayer.length))
+          : mode.type === 'local_merge' && mergeSources.includes(node)
+            ? [mode.target]
+            : [alignedNextNode(index, currentLayer.length, nextLayer)]
+      nextIdsByNodeId.set(node.id, nextNodes.map((next) => next.id))
+      for (const next of nextNodes) incoming.set(next.id, (incoming.get(next.id) ?? 0) + 1)
+    }
+
+    if (mode.type === 'full_merge') {
+      splitAfterMergeNodeIds.add(mode.target.id)
+      continue
     }
 
     for (const next of nextLayer) {
       if ((incoming.get(next.id) ?? 0) > 0) continue
+      const existingEdges = layerEdges(currentLayer, nextLayer, nextIdsByNodeId)
       const source = nearestNextSources(next, currentLayer)
-        .find((node) => (nextIdsByNodeId.get(node.id)?.length ?? 0) < 2)
+        .filter((node) => (nextIdsByNodeId.get(node.id)?.length ?? 0) < 2)
+        .sort((a, b) =>
+          edgeCrossingCount(a, next, existingEdges) - edgeCrossingCount(b, next, existingEdges)
+          || (nextIdsByNodeId.get(a.id)?.length ?? 0) - (nextIdsByNodeId.get(b.id)?.length ?? 0)
+          || Math.abs((a.x ?? 0.5) - (next.x ?? 0.5)) - Math.abs((b.x ?? 0.5) - (next.x ?? 0.5)),
+        )[0]
       if (!source) continue
+      if (edgeCrossingCount(source, next, existingEdges) > 0) continue
       const nextIds = nextIdsByNodeId.get(source.id) ?? []
       if (!nextIds.includes(next.id)) nextIdsByNodeId.set(source.id, [...nextIds, next.id])
       incoming.set(next.id, (incoming.get(next.id) ?? 0) + 1)
@@ -220,12 +239,78 @@ function connectMapLayers(nodes: ExplorationMapNode[], mapIndex: number) {
   }))
 }
 
+type LayerConnectionMode =
+  | { type: 'normal' }
+  | { type: 'local_merge'; target: ExplorationMapNode; sourceLimit: number }
+  | { type: 'full_merge'; target: ExplorationMapNode }
+
+function fullRouteMergeLayer(byLayer: ExplorationMapNode[][], mapIndex: number) {
+  const eligibleLayers = byLayer
+    .slice(1, MAP_LAYER_COUNT - 2)
+    .map((nodes, offset) => ({ layer: offset + 1, nodes }))
+    .filter(({ layer, nodes }) => nodes.length >= 2 && byLayer[layer + 1].length >= 2)
+  if (eligibleLayers.length === 0) return null
+  const rng = createRng(`map-${mapIndex}-full-route-merge-${eligibleLayers.map(({ nodes }) => nodes.length).join('-')}`)
+  if (rng() >= 0.28) return null
+  return pick(rng, eligibleLayers).layer
+}
+
+function layerConnectionMode(
+  currentLayer: ExplorationMapNode[],
+  nextLayer: ExplorationMapNode[],
+  mapIndex: number,
+  layer: number,
+  fullMergeLayer: number | null,
+): LayerConnectionMode {
+  if (layer === fullMergeLayer) return { type: 'full_merge', target: centralMergeTarget(nextLayer, mapIndex, layer, 'full') }
+  const mergeTarget = preferredPlayerBattleMergeTarget(currentLayer, nextLayer, mapIndex, layer)
+  if (mergeTarget) {
+    const rng = createRng(`map-${mapIndex}-local-route-merge-${layer}-${currentLayer.length}-${nextLayer.length}`)
+    return { type: 'local_merge', target: mergeTarget, sourceLimit: currentLayer.length >= 3 && rng() < 0.35 ? 3 : 2 }
+  }
+  return { type: 'normal' }
+}
+
+function centralMergeTarget(nextLayer: ExplorationMapNode[], mapIndex: number, layer: number, variant: string) {
+  const candidates = nextLayer.filter((node) => node.kind === 'PLAYER_BATTLE')
+  const pool = candidates.length > 0 ? candidates : nextLayer
+  const central = [...pool].sort((a, b) => {
+    const distance = Math.abs((a.x ?? 0.5) - 0.5) - Math.abs((b.x ?? 0.5) - 0.5)
+    if (distance !== 0) return distance
+    return a.id.localeCompare(b.id)
+  })
+  const rng = createRng(`map-${mapIndex}-${variant}-central-target-${layer}`)
+  return central[Math.floor(rng() * Math.min(2, central.length))] ?? central[0]
+}
+
+function alignedNextNode(index: number, currentCount: number, nextLayer: ExplorationMapNode[]) {
+  if (nextLayer.length <= 1 || currentCount <= 1) return nextLayer[0]
+  const targetIndex = Math.round((index * (nextLayer.length - 1)) / (currentCount - 1))
+  return nextLayer[Math.max(0, Math.min(nextLayer.length - 1, targetIndex))]
+}
+
+function layerEdges(currentLayer: ExplorationMapNode[], nextLayer: ExplorationMapNode[], nextIdsByNodeId: Map<string, string[]>) {
+  return currentLayer.flatMap((source) =>
+    (nextIdsByNodeId.get(source.id) ?? [])
+      .map((nextId) => nextLayer.find((next) => next.id === nextId))
+      .filter((target): target is ExplorationMapNode => target !== undefined)
+      .map((target) => ({ source, target })),
+  )
+}
+
+function edgeCrossingCount(source: ExplorationMapNode, target: ExplorationMapNode, edges: Array<{ source: ExplorationMapNode; target: ExplorationMapNode }>) {
+  return edges.filter((edge) => {
+    const sourceDelta = (source.x ?? 0.5) - (edge.source.x ?? 0.5)
+    const targetDelta = (target.x ?? 0.5) - (edge.target.x ?? 0.5)
+    return sourceDelta * targetDelta < 0
+  }).length
+}
+
 function preferredPlayerBattleMergeTarget(currentLayer: ExplorationMapNode[], nextLayer: ExplorationMapNode[], mapIndex: number, layer: number) {
   const playerBattleNodes = nextLayer.filter((node) => node.kind === 'PLAYER_BATTLE')
   if (playerBattleNodes.length === 0 || currentLayer.length < 2) return null
   if (nextLayer.length > currentLayer.length + 1) return null
-  const rng = createRng(`map-${mapIndex}-merge-${layer}-${currentLayer.length}-${nextLayer.length}`)
-  return pick(rng, playerBattleNodes)
+  return centralMergeTarget(playerBattleNodes, mapIndex, layer, 'local')
 }
 
 function preferredPlayerBattleMergeSources(currentLayer: ExplorationMapNode[], target: ExplorationMapNode) {

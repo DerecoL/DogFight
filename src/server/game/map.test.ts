@@ -98,6 +98,33 @@ describe('exploration map generation', () => {
     expect(foundMergedPlayerBattleNode).toBe(true)
   })
 
+  it('creates readable route convergence, including occasional full-route bottlenecks that split again', () => {
+    let foundLocalMerge = false
+    let foundFullConvergence = false
+    let foundSplitAfterFullConvergence = false
+
+    for (let index = 0; index < 500; index += 1) {
+      const map = createExplorationMapState(`route-convergence-${index}`, index % 3, index % 7, index % 3)
+      const incoming = incomingCounts(map)
+      if (map.nodes.some((node) => (incoming.get(node.id) ?? 0) >= 2)) foundLocalMerge = true
+      if (fullConvergenceLayers(map).length > 0) foundFullConvergence = true
+      if (hasSplitAfterFullConvergence(map)) foundSplitAfterFullConvergence = true
+    }
+
+    expect(foundLocalMerge).toBe(true)
+    expect(foundFullConvergence).toBe(true)
+    expect(foundSplitAfterFullConvergence).toBe(true)
+  })
+
+  it('keeps generated route layers from accumulating heavy crossing pressure', () => {
+    for (let index = 0; index < 160; index += 1) {
+      const map = createExplorationMapState(`route-crossing-pressure-${index}`, index % 3, index % 7, index % 3)
+      for (let layer = 0; layer < 9; layer += 1) {
+        expect(countLayerCrossings(map, layer)).toBeLessThanOrEqual(1)
+      }
+    }
+  })
+
   it('keeps the first map rest-free with only one early shop and softer monsters', () => {
     for (let index = 0; index < 80; index += 1) {
       const map = createExplorationMapState(`first-map-pacing-${index}`, 0, index % 4, index % 2)
@@ -168,6 +195,56 @@ function enumerateMapPaths(map: ReturnType<typeof createExplorationMapState>) {
   }
   for (const start of starts) visit([start])
   return paths
+}
+
+function incomingCounts(map: ReturnType<typeof createExplorationMapState>) {
+  const counts = new Map<string, number>()
+  for (const node of map.nodes) {
+    for (const nextId of node.nextNodeIds) counts.set(nextId, (counts.get(nextId) ?? 0) + 1)
+  }
+  return counts
+}
+
+function fullConvergenceLayers(map: ReturnType<typeof createExplorationMapState>) {
+  const byLayer = Array.from({ length: 10 }, (_, layer) => map.nodes.filter((node) => node.layer === layer))
+  const layers: Array<{ layer: number; targetId: string }> = []
+  for (let layer = 1; layer < 8; layer += 1) {
+    const currentLayer = byLayer[layer]
+    if (currentLayer.length < 2) continue
+    const targetIds = new Set(currentLayer.flatMap((node) => node.nextNodeIds))
+    if (targetIds.size === 1) layers.push({ layer, targetId: [...targetIds][0] })
+  }
+  return layers
+}
+
+function hasSplitAfterFullConvergence(map: ReturnType<typeof createExplorationMapState>) {
+  const byId = new Map(map.nodes.map((node) => [node.id, node]))
+  return fullConvergenceLayers(map).some(({ targetId }) => {
+    const target = byId.get(targetId)
+    if (!target) return false
+    if (target.nextNodeIds.length >= 2) return true
+    const next = target.nextNodeIds
+      .map((id) => byId.get(id))
+      .filter((node): node is (typeof map.nodes)[number] => node !== undefined)
+    return new Set(next.flatMap((node) => node.nextNodeIds)).size >= 2
+  })
+}
+
+function countLayerCrossings(map: ReturnType<typeof createExplorationMapState>, layer: number) {
+  const byId = new Map(map.nodes.map((node) => [node.id, node]))
+  const edges = map.nodes
+    .filter((node) => node.layer === layer)
+    .flatMap((source) => source.nextNodeIds.map((nextId) => ({ source, target: byId.get(nextId) })))
+    .filter((edge): edge is { source: (typeof map.nodes)[number]; target: (typeof map.nodes)[number] } => edge.target !== undefined)
+  let crossings = 0
+  for (let a = 0; a < edges.length; a += 1) {
+    for (let b = a + 1; b < edges.length; b += 1) {
+      const sourceDelta = (edges[a].source.x ?? 0.5) - (edges[b].source.x ?? 0.5)
+      const targetDelta = (edges[a].target.x ?? 0.5) - (edges[b].target.x ?? 0.5)
+      if (sourceDelta * targetDelta < 0) crossings += 1
+    }
+  }
+  return crossings
 }
 
 describe('exploration map node selection', () => {
