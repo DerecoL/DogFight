@@ -89,6 +89,24 @@ func _run() -> void:
 			_fail("Standalone dogfight room detail Web text missing: %s" % part)
 			return
 
+	var bot_member = _find_by_name(screen, "DogfightMember_member-bot") as Button
+	if bot_member == null:
+		_fail("Standalone dogfight bot member button missing")
+		return
+	bot_member.pressed.emit()
+	await process_frame
+	await process_frame
+	if fake_session.request_path != "/dogfight/battles/battle-bot":
+		_fail("Standalone dogfight member card must request member current battle, got: %s" % fake_session.request_path)
+		return
+	if fake_session.replay_battle_id != "battle-bot":
+		_fail("Standalone dogfight member card must emit selected member battle replay")
+		return
+	if fake_session.finish_context_room_id != "room-detail" or fake_session.finish_context_battle_id != "battle-bot":
+		_fail("Standalone dogfight member battle replay must keep dogfight room finish context")
+		return
+
+	fake_session.reset_capture()
 	var battle_row = _find_by_name(screen, "DogfightBattleRow_battle-1") as Button
 	if battle_row == null:
 		_fail("Standalone dogfight battle row button missing")
@@ -119,15 +137,22 @@ class FakeSession extends Node:
 	var finish_context_room_id := ""
 	var finish_context_battle_id := ""
 
+	func reset_capture() -> void:
+		request_path = ""
+		replay_battle_id = ""
+		finish_context_room_id = ""
+		finish_context_battle_id = ""
+
 	func dogfight_room_request(path: String, _method := "GET", _body: Dictionary = {}) -> Dictionary:
 		request_path = path
+		var battle_id := path.get_file()
 		return {
 			"ok": true,
 			"data": {
 				"battle": {
-					"id": "battle-1",
+					"id": battle_id,
 					"result": {
-						"id": "battle-1",
+						"id": battle_id,
 						"events": [],
 					},
 				},
@@ -173,6 +198,7 @@ func _sample_room() -> Dictionary:
 				"losses": 2,
 				"ready": true,
 				"eliminated": false,
+				"currentBattleId": "battle-bot",
 			},
 			{
 				"id": "member-waiting",

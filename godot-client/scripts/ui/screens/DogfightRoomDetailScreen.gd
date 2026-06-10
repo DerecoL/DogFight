@@ -13,6 +13,7 @@ const DOG_ASSETS := {
 
 var action_in_progress := false
 var error_message := ""
+var selected_member_id := ""
 
 func _ready() -> void:
 	_render()
@@ -158,12 +159,13 @@ func _render_survivor_board(parent: GridContainer, room: Dictionary) -> void:
 	_add_label(board, "DogfightSurvivorTitle", "房间玩家")
 	for member_value in _sorted_members(_array(room, "members")):
 		if member_value is Dictionary:
-			_render_member_card(board, member_value)
+			_render_member_card(board, member_value, room)
 
-func _render_member_card(parent: VBoxContainer, member: Dictionary) -> void:
+func _render_member_card(parent: VBoxContainer, member: Dictionary, room: Dictionary) -> void:
 	var member_id := str(member.get("id", ""))
 	var host_mark := " · 房主" if bool(member.get("isHost", false)) else ""
 	var dog_type := str(member.get("dogType", ""))
+	var current_battle_id := str(member.get("currentBattleId", ""))
 	var dog_text := _dog_name(dog_type) if not dog_type.is_empty() else "等待选狗"
 	var kind_text := "参赛者" if str(member.get("kind", "")) == "BOT" else "玩家"
 	var button := _action_button("%s%s\n%s · %s · %d胜 %d败\n%d" % [
@@ -174,10 +176,12 @@ func _render_member_card(parent: VBoxContainer, member: Dictionary) -> void:
 		int(member.get("wins", 0)),
 		int(member.get("losses", 0)),
 		_dogfight_lives(member),
-	], _noop)
+	], _select_room_member.bind(member_id, current_battle_id))
 	var legacy_text := button.text
 	button.name = "DogfightMember_%s" % member_id
 	button.custom_minimum_size = Vector2(0, 88)
+	button.toggle_mode = true
+	button.button_pressed = _selected_battle_member_id(room) == member_id
 	button.text = ""
 	parent.add_child(button)
 
@@ -338,6 +342,15 @@ func _room_action(action: String, body: Dictionary) -> void:
 		return
 	await _run_room_request(path, "POST", action)
 
+func _select_room_member(member_id: String, battle_id: String) -> void:
+	if member_id.is_empty():
+		return
+	selected_member_id = member_id
+	if battle_id.is_empty():
+		_render()
+		return
+	await _load_room_battle(battle_id)
+
 func _load_room_battle(battle_id: String) -> void:
 	if battle_id.is_empty() or action_in_progress:
 		return
@@ -438,6 +451,20 @@ func _current_room_member(room: Dictionary) -> Dictionary:
 		if member_value is Dictionary and str(member_value.get("runId", "")) == run_id:
 			return member_value
 	return {}
+
+func _selected_battle_member_id(room: Dictionary) -> String:
+	if not selected_member_id.is_empty():
+		for member_value in _array(room, "members"):
+			if member_value is Dictionary and str(member_value.get("id", "")) == selected_member_id:
+				return selected_member_id
+	var current := _current_room_member(room)
+	if not current.is_empty():
+		return str(current.get("id", ""))
+	var sorted_members := _sorted_members(_array(room, "members"))
+	if not sorted_members.is_empty() and sorted_members[0] is Dictionary:
+		var first_member: Dictionary = sorted_members[0]
+		return str(first_member.get("id", ""))
+	return ""
 
 func _can_start_room_action(room: Dictionary) -> bool:
 	return bool(room.get("isHost", false)) and str(room.get("status", "")) == "WAITING"
