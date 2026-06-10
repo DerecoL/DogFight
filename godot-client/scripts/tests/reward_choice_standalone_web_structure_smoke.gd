@@ -44,6 +44,7 @@ func _run() -> void:
 		"ChoiceSubmit",
 		"InventoryBoard",
 		"EquipmentBoard",
+		"BagRelicRow",
 		"RelicRail",
 		"BagBoard",
 	]:
@@ -74,6 +75,7 @@ func _run() -> void:
 			"RewardChoiceGrid",
 			"InventoryBoard",
 			"EquipmentBoard",
+			"BagRelicRow",
 			"RelicRail",
 			"BagBoard",
 		]:
@@ -122,6 +124,10 @@ func _run() -> void:
 			_assert_has(screen, "PotionWorkbench")
 			_assert_has(screen, "PotionPanel")
 			_assert_has(screen, "RewardChoice_potion-1")
+		var bag_relic_row = _find_by_name(screen, "BagRelicRow")
+		if not bag_relic_row is HBoxContainer:
+			_fail("%s BagRelicRow must lay out relic rail and bag board side by side like Web InventoryBoard" % phase)
+			return
 
 	var text := _collect_text(screen)
 	for part in ["选择药水", "药水奖励", "职业装备", "1点牙咬", "背包"]:
