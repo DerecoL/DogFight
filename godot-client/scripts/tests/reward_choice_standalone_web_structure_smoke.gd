@@ -27,9 +27,29 @@ func _run() -> void:
 		"ScreenHeading",
 		"ChoiceGrid",
 		"ChoiceCard_GENERAL",
+		"ChoiceCard_RELIC",
 		"ChoiceSubmit",
 	]:
 		_assert_has(screen, node_name)
+	var relic_shop_card := _find_by_name(screen, "ChoiceCard_RELIC") as Button
+	if relic_shop_card == null:
+		_fail("Shop choice RELIC card is missing")
+		return
+	relic_shop_card.pressed.emit()
+	await process_frame
+	if fake_session.shop_type != "":
+		_fail("Shop choice card click should only select locally, not call select_shop_choice")
+		return
+	var shop_submit := _find_by_name(screen, "ChoiceSubmit") as Button
+	if shop_submit == null:
+		_fail("Shop choice submit button is missing")
+		return
+	shop_submit.pressed.emit()
+	await process_frame
+	await process_frame
+	if fake_session.shop_type != "RELIC":
+		_fail("Shop choice submit should call select_shop_choice(RELIC), got %s" % fake_session.shop_type)
+		return
 
 	if screen.has_method("set_payload"):
 		screen.call("set_payload", {"run": _run_payload("CLASS_REWARD")})
@@ -49,6 +69,25 @@ func _run() -> void:
 		"BagBoard",
 	]:
 		_assert_has(screen, node_name)
+	var class_card := _find_by_name(screen, "RewardChoice_class-2") as Button
+	if class_card == null:
+		_fail("Class reward second choice card is missing")
+		return
+	class_card.pressed.emit()
+	await process_frame
+	if fake_session.class_reward_id != "":
+		_fail("Class reward card click should only select locally, not call select_class_reward")
+		return
+	var class_submit := _find_by_name(screen, "ChoiceSubmit") as Button
+	if class_submit == null:
+		_fail("Class reward submit button is missing")
+		return
+	class_submit.pressed.emit()
+	await process_frame
+	await process_frame
+	if fake_session.class_reward_id != "class-2":
+		_fail("Class reward submit should call select_class_reward(class-2), got %s" % fake_session.class_reward_id)
+		return
 
 	if screen.has_method("set_payload"):
 		screen.call("set_payload", {"run": _run_payload("RELIC_CHOICE")})
@@ -63,6 +102,25 @@ func _run() -> void:
 		"ChoiceSubmit",
 	]:
 		_assert_has(screen, node_name)
+	var relic_card := _find_by_name(screen, "RelicChoice_relic-2") as Button
+	if relic_card == null:
+		_fail("Relic second choice card is missing")
+		return
+	relic_card.pressed.emit()
+	await process_frame
+	if fake_session.relic_id != "":
+		_fail("Relic choice card click should only select locally, not call select_relic")
+		return
+	var relic_submit := _find_by_name(screen, "ChoiceSubmit") as Button
+	if relic_submit == null:
+		_fail("Relic choice submit button is missing")
+		return
+	relic_submit.pressed.emit()
+	await process_frame
+	await process_frame
+	if fake_session.relic_id != "relic-2":
+		_fail("Relic choice submit should call select_relic(relic-2), got %s" % fake_session.relic_id)
+		return
 
 	for phase in ["UPGRADE_CHOICE", "ENCHANT_CHOICE", "POTION_CHOICE"]:
 		if screen.has_method("set_payload"):
@@ -158,7 +216,22 @@ func _run() -> void:
 
 class FakeSession:
 	extends Node
+	var shop_type := ""
+	var class_reward_id := ""
+	var relic_id := ""
 	var upgrade_item_id := ""
+
+	func select_shop_choice(next_shop_type: String) -> bool:
+		shop_type = next_shop_type
+		return true
+
+	func select_class_reward(def_id: String) -> bool:
+		class_reward_id = def_id
+		return true
+
+	func select_relic(next_relic_id: String) -> bool:
+		relic_id = next_relic_id
+		return true
 
 	func select_upgrade_item(item_id: String) -> bool:
 		upgrade_item_id = item_id

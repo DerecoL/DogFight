@@ -1,6 +1,9 @@
 extends BaseWebScreen
 
 var action_in_progress := false
+var selected_shop_type := ""
+var selected_class_reward_id := ""
+var selected_relic_choice_id := ""
 var selected_enchant_id := ""
 var selected_potion_id := ""
 var selected_item_id := ""
@@ -14,6 +17,15 @@ func _on_payload_changed() -> void:
 
 func _select_defaults() -> void:
 	var run := _run()
+	var shop_choices := _array(run, "choices")
+	if not _string_array_has(shop_choices, selected_shop_type):
+		selected_shop_type = str(shop_choices[0]) if not shop_choices.is_empty() else ""
+	var class_choices := _array(run, "classRewardChoices")
+	if not _choice_array_has_id(class_choices, "defId", selected_class_reward_id):
+		selected_class_reward_id = str((class_choices[0] as Dictionary).get("defId", "")) if not class_choices.is_empty() and class_choices[0] is Dictionary else ""
+	var relic_choices := _array(run, "relicChoices")
+	if not _choice_array_has_id(relic_choices, "relicId", selected_relic_choice_id):
+		selected_relic_choice_id = str((relic_choices[0] as Dictionary).get("relicId", "")) if not relic_choices.is_empty() and relic_choices[0] is Dictionary else ""
 	var enchants := _array(run, "enchantChoices")
 	if selected_enchant_id.is_empty() and not enchants.is_empty() and enchants[0] is Dictionary:
 		selected_enchant_id = str((enchants[0] as Dictionary).get("id", ""))
@@ -45,11 +57,14 @@ func _render() -> void:
 		return
 	var phase := str(run.get("phase", ""))
 	if phase == "CHOICE":
+		_select_defaults()
 		_render_shop_choice(margin, run)
 		return
 	if phase == "RELIC_CHOICE":
+		_select_defaults()
 		_render_relic_choice(margin, run)
 		return
+	_select_defaults()
 	_render_reward_workbench(margin, run)
 	_ensure_reward_choice_web_children(run)
 
@@ -74,9 +89,11 @@ func _render_shop_choice(parent: Node, run: Dictionary) -> void:
 	for index in range(9):
 		if index < choices.size():
 			var shop_type := str(choices[index])
-			var button := _choice_button("%s\n%s" % [_shop_name(shop_type), _shop_description(shop_type)], _select_shop_choice.bind(shop_type))
+			var button := _choice_button("%s\n%s" % [_shop_name(shop_type), _shop_description(shop_type)], _set_shop_choice.bind(shop_type))
 			button.name = "ChoiceCard_%s" % shop_type
 			button.custom_minimum_size = Vector2(176, 126)
+			button.toggle_mode = true
+			button.button_pressed = selected_shop_type == shop_type
 			grid.add_child(button)
 		else:
 			var placeholder := Label.new()
@@ -86,13 +103,11 @@ func _render_shop_choice(parent: Node, run: Dictionary) -> void:
 			placeholder.add_theme_stylebox_override("normal", WebUiTokens.paper_card_style())
 			grid.add_child(placeholder)
 
-	var submit := _action_button("进入商店", _noop)
+	var submit := _action_button("进入商店", _submit_shop_choice)
 	submit.name = "ChoiceSubmit"
 	if not choices.is_empty():
-		var first_shop := str(choices[0])
-		submit.text = "进入 %s" % _shop_name(first_shop)
+		submit.text = "进入 %s" % _shop_name(selected_shop_type)
 		submit.disabled = action_in_progress
-		submit.pressed.connect(_select_shop_choice.bind(first_shop))
 	else:
 		submit.disabled = true
 	screen.add_child(submit)
@@ -169,21 +184,20 @@ func _render_class_reward(parent: HBoxContainer, run: Dictionary) -> void:
 			var choice: Dictionary = choice_value
 			var def: Dictionary = _dict(choice, "def")
 			var def_id := str(choice.get("defId", ""))
-			var button := _choice_button("%s\n%s\n%s" % [_fallback(str(def.get("name", "")), def_id), _quality_label(str(choice.get("quality", ""))), _fallback(str(def.get("description", "")), "")], _select_class_reward.bind(def_id))
+			var button := _choice_button("%s\n%s\n%s" % [_fallback(str(def.get("name", "")), def_id), _quality_label(str(choice.get("quality", ""))), _fallback(str(def.get("description", "")), "")], _set_class_reward_choice.bind(def_id))
 			button.name = "RewardChoice_%s" % def_id
 			button.custom_minimum_size = Vector2(220, 128)
+			button.toggle_mode = true
+			button.button_pressed = selected_class_reward_id == def_id
 			grid.add_child(button)
 			_add_label(button, "RewardChoiceName_%s" % def_id, _fallback(str(def.get("name", "")), def_id))
 			_add_label(button, "RewardChoiceTag_%s" % def_id, _quality_label(str(choice.get("quality", ""))))
 			_add_label(button, "RewardChoiceMeta_%s" % def_id, "%s格" % _fallback(_detail_size_text(def), "?"))
 			_add_label(button, "RewardChoiceCopy_%s" % def_id, _fallback(str(def.get("description", "")), str(choice.get("quality", ""))))
-	var submit := _action_button("领取职业装备", _noop)
+	var submit := _action_button("领取职业装备", _submit_class_reward_choice)
 	submit.name = "ChoiceSubmit"
-	if not choices.is_empty() and choices[0] is Dictionary:
-		var first_id := str((choices[0] as Dictionary).get("defId", ""))
-		submit.disabled = first_id.is_empty() or action_in_progress
-		if not first_id.is_empty():
-			submit.pressed.connect(_select_class_reward.bind(first_id))
+	if not selected_class_reward_id.is_empty():
+		submit.disabled = action_in_progress
 	else:
 		submit.disabled = true
 	panel.add_child(submit)
@@ -214,21 +228,20 @@ func _render_relic_choice(parent: Node, run: Dictionary) -> void:
 			var choice: Dictionary = choice_value
 			var def: Dictionary = _dict(choice, "def")
 			var relic_id := str(choice.get("relicId", ""))
-			var button := _choice_button("%s\n%s\n%s" % [_fallback(str(def.get("name", "")), relic_id), _quality_label(str(choice.get("quality", ""))), _fallback(str(def.get("description", "")), "")], _select_relic.bind(relic_id))
+			var button := _choice_button("%s\n%s\n%s" % [_fallback(str(def.get("name", "")), relic_id), _quality_label(str(choice.get("quality", ""))), _fallback(str(def.get("description", "")), "")], _set_relic_choice.bind(relic_id))
 			button.name = "RelicChoice_%s" % relic_id
 			button.custom_minimum_size = Vector2(190, 132)
+			button.toggle_mode = true
+			button.button_pressed = selected_relic_choice_id == relic_id
 			grid.add_child(button)
 			_add_label(button, "RelicGlyph_%s" % relic_id, "遗物")
 			_add_label(button, "RelicChoiceName_%s" % relic_id, _fallback(str(def.get("name", "")), relic_id))
 			_add_label(button, "RelicChoiceTag_%s" % relic_id, _quality_label(str(choice.get("quality", ""))))
 			_add_label(button, "RelicChoiceCopy_%s" % relic_id, _fallback(str(def.get("description", "")), str(choice.get("quality", ""))))
-	var submit := _action_button("获得遗物", _noop)
+	var submit := _action_button("获得遗物", _submit_relic_choice)
 	submit.name = "ChoiceSubmit"
-	if not choices.is_empty() and choices[0] is Dictionary:
-		var first_id := str((choices[0] as Dictionary).get("relicId", ""))
-		submit.disabled = first_id.is_empty() or action_in_progress
-		if not first_id.is_empty():
-			submit.pressed.connect(_select_relic.bind(first_id))
+	if not selected_relic_choice_id.is_empty():
+		submit.disabled = action_in_progress
 	else:
 		submit.disabled = true
 	panel.add_child(submit)
@@ -529,13 +542,40 @@ func _add_choice_label(parent: Node, node_name: String, text: String) -> Label:
 	label.custom_minimum_size = Vector2(0, 22)
 	return label
 
+func _set_shop_choice(shop_type: String) -> void:
+	selected_shop_type = shop_type
+	_render()
+
+func _submit_shop_choice() -> void:
+	if selected_shop_type.is_empty():
+		return
+	await _select_shop_choice(selected_shop_type)
+
 func _select_shop_choice(shop_type: String) -> void:
 	if session != null and session.has_method("select_shop_choice"):
 		await session.call("select_shop_choice", shop_type)
 
+func _set_class_reward_choice(def_id: String) -> void:
+	selected_class_reward_id = def_id
+	_render()
+
+func _submit_class_reward_choice() -> void:
+	if selected_class_reward_id.is_empty():
+		return
+	await _select_class_reward(selected_class_reward_id)
+
 func _select_class_reward(def_id: String) -> void:
 	if session != null and session.has_method("select_class_reward"):
 		await session.call("select_class_reward", def_id)
+
+func _set_relic_choice(relic_id: String) -> void:
+	selected_relic_choice_id = relic_id
+	_render()
+
+func _submit_relic_choice() -> void:
+	if selected_relic_choice_id.is_empty():
+		return
+	await _select_relic(selected_relic_choice_id)
 
 func _select_relic(relic_id: String) -> void:
 	if session != null and session.has_method("select_relic"):
@@ -591,6 +631,22 @@ func _dict(source: Dictionary, key: String) -> Dictionary:
 func _array(source: Dictionary, key: String) -> Array:
 	var value = source.get(key, [])
 	return value if value is Array else []
+
+func _string_array_has(values: Array, expected: String) -> bool:
+	if expected.is_empty():
+		return false
+	for value in values:
+		if str(value) == expected:
+			return true
+	return false
+
+func _choice_array_has_id(values: Array, key: String, expected: String) -> bool:
+	if expected.is_empty():
+		return false
+	for value in values:
+		if value is Dictionary and str((value as Dictionary).get(key, "")) == expected:
+			return true
+	return false
 
 func _selected_item(run: Dictionary) -> Dictionary:
 	if selected_item_id.is_empty():
