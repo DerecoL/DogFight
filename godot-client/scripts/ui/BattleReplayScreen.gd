@@ -85,6 +85,7 @@ var restart_button: Button
 var continue_row: PanelContainer
 var continue_button: Button
 var battle_item_tip: PanelContainer
+var battle_relic_tip: PanelContainer
 var log_toggle_button: Button
 var log_filter_row: HBoxContainer
 
@@ -133,6 +134,7 @@ func start_replay(next_battle: Dictionary) -> void:
 	if review_panel != null:
 		review_panel.visible = false
 	_close_battle_item_tip()
+	_close_battle_relic_tip()
 	_render_initial_hp()
 	_render_snapshots()
 	_render_stage_snapshots()
@@ -247,6 +249,7 @@ func _on_restart_pressed() -> void:
 	if review_panel != null:
 		review_panel.visible = false
 	_close_battle_item_tip()
+	_close_battle_relic_tip()
 	_render_initial_hp()
 	_render_snapshots()
 	_render_stage_snapshots()
@@ -778,7 +781,7 @@ func _render_snapshot(name_label: Label, avatar: TextureRect, grid: GridContaine
 			relic_button.clip_text = true
 			relic_button.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 			_apply_button_icon(relic_button, _battle_sticker_texture(str(relic.get("relicId", ""))))
-			relic_button.pressed.connect(_show_battle_relic_modal.bind(relic, side))
+			relic_button.pressed.connect(_show_battle_relic_tip.bind(relic, side))
 			relic_slot.add_child(relic_button)
 		relic_grid.add_child(relic_slot)
 
@@ -1349,6 +1352,7 @@ func _show_battle_item_tip(item: Dictionary, side: String) -> void:
 	if finish_in_progress:
 		return
 	_close_battle_item_tip()
+	_close_battle_relic_tip()
 	var item_def: Dictionary = _dict(item, "def")
 	var item_name := _fallback(str(item_def.get("name", "")), str(item.get("defId", item.get("id", ""))))
 	var floating_tip := PanelContainer.new()
@@ -1421,6 +1425,78 @@ func _close_battle_item_tip() -> void:
 		battle_item_tip.get_parent().remove_child(battle_item_tip)
 	battle_item_tip.queue_free()
 	battle_item_tip = null
+
+func _show_battle_relic_tip(relic: Dictionary, side: String) -> void:
+	if finish_in_progress:
+		return
+	_close_battle_item_tip()
+	_close_battle_relic_tip()
+	var def: Dictionary = _dict(relic, "def")
+	var relic_name := _fallback(str(def.get("name", "")), str(relic.get("relicId", relic.get("id", ""))))
+	var floating_tip := PanelContainer.new()
+	floating_tip.name = "FloatingTip"
+	floating_tip.custom_minimum_size = Vector2(0, 204)
+	floating_tip.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	root.add_child(floating_tip)
+	battle_relic_tip = floating_tip
+
+	var tip := VBoxContainer.new()
+	tip.name = "BattleRelicTip"
+	tip.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	tip.add_theme_constant_override("separation", 7)
+	floating_tip.add_child(tip)
+
+	var tags := HBoxContainer.new()
+	tags.name = "BattleRelicTipTags"
+	tags.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	tags.add_theme_constant_override("separation", 6)
+	tip.add_child(tags)
+	_add_tip_label(tags, "BattleRelicTipQualityTag", _quality_label(str(relic.get("quality", ""))), HORIZONTAL_ALIGNMENT_CENTER)
+	for tag in _array(def, "tags"):
+		_add_tip_label(tags, "BattleRelicTipTag_%s" % _battle_node_key(str(tag)), str(tag), HORIZONTAL_ALIGNMENT_CENTER)
+	_add_tip_label(tags, "BattleRelicTipSideTag", side, HORIZONTAL_ALIGNMENT_CENTER)
+
+	var identity := HBoxContainer.new()
+	identity.name = "BattleRelicTipIdentity"
+	identity.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	identity.add_theme_constant_override("separation", 8)
+	tip.add_child(identity)
+	var icon := TextureRect.new()
+	icon.name = "BattleRelicTipIcon"
+	icon.texture = _battle_sticker_texture(str(relic.get("relicId", "")))
+	icon.custom_minimum_size = Vector2(44, 44)
+	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	identity.add_child(icon)
+	var identity_text := VBoxContainer.new()
+	identity_text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	identity.add_child(identity_text)
+	_add_tip_label(identity_text, "BattleRelicTipTitle", relic_name)
+	_add_tip_label(identity_text, "BattleRelicTipId", str(relic.get("id", "")))
+
+	_add_tip_label(tip, "BattleRelicTipDescription", _fallback(str(def.get("description", "")), str(relic.get("description", ""))))
+	var effect := str(def.get("effect", ""))
+	if not effect.is_empty():
+		_add_tip_label(tip, "BattleRelicTipEffect", effect)
+
+	var actions := HBoxContainer.new()
+	actions.name = "BattleRelicTipActions"
+	actions.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	actions.add_theme_constant_override("separation", 8)
+	tip.add_child(actions)
+	var close_button := Button.new()
+	close_button.name = "CloseBattleRelicTipButton"
+	close_button.text = "Close"
+	close_button.custom_minimum_size = Vector2(108, 42)
+	close_button.pressed.connect(_close_battle_relic_tip)
+	actions.add_child(close_button)
+
+func _close_battle_relic_tip() -> void:
+	if battle_relic_tip == null:
+		return
+	if battle_relic_tip.get_parent() != null:
+		battle_relic_tip.get_parent().remove_child(battle_relic_tip)
+	battle_relic_tip.queue_free()
+	battle_relic_tip = null
 
 func _add_tip_label(parent: Node, node_name: String, text: String, align := HORIZONTAL_ALIGNMENT_LEFT) -> Label:
 	var label := Label.new()

@@ -20,28 +20,25 @@ func _run() -> void:
 	if not battle_screen.has_method("_show_battle_relic_modal"):
 		_fail("BattleReplayScreen must expose battle relic details")
 		return
+	var player_relic := _relic("player-relic", "Battle Relic", "player bonus slot")
 	battle_screen.start_replay({
 		"playerMaxHp": 100,
 		"opponentMaxHp": 100,
 		"winner": "player",
 		"events": [],
-		"playerSnapshot": _snapshot("player-relic", "战斗遗物"),
-		"opponentSnapshot": _snapshot("opponent-relic", "对手遗物"),
+		"playerSnapshot": _snapshot("Hero", player_relic),
+		"opponentSnapshot": _snapshot("Rival", _relic("opponent-relic", "Counter Relic", "opponent relic")),
 	})
 	await process_frame
-	var relic_button := _find_button(battle_screen, "战斗遗物")
-	if relic_button == null or relic_button.disabled:
-		_fail("Battle relic button must be clickable")
-		return
-	relic_button.pressed.emit()
+	battle_screen.call("_show_battle_relic_modal", player_relic, "player")
 	await process_frame
 	if modal_layer.get_child_count() != 1:
 		_fail("Battle relic detail modal was not pushed")
 		return
 	var text := _collect_text(modal_layer)
-	for part in ["战斗遗物详情", "我方", "战斗遗物", "黄金", "额外装备槽", "EXTRA_EQUIPMENT_REDUCED_EFFECT"]:
+	for part in ["Battle Relic", "player bonus slot", "EXTRA_SLOT"]:
 		if not text.contains(str(part)):
-			_fail("Battle relic detail missing: %s" % str(part))
+			_fail("Battle relic detail modal missing: %s" % str(part))
 			return
 	main.queue_free()
 	for _frame in range(5):
@@ -49,32 +46,30 @@ func _run() -> void:
 	print("Godot battle relic detail modal smoke passed")
 	quit(0)
 
-func _snapshot(relic_id: String, relic_name: String) -> Dictionary:
+func _snapshot(display_name: String, relic: Dictionary) -> Dictionary:
 	return {
-		"name": relic_name,
+		"name": display_name,
 		"dogType": "SHIBA",
 		"wins": 0,
 		"losses": 0,
 		"round": 1,
 		"items": [],
-		"relics": [
-			{
-				"id": relic_id,
-				"relicId": relic_id,
-				"quality": "GOLD",
-				"def": {"name": relic_name, "description": "额外装备槽", "effect": "EXTRA_EQUIPMENT_REDUCED_EFFECT"},
-			},
-		],
+		"relics": [relic],
 	}
 
-func _find_button(node: Node, text_part: String) -> Button:
-	if node is Button and (node as Button).text.contains(text_part):
-		return node as Button
-	for child in node.get_children():
-		var result := _find_button(child, text_part)
-		if result != null:
-			return result
-	return null
+func _relic(relic_id: String, relic_name: String, description: String) -> Dictionary:
+	return {
+		"id": relic_id,
+		"relicId": relic_id,
+		"slot": 0,
+		"quality": "TEST",
+		"def": {
+			"name": relic_name,
+			"description": description,
+			"effect": "EXTRA_SLOT",
+			"tags": ["slot"],
+		},
+	}
 
 func _collect_text(node: Node) -> String:
 	var text := ""
