@@ -13,6 +13,7 @@ const MAP_NODE_ICONS := {
 var action_in_progress := false
 var selected_item_id := ""
 var selected_map_node_id := ""
+var selected_map_reward_key := ""
 
 func _ready() -> void:
 	_render()
@@ -336,6 +337,7 @@ func _render_map_detail_panel(parent: VBoxContainer, map_state: Dictionary) -> v
 			enter_button.name = "MapEnterActionButton"
 			detail.add_child(enter_button)
 		_add_label(detail, "MapNodeStateCopy", _map_node_state_text(current_node, map_state))
+	_render_selected_map_reward_tip(parent, map_state)
 
 func _render_map_monster_equipment(parent: VBoxContainer, monster: Dictionary) -> void:
 	var label := Label.new()
@@ -377,11 +379,73 @@ func _render_map_reward_preview(parent: VBoxContainer, rewards: Array) -> void:
 			var reward: Dictionary = reward_value
 			var def: Dictionary = _dict(reward, "def")
 			var reward_name := _fallback(str(def.get("name", "")), str(reward.get("defId", "")))
-			var button := _action_button("%s\n%s" % [_quality_label(str(reward.get("quality", ""))), reward_name], _noop)
+			var button := _action_button("%s\n%s" % [_quality_label(str(reward.get("quality", ""))), reward_name], _inspect_map_reward.bind(str(reward.get("defId", "")), str(reward.get("quality", ""))))
 			button.name = "MapRewardPreview_%s" % str(reward.get("defId", row.get_child_count()))
 			button.custom_minimum_size = Vector2(82, 62)
 			button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 			row.add_child(button)
+
+func _render_selected_map_reward_tip(parent: VBoxContainer, map_state: Dictionary) -> void:
+	var reward := _selected_map_reward(map_state)
+	if reward.is_empty():
+		return
+	var def: Dictionary = _dict(reward, "def")
+	var title := _fallback(str(def.get("name", "")), str(reward.get("defId", "")))
+	var floating_tip := PanelContainer.new()
+	floating_tip.name = "FloatingTip"
+	floating_tip.custom_minimum_size = Vector2(0, 220)
+	floating_tip.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	floating_tip.add_theme_stylebox_override("panel", WebUiTokens.paper_card_style())
+	parent.add_child(floating_tip)
+
+	var tip := VBoxContainer.new()
+	tip.name = "MapRewardTip"
+	tip.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	tip.add_theme_constant_override("separation", 7)
+	floating_tip.add_child(tip)
+
+	var tags := HBoxContainer.new()
+	tags.name = "MapRewardTipTags"
+	tags.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	tags.add_theme_constant_override("separation", 6)
+	tip.add_child(tags)
+	_add_label(tags, "MapRewardTipSizeTag", "%s\u683c" % _fallback(_detail_size_text(def), "?"), HORIZONTAL_ALIGNMENT_CENTER)
+	_add_label(tags, "MapRewardTipQualityTag", _quality_label(str(reward.get("quality", ""))), HORIZONTAL_ALIGNMENT_CENTER)
+
+	var identity := HBoxContainer.new()
+	identity.name = "MapRewardTipIdentity"
+	identity.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	identity.add_theme_constant_override("separation", 8)
+	tip.add_child(identity)
+	var art := Label.new()
+	art.name = "MapRewardTipArt"
+	art.text = ""
+	art.custom_minimum_size = Vector2(54, 54)
+	art.add_theme_stylebox_override("normal", WebUiTokens.resource_pill_style())
+	identity.add_child(art)
+	_add_label(identity, "MapRewardTipTitle", title)
+
+	var size_preview := HBoxContainer.new()
+	size_preview.name = "MapRewardTipSizePreview"
+	size_preview.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	size_preview.add_theme_constant_override("separation", 8)
+	tip.add_child(size_preview)
+	_add_label(size_preview, "MapRewardTipGridPreview", _shop_size_preview_text(def))
+	_add_label(size_preview, "MapRewardTipSizeText", "\u5360\u7528 %s \u683c" % _fallback(_detail_size_text(def), "?"))
+
+	var trigger := _trigger_dice_text(def)
+	_add_label(tip, "MapRewardTipDice", "\u89e6\u53d1\u70b9\u6570 %s" % trigger if not trigger.is_empty() else "\u89e6\u53d1\u70b9\u6570 -")
+	var description := _fallback(str(def.get("description", "")), str(reward.get("description", "")))
+	_add_label(tip, "MapRewardTipDescription", description)
+	_add_label(tip, "MapRewardTipPrice", "\u5730\u56fe\u6389\u843d\u9884\u89c8")
+
+	var actions := HBoxContainer.new()
+	actions.name = "MapRewardTipActions"
+	actions.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	tip.add_child(actions)
+	var close_button := _action_button("\u5173\u95ed", _close_map_reward_tip)
+	close_button.name = "CloseMapRewardTipButton"
+	actions.add_child(close_button)
 
 func _render_inventory_board(parent: VBoxContainer, run: Dictionary) -> void:
 	_render_grid_panel(parent, "EquipmentGridPanel", "装备格", "EQUIPMENT", run)
@@ -557,6 +621,16 @@ func _add_resource_pill(parent: Node, label: String, value: String) -> void:
 func _inspect_map_node(node_id: String) -> void:
 	selected_map_node_id = node_id
 	selected_item_id = ""
+	selected_map_reward_key = ""
+	_render()
+
+func _inspect_map_reward(def_id: String, quality: String) -> void:
+	selected_map_reward_key = "%s|%s" % [def_id, quality]
+	selected_item_id = ""
+	_render()
+
+func _close_map_reward_tip() -> void:
+	selected_map_reward_key = ""
 	_render()
 
 func _enter_map_node(node_id: String) -> void:
@@ -622,6 +696,21 @@ func _selected_item(run: Dictionary) -> Dictionary:
 	for item_value in _array(run, "items"):
 		if item_value is Dictionary and str((item_value as Dictionary).get("id", "")) == selected_item_id:
 			return item_value
+	return {}
+
+func _selected_map_reward(map_state: Dictionary) -> Dictionary:
+	if selected_map_reward_key.is_empty():
+		return {}
+	for node_value in _array(map_state, "nodes"):
+		if not node_value is Dictionary:
+			continue
+		var monster: Dictionary = _dict(node_value, "monster")
+		for reward_value in _variant_array(monster.get("possibleRewards", [])):
+			if reward_value is Dictionary:
+				var reward: Dictionary = reward_value
+				var reward_key := "%s|%s" % [str(reward.get("defId", "")), str(reward.get("quality", ""))]
+				if reward_key == selected_map_reward_key:
+					return reward
 	return {}
 
 func _fallback(value: String, fallback: String) -> String:

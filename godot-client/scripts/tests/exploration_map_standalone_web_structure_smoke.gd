@@ -107,6 +107,33 @@ func _run() -> void:
 		return
 	current_node_button.pressed.emit()
 	await process_frame
+	var reward_preview_button := _find_by_name(screen, "MapRewardPreview_starter-1") as Button
+	if reward_preview_button == null:
+		_fail("Map reward preview button is missing")
+		return
+	reward_preview_button.pressed.emit()
+	await process_frame
+	for reward_tip_node in [
+		"FloatingTip",
+		"MapRewardTip",
+		"MapRewardTipTags",
+		"MapRewardTipIdentity",
+		"MapRewardTipSizePreview",
+		"MapRewardTipDice",
+		"MapRewardTipDescription",
+		"MapRewardTipPrice",
+		"CloseMapRewardTipButton",
+	]:
+		_assert_has(screen, reward_tip_node)
+	var close_reward_tip := _find_by_name(screen, "CloseMapRewardTipButton") as Button
+	if close_reward_tip == null:
+		_fail("Map reward preview FloatingTip close button is missing")
+		return
+	close_reward_tip.pressed.emit()
+	await process_frame
+	if _find_by_name(screen, "FloatingTip") != null:
+		_fail("Map reward preview FloatingTip should close from its close button")
+		return
 	var bag_relic_row = _find_by_name(screen, "BagRelicRow")
 	if not bag_relic_row is HBoxContainer:
 		_fail("ExplorationMap BagRelicRow must lay out relic rail and bag grid side by side like Web InventoryBoard")
