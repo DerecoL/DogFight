@@ -2,6 +2,14 @@ extends BaseWebScreen
 
 const ApiRoutes := preload("res://scripts/api/ApiRoutes.gd")
 const DOGFIGHT_LOSS_LIMIT := 3
+const DOG_ASSETS := {
+	"SHIBA": "res://assets/dogs/shiba.webp",
+	"SAMOYED": "res://assets/dogs/samoyed.webp",
+	"MUTT": "res://assets/dogs/mutt.webp",
+	"BULLY": "res://assets/dogs/bully.webp",
+	"EMPEROR": "res://assets/dogs/emperor.webp",
+	"FROG": "res://assets/dogs/zuling.jpg",
+}
 
 var action_in_progress := false
 var error_message := ""
@@ -167,9 +175,70 @@ func _render_member_card(parent: VBoxContainer, member: Dictionary) -> void:
 		int(member.get("losses", 0)),
 		_dogfight_lives(member),
 	], _noop)
+	var legacy_text := button.text
 	button.name = "DogfightMember_%s" % member_id
 	button.custom_minimum_size = Vector2(0, 88)
+	button.text = ""
 	parent.add_child(button)
+
+	var margin := MarginContainer.new()
+	margin.name = "DogfightMemberContent_%s" % member_id
+	margin.set_anchors_preset(Control.PRESET_FULL_RECT)
+	margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	margin.add_theme_constant_override("margin_left", 10)
+	margin.add_theme_constant_override("margin_top", 8)
+	margin.add_theme_constant_override("margin_right", 10)
+	margin.add_theme_constant_override("margin_bottom", 8)
+	button.add_child(margin)
+
+	var row := HBoxContainer.new()
+	row.name = "DogfightMemberRow_%s" % member_id
+	row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_theme_constant_override("separation", 10)
+	margin.add_child(row)
+	if dog_type.is_empty():
+		var paw_badge := CenterContainer.new()
+		paw_badge.name = "DogfightMemberPaw_%s" % member_id
+		paw_badge.custom_minimum_size = Vector2(54, 54)
+		paw_badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var paw_icon := Label.new()
+		paw_icon.name = "DogfightMemberPawIcon_%s" % member_id
+		paw_icon.text = "🐾"
+		paw_icon.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		paw_icon.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		paw_icon.custom_minimum_size = Vector2(48, 48)
+		paw_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		paw_icon.add_theme_stylebox_override("normal", WebUiTokens.resource_pill_style())
+		paw_badge.add_child(paw_icon)
+		row.add_child(paw_badge)
+	else:
+		var badge := CenterContainer.new()
+		badge.name = "DogfightMemberDogBadge_%s" % member_id
+		badge.custom_minimum_size = Vector2(54, 54)
+		badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var avatar := TextureRect.new()
+		avatar.name = "DogfightMemberAvatar_%s" % member_id
+		avatar.custom_minimum_size = Vector2(48, 48)
+		avatar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		avatar.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
+		avatar.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		avatar.texture = _dog_texture(dog_type)
+		badge.add_child(avatar)
+		row.add_child(badge)
+
+	var text_box := VBoxContainer.new()
+	text_box.name = "DogfightMemberText_%s" % member_id
+	text_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	text_box.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	text_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	text_box.add_theme_constant_override("separation", 2)
+	row.add_child(text_box)
+	var legacy_label := _add_label(text_box, "DogfightMemberName_%s" % member_id, legacy_text)
+	legacy_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var status_label := _add_label(text_box, "DogfightMemberStatus_%s" % member_id, _room_member_status(member))
+	status_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 func _render_play_area(parent: GridContainer, room: Dictionary) -> void:
 	var play_area := _paper_panel(parent, "DogfightPlayArea")
@@ -356,6 +425,14 @@ func _can_ready_room_action(room: Dictionary) -> bool:
 func _dogfight_lives(member: Dictionary) -> int:
 	return 0 if bool(member.get("eliminated", false)) else max(0, DOGFIGHT_LOSS_LIMIT - int(member.get("losses", 0)))
 
+func _room_member_status(member: Dictionary) -> String:
+	if bool(member.get("eliminated", false)):
+		var round_text := str(member.get("eliminatedRound", ""))
+		return "淘汰" if round_text.is_empty() else "第 %s 回合淘汰" % round_text
+	if bool(member.get("ready", false)):
+		return "已准备"
+	return "存活"
+
 func _sorted_members(members: Array) -> Array:
 	var result := members.duplicate()
 	result.sort_custom(_compare_members)
@@ -386,6 +463,12 @@ func _dog_name(dog_type: String) -> String:
 			return "祖灵"
 		_:
 			return "等待选狗"
+
+func _dog_texture(dog_type: String) -> Texture2D:
+	var path := str(DOG_ASSETS.get(dog_type, ""))
+	if path.is_empty():
+		return null
+	return load(path) as Texture2D
 
 func _noop() -> void:
 	pass

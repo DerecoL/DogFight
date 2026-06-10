@@ -2774,11 +2774,72 @@ func _render_dogfight_member_card(parent: VBoxContainer, member: Dictionary) -> 
 		int(member.get("losses", 0)),
 		_dogfight_lives(member),
 	], 0)
+	var legacy_text := button.text
 	button.name = "DogfightMember_%s" % member_id
 	button.custom_minimum_size = Vector2(0, 88)
+	button.text = ""
 	button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	button.pressed.connect(_show_room_member_modal.bind(member))
 	parent.add_child(button)
+
+	var margin := MarginContainer.new()
+	margin.name = "DogfightMemberContent_%s" % member_id
+	margin.set_anchors_preset(Control.PRESET_FULL_RECT)
+	margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	margin.add_theme_constant_override("margin_left", 10)
+	margin.add_theme_constant_override("margin_top", 8)
+	margin.add_theme_constant_override("margin_right", 10)
+	margin.add_theme_constant_override("margin_bottom", 8)
+	button.add_child(margin)
+
+	var row := HBoxContainer.new()
+	row.name = "DogfightMemberRow_%s" % member_id
+	row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_theme_constant_override("separation", 10)
+	margin.add_child(row)
+	if dog_type.is_empty():
+		var paw_badge := CenterContainer.new()
+		paw_badge.name = "DogfightMemberPaw_%s" % member_id
+		paw_badge.custom_minimum_size = Vector2(54, 54)
+		paw_badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var paw_icon := Label.new()
+		paw_icon.name = "DogfightMemberPawIcon_%s" % member_id
+		paw_icon.text = "🐾"
+		paw_icon.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		paw_icon.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		paw_icon.custom_minimum_size = Vector2(48, 48)
+		paw_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		paw_icon.add_theme_color_override("font_color", UiTokens.ink_color())
+		paw_badge.add_child(paw_icon)
+		row.add_child(paw_badge)
+	else:
+		var badge := CenterContainer.new()
+		badge.name = "DogfightMemberDogBadge_%s" % member_id
+		badge.custom_minimum_size = Vector2(54, 54)
+		badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var avatar := TextureRect.new()
+		avatar.name = "DogfightMemberAvatar_%s" % member_id
+		avatar.custom_minimum_size = Vector2(48, 48)
+		avatar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		avatar.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
+		avatar.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		avatar.texture = _dog_texture(dog_type)
+		badge.add_child(avatar)
+		row.add_child(badge)
+
+	var text_box := VBoxContainer.new()
+	text_box.name = "DogfightMemberText_%s" % member_id
+	text_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	text_box.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	text_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	text_box.add_theme_constant_override("separation", 2)
+	row.add_child(text_box)
+	var legacy_label := _add_plain_line(text_box, legacy_text)
+	legacy_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var status_label := _add_plain_line(text_box, _room_member_status(member))
+	status_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 func _render_dogfight_play_area(parent: GridContainer, room: Dictionary) -> void:
 	var play_area := _dogfight_panel(parent, "DogfightPlayArea")

@@ -49,6 +49,16 @@ func _run() -> void:
 				"ready": true,
 				"eliminated": false,
 			},
+			{
+				"id": "member-waiting",
+				"nickname": "waiting-player",
+				"kind": "PLAYER",
+				"isHost": false,
+				"wins": 0,
+				"losses": 0,
+				"ready": false,
+				"eliminated": false,
+			},
 		],
 		"battles": [
 			{"id": "battle-1", "round": 3, "opponentKind": "PLAYER"},
@@ -96,12 +106,23 @@ func _run() -> void:
 		"DogfightRoomColumns",
 		"DogfightSurvivorBoard",
 		"DogfightMember_member-host",
+		"DogfightMemberDogBadge_member-host",
+		"DogfightMemberAvatar_member-host",
 		"DogfightMember_member-bot",
+		"DogfightMemberDogBadge_member-bot",
+		"DogfightMemberAvatar_member-bot",
+		"DogfightMember_member-waiting",
+		"DogfightMemberPaw_member-waiting",
 		"DogfightPlayArea",
 		"DogfightBattleDock",
 		"DogfightBattleRow_battle-1",
 	]:
 		_assert_has(run_screen, node_name)
+	for avatar_name in ["DogfightMemberAvatar_member-host", "DogfightMemberAvatar_member-bot"]:
+		var avatar = _find_by_name(run_screen, avatar_name) as TextureRect
+		if avatar == null or avatar.texture == null:
+			_fail("Dogfight member DogBadge avatar missing texture: %s" % avatar_name)
+			return
 
 	var columns = _find_by_name(run_screen, "DogfightRoomColumns")
 	if not columns is GridContainer:

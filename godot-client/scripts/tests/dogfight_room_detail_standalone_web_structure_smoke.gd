@@ -31,12 +31,23 @@ func _run() -> void:
 		"DogfightRoomColumns",
 		"DogfightSurvivorBoard",
 		"DogfightMember_member-host",
+		"DogfightMemberDogBadge_member-host",
+		"DogfightMemberAvatar_member-host",
 		"DogfightMember_member-bot",
+		"DogfightMemberDogBadge_member-bot",
+		"DogfightMemberAvatar_member-bot",
+		"DogfightMember_member-waiting",
+		"DogfightMemberPaw_member-waiting",
 		"DogfightPlayArea",
 		"DogfightBattleDock",
 		"DogfightBattleRow_battle-1",
 	]:
 		_assert_has(screen, node_name)
+	for avatar_name in ["DogfightMemberAvatar_member-host", "DogfightMemberAvatar_member-bot"]:
+		var avatar = _find_by_name(screen, avatar_name) as TextureRect
+		if avatar == null or avatar.texture == null:
+			_fail("Standalone dogfight member DogBadge avatar missing texture: %s" % avatar_name)
+			return
 
 	var columns = _find_by_name(screen, "DogfightRoomColumns")
 	if not columns is GridContainer:
@@ -111,6 +122,16 @@ func _sample_room() -> Dictionary:
 				"wins": 1,
 				"losses": 2,
 				"ready": true,
+				"eliminated": false,
+			},
+			{
+				"id": "member-waiting",
+				"nickname": "waiting-player",
+				"kind": "PLAYER",
+				"isHost": false,
+				"wins": 0,
+				"losses": 0,
+				"ready": false,
 				"eliminated": false,
 			},
 		],
