@@ -107,6 +107,36 @@ func _run() -> void:
 		return
 	current_node_button.pressed.emit()
 	await process_frame
+	var monster_equipment_button := _find_by_name(screen, "MapMonsterEquipmentButton_monster-item") as Button
+	if monster_equipment_button == null or monster_equipment_button.disabled:
+		_fail("Map monster equipment button should be clickable like Web monster equipment preview")
+		return
+	monster_equipment_button.pressed.emit()
+	await process_frame
+	for monster_tip_node in [
+		"MapMonsterEquipmentPreviewModal",
+		"MapMonsterEquipmentSheet",
+		"MapMonsterEquipmentHeader",
+		"MapMonsterEquipmentPreview",
+		"FloatingTip",
+		"MapMonsterItemTip",
+		"MapMonsterItemTipTags",
+		"MapMonsterItemTipIdentity",
+		"MapMonsterItemTipSizePreview",
+		"MapMonsterItemTipDice",
+		"MapMonsterItemTipDescription",
+		"CloseMapMonsterItemTipButton",
+	]:
+		_assert_has(screen, monster_tip_node)
+	var close_monster_tip := _find_by_name(screen, "CloseMapMonsterItemTipButton") as Button
+	if close_monster_tip == null:
+		_fail("Map monster equipment tip close button is missing")
+		return
+	close_monster_tip.pressed.emit()
+	await process_frame
+	if _find_by_name(screen, "MapMonsterEquipmentPreviewModal") != null:
+		_fail("Map monster equipment preview should close from its close button")
+		return
 	var reward_preview_button := _find_by_name(screen, "MapRewardPreview_starter-1") as Button
 	if reward_preview_button == null:
 		_fail("Map reward preview button is missing")
@@ -260,7 +290,7 @@ func _node(id: String, kind: String, layer: int, column: int, next_ids: Array) -
 			"name": "训练野狗",
 			"dogType": "SHIBA",
 			"round": 2,
-			"equipment": [],
+			"equipment": [_item("monster-item", "EQUIPMENT", 0)],
 			"possibleRewards": [
 				{"defId": "starter-1", "quality": "SILVER", "def": {"name": "1点牙咬"}},
 			],

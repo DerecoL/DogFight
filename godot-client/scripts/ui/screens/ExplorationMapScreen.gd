@@ -14,6 +14,7 @@ var action_in_progress := false
 var selected_item_id := ""
 var selected_map_node_id := ""
 var selected_map_reward_key := ""
+var selected_monster_equipment_item: Dictionary = {}
 
 func _ready() -> void:
 	_render()
@@ -337,6 +338,7 @@ func _render_map_detail_panel(parent: VBoxContainer, map_state: Dictionary) -> v
 			enter_button.name = "MapEnterActionButton"
 			detail.add_child(enter_button)
 		_add_label(detail, "MapNodeStateCopy", _map_node_state_text(current_node, map_state))
+	_render_selected_monster_equipment_tip(parent)
 	_render_selected_map_reward_tip(parent, map_state)
 
 func _render_map_monster_equipment(parent: VBoxContainer, monster: Dictionary) -> void:
@@ -355,7 +357,8 @@ func _render_map_monster_equipment(parent: VBoxContainer, monster: Dictionary) -
 	var items := _variant_array(monster.get("equipment", []))
 	for x in range(6):
 		var item := _item_at_slot(items, "EQUIPMENT", x)
-		var button := _action_button(_slot_label(item, x), _noop)
+		var button := _action_button(_slot_label(item, x), _inspect_monster_equipment_item.bind(item))
+		button.name = "MapMonsterEquipmentButton_%s" % str(item.get("id", "slot-%d" % x))
 		button.custom_minimum_size = Vector2(52, 48)
 		button.disabled = item.is_empty()
 		grid.add_child(button)
@@ -445,6 +448,79 @@ func _render_selected_map_reward_tip(parent: VBoxContainer, map_state: Dictionar
 	tip.add_child(actions)
 	var close_button := _action_button("\u5173\u95ed", _close_map_reward_tip)
 	close_button.name = "CloseMapRewardTipButton"
+	actions.add_child(close_button)
+
+func _render_selected_monster_equipment_tip(parent: VBoxContainer) -> void:
+	if selected_monster_equipment_item.is_empty():
+		return
+	var item := selected_monster_equipment_item
+	var def: Dictionary = _dict(item, "def")
+	var title := _fallback(str(def.get("name", "")), str(item.get("defId", item.get("id", ""))))
+	var modal := PanelContainer.new()
+	modal.name = "MapMonsterEquipmentPreviewModal"
+	modal.custom_minimum_size = Vector2(0, 260)
+	modal.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	modal.add_theme_stylebox_override("panel", WebUiTokens.paper_card_style())
+	parent.add_child(modal)
+
+	var sheet := VBoxContainer.new()
+	sheet.name = "MapMonsterEquipmentSheet"
+	sheet.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	sheet.add_theme_constant_override("separation", 8)
+	modal.add_child(sheet)
+	_add_label(sheet, "MapMonsterEquipmentHeader", "\u91ce\u602a\u88c5\u5907\u680f\u9884\u89c8")
+	_add_label(sheet, "MapMonsterEquipmentPreview", "\u70b9\u51fb\u88c5\u5907\u67e5\u770b\u8be6\u60c5")
+
+	var floating_tip := PanelContainer.new()
+	floating_tip.name = "FloatingTip"
+	floating_tip.custom_minimum_size = Vector2(0, 220)
+	floating_tip.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	floating_tip.add_theme_stylebox_override("panel", WebUiTokens.paper_card_style())
+	sheet.add_child(floating_tip)
+
+	var tip := VBoxContainer.new()
+	tip.name = "MapMonsterItemTip"
+	tip.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	tip.add_theme_constant_override("separation", 7)
+	floating_tip.add_child(tip)
+	var tags := HBoxContainer.new()
+	tags.name = "MapMonsterItemTipTags"
+	tags.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	tags.add_theme_constant_override("separation", 6)
+	tip.add_child(tags)
+	_add_label(tags, "MapMonsterItemTipSizeTag", "%s\u683c" % _fallback(_detail_size_text(def), "?"), HORIZONTAL_ALIGNMENT_CENTER)
+	_add_label(tags, "MapMonsterItemTipQualityTag", _quality_label(str(item.get("quality", ""))), HORIZONTAL_ALIGNMENT_CENTER)
+
+	var identity := HBoxContainer.new()
+	identity.name = "MapMonsterItemTipIdentity"
+	identity.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	identity.add_theme_constant_override("separation", 8)
+	tip.add_child(identity)
+	var art := Label.new()
+	art.name = "MapMonsterItemTipArt"
+	art.text = ""
+	art.custom_minimum_size = Vector2(54, 54)
+	art.add_theme_stylebox_override("normal", WebUiTokens.resource_pill_style())
+	identity.add_child(art)
+	_add_label(identity, "MapMonsterItemTipTitle", title)
+
+	var size_preview := HBoxContainer.new()
+	size_preview.name = "MapMonsterItemTipSizePreview"
+	size_preview.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	size_preview.add_theme_constant_override("separation", 8)
+	tip.add_child(size_preview)
+	_add_label(size_preview, "MapMonsterItemTipGridPreview", _shop_size_preview_text(def))
+	_add_label(size_preview, "MapMonsterItemTipSizeText", "\u5360\u7528 %s \u683c" % _fallback(_detail_size_text(def), "?"))
+	var trigger := _trigger_dice_text(def)
+	_add_label(tip, "MapMonsterItemTipDice", "\u89e6\u53d1\u70b9\u6570 %s" % trigger if not trigger.is_empty() else "\u89e6\u53d1\u70b9\u6570 -")
+	var description := _fallback(str(def.get("description", "")), str(item.get("description", "")))
+	_add_label(tip, "MapMonsterItemTipDescription", description)
+	var actions := HBoxContainer.new()
+	actions.name = "MapMonsterItemTipActions"
+	actions.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	tip.add_child(actions)
+	var close_button := _action_button("\u5173\u95ed", _close_monster_equipment_tip)
+	close_button.name = "CloseMapMonsterItemTipButton"
 	actions.add_child(close_button)
 
 func _render_inventory_board(parent: VBoxContainer, run: Dictionary) -> void:
@@ -622,15 +698,29 @@ func _inspect_map_node(node_id: String) -> void:
 	selected_map_node_id = node_id
 	selected_item_id = ""
 	selected_map_reward_key = ""
+	selected_monster_equipment_item = {}
 	_render()
 
 func _inspect_map_reward(def_id: String, quality: String) -> void:
 	selected_map_reward_key = "%s|%s" % [def_id, quality]
 	selected_item_id = ""
+	selected_monster_equipment_item = {}
 	_render()
 
 func _close_map_reward_tip() -> void:
 	selected_map_reward_key = ""
+	_render()
+
+func _inspect_monster_equipment_item(item: Dictionary) -> void:
+	if item.is_empty():
+		return
+	selected_monster_equipment_item = item.duplicate(true)
+	selected_item_id = ""
+	selected_map_reward_key = ""
+	_render()
+
+func _close_monster_equipment_tip() -> void:
+	selected_monster_equipment_item = {}
 	_render()
 
 func _enter_map_node(node_id: String) -> void:
