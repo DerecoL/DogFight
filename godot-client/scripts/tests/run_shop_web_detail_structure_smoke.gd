@@ -52,6 +52,20 @@ func _run() -> void:
 	]:
 		_assert_has(run_screen, node_name)
 
+	var shop_card_button := _find_by_name(run_screen, "ShopCard_offer-1") as Button
+	if shop_card_button == null:
+		_fail("Legacy ShopCard root must be a clickable Button like Web ShopCard")
+		return
+	var modal_layer = main.get_node_or_null("OverlayRoot/ModalLayer")
+	if modal_layer == null:
+		_fail("ModalLayer is missing")
+		return
+	shop_card_button.pressed.emit()
+	await process_frame
+	if modal_layer.get_child_count() != 1:
+		_fail("Legacy ShopCard root click must open the same detail modal as Web ShopCard")
+		return
+
 	var text := _collect_text(run_screen)
 	for part in [
 		"装备店",

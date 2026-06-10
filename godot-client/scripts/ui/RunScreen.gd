@@ -1858,17 +1858,32 @@ func _shop_progression_button(run: Dictionary) -> Button:
 func _render_shop_offer_card(parent: VBoxContainer, run: Dictionary, offer: Dictionary) -> void:
 	var def: Dictionary = _dict(offer, "def")
 	var offer_id := str(offer.get("offerId", parent.get_child_count() + 1))
-	var box := VBoxContainer.new()
+	var box := _action_button("", _show_offer_modal.bind(offer))
 	box.name = "ShopCard_%s" % offer_id
 	box.custom_minimum_size = Vector2(0, 118)
-	box.add_theme_constant_override("separation", 4)
+	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	box.add_theme_stylebox_override("normal", UiTokens.paper_panel_style())
+	box.add_theme_stylebox_override("hover", UiTokens.paper_panel_style())
+	box.add_theme_stylebox_override("pressed", UiTokens.paper_panel_style())
 	parent.add_child(box)
+	var content := VBoxContainer.new()
+	content.name = "ShopCardContent_%s" % offer_id
+	content.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	content.set_anchors_preset(Control.PRESET_FULL_RECT)
+	content.offset_left = 8
+	content.offset_top = 8
+	content.offset_right = -8
+	content.offset_bottom = -8
+	content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	content.add_theme_constant_override("separation", 4)
+	box.add_child(content)
 	var quality_chip := Label.new()
 	quality_chip.name = "ShopQualityChip_%s" % offer_id
 	quality_chip.text = _quality_label(str(offer.get("quality", "")))
 	quality_chip.custom_minimum_size = Vector2(0, 24)
 	quality_chip.add_theme_color_override("font_color", UiTokens.ink_color())
-	box.add_child(quality_chip)
+	quality_chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	content.add_child(quality_chip)
 	var owned_count := _shop_offer_owned_count(run, offer)
 	if owned_count > 0:
 		var owned_badge := Label.new()
@@ -1876,17 +1891,19 @@ func _render_shop_offer_card(parent: VBoxContainer, run: Dictionary, offer: Dict
 		owned_badge.text = "已拥有 x%d" % owned_count
 		owned_badge.custom_minimum_size = Vector2(0, 24)
 		owned_badge.add_theme_color_override("font_color", UiTokens.ink_color())
-		box.add_child(owned_badge)
+		owned_badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		content.add_child(owned_badge)
 	var art_button := _action_button("", _show_offer_modal.bind(offer))
 	art_button.name = "ShopCardArt_%s" % offer_id
 	art_button.custom_minimum_size = Vector2(0, 52)
 	_apply_button_icon(art_button, _offer_texture(offer))
-	box.add_child(art_button)
+	content.add_child(art_button)
 	var main := HBoxContainer.new()
 	main.name = "ShopCardMain_%s" % offer_id
+	main.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	main.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	main.add_theme_constant_override("separation", 8)
-	box.add_child(main)
+	content.add_child(main)
 	var name_button := _action_button(_fallback(str(def.get("name", "")), str(offer.get("defId", offer_id))), _show_offer_modal.bind(offer))
 	name_button.name = "ShopName_%s" % offer_id
 	main.add_child(name_button)
@@ -1897,17 +1914,20 @@ func _render_shop_offer_card(parent: VBoxContainer, run: Dictionary, offer: Dict
 	size_badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	size_badge.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	size_badge.add_theme_color_override("font_color", UiTokens.ink_color())
+	size_badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	main.add_child(size_badge)
 	var meta := HBoxContainer.new()
 	meta.name = "ShopCardMeta_%s" % offer_id
+	meta.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	meta.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	meta.add_theme_constant_override("separation", 8)
-	box.add_child(meta)
+	content.add_child(meta)
 	var size_preview := Label.new()
 	size_preview.name = "ShopSizePreview_%s" % offer_id
 	size_preview.text = _shop_size_preview_text(def)
 	size_preview.custom_minimum_size = Vector2(70, 28)
 	size_preview.add_theme_color_override("font_color", UiTokens.ink_color())
+	size_preview.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	meta.add_child(size_preview)
 	var trigger := _map_preview_trigger_text(offer)
 	if not trigger.is_empty():
@@ -1916,6 +1936,7 @@ func _render_shop_offer_card(parent: VBoxContainer, run: Dictionary, offer: Dict
 		dice_line.text = "点数 %s" % trigger
 		dice_line.custom_minimum_size = Vector2(86, 28)
 		dice_line.add_theme_color_override("font_color", UiTokens.ink_color())
+		dice_line.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		meta.add_child(dice_line)
 	var description := _fallback(str(def.get("description", "")), str(offer.get("description", "")))
 	if not description.is_empty():
@@ -1925,13 +1946,15 @@ func _render_shop_offer_card(parent: VBoxContainer, run: Dictionary, offer: Dict
 		effect_line.custom_minimum_size = Vector2(0, 34)
 		effect_line.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		effect_line.add_theme_color_override("font_color", UiTokens.ink_color())
-		box.add_child(effect_line)
+		effect_line.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		content.add_child(effect_line)
 	var price_tag := Label.new()
 	price_tag.name = "ShopPriceTag_%s" % offer_id
 	price_tag.text = "价格 %s" % _shop_offer_price_text(offer)
 	price_tag.custom_minimum_size = Vector2(0, 28)
 	price_tag.add_theme_color_override("font_color", UiTokens.ink_color())
-	box.add_child(price_tag)
+	price_tag.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	content.add_child(price_tag)
 	var missing_gold := int(offer.get("price", 0)) - int(run.get("gold", 0))
 	if missing_gold > 0:
 		_add_plain_line(box, "金币不足，还差 %d 金币" % missing_gold)
@@ -5969,12 +5992,17 @@ func _add_line(parent: VBoxContainer, label: String, value: String) -> void:
 	parent.add_child(row)
 
 func _add_plain_line(parent: Node, text: String) -> Label:
+	if parent is Button and str(parent.name).begins_with("ShopCard_"):
+		var content := parent.get_node_or_null("ShopCardContent_%s" % str(parent.name).replace("ShopCard_", ""))
+		if content != null:
+			return _add_plain_line(content, text)
 	var row := Label.new()
 	row.custom_minimum_size = Vector2(0, 24)
 	row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	row.text = text
 	row.add_theme_color_override("font_color", UiTokens.ink_color())
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	parent.add_child(row)
 	return row
 

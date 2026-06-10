@@ -109,19 +109,33 @@ func _render_shop_shelf(parent: Node, run: Dictionary) -> void:
 func _render_shop_offer_card(parent: VBoxContainer, run: Dictionary, offer: Dictionary) -> void:
 	var def: Dictionary = _dict(offer, "def")
 	var offer_id := str(offer.get("offerId", parent.get_child_count() + 1))
-	var box := VBoxContainer.new()
+	var box := _action_button("", _select_offer.bind(offer_id))
 	box.name = "ShopCard_%s" % offer_id
 	box.custom_minimum_size = Vector2(0, 118)
 	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	box.add_theme_constant_override("separation", 4)
 	box.add_theme_stylebox_override("normal", WebUiTokens.paper_card_style())
+	box.add_theme_stylebox_override("hover", WebUiTokens.paper_card_style())
+	box.add_theme_stylebox_override("pressed", WebUiTokens.paper_card_style())
 	parent.add_child(box)
+
+	var content := VBoxContainer.new()
+	content.name = "ShopCardContent_%s" % offer_id
+	content.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	content.set_anchors_preset(Control.PRESET_FULL_RECT)
+	content.offset_left = 8
+	content.offset_top = 8
+	content.offset_right = -8
+	content.offset_bottom = -8
+	content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	content.add_theme_constant_override("separation", 4)
+	box.add_child(content)
 
 	var quality_chip := Label.new()
 	quality_chip.name = "ShopQualityChip_%s" % offer_id
 	quality_chip.text = _quality_label(str(offer.get("quality", "")))
 	quality_chip.custom_minimum_size = Vector2(0, 24)
-	box.add_child(quality_chip)
+	quality_chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	content.add_child(quality_chip)
 
 	var owned_count := _shop_offer_owned_count(run, offer)
 	if owned_count > 0:
@@ -129,12 +143,13 @@ func _render_shop_offer_card(parent: VBoxContainer, run: Dictionary, offer: Dict
 		owned_badge.name = "ShopOwnedBadge_%s" % offer_id
 		owned_badge.text = "已拥有 x%d" % owned_count
 		owned_badge.custom_minimum_size = Vector2(0, 24)
-		box.add_child(owned_badge)
+		owned_badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		content.add_child(owned_badge)
 
 	var art_button := _action_button("", _select_offer.bind(offer_id))
 	art_button.name = "ShopCardArt_%s" % offer_id
 	art_button.custom_minimum_size = Vector2(0, 52)
-	box.add_child(art_button)
+	content.add_child(art_button)
 	var art := TextureRect.new()
 	art.name = "ShopCardArtIcon_%s" % offer_id
 	art.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -145,9 +160,10 @@ func _render_shop_offer_card(parent: VBoxContainer, run: Dictionary, offer: Dict
 
 	var main := HBoxContainer.new()
 	main.name = "ShopCardMain_%s" % offer_id
+	main.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	main.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	main.add_theme_constant_override("separation", 8)
-	box.add_child(main)
+	content.add_child(main)
 	var name_button := _action_button(_fallback(str(def.get("name", "")), str(offer.get("defId", offer_id))), _select_offer.bind(offer_id))
 	name_button.name = "ShopName_%s" % offer_id
 	main.add_child(name_button)
@@ -157,17 +173,20 @@ func _render_shop_offer_card(parent: VBoxContainer, run: Dictionary, offer: Dict
 	size_badge.custom_minimum_size = Vector2(54, 32)
 	size_badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	size_badge.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	size_badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	main.add_child(size_badge)
 
 	var meta := HBoxContainer.new()
 	meta.name = "ShopCardMeta_%s" % offer_id
+	meta.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	meta.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	meta.add_theme_constant_override("separation", 8)
-	box.add_child(meta)
+	content.add_child(meta)
 	var size_preview := Label.new()
 	size_preview.name = "ShopSizePreview_%s" % offer_id
 	size_preview.text = _shop_size_preview_text(def)
 	size_preview.custom_minimum_size = Vector2(70, 28)
+	size_preview.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	meta.add_child(size_preview)
 	var trigger := _trigger_dice_text(def)
 	if not trigger.is_empty():
@@ -175,12 +194,15 @@ func _render_shop_offer_card(parent: VBoxContainer, run: Dictionary, offer: Dict
 		dice_line.name = "ShopDiceLine_%s" % offer_id
 		dice_line.text = "点数 %s" % trigger
 		dice_line.custom_minimum_size = Vector2(86, 28)
+		dice_line.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		meta.add_child(dice_line)
 
 	var description := _fallback(str(def.get("description", "")), str(offer.get("description", "")))
 	if not description.is_empty():
-		_add_label(box, "ShopEffectLine_%s" % offer_id, description)
-	_add_label(box, "ShopPriceTag_%s" % offer_id, _price_text(offer))
+		var effect_line := _add_label(content, "ShopEffectLine_%s" % offer_id, description)
+		effect_line.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var price_tag := _add_label(content, "ShopPriceTag_%s" % offer_id, _price_text(offer))
+	price_tag.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 func _render_inventory_board(parent: Node, run: Dictionary) -> void:
 	var inventory_panel := PanelContainer.new()

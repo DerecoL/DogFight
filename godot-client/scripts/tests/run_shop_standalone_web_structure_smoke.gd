@@ -68,6 +68,10 @@ func _run() -> void:
 	if not bag_relic_row is HBoxContainer:
 		_fail("BagRelicRow must lay out relic rail and bag grid side by side like Web InventoryBoard")
 		return
+	var shop_card_button := _find_by_name(screen, "ShopCard_offer-1") as Button
+	if shop_card_button == null:
+		_fail("ShopCard root must be a clickable Button like Web ShopCard")
+		return
 	var offer_button := _find_by_name(screen, "ShopCardArt_offer-1") as Button
 	if offer_button == null:
 		_fail("Shop offer art button is missing")
@@ -76,7 +80,7 @@ func _run() -> void:
 	if offer_icon == null or offer_icon.texture == null:
 		_fail("Shop offer art must render the Web ItemArt sticker texture")
 		return
-	offer_button.pressed.emit()
+	shop_card_button.pressed.emit()
 	await process_frame
 	for node_name in [
 		"FloatingTip",
