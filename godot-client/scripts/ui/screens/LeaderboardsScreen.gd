@@ -1,5 +1,16 @@
 extends BaseWebScreen
 
+const DOG_TYPES := ["SHIBA", "SAMOYED", "MUTT", "BULLY", "EMPEROR", "FROG"]
+const DOG_SELECTION_SLOT_COUNT := 8
+const DOG_ASSETS := {
+	"SHIBA": "res://assets/dogs/shiba.webp",
+	"SAMOYED": "res://assets/dogs/samoyed.webp",
+	"MUTT": "res://assets/dogs/mutt.webp",
+	"BULLY": "res://assets/dogs/bully.webp",
+	"EMPEROR": "res://assets/dogs/emperor.webp",
+	"FROG": "res://assets/dogs/zuling.jpg",
+}
+
 var selected_dog := "SHIBA"
 var lucky_number := 1
 var action_in_progress := false
@@ -111,26 +122,29 @@ func _render_ladder_start(parent: VBoxContainer) -> void:
 
 	var grid := GridContainer.new()
 	grid.name = "DogCardGrid"
-	grid.columns = 3
-	grid.add_theme_constant_override("h_separation", 8)
-	grid.add_theme_constant_override("v_separation", 8)
+	grid.columns = 4
+	grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	grid.add_theme_constant_override("h_separation", 12)
+	grid.add_theme_constant_override("v_separation", 12)
 	dog_select.add_child(grid)
-	for dog in ["SHIBA", "SAMOYED", "MUTT", "BULLY", "EMPEROR", "FROG"]:
-		var button := Button.new()
-		button.name = "LadderDogCard_%s" % dog
-		button.text = "%s\n%s" % [_dog_label(dog), _dog_trait(dog)]
-		button.custom_minimum_size = Vector2(140, 84)
-		button.toggle_mode = true
-		button.button_pressed = dog == selected_dog
-		button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		button.pressed.connect(_select_dog.bind(dog))
-		grid.add_child(button)
+	for index in range(DOG_SELECTION_SLOT_COUNT):
+		if index < DOG_TYPES.size():
+			grid.add_child(_ladder_dog_card_button(str(DOG_TYPES[index])))
+		else:
+			grid.add_child(_ladder_dog_card_placeholder(index))
 
 	var detail := VBoxContainer.new()
 	detail.name = "DogDetailPanel"
 	detail.custom_minimum_size = Vector2(260, 0)
 	detail.add_theme_constant_override("separation", 8)
 	dog_select.add_child(detail)
+	var detail_art := TextureRect.new()
+	detail_art.name = "DogDetailArt"
+	detail_art.custom_minimum_size = Vector2(0, 122)
+	detail_art.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
+	detail_art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	detail_art.texture = _dog_texture(selected_dog)
+	detail.add_child(detail_art)
 	_add_label(detail, "DogDetailName", _dog_label(selected_dog), HORIZONTAL_ALIGNMENT_CENTER)
 	_add_label(detail, "DogDetailStrategy", _dog_strategy(selected_dog), HORIZONTAL_ALIGNMENT_CENTER)
 	if selected_dog == "EMPEROR":
@@ -142,6 +156,67 @@ func _render_ladder_start(parent: VBoxContainer) -> void:
 	start_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	start_button.pressed.connect(_start_ladder_run)
 	detail.add_child(start_button)
+
+func _ladder_dog_card_button(dog_type: String) -> Button:
+	var button := Button.new()
+	button.name = "LadderDogCard_%s" % dog_type
+	button.text = ""
+	button.custom_minimum_size = Vector2(148, 150)
+	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	button.toggle_mode = true
+	button.button_pressed = dog_type == selected_dog
+	button.add_theme_stylebox_override("normal", WebUiTokens.handdrawn_button_style())
+	button.add_theme_stylebox_override("hover", WebUiTokens.handdrawn_button_hover_style())
+	button.add_theme_stylebox_override("pressed", WebUiTokens.handdrawn_button_pressed_style())
+	button.pressed.connect(_select_dog.bind(dog_type))
+
+	var margin := MarginContainer.new()
+	margin.name = "LadderDogCardContent_%s" % dog_type
+	margin.set_anchors_preset(Control.PRESET_FULL_RECT)
+	margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	margin.add_theme_constant_override("margin_left", 10)
+	margin.add_theme_constant_override("margin_top", 10)
+	margin.add_theme_constant_override("margin_right", 10)
+	margin.add_theme_constant_override("margin_bottom", 10)
+	button.add_child(margin)
+
+	var content := VBoxContainer.new()
+	content.name = "LadderDogCardStack_%s" % dog_type
+	content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	content.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	content.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	content.add_theme_constant_override("separation", 6)
+	margin.add_child(content)
+
+	var art_frame := PanelContainer.new()
+	art_frame.name = "LadderDogCardArtFrame_%s" % dog_type
+	art_frame.custom_minimum_size = Vector2(0, 50)
+	art_frame.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	art_frame.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	art_frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	art_frame.add_theme_stylebox_override("panel", WebUiTokens.paper_card_style())
+	content.add_child(art_frame)
+
+	var art := TextureRect.new()
+	art.name = "LadderDogCardArt_%s" % dog_type
+	art.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	art.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
+	art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	art.texture = _dog_texture(dog_type)
+	art_frame.add_child(art)
+
+	_add_label(content, "LadderDogCardName_%s" % dog_type, _dog_label(dog_type), HORIZONTAL_ALIGNMENT_CENTER).mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_add_label(content, "LadderDogCardCopy_%s" % dog_type, _dog_trait(dog_type), HORIZONTAL_ALIGNMENT_CENTER).mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return button
+
+func _ladder_dog_card_placeholder(index: int) -> PanelContainer:
+	var placeholder := PanelContainer.new()
+	placeholder.name = "LadderDogCardPlaceholder_%d" % index
+	placeholder.custom_minimum_size = Vector2(148, 150)
+	placeholder.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	placeholder.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	placeholder.add_theme_stylebox_override("panel", WebUiTokens.paper_card_style())
+	return placeholder
 
 func _render_recent_settlements(parent: VBoxContainer) -> void:
 	var settlements := _array(_ladder_data(), "recentSettlements")
@@ -308,6 +383,12 @@ func _dog_trait(dog_type: String) -> String:
 			return "遗物联动"
 		_:
 			return "构筑狗狗"
+
+func _dog_texture(dog_type: String) -> Texture2D:
+	var path := str(DOG_ASSETS.get(dog_type, ""))
+	if path.is_empty():
+		return null
+	return load(path) as Texture2D
 
 func _dog_strategy(dog_type: String) -> String:
 	match dog_type:

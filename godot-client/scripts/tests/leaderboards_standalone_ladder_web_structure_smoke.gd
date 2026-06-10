@@ -71,6 +71,40 @@ func _run() -> void:
 		_fail("LadderLayout must use the Web two-panel grid")
 		return
 
+	var grid := screen.find_child("DogCardGrid", true, false) as GridContainer
+	if grid == null or grid.columns != 4:
+		_fail("Standalone ladder DogCardGrid should use four columns like Web, got %s" % (str(grid.columns) if grid != null else "<missing>"))
+		return
+	if grid.get_child_count() != 8:
+		_fail("Standalone ladder DogCardGrid should mirror Web's fixed 8 dog slots, got %d" % grid.get_child_count())
+		return
+	for dog_type in ["SHIBA", "SAMOYED", "MUTT", "BULLY", "EMPEROR", "FROG"]:
+		var card = screen.find_child("LadderDogCard_%s" % dog_type, true, false) as Button
+		if card == null:
+			_fail("Standalone ladder DogCardGrid missing card for %s" % dog_type)
+			return
+		for child_name in [
+			"LadderDogCardArtFrame_%s" % dog_type,
+			"LadderDogCardArt_%s" % dog_type,
+			"LadderDogCardName_%s" % dog_type,
+			"LadderDogCardCopy_%s" % dog_type,
+		]:
+			if card.find_child(child_name, true, false) == null:
+				_fail("Standalone ladder DogCard should mirror Web card child: %s" % child_name)
+				return
+		var art = card.find_child("LadderDogCardArt_%s" % dog_type, true, false) as TextureRect
+		if art == null or art.texture == null:
+			_fail("Standalone ladder DogCardGrid card must render dog art for %s" % dog_type)
+			return
+	for index in [6, 7]:
+		if screen.find_child("LadderDogCardPlaceholder_%d" % index, true, false) == null:
+			_fail("Standalone ladder DogCardGrid missing Web placeholder slot %d" % index)
+			return
+	var detail_art = screen.find_child("DogDetailArt", true, false) as TextureRect
+	if detail_art == null or detail_art.texture == null:
+		_fail("Standalone ladder DogDetailPanel must render selected dog art")
+		return
+
 	var progress := screen.find_child("LadderProgress", true, false) as ProgressBar
 	if int(progress.value) != 100:
 		_fail("Dog king ladder progress should be capped at 100")
