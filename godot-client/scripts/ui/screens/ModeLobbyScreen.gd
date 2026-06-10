@@ -1,4 +1,4 @@
-extends BaseWebScreen
+extends ShellBackedWebScreen
 
 var account_label: Label
 var run_label: Label
@@ -17,22 +17,23 @@ var action_buttons: Array[Button] = []
 var action_in_progress := false
 var tutorial_active := false
 
-func _ready() -> void:
+func _on_payload_changed() -> void:
+	super._on_payload_changed()
+
+func _render_shell_content() -> void:
 	_build_lobby()
 	_refresh_content()
 
-func _on_payload_changed() -> void:
-	_refresh_content()
-
 func _build_lobby() -> void:
+	action_buttons = []
+
 	var panel := PanelContainer.new()
 	panel.name = "ModeLobbyPanel"
-	panel.set_anchors_preset(Control.PRESET_CENTER)
 	panel.custom_minimum_size = Vector2(960, 660)
-	panel.size = panel.custom_minimum_size
-	panel.position = -panel.custom_minimum_size / 2.0
+	panel.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	panel.add_theme_stylebox_override("panel", WebUiTokens.paper_card_style())
-	add_child(panel)
+	content_container().add_child(panel)
 
 	var scroll := ScrollContainer.new()
 	scroll.name = "ModeLobbyScroll"
@@ -205,7 +206,7 @@ func _build_tutorial_guide() -> void:
 	tutorial_guide_panel.offset_right = -28
 	tutorial_guide_panel.offset_bottom = -28
 	tutorial_guide_panel.add_theme_stylebox_override("panel", WebUiTokens.paper_card_style())
-	add_child(tutorial_guide_panel)
+	content_container().add_child(tutorial_guide_panel)
 
 	var margin := MarginContainer.new()
 	margin.add_theme_constant_override("margin_left", 16)

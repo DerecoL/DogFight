@@ -1,4 +1,4 @@
-extends BaseWebScreen
+extends ShellBackedWebScreen
 
 const ApiRoutes := preload("res://scripts/api/ApiRoutes.gd")
 const WebUiTokens := preload("res://scripts/ui/web/WebUiTokens.gd")
@@ -11,34 +11,32 @@ var status_label: Label
 var content_box: VBoxContainer
 var action_buttons: Array[Button] = []
 
-func _ready() -> void:
-	_build_screen()
-	_apply_payload_data()
-	_render()
-
 func bind_session(next_session: Node) -> void:
 	super.bind_session(next_session)
 	if visible:
 		call_deferred("_refresh_achievements")
 
 func _on_payload_changed() -> void:
-	_apply_payload_data()
-	_render()
+	super._on_payload_changed()
 
 func _notification(what: int) -> void:
+	super._notification(what)
 	if what == NOTIFICATION_VISIBILITY_CHANGED and visible:
 		call_deferred("_refresh_achievements")
+
+func _render_shell_content() -> void:
+	_build_screen()
+	_apply_payload_data()
+	_render()
 
 func _build_screen() -> void:
 	var panel := PanelContainer.new()
 	panel.name = "AchievementsPanel"
-	panel.set_anchors_preset(Control.PRESET_FULL_RECT)
-	panel.offset_left = 28
-	panel.offset_top = 28
-	panel.offset_right = -28
-	panel.offset_bottom = -28
+	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	panel.custom_minimum_size = Vector2(0, 420)
 	panel.add_theme_stylebox_override("panel", WebUiTokens.paper_card_style())
-	add_child(panel)
+	content_container().add_child(panel)
 
 	var scroll := ScrollContainer.new()
 	scroll.name = "AchievementsScroll"

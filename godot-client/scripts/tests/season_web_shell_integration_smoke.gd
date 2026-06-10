@@ -12,6 +12,16 @@ func _init() -> void:
 	if screen.find_child("WebShell", true, false) == null:
 		_fail("SeasonScreen must include WebShell")
 		return
+	var content := screen.get_node_or_null("WebShell/Root/Content")
+	if content == null:
+		_fail("SeasonScreen must expose WebShell content")
+		return
+	if content.find_child("SeasonPanel", true, false) == null:
+		_fail("SeasonScreen content must render inside WebShell content")
+		return
+	if screen.get_node_or_null("SeasonPanel") != null:
+		_fail("SeasonScreen must not render SeasonPanel outside WebShell")
+		return
 	if screen.find_child("LegacyRunScreen", true, false) != null:
 		_fail("SeasonScreen must not embed LegacyRunScreen")
 		return

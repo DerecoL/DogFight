@@ -1,4 +1,4 @@
-extends BaseWebScreen
+extends ShellBackedWebScreen
 
 const ApiRoutes := preload("res://scripts/api/ApiRoutes.gd")
 const WebUiTokens := preload("res://scripts/ui/web/WebUiTokens.gd")
@@ -11,27 +11,28 @@ var shop_data: Dictionary = {}
 var cosmetics_data: Dictionary = {}
 var action_in_progress := false
 
-func _ready() -> void:
-	_build_screen()
-	_render_shop()
-
 func bind_session(next_session: Node) -> void:
 	super.bind_session(next_session)
-
-func _on_payload_changed() -> void:
 	if visible:
 		call_deferred("_refresh_account_shop")
+
+func _on_payload_changed() -> void:
+	super._on_payload_changed()
+	if visible:
+		call_deferred("_refresh_account_shop")
+
+func _render_shell_content() -> void:
+	_build_screen()
+	_render_shop()
 
 func _build_screen() -> void:
 	var panel := PanelContainer.new()
 	panel.name = "AccountShopPanel"
-	panel.set_anchors_preset(Control.PRESET_FULL_RECT)
-	panel.offset_left = 28
-	panel.offset_top = 28
-	panel.offset_right = -28
-	panel.offset_bottom = -28
+	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	panel.custom_minimum_size = Vector2(0, 420)
 	panel.add_theme_stylebox_override("panel", WebUiTokens.paper_card_style())
-	add_child(panel)
+	content_container().add_child(panel)
 
 	var scroll := ScrollContainer.new()
 	scroll.name = "AccountShopScroll"
