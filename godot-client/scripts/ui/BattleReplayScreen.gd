@@ -86,6 +86,7 @@ var continue_row: PanelContainer
 var continue_button: Button
 var battle_item_tip: PanelContainer
 var battle_relic_tip: PanelContainer
+var battle_status_tip: PanelContainer
 var log_toggle_button: Button
 var log_filter_row: HBoxContainer
 
@@ -135,6 +136,7 @@ func start_replay(next_battle: Dictionary) -> void:
 		review_panel.visible = false
 	_close_battle_item_tip()
 	_close_battle_relic_tip()
+	_close_battle_status_tip()
 	_render_initial_hp()
 	_render_snapshots()
 	_render_stage_snapshots()
@@ -250,6 +252,7 @@ func _on_restart_pressed() -> void:
 		review_panel.visible = false
 	_close_battle_item_tip()
 	_close_battle_relic_tip()
+	_close_battle_status_tip()
 	_render_initial_hp()
 	_render_snapshots()
 	_render_stage_snapshots()
@@ -357,7 +360,7 @@ func _build_web_battle_layout() -> void:
 	opponent_status_label = opponent_panel["statuses"]
 	opponent_status_button = opponent_panel["status_button"]
 	opponent_status_button.text = "%s%s" % [_battle_actor_label("opponent"), str(opponent_status_button.text)]
-	opponent_status_button.pressed.connect(_show_battle_status_modal.bind("opponent"))
+	opponent_status_button.pressed.connect(_show_battle_status_tip.bind("opponent"))
 	opponent_reservoir_label = opponent_panel["reservoirs"]
 	opponent_equipment_grid = opponent_panel["grid"]
 	opponent_relic_row = opponent_panel["relics"]
@@ -410,7 +413,7 @@ func _build_web_battle_layout() -> void:
 	player_status_label = player_panel["statuses"]
 	player_status_button = player_panel["status_button"]
 	player_status_button.text = "%s%s" % [_battle_actor_label("player"), str(player_status_button.text)]
-	player_status_button.pressed.connect(_show_battle_status_modal.bind("player"))
+	player_status_button.pressed.connect(_show_battle_status_tip.bind("player"))
 	player_reservoir_label = player_panel["reservoirs"]
 	player_equipment_grid = player_panel["grid"]
 	player_relic_row = player_panel["relics"]
@@ -523,7 +526,7 @@ func _build_battle_layout() -> void:
 	opponent_status_label = opponent_panel["statuses"]
 	opponent_status_button = opponent_panel["status_button"]
 	opponent_status_button.text = "对手状态详情"
-	opponent_status_button.pressed.connect(_show_battle_status_modal.bind("opponent"))
+	opponent_status_button.pressed.connect(_show_battle_status_tip.bind("opponent"))
 	opponent_reservoir_label = opponent_panel["reservoirs"]
 	opponent_equipment_grid = opponent_panel["grid"]
 	opponent_relic_row = opponent_panel["relics"]
@@ -537,7 +540,7 @@ func _build_battle_layout() -> void:
 	player_status_label = player_panel["statuses"]
 	player_status_button = player_panel["status_button"]
 	player_status_button.text = "我方状态详情"
-	player_status_button.pressed.connect(_show_battle_status_modal.bind("player"))
+	player_status_button.pressed.connect(_show_battle_status_tip.bind("player"))
 	player_reservoir_label = player_panel["reservoirs"]
 	player_equipment_grid = player_panel["grid"]
 	player_relic_row = player_panel["relics"]
@@ -1330,6 +1333,99 @@ func _show_battle_status_modal(side: String) -> void:
 		_add_modal_line(lines, label, _status_detail_text(status))
 	stack.call("push_modal", panel, true)
 
+func _show_battle_status_tip(side: String) -> void:
+	if finish_in_progress:
+		return
+	_close_battle_item_tip()
+	_close_battle_relic_tip()
+	_close_battle_status_tip()
+	var status := _first_battle_status(side)
+	if status.is_empty():
+		return
+	var polarity := _battle_status_polarity(side, status)
+	var label := _fallback(str(status.get("label", "")), _status_type_label(str(status.get("type", ""))))
+	var floating_tip := PanelContainer.new()
+	floating_tip.name = "FloatingTip"
+	floating_tip.custom_minimum_size = Vector2(0, 176)
+	floating_tip.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	root.add_child(floating_tip)
+	battle_status_tip = floating_tip
+
+	var tip := VBoxContainer.new()
+	tip.name = "BattleStatusTip"
+	tip.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	tip.add_theme_constant_override("separation", 7)
+	floating_tip.add_child(tip)
+
+	var title := HBoxContainer.new()
+	title.name = "BattleStatusTipTitle"
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	title.add_theme_constant_override("separation", 8)
+	tip.add_child(title)
+	_add_tip_label(title, "BattleStatusTipLabel", label)
+	_add_tip_label(title, "BattleStatusTipPolarityTag", _battle_status_polarity_label(polarity), HORIZONTAL_ALIGNMENT_CENTER)
+
+	var tags := HBoxContainer.new()
+	tags.name = "BattleStatusTipTags"
+	tags.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	tags.add_theme_constant_override("separation", 6)
+	tip.add_child(tags)
+	_add_tip_label(tags, "BattleStatusTipSideTag", side, HORIZONTAL_ALIGNMENT_CENTER)
+	_add_tip_label(tags, "BattleStatusTipValueTag", _format_status_entry(status), HORIZONTAL_ALIGNMENT_CENTER)
+
+	_add_tip_label(tip, "BattleStatusTipDescription", _battle_status_description(status, polarity))
+	_add_tip_label(tip, "BattleStatusTipTiming", "exists during battle")
+	_add_tip_label(tip, "BattleStatusTipSource", "source: equipment, class item, or relic")
+
+	var actions := HBoxContainer.new()
+	actions.name = "BattleStatusTipActions"
+	actions.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	actions.add_theme_constant_override("separation", 8)
+	tip.add_child(actions)
+	var close_button := Button.new()
+	close_button.name = "CloseBattleStatusTipButton"
+	close_button.text = "Close"
+	close_button.custom_minimum_size = Vector2(108, 42)
+	close_button.pressed.connect(_close_battle_status_tip)
+	actions.add_child(close_button)
+
+func _first_battle_status(side: String) -> Dictionary:
+	var rows: Dictionary = current_player_statuses if side == "player" else current_opponent_statuses
+	var entries := _status_entries(rows)
+	if entries.is_empty():
+		return {}
+	return entries[0] if entries[0] is Dictionary else {}
+
+func _battle_status_polarity(side: String, status: Dictionary) -> String:
+	var rows: Dictionary = current_player_statuses if side == "player" else current_opponent_statuses
+	for raw_status in _array(rows, "positive"):
+		if raw_status is Dictionary and str((raw_status as Dictionary).get("type", "")) == str(status.get("type", "")):
+			return "positive"
+	return "negative"
+
+func _battle_status_polarity_label(polarity: String) -> String:
+	return "positive effect" if polarity == "positive" else "negative effect"
+
+func _battle_status_description(status: Dictionary, polarity: String) -> String:
+	var type_name := str(status.get("type", "")).to_lower()
+	match type_name:
+		"shield":
+			return "Absorbs incoming damage before health changes."
+		"poison":
+			return "Deals delayed damage while poison stacks remain."
+		"weak":
+			return "Reduces combat effectiveness while it lasts."
+		_:
+			return "This status affects the current battle."
+
+func _close_battle_status_tip() -> void:
+	if battle_status_tip == null:
+		return
+	if battle_status_tip.get_parent() != null:
+		battle_status_tip.get_parent().remove_child(battle_status_tip)
+	battle_status_tip.queue_free()
+	battle_status_tip = null
+
 func _status_detail_text(status: Dictionary) -> String:
 	var parts: Array[String] = []
 	var amount := int(status.get("amount", 0))
@@ -1353,6 +1449,7 @@ func _show_battle_item_tip(item: Dictionary, side: String) -> void:
 		return
 	_close_battle_item_tip()
 	_close_battle_relic_tip()
+	_close_battle_status_tip()
 	var item_def: Dictionary = _dict(item, "def")
 	var item_name := _fallback(str(item_def.get("name", "")), str(item.get("defId", item.get("id", ""))))
 	var floating_tip := PanelContainer.new()
@@ -1431,6 +1528,7 @@ func _show_battle_relic_tip(relic: Dictionary, side: String) -> void:
 		return
 	_close_battle_item_tip()
 	_close_battle_relic_tip()
+	_close_battle_status_tip()
 	var def: Dictionary = _dict(relic, "def")
 	var relic_name := _fallback(str(def.get("name", "")), str(relic.get("relicId", relic.get("id", ""))))
 	var floating_tip := PanelContainer.new()

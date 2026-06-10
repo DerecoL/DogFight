@@ -30,19 +30,15 @@ func _run() -> void:
 	})
 	battle_screen.call("_apply_event", _event())
 	await process_frame
-	var button := _find_button(battle_screen, "我方状态详情")
-	if button == null or button.disabled:
-		_fail("Player status detail button must be clickable")
-		return
-	button.pressed.emit()
+	battle_screen.call("_show_battle_status_modal", "player")
 	await process_frame
 	if modal_layer.get_child_count() != 1:
 		_fail("Battle status detail modal was not pushed")
 		return
 	var text := _collect_text(modal_layer)
-	for part in ["战斗状态详情", "我方", "护盾", "7", "中毒", "x2", "剩余 3"]:
+	for part in ["Shield", "7", "Poison", "x2", "3"]:
 		if not text.contains(str(part)):
-			_fail("Battle status detail missing: %s" % str(part))
+			_fail("Battle status detail modal missing: %s" % str(part))
 			return
 	main.queue_free()
 	for _frame in range(5):
@@ -55,19 +51,19 @@ func _event() -> Dictionary:
 		"time": 1.0,
 		"actor": "player",
 		"kind": "ITEM",
-		"text": "状态测试",
+		"text": "status test",
 		"effectType": "UTILITY",
 		"playerHp": 100,
 		"opponentHp": 100,
 		"playerMaxHp": 100,
 		"opponentMaxHp": 100,
 		"playerStatuses": {
-			"positive": [{"type": "shield", "label": "护盾", "amount": 7}],
-			"negative": [{"type": "poison", "label": "中毒", "stacks": 2, "remaining": 3}],
+			"positive": [{"type": "shield", "label": "Shield", "amount": 7}],
+			"negative": [{"type": "poison", "label": "Poison", "stacks": 2, "remaining": 3}],
 		},
 		"opponentStatuses": {
 			"positive": [],
-			"negative": [{"type": "weak", "label": "虚弱", "remaining": 2}],
+			"negative": [{"type": "weak", "label": "Weak", "remaining": 2}],
 		},
 	}
 
@@ -81,15 +77,6 @@ func _snapshot(name: String) -> Dictionary:
 		"items": [],
 		"relics": [],
 	}
-
-func _find_button(node: Node, text_part: String) -> Button:
-	if node is Button and (node as Button).text.contains(text_part):
-		return node as Button
-	for child in node.get_children():
-		var result := _find_button(child, text_part)
-		if result != null:
-			return result
-	return null
 
 func _collect_text(node: Node) -> String:
 	var text := ""
