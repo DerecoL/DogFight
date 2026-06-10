@@ -1,6 +1,59 @@
 extends SceneTree
 
+const ApiClientScript := preload("res://scripts/api/ApiClient.gd")
+
+class FakeApi:
+	extends ApiClientScript
+
+	var users: Dictionary = {}
+	var current_account := ""
+
+	func post_json(path: String, body: Dictionary = {}) -> Dictionary:
+		match path:
+			"/auth/register":
+				var account := str(body.get("account", ""))
+				var user := {"id": "user-%s" % account, "account": account, "nickname": null}
+				users[account] = user
+				current_account = account
+				return _ok({"user": user.duplicate(true), "needsNickname": true})
+			"/profile/nickname":
+				if current_account.is_empty() or not users.has(current_account):
+					return _error("No active user")
+				var user: Dictionary = users[current_account]
+				user["nickname"] = str(body.get("nickname", ""))
+				users[current_account] = user
+				return _ok({"user": user.duplicate(true), "needsNickname": false})
+			"/auth/logout":
+				current_account = ""
+				return _ok({})
+			_:
+				return _ok({})
+
+	func get_json(path: String) -> Dictionary:
+		match path:
+			"/me":
+				if current_account.is_empty() or not users.has(current_account):
+					return _error("Not logged in")
+				var user: Dictionary = users[current_account]
+				return _ok({"user": user.duplicate(true), "needsNickname": _needs_nickname(user), "activeRun": null})
+			"/runs/history":
+				return _ok({"history": {"runs": [], "stats": {"totalRuns": 0, "wins": 0, "losses": 0}}, "seasonSummaries": []})
+			"/ladder/me":
+				return _ok({"profile": {}, "leaderboard": [], "bestRun": null})
+			_:
+				return _ok({})
+
+	func _needs_nickname(user: Dictionary) -> bool:
+		return user.get("nickname", null) == null or str(user.get("nickname", "")).strip_edges().is_empty()
+
+	func _ok(data: Dictionary) -> Dictionary:
+		return {"ok": true, "status": 200, "error": "", "data": data}
+
+	func _error(message: String) -> Dictionary:
+		return {"ok": false, "status": 400, "error": message, "data": {}}
+
 var main_node: Node
+var fake_api_node: FakeApi
 
 func _init() -> void:
 	_run()
@@ -15,6 +68,10 @@ func _run() -> void:
 	root.add_child(main)
 	await process_frame
 	await process_frame
+	var fake_api := FakeApi.new()
+	fake_api_node = fake_api
+	main.set("api", fake_api)
+	main.add_child(fake_api)
 
 	var router = main.get("router")
 	var login_screen = main.get_node_or_null("ScreenRoot/LoginScreen")

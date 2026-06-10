@@ -1,6 +1,7 @@
 extends BaseWebScreen
 
 const DOG_TYPES := ["SHIBA", "SAMOYED", "MUTT", "BULLY", "EMPEROR", "FROG"]
+const DOG_SELECTION_SLOT_COUNT := 8
 const DOG_NAMES := {
 	"SHIBA": "柴犬",
 	"SAMOYED": "萨摩耶",
@@ -97,28 +98,76 @@ func _render() -> void:
 	dog_grid.add_theme_constant_override("h_separation", 12)
 	dog_grid.add_theme_constant_override("v_separation", 12)
 	dog_select.add_child(dog_grid)
-	for dog_type in DOG_TYPES:
-		dog_grid.add_child(_dog_card_button(dog_type))
+	for index in range(DOG_SELECTION_SLOT_COUNT):
+		if index < DOG_TYPES.size():
+			dog_grid.add_child(_dog_card_button(str(DOG_TYPES[index])))
+		else:
+			dog_grid.add_child(_dog_card_placeholder(index))
 
 	_render_detail_panel(dog_select)
 
 func _dog_card_button(dog_type: String) -> Button:
 	var button := Button.new()
 	button.name = "DogCard_%s" % dog_type
-	button.text = "%s\n%s\n%s" % [_dog_name(dog_type), str(DOG_TRAITS.get(dog_type, "")), " / ".join(_dog_tags(dog_type))]
+	button.text = ""
 	button.custom_minimum_size = Vector2(148, 150)
 	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	button.toggle_mode = true
 	button.button_pressed = selected_dog == dog_type
 	button.disabled = action_in_progress
-	button.icon = _dog_texture(dog_type)
-	button.expand_icon = true
 	button.add_theme_stylebox_override("normal", WebUiTokens.handdrawn_button_style())
 	button.add_theme_stylebox_override("hover", WebUiTokens.handdrawn_button_hover_style())
 	button.add_theme_stylebox_override("pressed", WebUiTokens.handdrawn_button_pressed_style())
 	button.pressed.connect(_select_dog.bind(dog_type))
+
+	var margin := MarginContainer.new()
+	margin.name = "DogCardContent_%s" % dog_type
+	margin.set_anchors_preset(Control.PRESET_FULL_RECT)
+	margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	margin.add_theme_constant_override("margin_left", 10)
+	margin.add_theme_constant_override("margin_top", 10)
+	margin.add_theme_constant_override("margin_right", 10)
+	margin.add_theme_constant_override("margin_bottom", 10)
+	button.add_child(margin)
+
+	var content := VBoxContainer.new()
+	content.name = "DogCardStack_%s" % dog_type
+	content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	content.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	content.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	content.add_theme_constant_override("separation", 6)
+	margin.add_child(content)
+
+	var art_frame := PanelContainer.new()
+	art_frame.name = "DogCardArtFrame_%s" % dog_type
+	art_frame.custom_minimum_size = Vector2(0, 50)
+	art_frame.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	art_frame.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	art_frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	art_frame.add_theme_stylebox_override("panel", WebUiTokens.paper_card_style())
+	content.add_child(art_frame)
+
+	var art := TextureRect.new()
+	art.name = "DogCardArt_%s" % dog_type
+	art.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	art.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
+	art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	art.texture = _dog_texture(dog_type)
+	art_frame.add_child(art)
+
+	_add_label(content, "DogCardName_%s" % dog_type, _dog_name(dog_type), HORIZONTAL_ALIGNMENT_CENTER).mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_add_label(content, "DogCardCopy_%s" % dog_type, str(DOG_TRAITS.get(dog_type, "")), HORIZONTAL_ALIGNMENT_CENTER).mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_add_tag_row(content, "DogCardTagRow_%s" % dog_type, _dog_tags(dog_type))
 	return button
+
+func _dog_card_placeholder(index: int) -> PanelContainer:
+	var placeholder := PanelContainer.new()
+	placeholder.name = "DogCardPlaceholder_%d" % index
+	placeholder.custom_minimum_size = Vector2(148, 150)
+	placeholder.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	placeholder.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	placeholder.add_theme_stylebox_override("panel", WebUiTokens.paper_card_style())
+	return placeholder
 
 func _render_detail_panel(parent: Node) -> void:
 	var panel := PanelContainer.new()
@@ -144,7 +193,7 @@ func _render_detail_panel(parent: Node) -> void:
 	_add_label(box, "DogDetailName", _dog_name(selected_dog), HORIZONTAL_ALIGNMENT_CENTER)
 	_add_detail_box(box, "被动特性", str(DOG_TRAITS.get(selected_dog, "")))
 	_add_detail_box(box, "策略说明", str(DOG_STRATEGIES.get(selected_dog, "")))
-	_add_label(box, "DogTagRow", " / ".join(_dog_tags(selected_dog)), HORIZONTAL_ALIGNMENT_CENTER)
+	_add_tag_row(box, "DogTagRow", _dog_tags(selected_dog))
 
 	if selected_dog == "EMPEROR":
 		var lucky := HBoxContainer.new()
@@ -184,6 +233,24 @@ func _add_detail_box(parent: Node, title_text: String, body_text: String) -> voi
 	parent.add_child(box)
 	_add_label(box, "DetailTitle", title_text)
 	_add_label(box, "DetailBody", body_text)
+
+func _add_tag_row(parent: Node, node_name: String, tags: Array) -> HBoxContainer:
+	var row := HBoxContainer.new()
+	row.name = node_name
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_theme_constant_override("separation", 6)
+	parent.add_child(row)
+	for index in range(tags.size()):
+		var tag := Label.new()
+		tag.name = "%sTag_%d" % [node_name, index]
+		tag.text = str(tags[index])
+		tag.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		tag.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		tag.add_theme_stylebox_override("normal", WebUiTokens.resource_pill_style())
+		row.add_child(tag)
+	return row
 
 func _add_label(parent: Node, node_name: String, text: String, align := HORIZONTAL_ALIGNMENT_LEFT) -> Label:
 	var label := Label.new()

@@ -32,10 +32,27 @@ func _run() -> void:
 	if grid == null or grid.columns != 4:
 		_fail("DogCardGrid should use four columns like Web, got %s" % (str(grid.columns) if grid != null else "<missing>"))
 		return
+	if grid.get_child_count() != 8:
+		_fail("DogCardGrid should mirror Web's fixed 8 dog slots, got %d" % grid.get_child_count())
+		return
 	for dog_type in ["SHIBA", "SAMOYED", "MUTT", "BULLY", "EMPEROR", "FROG"]:
-		var card = dog_select.find_child("DogCard_%s" % dog_type, true, false)
+		var card = dog_select.find_child("DogCard_%s" % dog_type, true, false) as Button
 		if card == null:
 			_fail("DogCardGrid missing card for %s" % dog_type)
+			return
+		for child_name in [
+			"DogCardArtFrame_%s" % dog_type,
+			"DogCardArt_%s" % dog_type,
+			"DogCardName_%s" % dog_type,
+			"DogCardCopy_%s" % dog_type,
+			"DogCardTagRow_%s" % dog_type,
+		]:
+			if card.find_child(child_name, true, false) == null:
+				_fail("DogCard should mirror Web card child: %s" % child_name)
+				return
+	for index in [6, 7]:
+		if dog_select.find_child("DogCardPlaceholder_%d" % index, true, false) == null:
+			_fail("DogCardGrid missing Web placeholder slot %d" % index)
 			return
 	if _visible_option_button_count(dog_select) > 0:
 		_fail("DogSelectScreen must not expose the old dropdown run creation controls")

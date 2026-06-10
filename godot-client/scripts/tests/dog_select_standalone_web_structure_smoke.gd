@@ -30,13 +30,31 @@ func _run() -> void:
 	if grid == null or grid.columns != 4:
 		_fail("Standalone DogCardGrid should use four columns like Web, got %s" % (str(grid.columns) if grid != null else "<missing>"))
 		return
+	if grid.get_child_count() != 8:
+		_fail("Standalone DogCardGrid should mirror Web's fixed 8 dog slots, got %d" % grid.get_child_count())
+		return
 	for dog_type in ["SHIBA", "SAMOYED", "MUTT", "BULLY", "EMPEROR", "FROG"]:
 		var card = screen.find_child("DogCard_%s" % dog_type, true, false) as Button
 		if card == null:
 			_fail("Standalone DogCardGrid missing card for %s" % dog_type)
 			return
-		if card.icon == null:
+		for child_name in [
+			"DogCardArtFrame_%s" % dog_type,
+			"DogCardArt_%s" % dog_type,
+			"DogCardName_%s" % dog_type,
+			"DogCardCopy_%s" % dog_type,
+			"DogCardTagRow_%s" % dog_type,
+		]:
+			if card.find_child(child_name, true, false) == null:
+				_fail("Standalone DogCard should mirror Web card child: %s" % child_name)
+				return
+		var art = card.find_child("DogCardArt_%s" % dog_type, true, false) as TextureRect
+		if art == null or art.texture == null:
 			_fail("Standalone DogCardGrid card must render dog art for %s" % dog_type)
+			return
+	for index in [6, 7]:
+		if screen.find_child("DogCardPlaceholder_%d" % index, true, false) == null:
+			_fail("Standalone DogCardGrid missing Web placeholder slot %d" % index)
 			return
 	var selected = screen.find_child("DogCard_SHIBA", true, false) as Button
 	if selected == null or not selected.button_pressed:
