@@ -178,6 +178,36 @@ func _run() -> void:
 			if fake_session.upgrade_item_id != "item-1":
 				_fail("Upgrade reward apply button must call select_upgrade_item(item-1)")
 				return
+			var relic_button := _find_by_name(screen, "RelicSlot_0") as Button
+			if relic_button == null:
+				_fail("Upgrade reward relic slot button is missing")
+				return
+			relic_button.pressed.emit()
+			await process_frame
+			for relic_tip_node in [
+				"FloatingTip",
+				"RewardRelicTip",
+				"RewardRelicTipTags",
+				"RewardRelicTipIdentity",
+				"RewardRelicTipDescription",
+				"RewardRelicTipActions",
+				"CloseRewardRelicTipButton",
+			]:
+				_assert_has(screen, relic_tip_node)
+			var relic_tip_text := _collect_text(screen)
+			for relic_tip_part in ["reward-owned-relic", "REWARD_RELIC", "reward-tag"]:
+				if not relic_tip_text.contains(relic_tip_part):
+					_fail("Reward relic tip text missing: %s" % relic_tip_part)
+					return
+			var close_relic_tip := _find_by_name(screen, "CloseRewardRelicTipButton") as Button
+			if close_relic_tip == null:
+				_fail("Reward relic tip close button is missing")
+				return
+			close_relic_tip.pressed.emit()
+			await process_frame
+			if _find_by_name(screen, "FloatingTip") != null:
+				_fail("Reward relic tip should close from its close button")
+				return
 		elif phase == "ENCHANT_CHOICE":
 			_assert_has(screen, "EnchantWorkbench")
 			_assert_has(screen, "EnchantPanel")
@@ -280,7 +310,7 @@ func _run_payload(phase: String) -> Dictionary:
 		"enchantChoices": [_enchant_choice("enchant-1"), _enchant_choice("enchant-2")],
 		"potionChoices": [_potion_choice("potion-1"), _potion_choice("potion-2")],
 		"items": [_item("item-1", "EQUIPMENT", 0), _item("item-2", "BAG", 0)],
-		"relics": [],
+		"relics": [_owned_relic("owned-relic-1")],
 		"shopItems": [],
 		"mapState": {
 			"nodes": [],
@@ -327,6 +357,15 @@ func _item(id: String, area: String, x: int) -> Dictionary:
 		"x": x,
 		"y": 0,
 		"def": {"name": "1点牙咬", "size": 1, "description": "命中 1 点时造成伤害", "triggerDice": [1], "tags": ["伤害"]},
+	}
+
+func _owned_relic(id: String) -> Dictionary:
+	return {
+		"id": id,
+		"relicId": "reward-owned-relic",
+		"quality": "GOLD",
+		"slot": 0,
+		"def": {"name": "reward-owned-relic", "description": "REWARD_RELIC", "effect": "REWARD_RELIC", "tags": ["reward-tag"]},
 	}
 
 func _fail(message: String) -> void:

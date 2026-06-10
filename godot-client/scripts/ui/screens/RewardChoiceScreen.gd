@@ -7,6 +7,7 @@ var selected_relic_choice_id := ""
 var selected_enchant_id := ""
 var selected_potion_id := ""
 var selected_item_id := ""
+var selected_inventory_relic_id := ""
 
 func _ready() -> void:
 	_render()
@@ -162,6 +163,7 @@ func _render_reward_workbench(parent: Node, run: Dictionary) -> void:
 	inventory_frame.add_child(inventory)
 	_render_inventory_board(inventory, run)
 	_render_selected_item_tip(workbench, run)
+	_render_selected_relic_tip(workbench, run)
 
 func _render_class_reward(parent: HBoxContainer, run: Dictionary) -> void:
 	var selector := VBoxContainer.new()
@@ -431,7 +433,8 @@ func _render_relic_rail(parent: Node, run: Dictionary) -> void:
 	for slot in range(6):
 		var relic: Dictionary = relics[slot] if slot < relics.size() and relics[slot] is Dictionary else {}
 		var def: Dictionary = _dict(relic, "def")
-		var button := _action_button(_fallback(str(def.get("name", "")), "遗物槽 %d" % (slot + 1)), _noop)
+		var relic_id := str(relic.get("id", relic.get("relicId", "")))
+		var button := _action_button(_fallback(str(def.get("name", "")), "遗物槽 %d" % (slot + 1)), _select_inventory_relic.bind(relic_id) if not relic_id.is_empty() else _noop)
 		button.name = "RelicSlot_%d" % slot
 		button.custom_minimum_size = Vector2(74, 42)
 		button.disabled = relic.is_empty()
@@ -506,6 +509,65 @@ func _render_selected_item_tip(parent: HBoxContainer, run: Dictionary) -> void:
 	actions.add_child(apply_button)
 	var close_button := _action_button("关闭", _close_item_tip)
 	close_button.name = "CloseRewardItemTipButton"
+	actions.add_child(close_button)
+
+func _render_selected_relic_tip(parent: HBoxContainer, run: Dictionary) -> void:
+	var relic := _selected_inventory_relic(run)
+	if relic.is_empty():
+		return
+	var def: Dictionary = _dict(relic, "def")
+	var title := _fallback(str(def.get("name", "")), str(relic.get("relicId", relic.get("id", ""))))
+	var floating_tip := PanelContainer.new()
+	floating_tip.name = "FloatingTip"
+	floating_tip.custom_minimum_size = Vector2(320, 204)
+	floating_tip.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	floating_tip.add_theme_stylebox_override("panel", WebUiTokens.paper_card_style())
+	parent.add_child(floating_tip)
+
+	var tip := VBoxContainer.new()
+	tip.name = "RewardRelicTip"
+	tip.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	tip.add_theme_constant_override("separation", 7)
+	floating_tip.add_child(tip)
+
+	var tags := HBoxContainer.new()
+	tags.name = "RewardRelicTipTags"
+	tags.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	tags.add_theme_constant_override("separation", 6)
+	tip.add_child(tags)
+	_add_label(tags, "RewardRelicTipQualityTag", _quality_label(str(relic.get("quality", ""))), HORIZONTAL_ALIGNMENT_CENTER)
+	for tag in _array(def, "tags"):
+		_add_label(tags, "RewardRelicTipTag_%s" % _node_key(str(tag)), str(tag), HORIZONTAL_ALIGNMENT_CENTER)
+
+	var identity := HBoxContainer.new()
+	identity.name = "RewardRelicTipIdentity"
+	identity.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	identity.add_theme_constant_override("separation", 8)
+	tip.add_child(identity)
+	var icon := TextureRect.new()
+	icon.name = "RewardRelicTipIcon"
+	icon.texture = _relic_texture(relic)
+	icon.custom_minimum_size = Vector2(44, 44)
+	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	identity.add_child(icon)
+	var identity_text := VBoxContainer.new()
+	identity_text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	identity.add_child(identity_text)
+	_add_label(identity_text, "RewardRelicTipTitle", title)
+	_add_label(identity_text, "RewardRelicTipId", str(relic.get("relicId", relic.get("id", ""))))
+
+	_add_label(tip, "RewardRelicTipDescription", _fallback(str(def.get("description", "")), str(relic.get("description", ""))))
+	var effect := str(def.get("effect", ""))
+	if not effect.is_empty():
+		_add_label(tip, "RewardRelicTipEffect", effect)
+
+	var actions := HBoxContainer.new()
+	actions.name = "RewardRelicTipActions"
+	actions.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	actions.add_theme_constant_override("separation", 8)
+	tip.add_child(actions)
+	var close_button := _action_button("\u5173\u95ed", _close_relic_tip)
+	close_button.name = "CloseRewardRelicTipButton"
 	actions.add_child(close_button)
 
 func _choice_button(text: String, callback: Callable) -> Button:
@@ -595,10 +657,20 @@ func _set_potion_choice(id: String) -> void:
 
 func _select_item(item_id: String) -> void:
 	selected_item_id = item_id
+	selected_inventory_relic_id = ""
 	_render()
 
 func _close_item_tip() -> void:
 	selected_item_id = ""
+	_render()
+
+func _select_inventory_relic(relic_id: String) -> void:
+	selected_inventory_relic_id = "" if selected_inventory_relic_id == relic_id else relic_id
+	selected_item_id = ""
+	_render()
+
+func _close_relic_tip() -> void:
+	selected_inventory_relic_id = ""
 	_render()
 
 func _apply_selected_item_reward() -> void:
@@ -656,6 +728,16 @@ func _selected_item(run: Dictionary) -> Dictionary:
 			return item_value
 	return {}
 
+func _selected_inventory_relic(run: Dictionary) -> Dictionary:
+	if selected_inventory_relic_id.is_empty():
+		return {}
+	for relic_value in _array(run, "relics"):
+		if relic_value is Dictionary:
+			var relic: Dictionary = relic_value
+			if str(relic.get("id", relic.get("relicId", ""))) == selected_inventory_relic_id:
+				return relic
+	return {}
+
 func _fallback(value: String, fallback: String) -> String:
 	return fallback if value.strip_edges().is_empty() else value
 
@@ -679,6 +761,28 @@ func _trigger_dice_text(def: Dictionary) -> String:
 	for value in dice:
 		parts.append(str(value))
 	return " / ".join(parts)
+
+func _relic_texture(relic: Dictionary) -> Texture2D:
+	var def: Dictionary = _dict(relic, "def")
+	var asset_id := str(def.get("icon", relic.get("relicId", relic.get("id", ""))))
+	return _sticker_texture(asset_id)
+
+func _sticker_texture(asset_id: String) -> Texture2D:
+	if asset_id.is_empty():
+		return _texture("res://assets/sticker-icons/starter-1.webp")
+	var texture := _texture("res://assets/sticker-icons/%s.webp" % asset_id)
+	return texture if texture != null else _texture("res://assets/sticker-icons/starter-1.webp")
+
+func _texture(path: String) -> Texture2D:
+	if path.is_empty():
+		return null
+	if not ResourceLoader.exists(path):
+		return null
+	return load(path) as Texture2D
+
+func _node_key(value: String) -> String:
+	var key := value.strip_edges().replace(" ", "_").replace("-", "_").replace(".", "_")
+	return "empty" if key.is_empty() else key
 
 func _selected_item_has_action(run: Dictionary) -> bool:
 	var phase := str(run.get("phase", ""))
