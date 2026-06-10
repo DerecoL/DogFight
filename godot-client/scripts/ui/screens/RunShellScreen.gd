@@ -104,10 +104,15 @@ func _render_matched_heading(parent: VBoxContainer, run: Dictionary) -> void:
 
 func _render_inventory_board(parent: VBoxContainer, run: Dictionary) -> void:
 	_render_grid_panel(parent, "EquipmentBoard", "装备格", "EQUIPMENT", run)
-	_render_relic_rail(parent, run)
-	_render_grid_panel(parent, "BagBoard", "背包", "BAG", run)
+	var bag_relic_row := HBoxContainer.new()
+	bag_relic_row.name = "BagRelicRow"
+	bag_relic_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	bag_relic_row.add_theme_constant_override("separation", 10)
+	parent.add_child(bag_relic_row)
+	_render_relic_rail(bag_relic_row, run)
+	_render_grid_panel(bag_relic_row, "BagBoard", "背包", "BAG", run)
 
-func _render_grid_panel(parent: VBoxContainer, node_name: String, title: String, area: String, run: Dictionary) -> void:
+func _render_grid_panel(parent: Node, node_name: String, title: String, area: String, run: Dictionary) -> void:
 	var panel := VBoxContainer.new()
 	panel.name = node_name
 	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -127,7 +132,7 @@ func _render_grid_panel(parent: VBoxContainer, node_name: String, title: String,
 			button.custom_minimum_size = Vector2(90, 52)
 			item_line.add_child(button)
 
-func _render_relic_rail(parent: VBoxContainer, run: Dictionary) -> void:
+func _render_relic_rail(parent: Node, run: Dictionary) -> void:
 	var rail := VBoxContainer.new()
 	rail.name = "RelicRail"
 	rail.size_flags_horizontal = Control.SIZE_EXPAND_FILL
