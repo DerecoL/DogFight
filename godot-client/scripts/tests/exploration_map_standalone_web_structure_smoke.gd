@@ -38,6 +38,10 @@ func _run() -> void:
 		"MapRouteLayer",
 		"MapRouteSvg",
 		"MapDrawingToolbar",
+		"MapDrawingTool_inspect",
+		"MapDrawingTool_brush",
+		"MapDrawingTool_eraser",
+		"MapDrawingTool_clear",
 		"MapNodeButton_start-1",
 		"MapNodeButton_monster-1",
 		"MapNodeDetailPanel",
@@ -65,6 +69,34 @@ func _run() -> void:
 	var route_board = _find_by_name(screen, "ExplorationMapRouteBoard")
 	if not route_board is HBoxContainer:
 		_fail("ExplorationMapRouteBoard must use the Web two-column map layout")
+		return
+	var inspect_tool := _find_by_name(screen, "MapDrawingTool_inspect") as Button
+	var brush_tool := _find_by_name(screen, "MapDrawingTool_brush") as Button
+	var eraser_tool := _find_by_name(screen, "MapDrawingTool_eraser") as Button
+	var clear_tool := _find_by_name(screen, "MapDrawingTool_clear") as Button
+	if inspect_tool == null or brush_tool == null or eraser_tool == null or clear_tool == null:
+		_fail("Map drawing toolbar must expose Web tool buttons by stable names")
+		return
+	if not inspect_tool.button_pressed or brush_tool.button_pressed or eraser_tool.button_pressed:
+		_fail("Map drawing toolbar should default to inspect mode like Web")
+		return
+	if not clear_tool.disabled:
+		_fail("Map clear draft tool should be disabled while no draft exists")
+		return
+	brush_tool.pressed.emit()
+	await process_frame
+	brush_tool = _find_by_name(screen, "MapDrawingTool_brush") as Button
+	inspect_tool = _find_by_name(screen, "MapDrawingTool_inspect") as Button
+	if brush_tool == null or inspect_tool == null or not brush_tool.button_pressed or inspect_tool.button_pressed:
+		_fail("Map drawing toolbar brush button must switch active tool")
+		return
+	eraser_tool = _find_by_name(screen, "MapDrawingTool_eraser") as Button
+	eraser_tool.pressed.emit()
+	await process_frame
+	eraser_tool = _find_by_name(screen, "MapDrawingTool_eraser") as Button
+	brush_tool = _find_by_name(screen, "MapDrawingTool_brush") as Button
+	if eraser_tool == null or brush_tool == null or not eraser_tool.button_pressed or brush_tool.button_pressed:
+		_fail("Map drawing toolbar eraser button must switch active tool")
 		return
 	for node_id in ["start-1", "monster-1"]:
 		var node_button := _find_by_name(screen, "MapNodeButton_%s" % node_id) as Button

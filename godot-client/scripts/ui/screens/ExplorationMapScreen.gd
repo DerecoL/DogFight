@@ -16,6 +16,7 @@ var selected_relic_id := ""
 var selected_map_node_id := ""
 var selected_map_reward_key := ""
 var selected_monster_equipment_item: Dictionary = {}
+var drawing_tool := "inspect"
 
 func _ready() -> void:
 	_render()
@@ -186,10 +187,20 @@ func _render_drawing_toolbar(parent: VBoxContainer) -> void:
 	toolbar.add_theme_constant_override("separation", 6)
 	parent.add_child(toolbar)
 	for tool_label in ["查看节点", "画笔", "橡皮", "清空草稿"]:
-		var tool := _action_button(tool_label, _noop)
+		var tool_id: String = str(["inspect", "brush", "eraser", "clear"][toolbar.get_child_count()])
+		var tool := _action_button(tool_label, _select_drawing_tool.bind(tool_id))
+		tool.name = "MapDrawingTool_%s" % tool_id
 		tool.custom_minimum_size = Vector2(92, WebUiTokens.touch_target_height())
+		tool.toggle_mode = tool_id != "clear"
+		tool.button_pressed = tool_id == drawing_tool
 		tool.disabled = tool_label == "清空草稿"
 		toolbar.add_child(tool)
+
+func _select_drawing_tool(tool_id: String) -> void:
+	if tool_id == "clear":
+		return
+	drawing_tool = tool_id
+	_render()
 
 func _render_map_route(parent: VBoxContainer, map_state: Dictionary) -> void:
 	var nodes := _array(map_state, "nodes").duplicate()
