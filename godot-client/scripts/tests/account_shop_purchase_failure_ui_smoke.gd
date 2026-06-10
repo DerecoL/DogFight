@@ -132,7 +132,7 @@ func _assert_account_shop_screen(main: Node, account_shop: Node, context: String
 			_fail("%s missing Web account shop node: %s" % [context, node_name])
 			return false
 	var text := _collect_text(account_shop)
-	for part in ["账号商城", "外观商店", "金币", "常驻区", "精选轮换区"]:
+	for part in ["账号商城", "外观商店", "0", "常驻区", "精选轮换区"]:
 		if not text.contains(part):
 			_fail("%s missing Web account shop text: %s" % [context, part])
 			return false

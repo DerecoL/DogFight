@@ -130,7 +130,7 @@ func _render_shop() -> void:
 		child.free()
 	action_buttons = []
 	var wallet := _dict(shop_data, "wallet")
-	currency_label.text = "金币 %d" % int(wallet.get("balance", 0))
+	currency_label.text = str(int(wallet.get("balance", 0)))
 	var sections := _dict(shop_data, "sections")
 	_add_catalog_section("常驻区", "permanent", _array(sections, "permanent"))
 	_add_catalog_section("精选轮换区", "featured", _array(sections, "featured"))

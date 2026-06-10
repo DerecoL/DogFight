@@ -55,6 +55,10 @@ func _run() -> void:
 		_assert_has(screen, node_name)
 
 	_assert_missing(screen, "RefreshShopButton")
+	var currency := _find_by_name(screen, "AccountCurrencyPill") as Label
+	if currency == null or currency.text != "360":
+		_fail("AccountCurrencyPill must match the Web pill value only, got %s" % (currency.text if currency != null else "<missing>"))
+		return
 
 	var text := _collect_text(screen)
 	for part in [
