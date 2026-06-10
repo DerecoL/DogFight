@@ -216,6 +216,36 @@ func _run() -> void:
 	if fake_session.upgrade_item_id != "item-1":
 		_fail("MAP upgrade button must call upgrade_item(item-1)")
 		return
+	var relic_button := _find_by_name(screen, "RelicSlot_0") as Button
+	if relic_button == null:
+		_fail("MAP relic slot button is missing")
+		return
+	relic_button.pressed.emit()
+	await process_frame
+	for relic_tip_node in [
+		"FloatingTip",
+		"MapRelicTip",
+		"MapRelicTipTags",
+		"MapRelicTipIdentity",
+		"MapRelicTipDescription",
+		"MapRelicTipActions",
+		"CloseMapRelicTipButton",
+	]:
+		_assert_has(screen, relic_tip_node)
+	var relic_tip_text := _collect_text(screen)
+	for relic_tip_part in ["map-owned-relic", "MAP_RELIC", "map-tag"]:
+		if not relic_tip_text.contains(relic_tip_part):
+			_fail("Map relic tip text missing: %s" % relic_tip_part)
+			return
+	var close_relic_tip := _find_by_name(screen, "CloseMapRelicTipButton") as Button
+	if close_relic_tip == null:
+		_fail("Map relic tip close button is missing")
+		return
+	close_relic_tip.pressed.emit()
+	await process_frame
+	if _find_by_name(screen, "FloatingTip") != null:
+		_fail("Map relic tip should close from its close button")
+		return
 
 	if screen.has_method("set_payload"):
 		screen.call("set_payload", {"run": _map_run(false)})
@@ -258,7 +288,7 @@ func _map_run(with_reward: bool) -> Dictionary:
 		"losses": 0,
 		"gold": 8,
 		"items": [_item("item-1", "EQUIPMENT", 0), _item("item-2", "BAG", 1)],
-		"relics": [],
+		"relics": [_relic("map-relic-1")],
 		"shopItems": [],
 		"choices": [],
 		"classRewardChoices": [],
@@ -306,6 +336,15 @@ func _item(id: String, area: String, x: int) -> Dictionary:
 		"x": x,
 		"y": 0,
 		"def": {"name": "1点牙咬", "size": 1, "description": "造成 5 点伤害", "triggerDice": [1]},
+	}
+
+func _relic(id: String) -> Dictionary:
+	return {
+		"id": id,
+		"relicId": "map-owned-relic",
+		"quality": "GOLD",
+		"slot": 0,
+		"def": {"name": "map-owned-relic", "description": "MAP_RELIC", "effect": "MAP_RELIC", "tags": ["map-tag"]},
 	}
 
 func _assert_has(root_node: Node, node_name: String) -> void:
