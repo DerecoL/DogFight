@@ -1,5 +1,15 @@
 extends BaseWebScreen
 
+const MAP_NODE_ICONS := {
+	"PLAYER_BATTLE": "res://assets/map-icons/player-battle.webp",
+	"MONSTER_BATTLE": "res://assets/map-icons/monster-battle.webp",
+	"SHOP_FIXED": "res://assets/map-icons/shop-fixed.webp",
+	"SHOP_UNKNOWN": "res://assets/map-icons/shop-unknown.webp",
+	"SHOP_EQUIPMENT": "res://assets/map-icons/shop-equipment.webp",
+	"REST": "res://assets/map-icons/rest.webp",
+	"EVENT": "res://assets/map-icons/event.webp",
+}
+
 var action_in_progress := false
 var selected_item_id := ""
 
@@ -231,12 +241,7 @@ func _map_node_button(node: Dictionary, available: Array, completed: Array, curr
 	var available_state := available.has(node_id)
 	var completed_state := completed.has(node_id)
 	var current_state := node_id == current_node_id
-	var text := "%s\n%s" % [_map_node_title(node), _map_node_state_text(node, {
-		"availableNodeIds": available,
-		"completedNodeIds": completed,
-		"currentNodeId": current_node_id,
-	})]
-	var button := _action_button(text, _select_map_node.bind(node_id, available_state))
+	var button := _action_button("", _select_map_node.bind(node_id, available_state))
 	button.name = "MapNodeButton_%s" % node_id
 	button.custom_minimum_size = Vector2(104, 74)
 	button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -245,6 +250,37 @@ func _map_node_button(node: Dictionary, available: Array, completed: Array, curr
 		button.add_theme_color_override("font_color", WebUiTokens.accent_color())
 	elif completed_state:
 		button.add_theme_color_override("font_color", WebUiTokens.safe_color())
+	var content := VBoxContainer.new()
+	content.name = "MapNodeContent_%s" % node_id
+	content.set_anchors_preset(Control.PRESET_FULL_RECT)
+	content.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	content.alignment = BoxContainer.ALIGNMENT_CENTER
+	content.add_theme_constant_override("separation", 4)
+	button.add_child(content)
+
+	var sticker := PanelContainer.new()
+	sticker.name = "MapNodeSticker_%s" % node_id
+	sticker.custom_minimum_size = Vector2(42, 42)
+	sticker.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	sticker.add_theme_stylebox_override("panel", WebUiTokens.resource_pill_style())
+	content.add_child(sticker)
+
+	var icon := TextureRect.new()
+	icon.name = "MapNodeIcon_%s" % node_id
+	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	icon.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
+	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	icon.texture = _map_node_icon_texture(str(node.get("kind", "")))
+	sticker.add_child(icon)
+
+	var title := Label.new()
+	title.name = "MapNodeTitle_%s" % node_id
+	title.text = _map_node_title(node)
+	title.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	content.add_child(title)
 	return button
 
 func _render_map_detail_panel(parent: VBoxContainer, map_state: Dictionary) -> void:
@@ -683,6 +719,12 @@ func _map_node_title(node: Dictionary) -> String:
 			return _fallback(str(event.get("title", "")), "事件")
 		_:
 			return str(node.get("kind", "节点"))
+
+func _map_node_icon_texture(kind: String) -> Texture2D:
+	var path := str(MAP_NODE_ICONS.get(kind, ""))
+	if path.is_empty():
+		return null
+	return load(path) as Texture2D
 
 func _map_node_preview(node: Dictionary) -> String:
 	match str(node.get("kind", "")):

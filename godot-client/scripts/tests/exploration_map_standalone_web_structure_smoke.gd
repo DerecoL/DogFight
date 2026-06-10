@@ -66,6 +66,23 @@ func _run() -> void:
 	if not route_board is HBoxContainer:
 		_fail("ExplorationMapRouteBoard must use the Web two-column map layout")
 		return
+	for node_id in ["start-1", "monster-1"]:
+		var node_button := _find_by_name(screen, "MapNodeButton_%s" % node_id) as Button
+		if node_button == null:
+			_fail("Exploration map route is missing node button %s" % node_id)
+			return
+		for child_name in [
+			"MapNodeSticker_%s" % node_id,
+			"MapNodeIcon_%s" % node_id,
+			"MapNodeTitle_%s" % node_id,
+		]:
+			if node_button.find_child(child_name, true, false) == null:
+				_fail("MapNodeButton should mirror Web map-node child: %s" % child_name)
+				return
+		var icon := node_button.find_child("MapNodeIcon_%s" % node_id, true, false) as TextureRect
+		if icon == null or icon.texture == null:
+			_fail("MapNodeButton must render map icon texture for %s" % node_id)
+			return
 	var bag_relic_row = _find_by_name(screen, "BagRelicRow")
 	if not bag_relic_row is HBoxContainer:
 		_fail("ExplorationMap BagRelicRow must lay out relic rail and bag grid side by side like Web InventoryBoard")
