@@ -85,6 +85,36 @@ func _run() -> void:
 	if fake_session.upgrade_item_id != "equip-1":
 		_fail("PREP upgrade button must call upgrade_item(equip-1)")
 		return
+	var relic_button := _find_by_name(screen, "RelicSlot_0") as Button
+	if relic_button == null:
+		_fail("PREP relic slot button is missing")
+		return
+	relic_button.pressed.emit()
+	await process_frame
+	for relic_tip_node in [
+		"FloatingTip",
+		"RunShellRelicTip",
+		"RunShellRelicTipTags",
+		"RunShellRelicTipIdentity",
+		"RunShellRelicTipDescription",
+		"RunShellRelicTipActions",
+		"CloseRunShellRelicTipButton",
+	]:
+		_assert_has(screen, relic_tip_node)
+	var relic_tip_text := _collect_text(screen)
+	for relic_tip_part in ["training-relic", "PREP_RELIC", "prep-tag"]:
+		if not relic_tip_text.contains(relic_tip_part):
+			_fail("PREP relic tip text missing: %s" % relic_tip_part)
+			return
+	var close_relic_tip_button := _find_by_name(screen, "CloseRunShellRelicTipButton") as Button
+	if close_relic_tip_button == null:
+		_fail("CloseRunShellRelicTipButton is missing")
+		return
+	close_relic_tip_button.pressed.emit()
+	await process_frame
+	if _find_by_name(screen, "FloatingTip") != null:
+		_fail("CloseRunShellRelicTipButton must close the PREP relic tip")
+		return
 
 	if screen.has_method("set_payload"):
 		screen.call("set_payload", {"run": _run_payload("MATCH")})
@@ -199,7 +229,7 @@ func _relic(id: String) -> Dictionary:
 		"relicId": "training-relic",
 		"quality": "SILVER",
 		"slot": 0,
-		"def": {"name": "训练徽章", "description": "测试遗物"},
+		"def": {"name": "training-relic", "description": "PREP_RELIC", "effect": "PREP_RELIC", "tags": ["prep-tag"]},
 	}
 
 func _fail(message: String) -> void:
