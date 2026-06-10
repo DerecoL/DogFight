@@ -83,6 +83,30 @@ func _run() -> void:
 		if icon == null or icon.texture == null:
 			_fail("MapNodeButton must render map icon texture for %s" % node_id)
 			return
+	var available_node_button := _find_by_name(screen, "MapNodeButton_start-1") as Button
+	if available_node_button == null:
+		_fail("Available map node button is missing")
+		return
+	available_node_button.pressed.emit()
+	await process_frame
+	if fake_session.selected_node_id != "":
+		_fail("Map node click should inspect/select the detail panel before entering")
+		return
+	var enter_button := _find_by_name(screen, "MapEnterActionButton") as Button
+	if enter_button == null or enter_button.disabled:
+		_fail("Selected available map node should expose a Web-style enter action button")
+		return
+	enter_button.pressed.emit()
+	await process_frame
+	if fake_session.selected_node_id != "start-1":
+		_fail("MapEnterActionButton must call select_map_node(start-1)")
+		return
+	var current_node_button := _find_by_name(screen, "MapNodeButton_monster-1") as Button
+	if current_node_button == null:
+		_fail("Current map node button is missing after entering available node")
+		return
+	current_node_button.pressed.emit()
+	await process_frame
 	var bag_relic_row = _find_by_name(screen, "BagRelicRow")
 	if not bag_relic_row is HBoxContainer:
 		_fail("ExplorationMap BagRelicRow must lay out relic rail and bag grid side by side like Web InventoryBoard")
@@ -153,9 +177,14 @@ func _run() -> void:
 class FakeSession:
 	extends Node
 	var upgrade_item_id := ""
+	var selected_node_id := ""
 
 	func upgrade_item(item_id: String) -> bool:
 		upgrade_item_id = item_id
+		return true
+
+	func select_map_node(node_id: String) -> bool:
+		selected_node_id = node_id
 		return true
 
 func _map_run(with_reward: bool) -> Dictionary:

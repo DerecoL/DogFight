@@ -12,6 +12,7 @@ const MAP_NODE_ICONS := {
 
 var action_in_progress := false
 var selected_item_id := ""
+var selected_map_node_id := ""
 
 func _ready() -> void:
 	_render()
@@ -241,7 +242,7 @@ func _map_node_button(node: Dictionary, available: Array, completed: Array, curr
 	var available_state := available.has(node_id)
 	var completed_state := completed.has(node_id)
 	var current_state := node_id == current_node_id
-	var button := _action_button("", _select_map_node.bind(node_id, available_state))
+	var button := _action_button("", _inspect_map_node.bind(node_id))
 	button.name = "MapNodeButton_%s" % node_id
 	button.custom_minimum_size = Vector2(104, 74)
 	button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -330,6 +331,10 @@ func _render_map_detail_panel(parent: VBoxContainer, map_state: Dictionary) -> v
 			_add_line(detail, "MapMonsterLine", "对手", "%s · %s" % [str(monster.get("name", "")), _dog_name(str(monster.get("dogType", "")))])
 			_render_map_monster_equipment(detail, monster)
 			_render_map_reward_preview(detail, _variant_array(monster.get("possibleRewards", [])))
+		if _variant_array(map_state.get("availableNodeIds", [])).has(str(current_node.get("id", ""))):
+			var enter_button := _action_button("前往", _enter_map_node.bind(str(current_node.get("id", ""))))
+			enter_button.name = "MapEnterActionButton"
+			detail.add_child(enter_button)
 		_add_label(detail, "MapNodeStateCopy", _map_node_state_text(current_node, map_state))
 
 func _render_map_monster_equipment(parent: VBoxContainer, monster: Dictionary) -> void:
@@ -549,10 +554,13 @@ func _add_resource_pill(parent: Node, label: String, value: String) -> void:
 	pill.add_theme_stylebox_override("normal", WebUiTokens.resource_pill_style())
 	parent.add_child(pill)
 
-func _select_map_node(node_id: String, available: bool) -> void:
+func _inspect_map_node(node_id: String) -> void:
+	selected_map_node_id = node_id
+	selected_item_id = ""
+	_render()
+
+func _enter_map_node(node_id: String) -> void:
 	if action_in_progress:
-		return
-	if not available:
 		return
 	if session != null and session.has_method("select_map_node"):
 		action_in_progress = true
@@ -669,6 +677,11 @@ func _map_current_layer(map_state: Dictionary) -> int:
 	return current
 
 func _map_selected_node(map_state: Dictionary) -> Dictionary:
+	if not selected_map_node_id.is_empty():
+		var selected := _find_map_node(map_state, selected_map_node_id)
+		if not selected.is_empty():
+			return selected
+		selected_map_node_id = ""
 	var current_node_id := str(map_state.get("currentNodeId", ""))
 	if not current_node_id.is_empty():
 		var current := _find_map_node(map_state, current_node_id)
