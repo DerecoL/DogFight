@@ -13,6 +13,7 @@ const DOG_ASSETS := {
 var apex_data: Dictionary = {}
 var content_box: VBoxContainer
 var action_buttons: Array[Button] = []
+var active_board := "overall"
 
 func _ready() -> void:
 	_build_screen()
@@ -165,22 +166,32 @@ func _render_leaderboard(parent: GridContainer) -> void:
 	panel.add_child(tabs)
 	var overall_tab := _plain_button("总榜", 72)
 	overall_tab.name = "ApexTab_overall"
+	_configure_board_tab(overall_tab, "overall")
 	tabs.add_child(overall_tab)
 	var daily_tab := _plain_button("当日榜", 84)
 	daily_tab.name = "ApexTab_daily"
+	_configure_board_tab(daily_tab, "daily")
 	tabs.add_child(daily_tab)
 	_add_label(panel, "ApexOverallHint", "总榜：初始种子会随玩家提交逐步下移")
 	_add_label(panel, "ApexDailyHint", "当日榜：每日 %02d:00 更新 · %s" % [int(apex_data.get("dailyResetHour", 5)), str(apex_data.get("dailyBoardKey", ""))])
+
+	if active_board == "daily":
+		var overall_hint := panel.get_node_or_null("ApexOverallHint")
+		if overall_hint != null:
+			overall_hint.queue_free()
+	else:
+		var daily_hint := panel.get_node_or_null("ApexDailyHint")
+		if daily_hint != null:
+			daily_hint.queue_free()
 
 	var rank_list := VBoxContainer.new()
 	rank_list.name = "ApexRankList"
 	rank_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	rank_list.add_theme_constant_override("separation", 8)
 	panel.add_child(rank_list)
-	for board_name in ["overall", "daily"]:
-		for entry_value in _array(leaderboards, board_name).slice(0, 20):
-			if entry_value is Dictionary:
-				_render_apex_rank_entry(rank_list, entry_value)
+	for entry_value in _array(leaderboards, active_board).slice(0, 20):
+		if entry_value is Dictionary:
+			_render_apex_rank_entry(rank_list, entry_value)
 
 func _render_apex_rank_entry(parent: VBoxContainer, entry: Dictionary) -> void:
 	var entry_id := str(entry.get("id", ""))
@@ -227,6 +238,14 @@ func _render_apex_rank_entry(parent: VBoxContainer, entry: Dictionary) -> void:
 	var config_button := _action_button("查看配置", _show_config.bind(entry))
 	config_button.name = "ApexConfig_%s" % entry_id
 	row.add_child(config_button)
+
+func _configure_board_tab(button: Button, board_name: String) -> void:
+	button.toggle_mode = true
+	button.button_pressed = active_board == board_name
+	button.pressed.connect(func() -> void:
+		active_board = board_name
+		_render()
+	)
 
 func _paper_panel(node_name: String, parent: Node = null) -> VBoxContainer:
 	var panel := VBoxContainer.new()

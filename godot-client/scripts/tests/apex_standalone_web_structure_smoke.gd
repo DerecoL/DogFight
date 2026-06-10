@@ -67,6 +67,44 @@ func _run() -> void:
 	if int((layout as GridContainer).columns) != 2:
 		_fail("ApexLayout must keep two columns")
 		return
+	var overall_tab := _find_by_name(screen, "ApexTab_overall") as Button
+	var daily_tab := _find_by_name(screen, "ApexTab_daily") as Button
+	if overall_tab == null or daily_tab == null:
+		_fail("Apex tabs must expose stable Web tab buttons")
+		return
+	if not overall_tab.button_pressed or daily_tab.button_pressed:
+		_fail("Apex leaderboard must default to the overall tab")
+		return
+	if _find_by_name(screen, "ApexRankEntry_daily-1") != null:
+		_fail("Apex overall tab must not render daily board entries before switching")
+		return
+	if _find_by_name(screen, "ApexDailyHint") != null:
+		_fail("Apex overall tab must not render daily hint before switching")
+		return
+	if _find_by_name(screen, "ApexRankSelf_overall-1") == null:
+		_fail("Apex overall tab must render mine marker for my overall entry")
+		return
+	daily_tab.pressed.emit()
+	await process_frame
+	daily_tab = _find_by_name(screen, "ApexTab_daily") as Button
+	overall_tab = _find_by_name(screen, "ApexTab_overall") as Button
+	if daily_tab == null or overall_tab == null or not daily_tab.button_pressed or overall_tab.button_pressed:
+		_fail("Apex daily tab must become active after click")
+		return
+	if _find_by_name(screen, "ApexRankEntry_daily-1") == null:
+		_fail("Apex daily tab must render daily leaderboard entries")
+		return
+	if _find_by_name(screen, "ApexRankEntry_overall-1") != null:
+		_fail("Apex daily tab must not render overall board entries")
+		return
+	if _find_by_name(screen, "ApexDailyHint") == null:
+		_fail("Apex daily tab must render daily board hint")
+		return
+	if _find_by_name(screen, "ApexOverallHint") != null:
+		_fail("Apex daily tab must not render overall board hint")
+		return
+	overall_tab.pressed.emit()
+	await process_frame
 
 	var text := _collect_text(screen)
 	for part in ["巅峰竞技场", "刷新", "已投入巅峰榜", "可投入的完成狗", "投入巅峰", "总榜", "当日榜", "查看配置", "我的记录", "防守连胜 4"]:
