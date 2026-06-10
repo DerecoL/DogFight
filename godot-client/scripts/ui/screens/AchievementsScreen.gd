@@ -298,7 +298,8 @@ func _render_achievement_card(parent: GridContainer, achievement: Dictionary) ->
 
 func _category_button(category: String) -> Button:
 	var button := _plain_button(category, 84)
-	button.disabled = selected_category == category
+	button.toggle_mode = true
+	button.button_pressed = selected_category == category
 	button.pressed.connect(func() -> void:
 		selected_category = category
 		_render()

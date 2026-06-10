@@ -54,6 +54,49 @@ func _run() -> void:
 		_fail("AchievementGrid should expose a multi-column card layout")
 		return
 
+	var all_tab := _find_by_name(screen, "AchievementTab_all") as Button
+	var combat_tab := _find_by_name(screen, "AchievementTab_combat") as Button
+	var collection_tab := _find_by_name(screen, "AchievementTab_collection") as Button
+	if all_tab == null or combat_tab == null or collection_tab == null:
+		_fail("Achievement category tabs must render as clickable buttons")
+		return
+	if all_tab.disabled:
+		_fail("Active achievement tab must remain clickable like the Web category button")
+		return
+	if not all_tab.button_pressed or combat_tab.button_pressed or collection_tab.button_pressed:
+		_fail("Achievement category tabs must expose the selected tab with button_pressed")
+		return
+
+	combat_tab.pressed.emit()
+	await process_frame
+	combat_tab = _find_by_name(screen, "AchievementTab_combat") as Button
+	all_tab = _find_by_name(screen, "AchievementTab_all") as Button
+	if combat_tab == null or all_tab == null or not combat_tab.button_pressed or all_tab.button_pressed:
+		_fail("Combat achievement tab must become the active pressed tab")
+		return
+	_assert_has(screen, "AchievementCard_first-win")
+	_assert_missing(screen, "AchievementCard_collector")
+
+	collection_tab = _find_by_name(screen, "AchievementTab_collection") as Button
+	if collection_tab == null:
+		_fail("Collection achievement tab missing after category re-render")
+		return
+	collection_tab.pressed.emit()
+	await process_frame
+	collection_tab = _find_by_name(screen, "AchievementTab_collection") as Button
+	if collection_tab == null or not collection_tab.button_pressed:
+		_fail("Collection achievement tab must become the active pressed tab")
+		return
+	_assert_has(screen, "AchievementCard_collector")
+	_assert_missing(screen, "AchievementCard_first-win")
+
+	all_tab = _find_by_name(screen, "AchievementTab_all") as Button
+	if all_tab == null:
+		_fail("All achievement tab missing after category re-render")
+		return
+	all_tab.pressed.emit()
+	await process_frame
+
 	var text := _collect_text(screen)
 	for part in ["长期目标", "成就与每日任务", "500", "每日任务 2026-06-09", "刷新", "商店达人", "购买 5 件商品", "领取 20", "继续挑战", "1/4", "全部", "战斗", "收藏", "首胜", "赢下一场战斗", "1/1 · 30", "领取", "收藏大师", "2/5 · 20", "未完成"]:
 		if not text.contains(part):
@@ -130,6 +173,10 @@ func _daily_data() -> Dictionary:
 func _assert_has(root_node: Node, node_name: String) -> void:
 	if _find_by_name(root_node, node_name) == null:
 		_fail("Missing achievements standalone Web node: %s" % node_name)
+
+func _assert_missing(root_node: Node, node_name: String) -> void:
+	if _find_by_name(root_node, node_name) != null:
+		_fail("Unexpected achievements standalone Web node: %s" % node_name)
 
 func _find_by_name(node: Node, node_name: String) -> Node:
 	if node.name == node_name:
