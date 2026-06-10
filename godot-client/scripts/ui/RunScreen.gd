@@ -3166,13 +3166,24 @@ func _dog_card_button(dog_type: String) -> Button:
 	art_frame.add_theme_stylebox_override("panel", UiTokens.paper_panel_style())
 	content.add_child(art_frame)
 
+	var badge := CenterContainer.new()
+	badge.name = "DogCardDogBadge_%s" % dog_type
+	badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	art_frame.add_child(badge)
+	var texture := _dog_texture(dog_type)
+	var avatar := TextureRect.new()
+	avatar.name = "DogCardAvatar_%s" % dog_type
+	avatar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	avatar.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
+	avatar.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	avatar.texture = texture
+	badge.add_child(avatar)
 	var art := TextureRect.new()
 	art.name = "DogCardArt_%s" % dog_type
+	art.visible = false
 	art.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	art.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
-	art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	art.texture = _dog_texture(dog_type)
-	art_frame.add_child(art)
+	art.texture = texture
+	badge.add_child(art)
 
 	var name_label := Label.new()
 	name_label.name = "DogCardName_%s" % dog_type
@@ -3214,13 +3225,24 @@ func _render_dog_detail_panel(parent: Node) -> void:
 	box.add_theme_constant_override("separation", 10)
 	panel.add_child(box)
 
+	var detail_art := PanelContainer.new()
+	detail_art.name = "DogDetailArt"
+	detail_art.custom_minimum_size = Vector2(0, 120)
+	detail_art.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	detail_art.add_theme_stylebox_override("panel", UiTokens.paper_panel_style())
+	box.add_child(detail_art)
+	var detail_badge := CenterContainer.new()
+	detail_badge.name = "DogDetailDogBadge"
+	detail_badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	detail_art.add_child(detail_badge)
 	var art := TextureRect.new()
-	art.name = "DogDetailArt"
-	art.custom_minimum_size = Vector2(0, 120)
+	art.name = "DogDetailAvatar"
+	art.custom_minimum_size = Vector2(0, 108)
+	art.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	art.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
 	art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	art.texture = _dog_texture(dog_type)
-	box.add_child(art)
+	detail_badge.add_child(art)
 
 	var title := Label.new()
 	title.name = "DogDetailName"

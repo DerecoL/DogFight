@@ -42,6 +42,8 @@ func _run() -> void:
 			return
 		for child_name in [
 			"DogCardArtFrame_%s" % dog_type,
+			"DogCardDogBadge_%s" % dog_type,
+			"DogCardAvatar_%s" % dog_type,
 			"DogCardArt_%s" % dog_type,
 			"DogCardName_%s" % dog_type,
 			"DogCardCopy_%s" % dog_type,

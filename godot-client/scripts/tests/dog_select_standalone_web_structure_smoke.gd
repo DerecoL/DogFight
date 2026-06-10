@@ -40,6 +40,8 @@ func _run() -> void:
 			return
 		for child_name in [
 			"DogCardArtFrame_%s" % dog_type,
+			"DogCardDogBadge_%s" % dog_type,
+			"DogCardAvatar_%s" % dog_type,
 			"DogCardArt_%s" % dog_type,
 			"DogCardName_%s" % dog_type,
 			"DogCardCopy_%s" % dog_type,
@@ -52,6 +54,14 @@ func _run() -> void:
 		if art == null or art.texture == null:
 			_fail("Standalone DogCardGrid card must render dog art for %s" % dog_type)
 			return
+		var avatar = card.find_child("DogCardAvatar_%s" % dog_type, true, false) as TextureRect
+		if avatar == null or avatar.texture == null:
+			_fail("Standalone DogCardGrid card must render Web dog-avatar for %s" % dog_type)
+			return
+	var detail_avatar := screen.find_child("DogDetailAvatar", true, false) as TextureRect
+	if detail_avatar == null or detail_avatar.texture == null:
+		_fail("Standalone DogDetailPanel must render Web DogBadge avatar texture")
+		return
 	for index in [6, 7]:
 		if screen.find_child("DogCardPlaceholder_%d" % index, true, false) == null:
 			_fail("Standalone DogCardGrid missing Web placeholder slot %d" % index)
