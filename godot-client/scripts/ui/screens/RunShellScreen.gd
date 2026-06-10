@@ -127,9 +127,26 @@ func _render_grid_panel(parent: Node, node_name: String, title: String, area: St
 		if item_value is Dictionary and str((item_value as Dictionary).get("area", "")) == area:
 			var item: Dictionary = item_value
 			var def := _dict(item, "def")
-			var button := _action_button(_fallback(str(def.get("name", "")), str(item.get("defId", ""))), _select_item.bind(str(item.get("id", ""))))
-			button.name = "%sItem_%s" % [node_name, str(item.get("id", ""))]
-			button.custom_minimum_size = Vector2(90, 52)
+			var item_id := str(item.get("id", ""))
+			var button := _action_button("", _select_item.bind(item_id))
+			button.name = "%sItem_%s" % [node_name, item_id]
+			button.custom_minimum_size = Vector2(108, 86)
+			button.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+			var slot := VBoxContainer.new()
+			slot.name = "%sSlot_%s" % [node_name, item_id]
+			slot.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			slot.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			slot.add_theme_constant_override("separation", 3)
+			button.add_child(slot)
+			var art := TextureRect.new()
+			art.name = "%sItemArt_%s" % [node_name, item_id]
+			art.custom_minimum_size = Vector2(0, 44)
+			art.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			art.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
+			art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			art.texture = _item_texture(item)
+			slot.add_child(art)
+			_add_label(slot, "%sItemName_%s" % [node_name, item_id], _fallback(str(def.get("name", "")), str(item.get("defId", ""))), HORIZONTAL_ALIGNMENT_CENTER)
 			item_line.add_child(button)
 
 func _render_relic_rail(parent: Node, run: Dictionary) -> void:
@@ -151,6 +168,15 @@ func _render_relic_rail(parent: Node, run: Dictionary) -> void:
 		button.name = "RelicSlot_%d" % slot
 		button.custom_minimum_size = Vector2(74, 42)
 		button.disabled = relic.is_empty()
+		var name := Label.new()
+		name.name = "RelicSlot_%dName" % slot
+		name.text = _fallback(str(def.get("name", "")), "遗物槽 %d" % (slot + 1))
+		name.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		name.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		name.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		name.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		button.add_child(name)
 		row.add_child(button)
 
 func _render_selected_item_tip(parent: VBoxContainer, run: Dictionary) -> void:
@@ -285,6 +311,26 @@ func _dict(source: Dictionary, key: String) -> Dictionary:
 func _array(source: Dictionary, key: String) -> Array:
 	var value = source.get(key, [])
 	return value if value is Array else []
+
+func _item_texture(item: Dictionary) -> Texture2D:
+	var def_id := str(item.get("defId", ""))
+	var art := _texture("res://assets/item-card-art/%s.webp" % def_id) if not def_id.is_empty() else null
+	if art != null:
+		return art
+	return _sticker_texture(def_id)
+
+func _sticker_texture(asset_id: String) -> Texture2D:
+	if asset_id.is_empty():
+		return _texture("res://assets/sticker-icons/starter-1.webp")
+	var texture := _texture("res://assets/sticker-icons/%s.webp" % asset_id)
+	return texture if texture != null else _texture("res://assets/sticker-icons/starter-1.webp")
+
+func _texture(path: String) -> Texture2D:
+	if path.is_empty():
+		return null
+	if not ResourceLoader.exists(path):
+		return null
+	return load(path) as Texture2D
 
 func _selected_item(run: Dictionary) -> Dictionary:
 	if selected_item_id.is_empty():

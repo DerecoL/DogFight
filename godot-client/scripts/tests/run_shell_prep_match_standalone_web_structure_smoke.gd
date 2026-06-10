@@ -28,12 +28,26 @@ func _run() -> void:
 		"MatchPanelHeading",
 		"InventoryBoard",
 		"EquipmentBoard",
+		"EquipmentBoardItems",
+		"EquipmentBoardSlot_equip-1",
+		"EquipmentBoardItemArt_equip-1",
+		"EquipmentBoardItemName_equip-1",
 		"BagRelicRow",
 		"RelicRail",
+		"RelicSlot_0Name",
 		"BagBoard",
+		"BagBoardItems",
+		"BagBoardSlot_bag-1",
+		"BagBoardItemArt_bag-1",
+		"BagBoardItemName_bag-1",
 		"MatchActionButton",
 	]:
 		_assert_has(screen, node_name)
+	for texture_node_name in ["EquipmentBoardItemArt_equip-1", "BagBoardItemArt_bag-1"]:
+		var texture_rect := _find_by_name(screen, texture_node_name) as TextureRect
+		if texture_rect == null or texture_rect.texture == null:
+			_fail("PREP inventory item must render Web item art texture: %s" % texture_node_name)
+			return
 	var prep_text := _collect_text(screen)
 	for part in ["整备阶段", "整理装备与遗物后再匹配对手。", "匹配对手", "1点牙咬", "背包"]:
 		if not prep_text.contains(part):
