@@ -155,6 +155,36 @@ func _run() -> void:
 	if _find_by_name(screen, "FloatingTip") != null:
 		_fail("Shop inventory item tip should close from its close button")
 		return
+	var relic_button := _find_by_name(screen, "RelicSlot_0") as Button
+	if relic_button == null:
+		_fail("Shop relic slot button is missing")
+		return
+	relic_button.pressed.emit()
+	await process_frame
+	for relic_tip_node in [
+		"FloatingTip",
+		"ShopRelicTip",
+		"ShopRelicTipTags",
+		"ShopRelicTipIdentity",
+		"ShopRelicTipDescription",
+		"ShopRelicTipActions",
+		"CloseShopRelicTipButton",
+	]:
+		_assert_has(screen, relic_tip_node)
+	var relic_tip_text := _collect_text(screen)
+	for relic_tip_part in ["shop-training-relic", "SHOP_RELIC", "shop-tag"]:
+		if not relic_tip_text.contains(relic_tip_part):
+			_fail("Shop relic tip text missing: %s" % relic_tip_part)
+			return
+	var close_relic_tip := _find_by_name(screen, "CloseShopRelicTipButton") as Button
+	if close_relic_tip == null:
+		_fail("Shop relic tip close button is missing")
+		return
+	close_relic_tip.pressed.emit()
+	await process_frame
+	if _find_by_name(screen, "FloatingTip") != null:
+		_fail("Shop relic tip should close from its close button")
+		return
 	var text := _collect_text(screen)
 	for part in [
 		"装备店",
@@ -303,8 +333,8 @@ func _fail(message: String) -> void:
 func _relic(id: String) -> Dictionary:
 	return {
 		"id": id,
-		"relicId": "training-relic",
+		"relicId": "shop-training-relic",
 		"quality": "SILVER",
 		"slot": 0,
-		"def": {"name": "训练徽章", "description": "测试遗物"},
+		"def": {"name": "shop-training-relic", "description": "SHOP_RELIC", "effect": "SHOP_RELIC", "tags": ["shop-tag"]},
 	}
