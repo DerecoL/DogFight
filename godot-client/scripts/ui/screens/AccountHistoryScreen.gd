@@ -88,7 +88,7 @@ func _render_header() -> void:
 
 	var close_button := _plain_button("×", 48)
 	close_button.name = "HistoryCloseButton"
-	close_button.disabled = true
+	close_button.pressed.connect(_close_history)
 	header.add_child(close_button)
 
 func _render_tabs() -> void:
@@ -280,6 +280,10 @@ func _select_tab(tab_id: String) -> void:
 func _select_run(run_id: String) -> void:
 	selected_run_id = run_id
 	_render()
+
+func _close_history() -> void:
+	if session != null and session.has_method("open_screen"):
+		session.call("open_screen", "mode_lobby")
 
 func _runs_for_active_tab() -> Array:
 	var runs := _array(history_data, "recentRuns")

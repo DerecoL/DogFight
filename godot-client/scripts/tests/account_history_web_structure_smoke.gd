@@ -33,6 +33,7 @@ func _run() -> void:
 		"AccountHistoryScreen",
 		"HistoryPageHeader",
 		"HistoryPageBest",
+		"HistoryCloseButton",
 		"HistoryModeTabs",
 		"HistoryTab_ALL",
 		"HistoryTab_CASUAL",
@@ -56,6 +57,11 @@ func _run() -> void:
 		return
 	if int((layout as GridContainer).columns) != 2:
 		_fail("HistoryDetailLayout must keep two columns")
+		return
+
+	var close_button := _find_by_name(screen, "HistoryCloseButton") as Button
+	if close_button == null or close_button.disabled:
+		_fail("HistoryCloseButton must be enabled like the Web history close button")
 		return
 
 	_assert_missing(screen, "HistoryTab_ROOM")

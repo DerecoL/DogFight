@@ -40,6 +40,19 @@ func _run() -> void:
 	if account_history.find_child("PlaceholderPanel", true, false) != null:
 		_fail("HistoryDetailButton must not show placeholder content")
 		return
+	var close_button := account_history.find_child("HistoryCloseButton", true, false) as Button
+	if close_button == null or close_button.disabled:
+		_fail("Account history close button should remain clickable like the Web overlay close button")
+		return
+	close_button.pressed.emit()
+	await process_frame
+	await process_frame
+	if str(router.get("current_screen_id")) != "mode_lobby":
+		_fail("HistoryCloseButton should return to standalone mode_lobby, got %s" % str(router.get("current_screen_id")))
+		return
+	if not mode_lobby.visible:
+		_fail("HistoryCloseButton should show ModeLobbyScreen")
+		return
 
 	main.queue_free()
 	for _frame in range(2):
