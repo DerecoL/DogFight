@@ -36,6 +36,8 @@ func _run() -> void:
 		"HistoryModeTabs",
 		"HistoryTab_ALL",
 		"HistoryTab_CASUAL",
+		"HistoryTab_DOGFIGHT",
+		"HistoryTab_PEAK",
 		"HistoryTab_LADDER",
 		"HistoryDetailLayout",
 		"HistoryRunBrowser",
@@ -55,6 +57,31 @@ func _run() -> void:
 	if int((layout as GridContainer).columns) != 2:
 		_fail("HistoryDetailLayout must keep two columns")
 		return
+
+	_assert_missing(screen, "HistoryTab_ROOM")
+	_assert_tab_state(screen, "HistoryTab_ALL", "全部", "2", true)
+	_assert_tab_state(screen, "HistoryTab_CASUAL", "休闲模式", "1", false)
+	_assert_tab_state(screen, "HistoryTab_DOGFIGHT", "斗狗模式", "0", false)
+	_assert_tab_state(screen, "HistoryTab_PEAK", "巅峰模式", "0", false)
+	_assert_tab_state(screen, "HistoryTab_LADDER", "天梯模式", "1", false)
+
+	var ladder_tab := _find_by_name(screen, "HistoryTab_LADDER") as Button
+	if ladder_tab == null:
+		_fail("Ladder history tab missing")
+		return
+	ladder_tab.pressed.emit()
+	await process_frame
+	_assert_tab_state(screen, "HistoryTab_LADDER", "天梯模式", "1", true)
+	_assert_tab_state(screen, "HistoryTab_ALL", "全部", "2", false)
+	_assert_has(screen, "HistoryDetailRow_run-2")
+	_assert_missing(screen, "HistoryDetailRow_run-1")
+
+	var all_tab := _find_by_name(screen, "HistoryTab_ALL") as Button
+	if all_tab == null:
+		_fail("All history tab missing after re-render")
+		return
+	all_tab.pressed.emit()
+	await process_frame
 
 	var text := _collect_text(screen)
 	for part in ["个人战绩", "8胜 3败", "共 12 局", "进行中 1 局", "已完成 7 局", "最佳成绩", "休闲", "天梯", "历史装备栏", "点击查看装备", "遗物 1 个", "背包物品 1 个"]:
@@ -114,6 +141,27 @@ func _history_data() -> Dictionary:
 func _assert_has(root_node: Node, node_name: String) -> void:
 	if _find_by_name(root_node, node_name) == null:
 		_fail("Missing account history Web node: %s" % node_name)
+
+func _assert_missing(root_node: Node, node_name: String) -> void:
+	if _find_by_name(root_node, node_name) != null:
+		_fail("Unexpected account history Web node: %s" % node_name)
+
+func _assert_tab_state(root_node: Node, node_name: String, label: String, count: String, expected_pressed: bool) -> void:
+	var button := _find_by_name(root_node, node_name) as Button
+	if button == null:
+		_fail("Missing history tab button: %s" % node_name)
+		return
+	if not button.toggle_mode:
+		_fail("History tab must use toggle_mode like the Web active tab: %s" % node_name)
+		return
+	if button.button_pressed != expected_pressed:
+		_fail("History tab pressed state mismatch for %s" % node_name)
+		return
+	if button.disabled:
+		_fail("History active tab must remain clickable: %s" % node_name)
+		return
+	if not button.text.contains(label) or not button.text.contains(count):
+		_fail("History tab %s should contain label %s and count %s, got %s" % [node_name, label, count, button.text])
 
 func _find_by_name(node: Node, node_name: String) -> Node:
 	if node.name == node_name:

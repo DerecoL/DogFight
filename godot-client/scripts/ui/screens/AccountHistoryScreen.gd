@@ -100,10 +100,10 @@ func _render_tabs() -> void:
 	for tab in _history_mode_tabs():
 		var tab_id := str(tab.get("id", "ALL"))
 		var label := "%s  %d" % [str(tab.get("label", "")), _tab_count(tab_id)]
-		var button := _plain_button(label, 116)
+		var button := _plain_button(label, 132)
 		button.name = "HistoryTab_%s" % tab_id
-		if active_tab == tab_id:
-			button.add_theme_stylebox_override("normal", WebUiTokens.handdrawn_button_pressed_style())
+		button.toggle_mode = true
+		button.button_pressed = active_tab == tab_id
 		button.pressed.connect(_select_tab.bind(tab_id))
 		tabs.add_child(button)
 
@@ -302,9 +302,10 @@ func _selected_run(runs: Array) -> Dictionary:
 func _history_mode_tabs() -> Array:
 	return [
 		{"id": "ALL", "label": "全部"},
-		{"id": "CASUAL", "label": "休闲"},
-		{"id": "LADDER", "label": "天梯"},
-		{"id": "ROOM", "label": "房间"},
+		{"id": "CASUAL", "label": "休闲模式"},
+		{"id": "DOGFIGHT", "label": "斗狗模式"},
+		{"id": "PEAK", "label": "巅峰模式"},
+		{"id": "LADDER", "label": "天梯模式"},
 	]
 
 func _tab_count(tab_id: String) -> int:
