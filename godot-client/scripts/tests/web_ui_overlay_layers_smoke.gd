@@ -49,8 +49,23 @@ func _init() -> void:
 	var drag = overlay.get_node_or_null("DragLayer") as Control
 	var fx = overlay.get_node_or_null("BattleFxLayer") as Control
 	var tips = overlay.get_node_or_null("TipLayer") as Control
+	var toast_layer = overlay.get_node_or_null("ToastLayer") as Control
+	var modal_layer = overlay.get_node_or_null("ModalLayer") as Control
+	var confirm_layer = overlay.get_node_or_null("ConfirmLayer") as Control
 	var loading = overlay.get_node_or_null("LoadingLayer") as Control
 	var loading_label = overlay.get_node_or_null("LoadingLayer/LoadingLabel") as Label
+	if tips.get_index() >= toast_layer.get_index():
+		_fail("TipLayer must render below ToastLayer")
+		return
+	if toast_layer.get_index() >= modal_layer.get_index():
+		_fail("ToastLayer must render below ModalLayer")
+		return
+	if modal_layer.get_index() >= confirm_layer.get_index():
+		_fail("ModalLayer must render below ConfirmLayer")
+		return
+	if confirm_layer.get_index() >= loading.get_index():
+		_fail("ConfirmLayer must render below LoadingLayer")
+		return
 	if blocking.visible:
 		_fail("BlockingLayer must be hidden by default")
 		return

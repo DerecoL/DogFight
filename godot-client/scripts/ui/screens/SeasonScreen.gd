@@ -1,7 +1,9 @@
 extends BaseWebScreen
 
+const WebShellScene := preload("res://scenes/shell/WebShell.tscn")
 const WebUiTokens := preload("res://scripts/ui/web/WebUiTokens.gd")
 
+var shell: WebShell
 var content_box: VBoxContainer
 
 func _ready() -> void:
@@ -12,15 +14,31 @@ func _on_payload_changed() -> void:
 	_render()
 
 func _build_screen() -> void:
+	for child in get_children():
+		remove_child(child)
+		child.queue_free()
+
+	shell = WebShellScene.instantiate()
+	shell.name = "WebShell"
+	add_child(shell)
+	shell.lobby_requested.connect(func() -> void:
+		if session != null and session.has_method("open_screen"):
+			session.call("open_screen", "mode_lobby")
+	)
+	shell.logout_requested.connect(func() -> void:
+		if session != null and session.has_method("logout"):
+			session.call("logout")
+	)
+
+	var shell_content := shell.content_container()
+
 	var panel := PanelContainer.new()
 	panel.name = "SeasonPanel"
-	panel.set_anchors_preset(Control.PRESET_FULL_RECT)
-	panel.offset_left = 28
-	panel.offset_top = 28
-	panel.offset_right = -28
-	panel.offset_bottom = -28
+	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	panel.custom_minimum_size = Vector2(0, 420)
 	panel.add_theme_stylebox_override("panel", WebUiTokens.paper_card_style())
-	add_child(panel)
+	shell_content.add_child(panel)
 
 	var scroll := ScrollContainer.new()
 	scroll.name = "SeasonScroll"
@@ -43,8 +61,11 @@ func _build_screen() -> void:
 	margin.add_child(content_box)
 
 func _render() -> void:
-	if content_box == null:
+	if shell == null or content_box == null:
 		return
+	shell.set_user(_dict(payload, "user"))
+	shell.set_run(_dict(payload, "run"))
+	shell.set_error("")
 	for child in content_box.get_children():
 		content_box.remove_child(child)
 		child.queue_free()

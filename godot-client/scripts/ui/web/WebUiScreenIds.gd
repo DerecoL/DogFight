@@ -69,4 +69,7 @@ static func node_name_for(screen_id: String) -> String:
 	return str(SCREEN_NODES.get(screen_id, ""))
 
 static func screen_for_run_phase(phase: String) -> String:
+	var policy = load("res://scripts/ui/web/WebRoutePolicy.gd")
+	if policy != null and policy.has_method("formal_screen_for_run_phase"):
+		return str(policy.formal_screen_for_run_phase(phase))
 	return str(RUN_PHASE_SCREENS.get(phase, PLAYABLE_RUN))
