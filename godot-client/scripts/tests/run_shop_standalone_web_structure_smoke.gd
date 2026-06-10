@@ -36,6 +36,7 @@ func _run() -> void:
 		"ShopQualityChip_offer-1",
 		"ShopOwnedBadge_offer-1",
 		"ShopCardArt_offer-1",
+		"ShopCardArtIcon_offer-1",
 		"ShopCardMain_offer-1",
 		"ShopSizeBadge_offer-1",
 		"ShopCardMeta_offer-1",
@@ -70,6 +71,10 @@ func _run() -> void:
 	var offer_button := _find_by_name(screen, "ShopCardArt_offer-1") as Button
 	if offer_button == null:
 		_fail("Shop offer art button is missing")
+		return
+	var offer_icon := _find_by_name(screen, "ShopCardArtIcon_offer-1") as TextureRect
+	if offer_icon == null or offer_icon.texture == null:
+		_fail("Shop offer art must render the Web ItemArt sticker texture")
 		return
 	offer_button.pressed.emit()
 	await process_frame
@@ -137,6 +142,20 @@ func _run() -> void:
 			_fail("Standalone run shop Web text missing: %s" % part)
 			return
 
+	if not _match_button_text(screen).contains("匹配对手"):
+		_fail("Plain standalone SHOP phase should expose match action")
+		return
+	screen.call("set_payload", {"run": _shop_run("shop-node", "SHOP_FIXED")})
+	await process_frame
+	if not _match_button_text(screen).contains("返回地图"):
+		_fail("Standalone map shop node should expose return-to-map action")
+		return
+	screen.call("set_payload", {"run": _shop_run("player-node", "PLAYER_BATTLE")})
+	await process_frame
+	if not _match_button_text(screen).contains("进入战斗"):
+		_fail("Standalone player battle shop node should expose enter-battle action")
+		return
+
 	screen.queue_free()
 	fake_session.queue_free()
 	for _frame in range(3):
@@ -154,7 +173,21 @@ class FakeSession:
 		bought_area = area
 		return true
 
-func _shop_run() -> Dictionary:
+func _shop_run(current_node_id := "", current_node_kind := "") -> Dictionary:
+	var map_state := {
+		"nodes": [],
+		"availableNodeIds": [],
+		"completedNodeIds": [],
+		"currentNodeId": current_node_id,
+	}
+	if not current_node_id.is_empty():
+		map_state["nodes"] = [{
+			"id": current_node_id,
+			"layer": 0,
+			"column": 0,
+			"kind": current_node_kind,
+			"nextNodeIds": [],
+		}]
 	return {
 		"id": "shop-web-detail-run",
 		"mode": "CASUAL",
@@ -188,12 +221,7 @@ func _shop_run() -> Dictionary:
 		"relicChoices": [],
 		"upgradeChoices": [],
 		"potionChoices": [],
-		"mapState": {
-			"nodes": [],
-			"availableNodeIds": [],
-			"completedNodeIds": [],
-			"currentNodeId": "",
-		},
+		"mapState": map_state,
 	}
 
 func _item(id: String, def_id: String, area: String, x: int) -> Dictionary:
@@ -229,6 +257,10 @@ func _collect_text(node: Node) -> String:
 	for child in node.get_children():
 		text += _collect_text(child)
 	return text
+
+func _match_button_text(root_node: Node) -> String:
+	var button := _find_by_name(root_node, "MatchButton") as Button
+	return "" if button == null else button.text
 
 func _fail(message: String) -> void:
 	push_error(message)

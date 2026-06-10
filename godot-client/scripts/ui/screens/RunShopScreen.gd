@@ -135,6 +135,13 @@ func _render_shop_offer_card(parent: VBoxContainer, run: Dictionary, offer: Dict
 	art_button.name = "ShopCardArt_%s" % offer_id
 	art_button.custom_minimum_size = Vector2(0, 52)
 	box.add_child(art_button)
+	var art := TextureRect.new()
+	art.name = "ShopCardArtIcon_%s" % offer_id
+	art.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	art.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
+	art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	art.texture = _offer_texture(offer)
+	art_button.add_child(art)
 
 	var main := HBoxContainer.new()
 	main.name = "ShopCardMain_%s" % offer_id
@@ -437,6 +444,26 @@ func _price_text(offer: Dictionary) -> String:
 		return "%d · %d折" % [price, int(round(discount * 10.0))]
 	return str(price)
 
+func _offer_texture(offer: Dictionary) -> Texture2D:
+	var def_id := str(offer.get("defId", ""))
+	var art := _texture("res://assets/item-card-art/%s.webp" % def_id) if not def_id.is_empty() else null
+	if art != null:
+		return art
+	return _sticker_texture(def_id)
+
+func _sticker_texture(asset_id: String) -> Texture2D:
+	if asset_id.is_empty():
+		return _texture("res://assets/sticker-icons/starter-1.webp")
+	var texture := _texture("res://assets/sticker-icons/%s.webp" % asset_id)
+	return texture if texture != null else _texture("res://assets/sticker-icons/starter-1.webp")
+
+func _texture(path: String) -> Texture2D:
+	if path.is_empty():
+		return null
+	if not ResourceLoader.exists(path):
+		return null
+	return load(path) as Texture2D
+
 func _shop_offer_owned_count(run: Dictionary, offer: Dictionary) -> int:
 	var def_id := str(offer.get("defId", ""))
 	if def_id.is_empty():
@@ -449,9 +476,13 @@ func _shop_offer_owned_count(run: Dictionary, offer: Dictionary) -> int:
 
 func _match_label(run: Dictionary) -> String:
 	var map_state := _dict(run, "mapState")
-	if not str(map_state.get("currentNodeId", "")).is_empty():
-		return "返回地图"
-	return "匹配对手"
+	var current_node_id := str(map_state.get("currentNodeId", ""))
+	if current_node_id.is_empty():
+		return "匹配对手"
+	for node in _array(map_state, "nodes"):
+		if node is Dictionary and str((node as Dictionary).get("id", "")) == current_node_id:
+			return "进入战斗" if str((node as Dictionary).get("kind", "")) == "PLAYER_BATTLE" else "返回地图"
+	return "返回地图"
 
 func _noop() -> void:
 	pass
