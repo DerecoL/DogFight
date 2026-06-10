@@ -51,6 +51,7 @@ func _render() -> void:
 		_render_relic_choice(margin, run)
 		return
 	_render_reward_workbench(margin, run)
+	_ensure_reward_choice_web_children(run)
 
 func _render_shop_choice(parent: Node, run: Dictionary) -> void:
 	var screen := VBoxContainer.new()
@@ -303,6 +304,51 @@ func _render_reward_empty_panel(parent: Node) -> void:
 	var panel := _new_reward_panel(parent)
 	_render_screen_heading(panel, "暂无奖励", "当前阶段没有可显示的奖励选择。")
 
+func _ensure_reward_choice_web_children(run: Dictionary) -> void:
+	var phase := str(run.get("phase", ""))
+	if phase == "UPGRADE_CHOICE":
+		var max_quality := _upgrade_shop_max_quality(str(run.get("shopType", "UPGRADE")))
+		var card := find_child("RewardChoice_upgrade", true, false)
+		if card != null:
+			_ensure_choice_label(card, "RewardChoiceIcon_upgrade", "\u5347\u7ea7")
+			_ensure_choice_label(card, "RewardChoiceName_upgrade", _shop_name(str(run.get("shopType", "UPGRADE"))))
+			_ensure_choice_label(card, "RewardChoiceTag_upgrade", "\u53ef\u5347\u7ea7 %d \u4ef6" % _upgradeable_item_count(run, max_quality))
+			_ensure_choice_label(card, "RewardChoiceCopy_upgrade", "%s\u53ca\u4ee5\u4e0a\u54c1\u8d28\u4e0d\u80fd\u5728\u672c\u5546\u5e97\u7ee7\u7eed\u63d0\u5347\u3002" % _quality_label(max_quality))
+	elif phase == "ENCHANT_CHOICE":
+		for choice_value in _array(run, "enchantChoices"):
+			if choice_value is Dictionary:
+				var choice: Dictionary = choice_value
+				var id := str(choice.get("id", ""))
+				var enchant: Dictionary = _dict(choice, "enchant")
+				var card := find_child("RewardChoice_%s" % id, true, false)
+				if card != null:
+					_ensure_choice_label(card, "RewardChoiceIcon_%s" % id, "\u9644\u9b54")
+					_ensure_choice_label(card, "RewardChoiceName_%s" % id, _fallback(str(enchant.get("label", "")), id))
+					_ensure_choice_label(card, "RewardChoiceTag_%s" % id, "\u514d\u8d39")
+					_ensure_choice_label(card, "RewardChoiceCopy_%s" % id, str(choice.get("description", "")))
+		var enchant_panel := find_child("EnchantPanel", true, false)
+		if enchant_panel != null:
+			_ensure_choice_label(enchant_panel, "RewardDisabledReason", "\u5f53\u524d\u9009\u4e2d\uff1a%s" % _selected_enchant_label(run))
+	elif phase == "POTION_CHOICE":
+		for choice_value in _array(run, "potionChoices"):
+			if choice_value is Dictionary:
+				var choice: Dictionary = choice_value
+				var id := str(choice.get("id", ""))
+				var card := find_child("RewardChoice_%s" % id, true, false)
+				if card != null:
+					_ensure_choice_label(card, "RewardChoiceIcon_%s" % id, "\u836f\u6c34")
+					_ensure_choice_label(card, "RewardChoiceName_%s" % id, _fallback(str(choice.get("description", "")), id))
+					_ensure_choice_label(card, "RewardChoiceTag_%s" % id, "\u836f\u6c34")
+					_ensure_choice_label(card, "RewardChoiceCopy_%s" % id, "\u4fee\u6539\u57fa\u7840\u89e6\u53d1\u70b9\u6570\uff1b\u4e4b\u540e\u4ecd\u4f1a\u88ab\u9057\u7269\u548c\u5176\u4ed6\u9053\u5177\u5f71\u54cd\u3002")
+		var potion_panel := find_child("PotionPanel", true, false)
+		if potion_panel != null:
+			_ensure_choice_label(potion_panel, "RewardDisabledReason", "\u804c\u4e1a\u88c5\u5907\u4e0d\u53ef\u4f7f\u7528\u836f\u6c34")
+
+func _ensure_choice_label(parent: Node, node_name: String, text: String) -> void:
+	if parent.find_child(node_name, true, false) != null:
+		return
+	_add_choice_label(parent, node_name, text)
+
 func _new_reward_panel(parent: Node, panel_name := "RewardPanel") -> VBoxContainer:
 	var frame := PanelContainer.new()
 	frame.name = "%sFrame" % panel_name
@@ -476,6 +522,11 @@ func _add_label(parent: Node, node_name: String, text: String, align := HORIZONT
 	label.horizontal_alignment = align
 	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	parent.add_child(label)
+	return label
+
+func _add_choice_label(parent: Node, node_name: String, text: String) -> Label:
+	var label := _add_label(parent, node_name, text)
+	label.custom_minimum_size = Vector2(0, 22)
 	return label
 
 func _select_shop_choice(shop_type: String) -> void:

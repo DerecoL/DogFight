@@ -83,6 +83,10 @@ func _run() -> void:
 		if phase == "UPGRADE_CHOICE":
 			_assert_has(screen, "UpgradeWorkbench")
 			_assert_has(screen, "UpgradePanel")
+			_assert_has(screen, "RewardChoiceIcon_upgrade")
+			_assert_has(screen, "RewardChoiceName_upgrade")
+			_assert_has(screen, "RewardChoiceTag_upgrade")
+			_assert_has(screen, "RewardChoiceCopy_upgrade")
 			_assert_has(screen, "ChoiceSubmit")
 			var item_button := _find_by_name(screen, "EquipmentBoardItem_item-1") as Button
 			if item_button == null:
@@ -120,10 +124,20 @@ func _run() -> void:
 			_assert_has(screen, "EnchantWorkbench")
 			_assert_has(screen, "EnchantPanel")
 			_assert_has(screen, "RewardChoice_enchant-1")
+			_assert_has(screen, "RewardChoiceIcon_enchant-1")
+			_assert_has(screen, "RewardChoiceName_enchant-1")
+			_assert_has(screen, "RewardChoiceTag_enchant-1")
+			_assert_has(screen, "RewardChoiceCopy_enchant-1")
+			_assert_has(screen, "RewardDisabledReason")
 		elif phase == "POTION_CHOICE":
 			_assert_has(screen, "PotionWorkbench")
 			_assert_has(screen, "PotionPanel")
 			_assert_has(screen, "RewardChoice_potion-1")
+			_assert_has(screen, "RewardChoiceIcon_potion-1")
+			_assert_has(screen, "RewardChoiceName_potion-1")
+			_assert_has(screen, "RewardChoiceTag_potion-1")
+			_assert_has(screen, "RewardChoiceCopy_potion-1")
+			_assert_has(screen, "RewardDisabledReason")
 		var bag_relic_row = _find_by_name(screen, "BagRelicRow")
 		if not bag_relic_row is HBoxContainer:
 			_fail("%s BagRelicRow must lay out relic rail and bag board side by side like Web InventoryBoard" % phase)
