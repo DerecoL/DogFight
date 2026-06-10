@@ -59,6 +59,9 @@ func _run() -> void:
 	if currency == null or currency.text != "360":
 		_fail("AccountCurrencyPill must match the Web pill value only, got %s" % (currency.text if currency != null else "<missing>"))
 		return
+	_assert_label_text(screen, "ShopCardPrice_title-paper-crown", "120")
+	_assert_label_text(screen, "ShopCardPrice_avatar-crown", "80")
+	_assert_label_text(screen, "ShopCardPrice_bg-royal-kennel", "300")
 
 	var text := _collect_text(screen)
 	for part in [
@@ -160,6 +163,14 @@ func _assert_has(root_node: Node, node_name: String) -> void:
 func _assert_missing(root_node: Node, node_name: String) -> void:
 	if _find_by_name(root_node, node_name) != null:
 		_fail("Unexpected account shop Web detail node: %s" % node_name)
+
+func _assert_label_text(root_node: Node, node_name: String, expected: String) -> void:
+	var label := _find_by_name(root_node, node_name) as Label
+	if label == null:
+		_fail("Missing account shop Web detail label: %s" % node_name)
+		return
+	if label.text != expected:
+		_fail("Account shop label %s should be %s, got %s" % [node_name, expected, label.text])
 
 func _find_by_name(node: Node, node_name: String) -> Node:
 	if node.name == node_name:

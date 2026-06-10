@@ -237,7 +237,7 @@ func _cosmetic_card(item: Dictionary) -> PanelContainer:
 
 	var price := Label.new()
 	price.name = "ShopCardPrice_%s" % card_key
-	price.text = "金币 %d" % int(item.get("price", 0))
+	price.text = str(int(item.get("price", 0)))
 	price.custom_minimum_size = Vector2(86, 34)
 	price.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	actions.add_child(price)
