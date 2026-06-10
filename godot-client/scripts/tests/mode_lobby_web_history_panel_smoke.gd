@@ -20,17 +20,18 @@ func _run() -> void:
 		"HistoryBest",
 		"AccountPanelActions",
 		"HistoryRunList",
+		"SeasonHistoryList",
+		"SeasonHistoryHeading",
 	]:
-		if screen.find_child(node_name, true, false) == null:
-			_fail("ModeLobbyScreen must mirror Web history panel structure: %s" % node_name)
-			return
+		_assert_has(screen, node_name)
 	for button_name in [
 		"HistoryShopButton",
 		"HistoryAchievementsButton",
 		"HistorySettingsButton",
 		"HistoryDetailButton",
 	]:
-		if screen.find_child(button_name, true, false) == null:
+		var button := _find_by_name(screen, button_name)
+		if not button is Button:
 			_fail("ModeLobbyScreen history panel missing shortcut: %s" % button_name)
 			return
 
@@ -49,23 +50,34 @@ func _run() -> void:
 			{"id": "r6", "dogType": "FROG", "wins": 0, "losses": 3, "round": 3, "status": "FAILED"},
 		],
 	}
+	var sample_seasons := [
+		{"id": "season-2-summary", "seasonName": "Season Two", "ladderTierLabel": "MASTER", "ladderScore": 620, "dogKingRank": 2, "apexRank": 5, "apexWins": 11, "apexLosses": 1},
+		{"id": "season-1-summary", "seasonName": "Season One", "ladderTierLabel": "GOLD", "ladderScore": 90, "dogKingRank": 0, "apexRank": 0},
+		{"id": "season-0-summary", "seasonName": "Season Zero", "ladderTierLabel": "BRONZE", "ladderScore": 20, "dogKingRank": 0, "apexRank": 12, "apexWins": 3, "apexLosses": 4},
+		{"id": "season-old-summary", "seasonName": "Older Season", "ladderTierLabel": "BRONZE", "ladderScore": 10, "dogKingRank": 0, "apexRank": 0},
+	]
 	screen.call("set_payload", {
 		"user": {"nickname": "Tester"},
 		"history": sample_history,
-		"ladderProfile": {"tierLabel": "白银", "score": 120},
-		"season": {"name": "测试赛季"},
+		"seasonSummaries": sample_seasons,
+		"ladderProfile": {"tierLabel": "SILVER", "score": 120},
+		"season": {"name": "Current Season"},
 	})
 	await process_frame
-
-	var text := _collect_text(screen)
-	for part in ["个人战绩", "9胜 5败", "共 7 局", "胜率 64%", "完成 4 局", "天梯段位", "白银", "测试赛季 · 120 分", "最佳成绩", "柴犬 · 5胜 1败 · 第 8 回合", "最近对局"]:
-		if not text.contains(str(part)):
-			_fail("ModeLobbyScreen history panel text missing: %s" % str(part))
-			return
 
 	var history_rows := _count_named_children(screen, "HistoryRunRow")
 	if history_rows != 5:
 		_fail("ModeLobbyScreen must limit recent lobby runs to five rows, got %d" % history_rows)
+		return
+	var season_rows := _count_named_children(screen, "SeasonHistoryCard_")
+	if season_rows != 3:
+		_fail("ModeLobbyScreen must mirror Web season history limit of three cards, got %d" % season_rows)
+		return
+	_assert_label_text(screen, "SeasonHistoryName_season-2-summary", "Season Two")
+	_assert_label_text(screen, "SeasonHistoryName_season-1-summary", "Season One")
+	_assert_label_text(screen, "SeasonHistoryName_season-0-summary", "Season Zero")
+	if _find_by_name(screen, "SeasonHistoryCard_season-old-summary") != null:
+		_fail("ModeLobbyScreen should not render more than three season history cards")
 		return
 
 	screen.call("set_payload", {
@@ -73,11 +85,11 @@ func _run() -> void:
 		"history": {"totalRuns": 0, "totalWins": 0, "totalLosses": 0, "completedRuns": 0, "bestRun": null, "recentRuns": null},
 		"ladderProfile": null,
 		"season": null,
+		"seasonSummaries": [],
 	})
 	await process_frame
-	var empty_text := _collect_text(screen)
-	if not empty_text.contains("暂无对局") or not empty_text.contains("还没有记录"):
-		_fail("ModeLobbyScreen must render null history fields as a stable empty state")
+	if _find_by_name(screen, "SeasonHistoryEmpty") == null:
+		_fail("ModeLobbyScreen must render empty season history as a stable Web empty state")
 		return
 
 	screen.queue_free()
@@ -86,16 +98,6 @@ func _run() -> void:
 	print("Godot mode lobby Web history panel smoke passed")
 	quit(0)
 
-func _collect_text(node: Node) -> String:
-	var text := ""
-	if node is Label:
-		text += (node as Label).text + "\n"
-	if node is Button:
-		text += (node as Button).text + "\n"
-	for child in node.get_children():
-		text += _collect_text(child)
-	return text
-
 func _count_named_children(node: Node, target_name: String) -> int:
 	var count := 0
 	if str(node.name).begins_with(target_name):
@@ -103,6 +105,27 @@ func _count_named_children(node: Node, target_name: String) -> int:
 	for child in node.get_children():
 		count += _count_named_children(child, target_name)
 	return count
+
+func _assert_has(root_node: Node, node_name: String) -> void:
+	if _find_by_name(root_node, node_name) == null:
+		_fail("ModeLobbyScreen must mirror Web history panel structure: %s" % node_name)
+
+func _assert_label_text(root_node: Node, node_name: String, expected: String) -> void:
+	var label := _find_by_name(root_node, node_name) as Label
+	if label == null:
+		_fail("Missing label: %s" % node_name)
+		return
+	if label.text != expected:
+		_fail("Label %s should be %s, got %s" % [node_name, expected, label.text])
+
+func _find_by_name(node: Node, node_name: String) -> Node:
+	if node.name == node_name:
+		return node
+	for child in node.get_children():
+		var found := _find_by_name(child, node_name)
+		if found != null:
+			return found
+	return null
 
 func _fail(message: String) -> void:
 	push_error(message)
