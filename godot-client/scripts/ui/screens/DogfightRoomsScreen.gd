@@ -1,4 +1,4 @@
-extends BaseWebScreen
+extends ShellBackedWebScreen
 
 const ApiRoutes := preload("res://scripts/api/ApiRoutes.gd")
 
@@ -7,22 +7,21 @@ var selected_room_id := ""
 var error_message := ""
 var join_button: Button
 
-func _ready() -> void:
-	_render()
-
-func _on_payload_changed() -> void:
+func _render_shell_content() -> void:
 	_render()
 
 func _render() -> void:
-	for child in get_children():
-		remove_child(child)
+	var content := content_container()
+	for child in content.get_children():
+		content.remove_child(child)
 		child.queue_free()
 
 	var screen := ScrollContainer.new()
 	screen.name = "DogfightScreen"
-	screen.set_anchors_preset(Control.PRESET_FULL_RECT)
+	screen.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	screen.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	screen.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	add_child(screen)
+	content.add_child(screen)
 
 	var margin := MarginContainer.new()
 	margin.add_theme_constant_override("margin_left", 24)

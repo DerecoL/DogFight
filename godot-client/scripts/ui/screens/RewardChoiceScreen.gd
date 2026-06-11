@@ -1,4 +1,4 @@
-extends BaseWebScreen
+extends ShellBackedWebScreen
 
 var action_in_progress := false
 var selected_shop_type := ""
@@ -9,11 +9,7 @@ var selected_potion_id := ""
 var selected_item_id := ""
 var selected_inventory_relic_id := ""
 
-func _ready() -> void:
-	_render()
-
-func _on_payload_changed() -> void:
-	_select_defaults()
+func _render_shell_content() -> void:
 	_render()
 
 func _select_defaults() -> void:
@@ -35,15 +31,17 @@ func _select_defaults() -> void:
 		selected_potion_id = str((potions[0] as Dictionary).get("id", ""))
 
 func _render() -> void:
-	for child in get_children():
-		remove_child(child)
+	var content := content_container()
+	for child in content.get_children():
+		content.remove_child(child)
 		child.queue_free()
 
 	var scroll := ScrollContainer.new()
 	scroll.name = "RewardChoiceScroll"
-	scroll.set_anchors_preset(Control.PRESET_FULL_RECT)
+	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	add_child(scroll)
+	content.add_child(scroll)
 
 	var margin := MarginContainer.new()
 	margin.add_theme_constant_override("margin_left", 24)

@@ -1,20 +1,19 @@
-extends BaseWebScreen
+extends ShellBackedWebScreen
 
-func _ready() -> void:
-	_render()
-
-func _on_payload_changed() -> void:
+func _render_shell_content() -> void:
 	_render()
 
 func _render() -> void:
-	for child in get_children():
-		remove_child(child)
+	var shell_content_root := content_container()
+	for child in shell_content_root.get_children():
+		shell_content_root.remove_child(child)
 		child.queue_free()
 
 	var page := Control.new()
 	page.name = "SettlementPage"
-	page.set_anchors_preset(Control.PRESET_FULL_RECT)
-	add_child(page)
+	page.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	page.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	shell_content_root.add_child(page)
 
 	var scroll := ScrollContainer.new()
 	scroll.name = "SettlementScroll"
