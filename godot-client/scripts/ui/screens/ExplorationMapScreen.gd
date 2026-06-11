@@ -1,4 +1,4 @@
-extends BaseWebScreen
+extends ShellBackedWebScreen
 
 const MAP_NODE_ICONS := {
 	"PLAYER_BATTLE": "res://assets/map-icons/player-battle.webp",
@@ -18,22 +18,21 @@ var selected_map_reward_key := ""
 var selected_monster_equipment_item: Dictionary = {}
 var drawing_tool := "inspect"
 
-func _ready() -> void:
-	_render()
-
-func _on_payload_changed() -> void:
+func _render_shell_content() -> void:
 	_render()
 
 func _render() -> void:
-	for child in get_children():
-		remove_child(child)
+	var content := content_container()
+	for child in content.get_children():
+		content.remove_child(child)
 		child.queue_free()
 
 	var scroll := ScrollContainer.new()
 	scroll.name = "ExplorationMapScroll"
-	scroll.set_anchors_preset(Control.PRESET_FULL_RECT)
+	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	add_child(scroll)
+	content.add_child(scroll)
 
 	var margin := MarginContainer.new()
 	margin.add_theme_constant_override("margin_left", 24)
