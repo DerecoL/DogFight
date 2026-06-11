@@ -28,6 +28,7 @@ func _init() -> void:
 		"mode_card_style",
 		"input_style",
 		"debug_foldout_style",
+		"debug_foldout_disabled_style",
 		"safe_content_size_16_9",
 		"safe_content_margin",
 		"handdrawn_card_min_size",
@@ -53,13 +54,13 @@ func _init() -> void:
 			_fail("WebUiTokens must expose %s" % method_name)
 			return
 
-	for style_method in ["auth_card_style", "mode_card_style", "input_style", "debug_foldout_style"]:
+	for style_method in ["auth_card_style", "mode_card_style", "input_style", "debug_foldout_style", "debug_foldout_disabled_style"]:
 		var style_box = tokens.call(style_method)
 		if style_box == null or not style_box is StyleBoxFlat:
 			_fail("%s must return StyleBoxFlat for direct theme override use" % style_method)
 			return
 
-	for token_method in ["auth_card_style_token", "mode_card_style_token", "input_style_token", "debug_foldout_style_token"]:
+	for token_method in ["auth_card_style_token", "mode_card_style_token", "input_style_token", "debug_foldout_style_token", "debug_foldout_disabled_style_token"]:
 		if not tokens.has_method(token_method):
 			_fail("WebUiTokens must expose %s" % token_method)
 			return
@@ -78,6 +79,15 @@ func _init() -> void:
 			if typeof(style_token[color_key]) != TYPE_COLOR:
 				_fail("%s %s must be Color" % [token_method, color_key])
 				return
+
+	var debug_style = tokens.debug_foldout_style()
+	var debug_disabled_style = tokens.debug_foldout_disabled_style()
+	if (debug_disabled_style as StyleBoxFlat).bg_color == (debug_style as StyleBoxFlat).bg_color:
+		_fail("debug_foldout_disabled_style must visibly differ from normal debug foldout style")
+		return
+	if (debug_disabled_style as StyleBoxFlat).border_color == (debug_style as StyleBoxFlat).border_color:
+		_fail("debug_foldout_disabled_style border must visibly differ from normal debug foldout style")
+		return
 
 	if typeof(tokens.screen_safe_margin()) != TYPE_INT:
 		_fail("screen_safe_margin must return int")

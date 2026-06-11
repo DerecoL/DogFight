@@ -54,12 +54,12 @@ anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
 offset_left = -230.0
-offset_top = -278.0
+offset_top = -302.0
 offset_right = 230.0
-offset_bottom = 278.0
+offset_bottom = 302.0
 grow_horizontal = 2
 grow_vertical = 2
-custom_minimum_size = Vector2(460, 556)
+custom_minimum_size = Vector2(460, 604)
 
 [node name="Margin" type="MarginContainer" parent="AuthShell/AuthPanel"]
 layout_mode = 2
@@ -178,23 +178,46 @@ layout_mode = 2
 size_flags_horizontal = 3
 text = "注册"
 
-[node name="DebugAuthGroup" type="VBoxContainer" parent="AuthShell/AuthPanel/Margin/Form"]
+[node name="DebugAuthToggle" type="Button" parent="AuthShell/AuthPanel/Margin/Form"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(176, 40)
+layout_mode = 2
+size_flags_horizontal = 3
+toggle_mode = true
+text = "其他登录方式 / 调试入口"
+
+[node name="DebugAuthGroup" type="PanelContainer" parent="AuthShell/AuthPanel/Margin/Form"]
+unique_name_in_owner = true
+visible = false
+custom_minimum_size = Vector2(0, 154)
+layout_mode = 2
+
+[node name="Margin" type="MarginContainer" parent="AuthShell/AuthPanel/Margin/Form/DebugAuthGroup"]
+layout_mode = 2
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 10
+
+[node name="DebugAuthContent" type="VBoxContainer" parent="AuthShell/AuthPanel/Margin/Form/DebugAuthGroup/Margin"]
 layout_mode = 2
 theme_override_constants/separation = 8
 
-[node name="QuickStartButton" type="Button" parent="AuthShell/AuthPanel/Margin/Form/DebugAuthGroup"]
+[node name="QuickStartButton" type="Button" parent="AuthShell/AuthPanel/Margin/Form/DebugAuthGroup/Margin/DebugAuthContent"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 36)
 layout_mode = 2
+size_flags_horizontal = 3
 text = "快速开始"
 
-[node name="TapTapCodeInput" type="LineEdit" parent="AuthShell/AuthPanel/Margin/Form/DebugAuthGroup"]
+[node name="TapTapCodeInput" type="LineEdit" parent="AuthShell/AuthPanel/Margin/Form/DebugAuthGroup/Margin/DebugAuthContent"]
 unique_name_in_owner = true
 layout_mode = 2
 placeholder_text = "TapTap 授权码"
 
-[node name="TapTapButton" type="Button" parent="AuthShell/AuthPanel/Margin/Form/DebugAuthGroup"]
+[node name="TapTapButton" type="Button" parent="AuthShell/AuthPanel/Margin/Form/DebugAuthGroup/Margin/DebugAuthContent"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 34)
 layout_mode = 2
+size_flags_horizontal = 3
 text = "TapTap 授权码登录"

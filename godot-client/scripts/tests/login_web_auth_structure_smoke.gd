@@ -33,6 +33,11 @@ func _run() -> void:
 		"AuthButtons",
 		"LoginButton",
 		"RegisterButton",
+		"DebugAuthToggle",
+		"DebugAuthGroup",
+		"QuickStartButton",
+		"TapTapCodeInput",
+		"TapTapButton",
 	]:
 		if login.find_child(node_name, true, false) == null:
 			_fail("Missing login Web auth node: %s" % node_name)
@@ -57,11 +62,35 @@ func _run() -> void:
 	if auth_buttons.get_child_count() != 2:
 		_fail("AuthButtons must mirror the Web login/register row")
 		return
+	for child in auth_buttons.get_children():
+		if child.name not in ["LoginButton", "RegisterButton"]:
+			_fail("AuthButtons must only contain primary login/register actions")
+			return
 
-	var text := _collect_text(login)
-	for part in ["狗骰对战", "摆好装备", "语言", "中文", "English", "账号", "密码", "登录", "注册"]:
-		if not text.contains(part):
-			_fail("Login Web auth text missing: %s" % part)
+	var debug_toggle := login.find_child("DebugAuthToggle", true, false) as Button
+	var debug_group := login.find_child("DebugAuthGroup", true, false) as Control
+	if debug_toggle.get_parent().name != "Form" or debug_group.get_parent().name != "Form":
+		_fail("Debug auth foldout must live outside the primary AuthButtons row")
+		return
+	if debug_group.visible:
+		_fail("DebugAuthGroup must be folded by default")
+		return
+	for node_name in ["QuickStartButton", "TapTapCodeInput", "TapTapButton"]:
+		var debug_child: Node = login.find_child(node_name, true, false)
+		if debug_child == null or not debug_group.is_ancestor_of(debug_child):
+			_fail("%s must stay inside DebugAuthGroup" % node_name)
+			return
+
+	var required_text_nodes := ["AppTitle", "AppSubtitle", "LanguageLabel", "AccountLabel", "PasswordLabel", "LoginButton", "RegisterButton"]
+	for node_name in required_text_nodes:
+		var node: Node = login.find_child(node_name, true, false)
+		var text := ""
+		if node is Label:
+			text = (node as Label).text
+		elif node is Button:
+			text = (node as Button).text
+		if text.strip_edges().is_empty():
+			_fail("Login Web auth text node must remain populated: %s" % node_name)
 			return
 
 	login.queue_free()
@@ -69,16 +98,6 @@ func _run() -> void:
 		await process_frame
 	print("Godot login Web auth structure smoke passed")
 	quit(0)
-
-func _collect_text(node: Node) -> String:
-	var text := ""
-	if node is Label:
-		text += (node as Label).text + "\n"
-	if node is Button:
-		text += (node as Button).text + "\n"
-	for child in node.get_children():
-		text += _collect_text(child)
-	return text
 
 func _fail(message: String) -> void:
 	push_error(message)

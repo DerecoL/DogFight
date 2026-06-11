@@ -155,6 +155,12 @@ static func debug_foldout_style() -> StyleBoxFlat:
 static func debug_foldout_style_token() -> Dictionary:
 	return _style_token(debug_foldout_style(), Color(1.0, 0.93, 0.76, 1.0), accent_color())
 
+static func debug_foldout_disabled_style() -> StyleBoxFlat:
+	return _style_box(Color(0.24, 0.19, 0.16, 0.72), Color(0.48, 0.38, 0.28, 0.72), 1, 8, 10)
+
+static func debug_foldout_disabled_style_token() -> Dictionary:
+	return _style_token(debug_foldout_disabled_style(), Color(0.72, 0.66, 0.58, 0.82), accent_color())
+
 static func slot_style(selected: bool, over: bool) -> StyleBoxFlat:
 	var bg := Color(0.91, 0.79, 0.56, 0.92)
 	var border := Color(0.42, 0.25, 0.13, 1.0)

@@ -9,6 +9,8 @@ const WebUiTokens := preload("res://scripts/ui/web/WebUiTokens.gd")
 @onready var password_input: LineEdit = %PasswordInput
 @onready var login_button: Button = %LoginButton
 @onready var register_button: Button = %RegisterButton
+@onready var debug_auth_toggle: Button = %DebugAuthToggle
+@onready var debug_auth_group: Control = %DebugAuthGroup
 @onready var quick_start_button: Button = %QuickStartButton
 @onready var taptap_code_input: LineEdit = %TapTapCodeInput
 @onready var taptap_button: Button = %TapTapButton
@@ -26,10 +28,13 @@ func bind_session(next_session: Node) -> void:
 
 func _ready() -> void:
 	_apply_visual_style()
+	_set_debug_auth_expanded(false)
 	if not login_button.pressed.is_connected(_on_login_pressed):
 		login_button.pressed.connect(_on_login_pressed)
 	if not register_button.pressed.is_connected(_on_register_pressed):
 		register_button.pressed.connect(_on_register_pressed)
+	if not debug_auth_toggle.pressed.is_connected(_on_debug_auth_toggle_pressed):
+		debug_auth_toggle.pressed.connect(_on_debug_auth_toggle_pressed)
 	if not quick_start_button.pressed.is_connected(_on_quick_start_pressed):
 		quick_start_button.pressed.connect(_on_quick_start_pressed)
 	if not taptap_button.pressed.is_connected(_on_taptap_pressed):
@@ -40,6 +45,15 @@ func _on_login_pressed() -> void:
 
 func _on_register_pressed() -> void:
 	await _submit_auth("register")
+
+func _on_debug_auth_toggle_pressed() -> void:
+	if auth_in_progress:
+		return
+	_set_debug_auth_expanded(not debug_auth_group.visible)
+
+func _set_debug_auth_expanded(expanded: bool) -> void:
+	debug_auth_group.visible = expanded
+	debug_auth_toggle.button_pressed = expanded
 
 func _on_quick_start_pressed() -> void:
 	if auth_in_progress:
@@ -106,6 +120,7 @@ func _submit_auth(action: String) -> void:
 func _set_busy(busy: bool) -> void:
 	login_button.disabled = busy
 	register_button.disabled = busy
+	debug_auth_toggle.disabled = busy
 	quick_start_button.disabled = busy
 	taptap_button.disabled = busy
 	account_input.editable = not busy
@@ -116,15 +131,19 @@ func _on_error_raised(message: String) -> void:
 	var normalized := message.to_lower()
 	var is_auth_error := (message.contains("账号") and message.contains("密码")) or (normalized.contains("account") and normalized.contains("password"))
 	if is_auth_error:
-		error_label.text = "%s。新玩家请注册，或点击快速开始直接进入。" % message
+		error_label.text = "%s。新玩家请注册；也可以展开“其他登录方式”使用快速开始。" % message
 	else:
 		error_label.text = message
 
 func _apply_visual_style() -> void:
 	if auth_panel != null:
-		auth_panel.add_theme_stylebox_override("panel", WebUiTokens.paper_card_style())
-	for button in [login_button, register_button, quick_start_button, taptap_button]:
+		auth_panel.add_theme_stylebox_override("panel", WebUiTokens.auth_card_style())
+	if debug_auth_group is PanelContainer:
+		(debug_auth_group as PanelContainer).add_theme_stylebox_override("panel", WebUiTokens.debug_foldout_style())
+	for button in [login_button, register_button]:
 		_apply_button_style(button)
+	for button in [debug_auth_toggle, quick_start_button, taptap_button]:
+		_apply_debug_button_style(button)
 	for node_name in ["LanguageZhButton", "LanguageEnButton"]:
 		var button := find_child(node_name, true, false) as Button
 		if button != null:
@@ -143,6 +162,20 @@ func _apply_button_style(button: Button) -> void:
 	button.add_theme_color_override("font_hover_color", WebUiTokens.ink_color())
 	button.add_theme_color_override("font_pressed_color", WebUiTokens.ink_color())
 
+func _apply_debug_button_style(button: Button) -> void:
+	var button_size := WebUiTokens.secondary_folded_entry_size() if button == debug_auth_toggle else WebUiTokens.debug_entry_button_size()
+	var debug_style_token := WebUiTokens.debug_foldout_style_token()
+	var debug_disabled_style_token := WebUiTokens.debug_foldout_disabled_style_token()
+	button.custom_minimum_size = Vector2(button_size.x, button_size.y)
+	button.add_theme_stylebox_override("normal", debug_style_token["style_box"])
+	button.add_theme_stylebox_override("hover", debug_style_token["style_box"])
+	button.add_theme_stylebox_override("pressed", debug_style_token["style_box"])
+	button.add_theme_stylebox_override("disabled", debug_disabled_style_token["style_box"])
+	button.add_theme_color_override("font_color", debug_style_token["text_color"])
+	button.add_theme_color_override("font_hover_color", debug_style_token["text_color"])
+	button.add_theme_color_override("font_pressed_color", debug_style_token["text_color"])
+	button.add_theme_color_override("font_disabled_color", debug_disabled_style_token["text_color"])
+
 func _apply_language_button_style(button: Button) -> void:
 	button.custom_minimum_size = Vector2(70, 32)
 	button.add_theme_stylebox_override("normal", _style_box(Color(1, 1, 1, 0.0), Color(1, 1, 1, 0.0), 0, 6, 8))
@@ -153,8 +186,8 @@ func _apply_language_button_style(button: Button) -> void:
 
 func _apply_input_style(input: LineEdit) -> void:
 	input.custom_minimum_size.y = max(input.custom_minimum_size.y, WebUiTokens.touch_target_height())
-	input.add_theme_stylebox_override("normal", _style_box(Color.WHITE, Color(0.72, 0.65, 0.55, 1.0), 1, 8, 10))
-	input.add_theme_stylebox_override("focus", _style_box(Color.WHITE, WebUiTokens.accent_color(), 2, 8, 10))
+	input.add_theme_stylebox_override("normal", WebUiTokens.input_style())
+	input.add_theme_stylebox_override("focus", WebUiTokens.input_style())
 	input.add_theme_color_override("font_color", WebUiTokens.ink_color())
 	input.add_theme_color_override("font_placeholder_color", Color(0.44, 0.37, 0.31, 0.78))
 
