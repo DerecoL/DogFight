@@ -25,6 +25,30 @@ static func safe_content_size_16_9() -> Vector2i:
 static func safe_content_margin() -> int:
 	return screen_safe_margin()
 
+static func shell_gap() -> int:
+	return 14
+
+static func shell_top_bar_padding() -> int:
+	return 16
+
+static func shell_content_separation() -> int:
+	return 16
+
+static func shell_content_horizontal_padding() -> int:
+	return 20
+
+static func shell_top_bar_separation() -> int:
+	return 8
+
+static func shell_resource_separation() -> int:
+	return 6
+
+static func shell_error_margin_horizontal() -> int:
+	return 12
+
+static func shell_error_margin_vertical() -> int:
+	return 6
+
 static func auth_card_min_size() -> Vector2i:
 	return Vector2i(420, 360)
 

@@ -34,6 +34,14 @@ func _init() -> void:
 		"handdrawn_card_fixed_size",
 		"debug_entry_button_size",
 		"secondary_folded_entry_size",
+		"shell_gap",
+		"shell_top_bar_padding",
+		"shell_content_separation",
+		"shell_content_horizontal_padding",
+		"shell_top_bar_separation",
+		"shell_resource_separation",
+		"shell_error_margin_horizontal",
+		"shell_error_margin_vertical",
 		"layer_base",
 		"layer_card",
 		"layer_overlay",
@@ -125,6 +133,52 @@ func _init() -> void:
 		return
 	if int(tokens.safe_content_margin()) < 24 or int(tokens.safe_content_margin()) > 96:
 		_fail("safe_content_margin must be large enough for 16:9 edge safety without wasting space")
+		return
+
+	var shell_spacing_methods := [
+		"shell_gap",
+		"shell_top_bar_padding",
+		"shell_content_separation",
+		"shell_content_horizontal_padding",
+		"shell_top_bar_separation",
+		"shell_resource_separation",
+		"shell_error_margin_horizontal",
+		"shell_error_margin_vertical",
+	]
+	for method_name in shell_spacing_methods:
+		var spacing_value = tokens.call(method_name)
+		if typeof(spacing_value) != TYPE_INT:
+			_fail("%s must return int" % method_name)
+			return
+		if int(spacing_value) < 0:
+			_fail("%s must not be negative" % method_name)
+			return
+	if int(tokens.shell_gap()) < 8 or int(tokens.shell_gap()) > 24:
+		_fail("shell_gap must visibly separate shell bands without wasting 720p vertical space")
+		return
+	if int(tokens.shell_top_bar_padding()) < 8 or int(tokens.shell_top_bar_padding()) > 24:
+		_fail("shell_top_bar_padding must protect controls without wasting 1280px width")
+		return
+	if int(tokens.shell_content_separation()) < 12 or int(tokens.shell_content_separation()) > 24:
+		_fail("shell_content_separation must leave stable card spacing inside Content")
+		return
+	if int(tokens.shell_content_horizontal_padding()) < 16 or int(tokens.shell_content_horizontal_padding()) > 32:
+		_fail("shell_content_horizontal_padding must protect page cards without wasting width")
+		return
+	if int(tokens.shell_top_bar_separation()) < 6 or int(tokens.shell_top_bar_separation()) > 12:
+		_fail("shell_top_bar_separation must keep top bar controls readable and compact")
+		return
+	if int(tokens.shell_resource_separation()) < 4 or int(tokens.shell_resource_separation()) > 10:
+		_fail("shell_resource_separation must keep resource pills compact")
+		return
+	if int(tokens.shell_error_margin_horizontal()) < 8 or int(tokens.shell_error_margin_horizontal()) > 18:
+		_fail("shell_error_margin_horizontal must keep error text padded but compact")
+		return
+	if int(tokens.shell_error_margin_vertical()) < 4 or int(tokens.shell_error_margin_vertical()) > 10:
+		_fail("shell_error_margin_vertical must keep the error strip compact")
+		return
+	if int(tokens.desktop_content_max_width()) - int(tokens.shell_content_horizontal_padding()) * 2 < 900:
+		_fail("Shell content padding must leave enough width for desktop cards")
 		return
 
 	var card_min_size = tokens.handdrawn_card_min_size()
