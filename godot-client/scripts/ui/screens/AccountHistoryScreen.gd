@@ -1,4 +1,4 @@
-extends BaseWebScreen
+extends ShellBackedWebScreen
 
 const WebUiTokens := preload("res://scripts/ui/web/WebUiTokens.gd")
 
@@ -8,25 +8,22 @@ var selected_run_id := ""
 var content_box: VBoxContainer
 var selected_detail_box: VBoxContainer
 
-func _ready() -> void:
+func _render_shell_content() -> void:
 	_build_screen()
 	_apply_payload_data()
 	_render()
 
 func _on_payload_changed() -> void:
-	_apply_payload_data()
-	_render()
+	super._on_payload_changed()
 
 func _build_screen() -> void:
 	var panel := PanelContainer.new()
 	panel.name = "AccountHistoryPanel"
-	panel.set_anchors_preset(Control.PRESET_FULL_RECT)
-	panel.offset_left = 18
-	panel.offset_top = 18
-	panel.offset_right = -18
-	panel.offset_bottom = -18
+	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	panel.custom_minimum_size = Vector2(0, 420)
 	panel.add_theme_stylebox_override("panel", WebUiTokens.paper_card_style())
-	add_child(panel)
+	content_container().add_child(panel)
 
 	var margin := MarginContainer.new()
 	margin.add_theme_constant_override("margin_left", 18)

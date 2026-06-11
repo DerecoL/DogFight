@@ -1,22 +1,22 @@
-extends BaseWebScreen
+extends ShellBackedWebScreen
 
 var nickname_input: LineEdit
 var status_label: Label
 var submit_button: Button
 var action_in_progress := false
 
-func _ready() -> void:
+func _render_shell_content() -> void:
 	_build_form()
 
 func _build_form() -> void:
 	var root := VBoxContainer.new()
 	root.name = "NicknameSetupRoot"
-	root.set_anchors_preset(Control.PRESET_CENTER)
 	root.custom_minimum_size = Vector2(520, 320)
 	root.size = root.custom_minimum_size
-	root.position = -root.custom_minimum_size / 2.0
+	root.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	root.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	root.add_theme_constant_override("separation", 18)
-	add_child(root)
+	content_container().add_child(root)
 
 	var heading := VBoxContainer.new()
 	heading.name = "ScreenHeadingCentered"
