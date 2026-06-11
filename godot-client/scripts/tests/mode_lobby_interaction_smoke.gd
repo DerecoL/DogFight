@@ -17,7 +17,7 @@ func _run() -> void:
 		if not text.contains(part):
 			_fail("ModeLobbyScreen text missing: %s" % part)
 			return
-	if screen.get_node_or_null("ModeLobbyPanel") == null:
+	if screen.find_child("ModeLobbyPanel", true, false) == null:
 		_fail("ModeLobbyScreen must have stable panel root")
 		return
 	if screen.find_child("StartRunButton", true, false) != null:

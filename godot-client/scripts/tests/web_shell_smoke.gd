@@ -82,7 +82,7 @@ func _init() -> void:
 		_fail("WebShell gold pill must include gold value")
 		return
 
-	var content := shell.content_container()
+	var content: VBoxContainer = shell.content_container()
 	var child := Label.new()
 	child.name = "TemporaryContent"
 	content.add_child(child)

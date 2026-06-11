@@ -56,10 +56,13 @@ func _init() -> void:
 			_fail("Runtime run phase %s should map to %s, got %s" % [str(phase), expected, runtime_actual])
 			return
 
-	for legacy_phase in ["MAP", "SHOP", "BATTLE"]:
-		if not policy.migration_allows_legacy_for_phase(legacy_phase):
-			_fail("Migration should allow legacy fallback for phase %s" % legacy_phase)
+	for standalone_phase in ["MAP", "SHOP"]:
+		if policy.migration_allows_legacy_for_phase(standalone_phase):
+			_fail("Migration should not allow legacy fallback for standalone phase %s" % standalone_phase)
 			return
+	if not policy.migration_allows_legacy_for_phase("BATTLE"):
+		_fail("Migration should allow legacy fallback for battle replay compatibility")
+		return
 	if policy.migration_allows_legacy_for_screen("account_shop"):
 		_fail("Migration should not allow legacy fallback for account_shop")
 		return

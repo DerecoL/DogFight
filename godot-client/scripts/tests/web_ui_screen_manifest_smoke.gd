@@ -58,8 +58,8 @@ func _init() -> void:
 			_fail("Phase %s should route to %s, got %s" % [phase, expected, actual])
 			return
 
-	if str(manifest.screen_for_run_phase("UNKNOWN_PHASE")) != "legacy_run":
-		_fail("Unknown run phase should fall back to playable run screen")
+	if str(manifest.screen_for_run_phase("UNKNOWN_PHASE")) != "mode_lobby":
+		_fail("Unknown run phase should fall back to mode lobby")
 		return
 
 	print("Web UI screen manifest smoke passed")

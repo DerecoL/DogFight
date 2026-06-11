@@ -4,28 +4,24 @@ func _init() -> void:
 	_run()
 
 func _run() -> void:
-	var main_scene := load("res://scenes/Main.tscn")
-	if main_scene == null:
-		_fail("Main scene failed to load")
+	var scene := load("res://scenes/screens/RunShopScreen.tscn")
+	if scene == null:
+		_fail("RunShopScreen scene failed to load")
 		return
-	var main = main_scene.instantiate()
-	root.add_child(main)
+	var screen = scene.instantiate()
+	var fake_session := FakeSession.new()
+	root.add_child(fake_session)
+	root.add_child(screen)
 	await process_frame
+	if screen.has_method("bind_session"):
+		screen.call("bind_session", fake_session)
+	if screen.has_method("set_payload"):
+		screen.call("set_payload", {"run": _shop_run()})
 	await process_frame
-	var run_screen = main.get_node_or_null("ScreenRoot/LegacyRunScreen")
-	if run_screen == null:
-		_fail("RunScreen is missing")
-		return
-	if run_screen.has_method("bind_session"):
-		run_screen.bind_session(main)
-	if not main.has_method("set_current_run"):
-		_fail("Main session does not expose set_current_run")
-		return
 
-	main.call("set_current_run", _shop_run())
-	run_screen.set("current_tab", "跑局")
-	run_screen.call("_render_current_tab")
-	await process_frame
+	if str(screen.get("playable_redirect_screen_id")) != "":
+		_fail("RunShopScreen must be standalone and must not redirect to LegacyRunScreen")
+		return
 
 	for node_name in [
 		"ShopWorkbench",
@@ -51,67 +47,74 @@ func _run() -> void:
 		"MatchButton",
 		"InventoryBoard",
 	]:
-		_assert_has(run_screen, node_name)
+		_assert_has(screen, node_name)
 
-	var shop_card_button := _find_by_name(run_screen, "ShopCard_offer-1") as Button
+	var shop_card_button := _find_by_name(screen, "ShopCard_offer-1") as Button
 	if shop_card_button == null:
-		_fail("Legacy ShopCard root must be a clickable Button like Web ShopCard")
+		_fail("ShopCard root must be a clickable Button like Web ShopCard")
 		return
-	_assert_button_text(run_screen, "RerollButton", "刷新")
-	_assert_label_text(run_screen, "RerollPriceTag", "1")
-	var modal_layer = main.get_node_or_null("OverlayRoot/ModalLayer")
-	if modal_layer == null:
-		_fail("ModalLayer is missing")
-		return
+	_assert_label_text(screen, "RerollPriceTag", "1")
+	_assert_label_starts_with(screen, "ShopPriceTag_offer-1", "7")
 	shop_card_button.pressed.emit()
 	await process_frame
-	if modal_layer.get_child_count() != 1:
-		_fail("Legacy ShopCard root click must open the same detail modal as Web ShopCard")
-		return
-
-	var text := _collect_text(run_screen)
-	for part in [
-		"装备店",
-		"点击商品查看详情，确认后再购买。",
-		"拖到这里出售",
-		"白银",
-		"已拥有 x2",
-		"1点牙咬",
-		"1格",
-		"点数 1",
-		"造成 5 点伤害",
-		"7 · 8折",
-		"匹配对手",
+	for node_name in [
+		"FloatingTip",
+		"ShopOfferTip",
+		"ShopOfferTipTags",
+		"ShopOfferTipIdentity",
+		"ShopOfferTipSizePreview",
+		"ShopOfferTipDice",
+		"ShopOfferTipDescription",
+		"ShopOfferTipPrice",
+		"ShopOfferTipActions",
+		"CloseOfferTipButton",
 	]:
+		_assert_has(screen, node_name)
+
+	var text := _collect_text(screen)
+	for part in ["Starter Fang", "Deal 5 damage", "x2"]:
 		if not text.contains(part):
-			_fail("Run shop Web detail text missing: %s" % part)
+			_fail("Standalone run shop Web detail text missing: %s" % part)
 			return
 
-	main.queue_free()
+	screen.queue_free()
+	fake_session.queue_free()
 	for _frame in range(5):
 		await process_frame
-	print("Godot run shop Web detail structure smoke passed")
+	print("Godot standalone run shop Web detail structure smoke passed")
 	quit(0)
+
+class FakeSession:
+	extends Node
+
+	func buy_offer(_offer_id: String, _area := "BAG") -> bool:
+		return true
+
+	func match_battle() -> bool:
+		return true
+
+	func reroll_shop() -> bool:
+		return true
 
 func _assert_has(root_node: Node, node_name: String) -> void:
 	if _find_by_name(root_node, node_name) == null:
-		_fail("Missing run shop Web detail node: %s" % node_name)
-
-func _assert_button_text(root_node: Node, node_name: String, expected: String) -> void:
-	var button := _find_by_name(root_node, node_name) as Button
-	if button == null:
-		_fail("Missing run shop Web detail button: %s" % node_name)
-		return
-	if button.text != expected:
-		_fail("Run shop button %s should be %s, got %s" % [node_name, expected, button.text])
+		_fail("Missing standalone run shop Web detail node: %s" % node_name)
 
 func _assert_label_text(root_node: Node, node_name: String, expected: String) -> void:
 	var label := _find_by_name(root_node, node_name) as Label
 	if label == null:
-		_fail("Missing run shop Web detail label: %s" % node_name)
+		_fail("Missing standalone run shop Web detail label: %s" % node_name)
 		return
 	if label.text != expected:
-		_fail("Run shop label %s should be %s, got %s" % [node_name, expected, label.text])
+		_fail("Standalone run shop label %s should be %s, got %s" % [node_name, expected, label.text])
+
+func _assert_label_starts_with(root_node: Node, node_name: String, expected_prefix: String) -> void:
+	var label := _find_by_name(root_node, node_name) as Label
+	if label == null:
+		_fail("Missing standalone run shop Web detail label: %s" % node_name)
+		return
+	if not label.text.begins_with(expected_prefix):
+		_fail("Standalone run shop label %s should start with %s, got %s" % [node_name, expected_prefix, label.text])
 
 func _find_by_name(node: Node, node_name: String) -> Node:
 	if node.name == node_name:
@@ -157,7 +160,7 @@ func _shop_run() -> Dictionary:
 				"quality": "SILVER",
 				"price": 7,
 				"discount": 0.8,
-				"def": {"name": "1点牙咬", "size": 1, "description": "造成 5 点伤害", "triggerDice": [1]},
+				"def": {"name": "Starter Fang", "size": 1, "description": "Deal 5 damage", "triggerDice": [1]},
 			},
 		],
 		"choices": [],
@@ -182,7 +185,7 @@ func _item(id: String, def_id: String, area: String, x: int) -> Dictionary:
 		"area": area,
 		"x": x,
 		"y": 0,
-		"def": {"name": "1点牙咬", "size": 1},
+		"def": {"name": "Starter Fang", "size": 1},
 	}
 
 func _fail(message: String) -> void:

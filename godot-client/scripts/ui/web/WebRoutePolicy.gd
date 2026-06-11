@@ -41,8 +41,6 @@ const _RUN_PHASE_SCREENS := {
 }
 
 const _LEGACY_ALLOWED_PHASES := [
-	"MAP",
-	"SHOP",
 	"BATTLE",
 ]
 

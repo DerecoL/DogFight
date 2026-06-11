@@ -1954,7 +1954,7 @@ func _render_shop_offer_card(parent: VBoxContainer, run: Dictionary, offer: Dict
 		content.add_child(effect_line)
 	var price_tag := Label.new()
 	price_tag.name = "ShopPriceTag_%s" % offer_id
-	price_tag.text = "价格 %s" % _shop_offer_price_text(offer)
+	price_tag.text = _shop_offer_price_text(offer)
 	price_tag.custom_minimum_size = Vector2(0, 28)
 	price_tag.add_theme_color_override("font_color", UiTokens.ink_color())
 	price_tag.mouse_filter = Control.MOUSE_FILTER_IGNORE
