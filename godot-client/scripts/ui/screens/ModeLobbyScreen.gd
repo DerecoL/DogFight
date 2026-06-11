@@ -1,5 +1,7 @@
 extends ShellBackedWebScreen
 
+const ACTION_BUTTON := preload("res://scripts/ui/shared/WebActionButton.gd")
+
 var account_label: Label
 var run_label: Label
 var status_label: Label
@@ -12,6 +14,7 @@ var history_rank_meta_label: Label
 var history_best_label: Label
 var history_run_list: VBoxContainer
 var season_history_list: VBoxContainer
+var overlay_host: Control
 var tutorial_guide_panel: PanelContainer
 var action_buttons: Array[Button] = []
 var action_in_progress := false
@@ -54,10 +57,15 @@ func _build_lobby() -> void:
 	box.add_theme_constant_override("separation", 12)
 	margin.add_child(box)
 
+	var hero := VBoxContainer.new()
+	hero.name = "ModeLobbyHero"
+	hero.add_theme_constant_override("separation", 6)
+	box.add_child(hero)
+
 	var heading := VBoxContainer.new()
 	heading.name = "ModeLobbyHeading"
 	heading.add_theme_constant_override("separation", 6)
-	box.add_child(heading)
+	hero.add_child(heading)
 
 	var title := Label.new()
 	title.name = "ModeLobbyTitle"
@@ -73,40 +81,75 @@ func _build_lobby() -> void:
 	subtitle.custom_minimum_size = Vector2(0, 42)
 	heading.add_child(subtitle)
 
+	var secondary_panel := VBoxContainer.new()
+	secondary_panel.name = "ModeLobbySecondaryPanel"
+	secondary_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	secondary_panel.add_theme_constant_override("separation", 10)
+
+	var account_strip := HBoxContainer.new()
+	account_strip.name = "ModeLobbyAccountStrip"
+	account_strip.custom_minimum_size = Vector2(0, WebUiTokens.touch_target_height())
+	account_strip.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	account_strip.add_theme_constant_override("separation", 10)
+	secondary_panel.add_child(account_strip)
+
 	account_label = Label.new()
 	account_label.name = "ModeLobbyAccountLabel"
-	account_label.custom_minimum_size = Vector2(0, 24)
-	account_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	box.add_child(account_label)
+	account_label.custom_minimum_size = Vector2(180, WebUiTokens.touch_target_height())
+	account_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	account_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	account_label.clip_text = true
+	account_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	account_strip.add_child(account_label)
 
 	run_label = Label.new()
 	run_label.name = "ModeLobbyRunLabel"
-	run_label.custom_minimum_size = Vector2(0, 40)
-	run_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	run_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	box.add_child(run_label)
+	run_label.custom_minimum_size = Vector2(360, WebUiTokens.touch_target_height())
+	run_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	run_label.autowrap_mode = TextServer.AUTOWRAP_OFF
+	run_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	run_label.clip_text = true
+	run_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	account_strip.add_child(run_label)
 
 	var tutorial_button := Button.new()
 	tutorial_button.name = "TutorialReplayButton"
 	tutorial_button.text = "新手引导"
 	tutorial_button.custom_minimum_size = Vector2(150, WebUiTokens.touch_target_height())
 	tutorial_button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	tutorial_button.clip_text = true
+	tutorial_button.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	tutorial_button.autowrap_mode = TextServer.AUTOWRAP_OFF
+	tutorial_button.add_theme_stylebox_override("normal", WebUiTokens.handdrawn_button_style())
+	tutorial_button.add_theme_stylebox_override("hover", WebUiTokens.handdrawn_button_hover_style())
+	tutorial_button.add_theme_stylebox_override("pressed", WebUiTokens.handdrawn_button_pressed_style())
 	tutorial_button.pressed.connect(_replay_tutorial)
-	box.add_child(_track_action_button(tutorial_button))
+	account_strip.add_child(_track_action_button(tutorial_button))
+	_clear_overlay_host()
 	_build_tutorial_guide()
+
+	var primary_modes := VBoxContainer.new()
+	primary_modes.name = "ModeLobbyPrimaryModes"
+	primary_modes.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	primary_modes.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	primary_modes.z_index = WebUiTokens.layer_card()
+	box.add_child(primary_modes)
 
 	var mode_entries := GridContainer.new()
 	mode_entries.name = "ModeGrid"
 	mode_entries.columns = 2
-	mode_entries.add_theme_constant_override("h_separation", 10)
-	mode_entries.add_theme_constant_override("v_separation", 8)
-	box.add_child(mode_entries)
+	mode_entries.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	mode_entries.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	mode_entries.add_theme_constant_override("h_separation", 16)
+	mode_entries.add_theme_constant_override("v_separation", 14)
+	primary_modes.add_child(mode_entries)
 	casual_button = _add_mode_button(mode_entries, "CasualModeButton", "休闲模式", "当前经典构筑、商店、匹配和自动战斗流程", "开始休闲模式", _enter_casual)
 	ladder_button = _add_mode_button(mode_entries, "LadderModeButton", "天梯模式", "按整局表现结算积分，冲击大师与犬王排行榜", "进入天梯模式", _enter_ladder)
 	_add_mode_button(mode_entries, "DogfightModeButton", "斗狗模式", "实时房间，8 狗同场淘汰", "进入斗狗模式", _open_screen.bind("dogfight_rooms"))
 	_add_mode_button(mode_entries, "PeakModeButton", "巅峰模式", "战斗结束后的狗进入巅峰竞技场，自动挑战榜单冲击排名", "进入巅峰模式", _open_screen.bind("apex"))
 
-	_add_history_panel(box)
+	box.add_child(secondary_panel)
+	_add_history_panel(secondary_panel)
 
 	status_label = Label.new()
 	status_label.name = "ModeLobbyStatus"
@@ -114,12 +157,12 @@ func _build_lobby() -> void:
 	status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	status_label.add_theme_color_override("font_color", WebUiTokens.danger_color())
-	box.add_child(status_label)
+	secondary_panel.add_child(status_label)
 
 func _add_history_panel(parent: Node) -> void:
 	var panel := PanelContainer.new()
 	panel.name = "PlayerHistoryPanel"
-	panel.custom_minimum_size = Vector2(0, 190)
+	panel.custom_minimum_size = Vector2(0, 280)
 	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	panel.add_theme_stylebox_override("panel", WebUiTokens.paper_card_style())
 	parent.add_child(panel)
@@ -144,58 +187,94 @@ func _add_history_panel(parent: Node) -> void:
 
 	var total_box := _history_cell(summary, "个人战绩")
 	history_total_label = Label.new()
+	history_total_label.name = "HistoryTotalLabel"
 	history_total_label.custom_minimum_size = Vector2(140, 24)
+	_configure_stable_label(history_total_label, 24)
 	total_box.add_child(history_total_label)
 	history_meta_label = Label.new()
+	history_meta_label.name = "HistoryMetaLabel"
 	history_meta_label.custom_minimum_size = Vector2(140, 36)
-	history_meta_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_configure_stable_label(history_meta_label, 36)
 	total_box.add_child(history_meta_label)
 
 	var rank_box := _history_cell(summary, "天梯段位")
 	rank_box.name = "HistoryLadderSlot"
 	history_rank_label = Label.new()
+	history_rank_label.name = "HistoryRankLabel"
 	history_rank_label.custom_minimum_size = Vector2(120, 24)
+	_configure_stable_label(history_rank_label, 24)
 	rank_box.add_child(history_rank_label)
 	history_rank_meta_label = Label.new()
+	history_rank_meta_label.name = "HistoryRankMeta"
 	history_rank_meta_label.custom_minimum_size = Vector2(120, 36)
-	history_rank_meta_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_configure_stable_label(history_rank_meta_label, 36)
 	rank_box.add_child(history_rank_meta_label)
 
 	var best_box := _history_cell(summary, "最佳成绩")
 	best_box.name = "HistoryBest"
 	history_best_label = Label.new()
+	history_best_label.name = "HistoryBestLabel"
 	history_best_label.custom_minimum_size = Vector2(160, 60)
-	history_best_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_configure_stable_label(history_best_label, 60)
 	best_box.add_child(history_best_label)
 
-	var actions := VBoxContainer.new()
+	var actions := GridContainer.new()
 	actions.name = "AccountPanelActions"
+	actions.columns = 2
 	actions.custom_minimum_size = Vector2(170, 88)
-	actions.add_theme_constant_override("separation", 6)
+	actions.add_theme_constant_override("h_separation", 6)
+	actions.add_theme_constant_override("v_separation", 6)
 	summary.add_child(actions)
 	_add_history_shortcut(actions, "HistoryShopButton", "商城", "account_shop")
 	_add_history_shortcut(actions, "HistoryAchievementsButton", "成就", "achievements")
 	_add_history_shortcut(actions, "HistorySettingsButton", "个人设置", "account_settings")
 	_add_history_shortcut(actions, "HistoryDetailButton", "查看详情和装备", "account")
 
+	var lists_row := HBoxContainer.new()
+	lists_row.name = "HistoryListsRow"
+	lists_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	lists_row.add_theme_constant_override("separation", 12)
+	box.add_child(lists_row)
+
+	var recent_column := VBoxContainer.new()
+	recent_column.name = "HistoryRecentColumn"
+	recent_column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	recent_column.add_theme_constant_override("separation", 5)
+	lists_row.add_child(recent_column)
+
 	var recent_title := Label.new()
 	recent_title.name = "HistoryRecentTitle"
 	recent_title.text = "最近对局"
 	recent_title.custom_minimum_size = Vector2(0, 22)
-	box.add_child(recent_title)
+	recent_column.add_child(recent_title)
+
+	var recent_scroll := ScrollContainer.new()
+	recent_scroll.name = "HistoryRecentScroll"
+	recent_scroll.custom_minimum_size = Vector2(0, 112)
+	recent_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	recent_scroll.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	recent_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	recent_column.add_child(recent_scroll)
 
 	history_run_list = VBoxContainer.new()
 	history_run_list.name = "HistoryRunList"
-	history_run_list.custom_minimum_size = Vector2(0, 74)
+	history_run_list.custom_minimum_size = Vector2(0, 112)
+	history_run_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	history_run_list.add_theme_constant_override("separation", 4)
-	box.add_child(history_run_list)
+	recent_scroll.add_child(history_run_list)
 
-	_add_season_history_list(box)
+	var season_column := VBoxContainer.new()
+	season_column.name = "HistorySeasonColumn"
+	season_column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	season_column.add_theme_constant_override("separation", 5)
+	lists_row.add_child(season_column)
+	_add_season_history_list(season_column)
 
 func _build_tutorial_guide() -> void:
 	tutorial_guide_panel = PanelContainer.new()
 	tutorial_guide_panel.name = "CasualTutorialGuide"
 	tutorial_guide_panel.visible = false
+	tutorial_guide_panel.z_index = WebUiTokens.layer_overlay()
 	tutorial_guide_panel.custom_minimum_size = Vector2(360, 220)
 	tutorial_guide_panel.anchor_left = 1.0
 	tutorial_guide_panel.anchor_top = 1.0
@@ -206,7 +285,7 @@ func _build_tutorial_guide() -> void:
 	tutorial_guide_panel.offset_right = -28
 	tutorial_guide_panel.offset_bottom = -28
 	tutorial_guide_panel.add_theme_stylebox_override("panel", WebUiTokens.paper_card_style())
-	content_container().add_child(tutorial_guide_panel)
+	_ensure_overlay_host().add_child(tutorial_guide_panel)
 
 	var margin := MarginContainer.new()
 	margin.add_theme_constant_override("margin_left", 16)
@@ -254,6 +333,28 @@ func _build_tutorial_guide() -> void:
 	skip.pressed.connect(_hide_tutorial_guide)
 	card.add_child(skip)
 
+func _ensure_overlay_host() -> Control:
+	if overlay_host != null and is_instance_valid(overlay_host):
+		return overlay_host
+	overlay_host = Control.new()
+	overlay_host.name = "ModeLobbyOverlayHost"
+	overlay_host.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	overlay_host.custom_minimum_size = Vector2(WebUiTokens.safe_content_size_16_9())
+	overlay_host.size = overlay_host.custom_minimum_size
+	overlay_host.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	overlay_host.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	overlay_host.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	overlay_host.z_index = WebUiTokens.layer_overlay()
+	shell.add_child(overlay_host)
+	shell.move_child(overlay_host, shell.get_child_count() - 1)
+	return overlay_host
+
+func _clear_overlay_host() -> void:
+	var host := _ensure_overlay_host()
+	for child in host.get_children():
+		host.remove_child(child)
+		child.queue_free()
+
 func _history_cell(parent: Node, title: String) -> VBoxContainer:
 	var cell := VBoxContainer.new()
 	cell.add_theme_constant_override("separation", 3)
@@ -261,25 +362,31 @@ func _history_cell(parent: Node, title: String) -> VBoxContainer:
 	parent.add_child(cell)
 	var label := Label.new()
 	label.text = title
+	_configure_stable_label(label, 20)
 	cell.add_child(label)
 	return cell
 
+func _configure_stable_label(label: Label, height: int) -> void:
+	label.custom_minimum_size.y = height
+	label.autowrap_mode = TextServer.AUTOWRAP_OFF
+	label.clip_text = true
+	label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+
 func _add_history_shortcut(parent: Node, node_name: String, text: String, screen_id: String) -> void:
-	var button := Button.new()
+	var button := ACTION_BUTTON.create(text, _open_screen.bind(screen_id), "secondary")
 	button.name = node_name
-	button.text = text
-	button.custom_minimum_size = Vector2(0, 28)
+	button.custom_minimum_size = Vector2(0, 34)
 	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	button.pressed.connect(_open_screen.bind(screen_id))
 	parent.add_child(_track_action_button(button))
 
 func _add_mode_button(parent: Node, node_name: String, title: String, detail: String, action_label: String, action: Callable) -> Button:
 	var mode_id := node_name.replace("ModeButton", "").to_upper()
 	var card := PanelContainer.new()
 	card.name = "ModeCard_%s" % mode_id
-	card.custom_minimum_size = Vector2(0, 128)
+	card.custom_minimum_size = Vector2(WebUiTokens.lobby_mode_card_min_size())
 	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	card.add_theme_stylebox_override("panel", WebUiTokens.paper_card_style())
+	card.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	card.add_theme_stylebox_override("panel", WebUiTokens.mode_card_style())
 	parent.add_child(card)
 
 	var margin := MarginContainer.new()
@@ -292,6 +399,7 @@ func _add_mode_button(parent: Node, node_name: String, title: String, detail: St
 	var content := VBoxContainer.new()
 	content.name = "ModeCardContent_%s" % mode_id
 	content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	content.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	content.add_theme_constant_override("separation", 8)
 	margin.add_child(content)
 
@@ -300,11 +408,13 @@ func _add_mode_button(parent: Node, node_name: String, title: String, detail: St
 	icon.text = _mode_icon_text(mode_id)
 	icon.custom_minimum_size = Vector2(0, 30)
 	icon.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	icon.clip_text = true
 	content.add_child(icon)
 
 	var copy := VBoxContainer.new()
 	copy.name = "ModeCopy_%s" % mode_id
 	copy.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	copy.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	copy.add_theme_constant_override("separation", 4)
 	content.add_child(copy)
 
@@ -312,6 +422,8 @@ func _add_mode_button(parent: Node, node_name: String, title: String, detail: St
 	title_label.name = "ModeTitle_%s" % mode_id
 	title_label.text = title
 	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title_label.clip_text = true
+	title_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	copy.add_child(title_label)
 
 	var detail_label := Label.new()
@@ -319,14 +431,15 @@ func _add_mode_button(parent: Node, node_name: String, title: String, detail: St
 	detail_label.text = detail
 	detail_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	detail_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	detail_label.custom_minimum_size = Vector2(0, 58)
+	detail_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	detail_label.clip_text = true
+	detail_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	copy.add_child(detail_label)
 
-	var button := Button.new()
+	var button := ACTION_BUTTON.create(action_label, action)
 	button.name = node_name
-	button.text = action_label
-	button.custom_minimum_size = Vector2(0, WebUiTokens.touch_target_height())
 	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	button.pressed.connect(action)
 	content.add_child(_track_action_button(button))
 	return button
 
@@ -429,12 +542,20 @@ func _render_history_rows(recent_runs: Variant) -> void:
 		history_run_list.add_child(_history_run_row(entry, index))
 
 func _add_season_history_list(parent: Node) -> void:
+	var season_scroll := ScrollContainer.new()
+	season_scroll.name = "SeasonHistoryScroll"
+	season_scroll.custom_minimum_size = Vector2(0, 152)
+	season_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	season_scroll.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	season_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	parent.add_child(season_scroll)
+
 	season_history_list = VBoxContainer.new()
 	season_history_list.name = "SeasonHistoryList"
-	season_history_list.custom_minimum_size = Vector2(0, 112)
+	season_history_list.custom_minimum_size = Vector2(0, 152)
 	season_history_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	season_history_list.add_theme_constant_override("separation", 8)
-	parent.add_child(season_history_list)
+	season_scroll.add_child(season_history_list)
 	_render_season_history_rows([])
 
 func _render_season_history_rows(summaries: Array) -> void:
@@ -494,26 +615,19 @@ func _render_season_history_card(summary: Dictionary) -> void:
 	var snapshot_value = summary.get("apexSnapshot", {})
 	var snapshot: Dictionary = snapshot_value if snapshot_value is Dictionary else {}
 	if not snapshot.is_empty():
-		var button := Button.new()
+		var button := ACTION_BUTTON.create("巅峰配置快照", _show_snapshot.bind(snapshot), "secondary")
 		button.name = "SeasonSnapshotAction_%s" % summary_id
-		button.text = "巅峰配置快照"
 		button.custom_minimum_size = Vector2(140, WebUiTokens.touch_target_height())
 		button.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-		button.add_theme_stylebox_override("normal", WebUiTokens.handdrawn_button_style())
-		button.add_theme_stylebox_override("hover", WebUiTokens.handdrawn_button_hover_style())
-		button.add_theme_stylebox_override("pressed", WebUiTokens.handdrawn_button_pressed_style())
-		button.pressed.connect(_show_snapshot.bind(snapshot))
-		row.add_child(button)
+		row.add_child(_track_action_button(button))
 
 func _season_history_label(parent: Node, node_name: String, text: String, align := HORIZONTAL_ALIGNMENT_LEFT) -> Label:
 	var label := Label.new()
 	label.name = node_name
 	label.text = text
-	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	label.horizontal_alignment = align
 	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	label.clip_text = true
-	label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	_configure_stable_label(label, 20)
 	parent.add_child(label)
 	return label
 
