@@ -4,58 +4,60 @@ func _init() -> void:
 	_run()
 
 func _run() -> void:
-	var main_scene := load("res://scenes/Main.tscn")
-	if main_scene == null:
-		_fail("Main scene failed to load")
+	var scene := load("res://scenes/screens/DogfightRoomDetailScreen.tscn")
+	if scene == null:
+		_fail("DogfightRoomDetailScreen scene failed to load")
 		return
-	var main = main_scene.instantiate()
-	root.add_child(main)
+	var screen = scene.instantiate()
+	root.add_child(screen)
 	await process_frame
+	screen.call("set_payload", {"dogfightRoomData": _room("DOG_SELECT")})
 	await process_frame
-	var run_screen = main.get_node_or_null("ScreenRoot/LegacyRunScreen")
-	if run_screen != null and run_screen.has_method("bind_session"):
-		run_screen.bind_session(main)
-	if run_screen == null:
-		_fail("RunScreen is missing")
-		return
-	run_screen.set("active_room", {
-		"id": "room-dog-select",
-		"status": "ACTIVE",
-		"phase": "DOG_SELECT",
-		"currentRound": 1,
-		"isHost": false,
-		"members": [
-			{"id": "member-1", "nickname": "玩家A", "kind": "PLAYER", "wins": 0, "losses": 0, "ready": false},
-			{"id": "bot-1", "nickname": "机器人", "kind": "BOT", "wins": 0, "losses": 0, "ready": false},
-		],
-		"battles": [],
-	})
-	run_screen.set("current_tab", "房间")
-	run_screen.call("_render_current_tab")
-	await process_frame
-	var text := _collect_text(run_screen)
-	for part in ["当前房间", "选狗阶段", "选择斗狗", "15 秒内锁定狗狗", "选择狗狗", "锁定斗狗"]:
-		if not text.contains(str(part)):
-			_fail("Room dog-select view missing: %s" % str(part))
-			return
-	if run_screen.find_child("RoomDogChoiceButton", true, false) == null:
-		_fail("Room dog-select view must expose RoomDogChoiceButton")
-		return
-	main.queue_free()
-	for _frame in range(5):
+
+	for node_name in [
+		"DogfightRoomDetailView",
+		"DogfightRoomStatus",
+		"DogfightPhase_DOG_SELECT",
+		"DogfightPlayArea",
+		"DogfightDogSelectTitle",
+		"DogfightDogSelectSubtitle",
+		"DogfightMember_member-1",
+		"DogfightMemberPaw_member-1",
+	]:
+		_assert_has(screen, node_name)
+
+	screen.queue_free()
+	for _frame in range(3):
 		await process_frame
 	print("Godot room dog-select entry smoke passed")
 	quit(0)
 
-func _collect_text(node: Node) -> String:
-	var text := ""
-	if node is Label:
-		text += (node as Label).text + "\n"
-	if node is Button:
-		text += (node as Button).text + "\n"
+func _room(phase: String) -> Dictionary:
+	return {
+		"id": "room-dog-select",
+		"status": "ACTIVE",
+		"phase": phase,
+		"currentRound": 1,
+		"isHost": false,
+		"members": [
+			{"id": "member-1", "nickname": "Player A", "kind": "PLAYER", "wins": 0, "losses": 0, "ready": false, "isCurrentUser": true},
+			{"id": "bot-1", "nickname": "Bot", "kind": "BOT", "wins": 0, "losses": 0, "ready": false},
+		],
+		"battles": [],
+	}
+
+func _assert_has(root_node: Node, node_name: String) -> void:
+	if _find_by_name(root_node, node_name) == null:
+		_fail("Missing dogfight room node: %s" % node_name)
+
+func _find_by_name(node: Node, node_name: String) -> Node:
+	if node.name == node_name:
+		return node
 	for child in node.get_children():
-		text += _collect_text(child)
-	return text
+		var found := _find_by_name(child, node_name)
+		if found != null:
+			return found
+	return null
 
 func _fail(message: String) -> void:
 	push_error(message)

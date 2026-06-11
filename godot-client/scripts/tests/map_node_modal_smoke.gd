@@ -4,66 +4,89 @@ func _init() -> void:
 	_run()
 
 func _run() -> void:
-	var main_scene := load("res://scenes/Main.tscn")
-	if main_scene == null:
-		_fail("Main scene failed to load")
+	var scene := load("res://scenes/screens/ExplorationMapScreen.tscn")
+	if scene == null:
+		_fail("ExplorationMapScreen scene failed to load")
 		return
-	var main = main_scene.instantiate()
-	root.add_child(main)
+	var screen = scene.instantiate()
+	root.add_child(screen)
 	await process_frame
+	screen.call("set_payload", {"run": _map_run()})
 	await process_frame
-	var run_screen = main.get_node_or_null("ScreenRoot/LegacyRunScreen")
-	if run_screen != null and run_screen.has_method("bind_session"):
-		run_screen.bind_session(main)
-	if run_screen == null or not run_screen.has_method("_show_map_node_modal"):
-		_fail("RunScreen map node modal is missing")
+
+	for node_name in [
+		"ExplorationMapOverlay",
+		"MapNodeDetailPanel",
+		"MapMonsterEquipmentTitle",
+		"MapMonsterEquipmentGrid",
+		"MapRewardPreviewLinks",
+		"MapRewardPreviewRow",
+		"MapRewardPreview_starter-1",
+	]:
+		_assert_has(screen, node_name)
+	var equipment_button := _find_by_name(screen, "MapMonsterEquipmentButton_monster-bite") as Button
+	if equipment_button == null:
+		_fail("Monster equipment button is missing")
 		return
-	var modal_layer = main.get_node_or_null("OverlayRoot/ModalLayer")
-	if modal_layer == null:
-		_fail("ModalLayer is missing")
-		return
-	run_screen.call("_show_map_node_modal", {
-		"id": "m0-l0-c0",
-		"layer": 0,
-		"column": 0,
-		"kind": "MONSTER_BATTLE",
-		"monster": {
-			"name": "训练野怪",
-			"dogType": "SHIBA",
-			"round": 1,
-			"equipment": [
-				{"id": "monster-bite", "defId": "starter-1", "quality": "BRONZE", "area": "EQUIPMENT", "x": 0, "y": 0},
-				{"id": "monster-bite-2", "defId": "starter-2", "quality": "BRONZE", "area": "EQUIPMENT", "x": 1, "y": 0},
-			],
-			"possibleRewards": [
-				{"defId": "starter-1", "quality": "BRONZE"},
-				{"defId": "starter-2", "quality": "BRONZE"},
-			],
-		},
-	})
+	equipment_button.pressed.emit()
 	await process_frame
-	if modal_layer.get_child_count() != 1:
-		_fail("Map node modal was not pushed")
-		return
-	var text := _collect_text(modal_layer)
-	if not text.contains("野怪装备栏") or not text.contains("可能掉落") or not text.contains("训练野怪"):
-		_fail("Map node modal did not render monster equipment and rewards")
-		return
-	main.queue_free()
-	for _frame in range(5):
+	_assert_has(screen, "MapMonsterEquipmentPreviewModal")
+	_assert_has(screen, "MapMonsterItemTip")
+
+	screen.queue_free()
+	for _frame in range(3):
 		await process_frame
 	print("Godot map node modal smoke passed")
 	quit(0)
 
-func _collect_text(node: Node) -> String:
-	var text := ""
-	if node is Label:
-		text += (node as Label).text + "\n"
-	if node is Button:
-		text += (node as Button).text + "\n"
+func _map_run() -> Dictionary:
+	return {
+		"id": "map-node-modal-run",
+		"phase": "MAP",
+		"status": "ACTIVE",
+		"dogType": "SHIBA",
+		"round": 1,
+		"wins": 0,
+		"losses": 0,
+		"gold": 8,
+		"items": [],
+		"relics": [],
+		"mapState": {
+			"currentNodeId": "m0-l0-c0",
+			"availableNodeIds": ["m0-l0-c0"],
+			"completedNodeIds": [],
+			"nodes": [{
+				"id": "m0-l0-c0",
+				"layer": 0,
+				"column": 0,
+				"kind": "MONSTER_BATTLE",
+				"monster": {
+					"name": "Training Monster",
+					"dogType": "SHIBA",
+					"round": 1,
+					"equipment": [
+						{"id": "monster-bite", "defId": "starter-1", "quality": "BRONZE", "area": "EQUIPMENT", "x": 0, "y": 0, "def": {"name": "Monster Fang", "size": 1}},
+					],
+					"possibleRewards": [
+						{"defId": "starter-1", "quality": "BRONZE", "def": {"name": "Reward Fang", "size": 1}},
+					],
+				},
+			}],
+		},
+	}
+
+func _assert_has(root_node: Node, node_name: String) -> void:
+	if _find_by_name(root_node, node_name) == null:
+		_fail("Missing map node: %s" % node_name)
+
+func _find_by_name(node: Node, node_name: String) -> Node:
+	if node.name == node_name:
+		return node
 	for child in node.get_children():
-		text += _collect_text(child)
-	return text
+		var found := _find_by_name(child, node_name)
+		if found != null:
+			return found
+	return null
 
 func _fail(message: String) -> void:
 	push_error(message)

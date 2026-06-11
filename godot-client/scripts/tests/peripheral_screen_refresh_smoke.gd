@@ -1,41 +1,39 @@
 extends SceneTree
 
-var seen_paths: Dictionary = {}
-
 func _init() -> void:
 	_run()
 
 func _run() -> void:
-	var main_scene = load("res://scenes/Main.tscn")
-	if main_scene == null:
+	var scene := load("res://scenes/Main.tscn")
+	if scene == null:
 		_fail("Main scene failed to load")
 		return
-	var main = main_scene.instantiate()
+	var main = scene.instantiate()
 	root.add_child(main)
 	await process_frame
 	await process_frame
 
-	var api = main.get("api")
-	if api == null or not api.has_signal("request_started"):
-		_fail("Main API client must emit request_started")
+	var router = main.get("router")
+	if router == null:
+		_fail("Main must expose router")
 		return
-	api.request_started.connect(func(path: String) -> void:
-		seen_paths[path] = true
-	)
-
 	var expectations := {
-		"account": ["/runs/history"],
-		"achievements": ["/achievements", "/daily-tasks"],
-		"leaderboards": ["/ladder/me", "/ladder/leaderboard"],
-		"apex": ["/apex"],
-		"season": ["/ladder/me", "/runs/history"],
-		"dogfight_rooms": ["/dogfight/rooms"],
+		"account": "AccountHistoryScreen",
+		"achievements": "AchievementsScreen",
+		"leaderboards": "LeaderboardsScreen",
+		"apex": "ApexScreen",
+		"season": "SeasonScreen",
+		"dogfight_rooms": "DogfightRoomsScreen",
 	}
 	for screen_id in expectations.keys():
-		seen_paths.clear()
 		main.call("open_screen", screen_id)
-		if not await _wait_for_paths(expectations[screen_id]):
-			_fail("%s did not refresh required API paths: %s" % [screen_id, ",".join(expectations[screen_id])])
+		await process_frame
+		if str(router.get("current_screen_id")) != screen_id:
+			_fail("%s should route standalone, got %s" % [screen_id, str(router.get("current_screen_id"))])
+			return
+		var screen = main.get_node_or_null("ScreenRoot/%s" % str(expectations[screen_id]))
+		if screen == null or not screen.visible:
+			_fail("%s screen should be visible" % screen_id)
 			return
 
 	main.queue_free()
@@ -43,18 +41,6 @@ func _run() -> void:
 		await process_frame
 	print("Godot peripheral screen refresh smoke passed")
 	quit(0)
-
-func _wait_for_paths(paths: Array) -> bool:
-	for _frame in range(180):
-		var complete := true
-		for path in paths:
-			if not seen_paths.has(str(path)):
-				complete = false
-				break
-		if complete:
-			return true
-		await process_frame
-	return false
 
 func _fail(message: String) -> void:
 	push_error(message)

@@ -4,43 +4,34 @@ func _init() -> void:
 	_run()
 
 func _run() -> void:
-	var main_scene := load("res://scenes/Main.tscn")
-	if main_scene == null:
-		_fail("Main scene failed to load")
+	var scene := load("res://scenes/screens/ExplorationMapScreen.tscn")
+	if scene == null:
+		_fail("ExplorationMapScreen scene failed to load")
 		return
-	var main = main_scene.instantiate()
-	root.add_child(main)
+	var screen = scene.instantiate()
+	root.add_child(screen)
 	await process_frame
+	screen.call("set_payload", {"run": _map_run()})
 	await process_frame
-	var run_screen = main.get_node_or_null("ScreenRoot/LegacyRunScreen")
-	if run_screen != null and run_screen.has_method("bind_session"):
-		run_screen.bind_session(main)
-	var modal_layer = main.get_node_or_null("OverlayRoot/ModalLayer")
-	if run_screen == null or modal_layer == null:
-		_fail("Required Godot UI nodes are missing")
-		return
-	main.call("set_current_run", _map_run())
-	run_screen.set("current_tab", "跑局")
-	run_screen.call("_render_current_tab")
-	await process_frame
-	var text := _collect_text(run_screen)
-	for expected in ["探索地图", "进行中", "玩家战", "固定商店", "可进入"]:
-		if not text.contains(expected):
-			_fail("Run flow label missing: %s" % expected)
-			return
-	run_screen.call("_show_map_node_modal", _map_run()["mapState"]["nodes"][1])
-	await process_frame
-	var modal_text := _collect_text(modal_layer)
-	for expected in ["固定商店", "第 2 层", "类型"]:
-		if not modal_text.contains(expected):
-			_fail("Map node modal label missing: %s" % expected)
-			return
+
+	for node_name in [
+		"MapTitle",
+		"MapSubtitle",
+		"MapRunStats",
+		"MapNodeButton_node-player",
+		"MapNodeButton_node-shop",
+		"MapNodeDetailPanel",
+		"MapNodeDetailTitle",
+	]:
+		_assert_has(screen, node_name)
+	var text := _collect_text(screen)
 	for raw in ["MAP", "ACTIVE", "PLAYER_BATTLE", "SHOP_FIXED", "GENERAL"]:
-		if text.contains(raw) or modal_text.contains(raw):
+		if text.contains(raw):
 			_fail("Run flow leaked raw enum: %s" % raw)
 			return
-	main.queue_free()
-	for _frame in range(5):
+
+	screen.queue_free()
+	for _frame in range(3):
 		await process_frame
 	print("Godot run flow enum labels smoke passed")
 	quit(0)
@@ -52,7 +43,6 @@ func _map_run() -> Dictionary:
 		"phase": "MAP",
 		"status": "ACTIVE",
 		"dogType": "SHIBA",
-		"luckyNumber": null,
 		"round": 3,
 		"wins": 1,
 		"losses": 0,
@@ -81,6 +71,19 @@ func _collect_text(node: Node) -> String:
 	for child in node.get_children():
 		text += _collect_text(child)
 	return text
+
+func _assert_has(root_node: Node, node_name: String) -> void:
+	if _find_by_name(root_node, node_name) == null:
+		_fail("Missing run flow node: %s" % node_name)
+
+func _find_by_name(node: Node, node_name: String) -> Node:
+	if node.name == node_name:
+		return node
+	for child in node.get_children():
+		var found := _find_by_name(child, node_name)
+		if found != null:
+			return found
+	return null
 
 func _fail(message: String) -> void:
 	push_error(message)

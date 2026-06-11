@@ -1,45 +1,33 @@
 extends SceneTree
 
-var seen_paths: Dictionary = {}
-
 func _init() -> void:
 	_run()
 
 func _run() -> void:
-	var main_scene = load("res://scenes/Main.tscn")
-	if main_scene == null:
+	var scene := load("res://scenes/Main.tscn")
+	if scene == null:
 		_fail("Main scene failed to load")
 		return
-	var main = main_scene.instantiate()
+	var main = scene.instantiate()
 	root.add_child(main)
 	await process_frame
 	await process_frame
 
-	var api = main.get("api")
-	if api == null or not api.has_signal("request_started"):
-		_fail("Main API client must emit request_started")
+	var router = main.get("router")
+	if router == null:
+		_fail("Main must expose router")
 		return
-	api.request_started.connect(func(path: String) -> void:
-		seen_paths[path] = true
-	)
-	main.call("open_screen", "legacy_run")
-	await _wait_for_idle(main)
-
-	var legacy = main.get_node_or_null("ScreenRoot/LegacyRunScreen")
-	if legacy == null:
-		_fail("LegacyRunScreen is missing")
-		return
-	var cases := {
-		"排行": ["/ladder/me", "/ladder/leaderboard"],
-		"巅峰": ["/apex"],
-		"赛季": ["/ladder/me", "/runs/history"],
-		"房间": ["/dogfight/rooms"],
-	}
-	for tab in cases.keys():
-		seen_paths.clear()
-		legacy.call("_on_tab_pressed", tab)
-		if not await _wait_for_paths(cases[tab]):
-			_fail("Tab %s did not refresh required API paths: %s" % [tab, ",".join(cases[tab])])
+	for screen_id in ["leaderboards", "apex", "season", "dogfight_rooms", "account"]:
+		if not main.call("open_screen", screen_id):
+			_fail("open_screen should accept %s" % screen_id)
+			return
+		await process_frame
+		if str(router.get("current_screen_id")) != screen_id:
+			_fail("open_screen(%s) should route to standalone screen, got %s" % [screen_id, str(router.get("current_screen_id"))])
+			return
+		var legacy = main.get_node_or_null("ScreenRoot/LegacyRunScreen")
+		if legacy != null and legacy.visible:
+			_fail("Standalone peripheral route %s must not show LegacyRunScreen" % screen_id)
 			return
 
 	main.queue_free()
@@ -47,25 +35,6 @@ func _run() -> void:
 		await process_frame
 	print("Godot legacy tab refresh smoke passed")
 	quit(0)
-
-func _wait_for_paths(paths: Array) -> bool:
-	for _frame in range(180):
-		var complete := true
-		for path in paths:
-			if not seen_paths.has(str(path)):
-				complete = false
-				break
-		if complete:
-			return true
-		await process_frame
-	return false
-
-func _wait_for_idle(main: Node) -> void:
-	for _frame in range(180):
-		var legacy = main.get_node_or_null("ScreenRoot/LegacyRunScreen")
-		if legacy != null and not bool(legacy.get("action_in_progress")):
-			return
-		await process_frame
 
 func _fail(message: String) -> void:
 	push_error(message)

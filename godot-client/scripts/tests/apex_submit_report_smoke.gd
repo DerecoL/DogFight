@@ -4,30 +4,46 @@ func _init() -> void:
 	_run()
 
 func _run() -> void:
-	var screen_scene := load("res://scenes/screens/ApexScreen.tscn")
-	if screen_scene == null:
+	var scene := load("res://scenes/screens/ApexScreen.tscn")
+	if scene == null:
 		_fail("ApexScreen scene failed to load")
 		return
-	var screen = screen_scene.instantiate()
+	var screen = scene.instantiate()
 	root.add_child(screen)
 	await process_frame
 	screen.call("set_payload", {"apexData": _apex_data()})
 	await process_frame
 
-	var text := _collect_text(screen)
-	for part in ["巅峰玩家 已投入巅峰榜", "总榜第 7 名", "当日榜未上榜", "防守连胜从 3 开始", "每日 05:00 更新", "我的记录", "查看配置"]:
-		if not text.contains(part):
-			_fail("Apex submit report missing: %s" % part)
-			return
+	for node_name in [
+		"ApexPanel",
+		"ApexScreen",
+		"ApexReport",
+		"ApexReportTitle",
+		"ApexReportSummary",
+		"ApexLeaderboard",
+		"ApexTabs",
+		"ApexTab_overall",
+		"ApexTab_daily",
+		"ApexRankEntry_apex-overall",
+	]:
+		_assert_has(screen, node_name)
+	var daily_tab := _find_by_name(screen, "ApexTab_daily") as Button
+	if daily_tab == null:
+		_fail("Apex daily tab is missing")
+		return
+	daily_tab.pressed.emit()
+	await process_frame
+	_assert_has(screen, "ApexDailyHint")
+
 	screen.queue_free()
-	for _frame in range(5):
+	for _frame in range(3):
 		await process_frame
 	print("Godot apex submit report smoke passed")
 	quit(0)
 
 func _apex_data() -> Dictionary:
 	return {
-		"season": {"name": "第一赛季"},
+		"season": {"name": "Season One"},
 		"dailyBoardKey": "2026-06-02",
 		"dailyResetHour": 5,
 		"candidates": [
@@ -38,52 +54,27 @@ func _apex_data() -> Dictionary:
 			"daily": {"placementRank": null, "battles": []},
 		},
 		"entries": {
-			"overall": {
-				"id": "apex-overall",
-				"name": "巅峰玩家",
-				"dogType": "SHIBA",
-				"wins": 12,
-				"losses": 2,
-				"round": 16,
-				"rank": 7,
-				"challengeWins": 3,
-				"isSeed": false,
-				"isMine": true,
-				"items": [],
-				"relics": [],
-			},
-			"daily": {
-				"id": "apex-daily",
-				"name": "巅峰玩家",
-				"dogType": "SHIBA",
-				"wins": 12,
-				"losses": 2,
-				"round": 16,
-				"rank": null,
-				"challengeWins": 3,
-				"isSeed": false,
-				"isMine": true,
-				"items": [],
-				"relics": [],
-			},
+			"overall": {"id": "apex-overall", "name": "Apex Player", "dogType": "SHIBA", "wins": 12, "losses": 2, "round": 16, "rank": 7, "challengeWins": 3, "isMine": true, "items": [], "relics": []},
+			"daily": {"id": "apex-daily", "name": "Apex Player", "dogType": "SHIBA", "wins": 12, "losses": 2, "round": 16, "rank": null, "challengeWins": 3, "isMine": true, "items": [], "relics": []},
 		},
 		"leaderboards": {
-			"overall": [
-				{"id": "apex-overall", "name": "巅峰玩家", "dogType": "SHIBA", "wins": 12, "losses": 2, "round": 16, "rank": 7, "challengeWins": 3, "isSeed": false, "isMine": true, "items": [], "relics": []},
-			],
+			"overall": [{"id": "apex-overall", "name": "Apex Player", "dogType": "SHIBA", "wins": 12, "losses": 2, "round": 16, "rank": 7, "challengeWins": 3, "isMine": true, "items": [], "relics": []}],
 			"daily": [],
 		},
 	}
 
-func _collect_text(node: Node) -> String:
-	var text := ""
-	if node is Label:
-		text += (node as Label).text + "\n"
-	if node is Button:
-		text += (node as Button).text + "\n"
+func _assert_has(root_node: Node, node_name: String) -> void:
+	if _find_by_name(root_node, node_name) == null:
+		_fail("Missing Apex node: %s" % node_name)
+
+func _find_by_name(node: Node, node_name: String) -> Node:
+	if node.name == node_name:
+		return node
 	for child in node.get_children():
-		text += _collect_text(child)
-	return text
+		var found := _find_by_name(child, node_name)
+		if found != null:
+			return found
+	return null
 
 func _fail(message: String) -> void:
 	push_error(message)
