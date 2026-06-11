@@ -89,6 +89,8 @@ var battle_relic_tip: PanelContainer
 var battle_status_tip: PanelContainer
 var log_toggle_button: Button
 var log_filter_row: HBoxContainer
+var battle_log_view: RichTextLabel
+var log_expanded := false
 
 func bind_session(next_session: Node) -> void:
 	if session != null and session.has_signal("error_raised") and session.error_raised.is_connected(_on_error_raised):
@@ -118,6 +120,7 @@ func start_replay(next_battle: Dictionary) -> void:
 	replay_complete = false
 	finish_in_progress = false
 	log_filter = "all"
+	log_expanded = false
 	playback_speed = 1.0
 	error_label.text = ""
 	_set_battle_controls_disabled(false)
@@ -132,6 +135,9 @@ func start_replay(next_battle: Dictionary) -> void:
 		continue_button.disabled = true
 	log_view.visible = false
 	log_view.text = ""
+	if battle_log_view != null:
+		battle_log_view.text = ""
+	_update_log_shell_state()
 	if review_panel != null:
 		review_panel.visible = false
 	_close_battle_item_tip()
@@ -248,6 +254,10 @@ func _on_restart_pressed() -> void:
 		continue_button.disabled = true
 	log_view.text = ""
 	log_view.visible = false
+	log_expanded = false
+	if battle_log_view != null:
+		battle_log_view.text = ""
+	_update_log_shell_state()
 	if review_panel != null:
 		review_panel.visible = false
 	_close_battle_item_tip()
@@ -433,16 +443,11 @@ func _build_web_battle_layout() -> void:
 	root.add_child(continue_row)
 
 	restart_button = Button.new()
-	restart_button.text = "Replay"
+	restart_button.text = "重播"
 	restart_button.custom_minimum_size = Vector2(82, 44)
 	restart_button.disabled = true
 	restart_button.pressed.connect(_on_restart_pressed)
 	footer.add_child(restart_button)
-	log_toggle_button = Button.new()
-	log_toggle_button.text = "Log"
-	log_toggle_button.custom_minimum_size = Vector2(72, 44)
-	log_toggle_button.pressed.connect(_toggle_log)
-	footer.add_child(log_toggle_button)
 	log_filter_row = HBoxContainer.new()
 	log_filter_row.name = "BattleLogFilters"
 	log_filter_row.add_theme_constant_override("separation", 6)
@@ -452,15 +457,29 @@ func _build_web_battle_layout() -> void:
 	var log_box := VBoxContainer.new()
 	log_box.add_theme_constant_override("separation", 6)
 	log_shell.add_child(log_box)
+	log_toggle_button = Button.new()
+	log_toggle_button.name = "BattleLogToggle"
+	log_toggle_button.custom_minimum_size = Vector2(116, 38)
+	log_toggle_button.pressed.connect(_toggle_log)
+	log_box.add_child(log_toggle_button)
 	log_box.add_child(log_filter_row)
 	var log_body := VBoxContainer.new()
 	log_body.name = "BattleLogBody"
 	log_body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	log_body.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	log_box.add_child(log_body)
+	battle_log_view = RichTextLabel.new()
+	battle_log_view.name = "BattleLog"
+	battle_log_view.bbcode_enabled = false
+	battle_log_view.fit_content = false
+	battle_log_view.scroll_following = true
+	battle_log_view.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	battle_log_view.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	log_body.add_child(battle_log_view)
 	root.add_child(log_shell)
 	footer.name = "BattleControls"
 	root.add_child(footer)
+	_update_log_shell_state()
 
 func _battle_dog_panel(node_name: String) -> Dictionary:
 	var panel := PanelContainer.new()
@@ -907,7 +926,16 @@ func _update_speed_buttons() -> void:
 func _toggle_log() -> void:
 	if finish_in_progress:
 		return
-	log_view.visible = not log_view.visible
+	log_expanded = not log_expanded
+	_update_log_shell_state()
+	_refresh_log_view()
+
+func _update_log_shell_state() -> void:
+	if log_toggle_button != null:
+		log_toggle_button.text = "收起日志" if log_expanded else "展开日志"
+	if battle_log_view != null:
+		battle_log_view.visible = true
+		battle_log_view.custom_minimum_size = Vector2(0, 260 if log_expanded else 96)
 
 func _update_log_filters() -> void:
 	if log_filter_row == null:
@@ -915,6 +943,7 @@ func _update_log_filters() -> void:
 	_clear_children(log_filter_row)
 	for filter in ["all", "damage", "sustain", "status", "equipment"]:
 		var button := Button.new()
+		button.name = "BattleLogFilter_%s" % filter
 		button.text = _log_filter_label(filter)
 		button.toggle_mode = true
 		button.button_pressed = filter == log_filter
@@ -930,14 +959,26 @@ func _set_log_filter(filter: String) -> void:
 	_refresh_log_view()
 
 func _refresh_log_view() -> void:
-	log_view.text = ""
+	var filtered_events: Array = []
 	for event in displayed_events:
 		if event is Dictionary and _event_matches_filter(event, log_filter):
-			log_view.append_text("%ss | %s | %s\n" % [
+			filtered_events.append(event)
+	var visible_events := filtered_events
+	if not log_expanded and filtered_events.size() > 3:
+		visible_events = filtered_events.slice(filtered_events.size() - 3, filtered_events.size())
+	var lines: Array[String] = []
+	for event_value in visible_events:
+		if event_value is Dictionary:
+			var event: Dictionary = event_value
+			lines.append("%ss | %s | %s" % [
 				str(event.get("time", "0")),
 				_battle_actor_label(str(event.get("actor", "system"))),
 				str(event.get("text", "")),
 			])
+	var next_text := "\n".join(lines)
+	log_view.text = next_text
+	if battle_log_view != null:
+		battle_log_view.text = next_text
 
 func _event_matches_filter(event: Dictionary, filter: String) -> bool:
 	if filter == "all":
