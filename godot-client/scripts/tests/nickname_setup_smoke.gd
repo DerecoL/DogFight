@@ -1,5 +1,7 @@
 extends SceneTree
 
+const WebUiTokens := preload("res://scripts/ui/web/WebUiTokens.gd")
+
 func _init() -> void:
 	_run()
 
@@ -16,21 +18,39 @@ func _run() -> void:
 	if input == null:
 		_fail("NicknameSetupScreen must include a LineEdit")
 		return
-	if input.max_length != 16 or input.custom_minimum_size.x < 260.0 or input.custom_minimum_size.y < 44.0:
+	if input.name != "NicknameInput":
+		_fail("NicknameSetupScreen must preserve the NicknameInput node name")
+		return
+	if input.max_length != 16 or input.custom_minimum_size.x < 420.0 or input.custom_minimum_size.y < WebUiTokens.touch_target_height():
 		_fail("NicknameSetupScreen input must be stable, touch-sized, and limited to 16 chars")
 		return
 
-	var text := _collect_text(screen)
-	for part in ["设置昵称", "昵称会显示在匹配和战斗记录里。", "昵称", "确认"]:
-		if not text.contains(str(part)):
-			_fail("NicknameSetupScreen text missing: %s" % str(part))
+	for node_name in ["NicknameSetupRoot", "NicknameTitle", "NicknameSubtitle", "NicknameStatus", "NicknameSubmitButton"]:
+		if screen.find_child(node_name, true, false) == null:
+			_fail("NicknameSetupScreen must preserve key node: %s" % node_name)
 			return
+
+	var submit := screen.find_child("NicknameSubmitButton", true, false) as Button
+	if submit == null or not submit.disabled:
+		_fail("Nickname submit must start disabled until a valid nickname is typed")
+		return
+	input.text = "A"
+	input.text_changed.emit(input.text)
+	if not submit.disabled:
+		_fail("Nickname submit must stay disabled for names shorter than 2 chars")
+		return
+	input.text = "AB"
+	input.text_changed.emit(input.text)
+	if submit.disabled:
+		_fail("Nickname submit must enable once the trimmed nickname reaches 2 chars")
+		return
 
 	var source := FileAccess.get_file_as_string("res://scripts/ui/screens/NicknameSetupScreen.gd")
 	for needle in [
 		"func _submit_nickname() -> void:",
 		"update_nickname",
-		"func _logout() -> void:",
+		"action_in_progress",
+		"nickname.length() < 2 or nickname.length() > 16",
 	]:
 		if not source.contains(str(needle)):
 			_fail("NicknameSetupScreen interaction wiring is missing: %s" % needle)
@@ -51,16 +71,6 @@ func _run() -> void:
 		await process_frame
 	print("Godot nickname setup smoke passed")
 	quit(0)
-
-func _collect_text(node: Node) -> String:
-	var text := ""
-	if node is Label:
-		text += (node as Label).text + "\n"
-	if node is Button:
-		text += (node as Button).text + "\n"
-	for child in node.get_children():
-		text += _collect_text(child)
-	return text
 
 func _find_line_edit(node: Node) -> LineEdit:
 	if node is LineEdit:

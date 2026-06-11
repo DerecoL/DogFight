@@ -48,6 +48,7 @@ func _init() -> void:
 		"layer_overlay",
 		"layer_toast",
 		"layer_debug",
+		"placeholder_text_color",
 	]
 	for method_name in required_visual_token_methods:
 		if not tokens.has_method(method_name):
@@ -264,6 +265,14 @@ func _init() -> void:
 	var bronze: Color = tokens.quality_color("BRONZE")
 	if gold == bronze:
 		_fail("Quality colors must distinguish GOLD and BRONZE")
+		return
+
+	var placeholder: Color = tokens.placeholder_text_color()
+	if placeholder.a <= 0.0 or placeholder.a >= 1.0:
+		_fail("placeholder_text_color must stay visible but subdued")
+		return
+	if placeholder == tokens.ink_color():
+		_fail("placeholder_text_color must differ from main ink text")
 		return
 
 	print("Web UI tokens smoke passed")

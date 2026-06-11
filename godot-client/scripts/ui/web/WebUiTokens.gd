@@ -100,6 +100,9 @@ static func safe_color() -> Color:
 static func danger_color() -> Color:
 	return Color(0.72, 0.18, 0.13, 1.0)
 
+static func placeholder_text_color() -> Color:
+	return Color(ink_color(), 0.62)
+
 static func quality_color(quality: String) -> Color:
 	match quality:
 		"BRONZE":
