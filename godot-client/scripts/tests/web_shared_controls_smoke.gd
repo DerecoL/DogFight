@@ -19,8 +19,8 @@ func _init() -> void:
 	if primary.text != "Start":
 		_fail("WebActionButton must keep the requested label")
 		return
-	if int(primary.custom_minimum_size.y) < 44:
-		_fail("WebActionButton touch height must stay at least 44")
+	if int(primary.custom_minimum_size.y) < 48:
+		_fail("WebActionButton touch height must stay at least the web token touch target")
 		return
 	if primary.size_flags_horizontal != Control.SIZE_SHRINK_CENTER:
 		_fail("WebActionButton must not expand horizontally by default")
@@ -36,18 +36,51 @@ func _init() -> void:
 		_fail("WebActionButton must call the provided callback when pressed")
 		return
 
-	var danger = button_factory.create("Delete", _on_button_pressed, "danger")
-	if danger == null or danger.get_theme_stylebox("normal") == null:
-		_fail("WebActionButton danger variant must provide a normal style")
-		return
+	for variant in ["primary", "secondary", "danger"]:
+		var variant_button = button_factory.create("Variant %s" % variant, _on_button_pressed, variant)
+		for state in ["normal", "hover", "pressed", "disabled"]:
+			if not variant_button.has_theme_stylebox_override(state):
+				_fail("WebActionButton %s variant must provide %s style override" % [variant, state])
+				return
 
+	var stable_height: float = primary.custom_minimum_size.y
 	button_factory.set_loading(primary, true, "Loading")
 	if not primary.disabled or primary.text != "Loading":
 		_fail("WebActionButton.set_loading(true) must disable and show loading text")
 		return
-	button_factory.set_loading(primary, false, "Start")
+	if primary.custom_minimum_size.y != stable_height:
+		_fail("WebActionButton loading must not change button height")
+		return
+	button_factory.set_loading(primary, false, "Wrong external label")
 	if primary.disabled or primary.text != "Start":
-		_fail("WebActionButton.set_loading(false) must enable and restore label")
+		_fail("WebActionButton.set_loading(false) must restore the original label without trusting callers")
+		return
+	if primary.custom_minimum_size.y != stable_height:
+		_fail("WebActionButton restore must not change button height")
+		return
+
+	var disabled_button = button_factory.create("Locked", _on_button_pressed, "primary")
+	disabled_button.disabled = true
+	button_factory.set_loading(disabled_button, true, "Loading locked")
+	button_factory.set_loading(disabled_button, true, "Still loading")
+	if not disabled_button.disabled or disabled_button.text != "Still loading":
+		_fail("WebActionButton repeated loading must keep disabled state and update loading text")
+		return
+	button_factory.set_loading(disabled_button, false, "Wrong external locked label")
+	if not disabled_button.disabled or disabled_button.text != "Locked":
+		_fail("WebActionButton.set_loading(false) must restore a pre-disabled button and its original label")
+		return
+
+	var long_button = button_factory.create("This button label is intentionally much longer than the available button width", _on_button_pressed, "secondary")
+	if long_button.autowrap_mode != TextServer.AUTOWRAP_OFF or long_button.text_overrun_behavior != TextServer.OVERRUN_TRIM_ELLIPSIS:
+		_fail("WebActionButton long text must stay single-line and ellipsized")
+		return
+	var long_button_minimum: Vector2 = long_button.get_combined_minimum_size()
+	if int(long_button.custom_minimum_size.x) > 220 or int(long_button_minimum.x) > 220:
+		_fail("WebActionButton long text must not create an oversized minimum width")
+		return
+	if long_button.custom_minimum_size.y != stable_height or int(long_button_minimum.y) > int(stable_height):
+		_fail("WebActionButton long text must keep the stable touch height")
 		return
 
 	var pill = pill_factory.create("\u91d1\u5e01", 12, "gold")
@@ -63,18 +96,52 @@ func _init() -> void:
 	if int(pill.custom_minimum_size.y) < 34:
 		_fail("WebResourcePill height must stay at least 34")
 		return
-	var label = pill.get_node_or_null("ResourcePillText")
-	if label == null or not label is Label:
-		_fail("WebResourcePill must contain ResourcePillText label")
+	for tone in ["default", "gold", "danger", "safe"]:
+		var toned_pill = pill_factory.create("Tone", 7, tone)
+		if not toned_pill.has_theme_stylebox_override("panel"):
+			_fail("WebResourcePill %s tone must provide panel style override" % tone)
+			return
+	var text_root = pill.get_node_or_null("ResourcePillText")
+	if text_root == null:
+		_fail("WebResourcePill must contain ResourcePillText node for lookup compatibility")
 		return
-	if not str(label.text).contains("\u91d1\u5e01 12"):
-		_fail("WebResourcePill text must include label and value")
+	if not text_root is Label:
+		_fail("WebResourcePill ResourcePillText compatibility node must remain a Label")
 		return
-	if label.autowrap_mode != TextServer.AUTOWRAP_OFF:
-		_fail("WebResourcePill text must not wrap")
+	if not str(text_root.text).contains("\u91d1\u5e01 12"):
+		_fail("WebResourcePill ResourcePillText label must keep the combined text")
 		return
-	if label.text_overrun_behavior != TextServer.OVERRUN_TRIM_ELLIPSIS:
-		_fail("WebResourcePill text must trim overflow")
+	if text_root.autowrap_mode != TextServer.AUTOWRAP_OFF:
+		_fail("WebResourcePill ResourcePillText compatibility label must not wrap")
+		return
+	if text_root.text_overrun_behavior != TextServer.OVERRUN_TRIM_ELLIPSIS or not text_root.clip_text:
+		_fail("WebResourcePill ResourcePillText compatibility label must clip and trim overflow")
+		return
+	var label = pill.get_node_or_null("ResourcePillContent/ResourcePillLabel")
+	var value = pill.get_node_or_null("ResourcePillContent/ResourcePillValue")
+	if label == null or not label is Label or value == null or not value is Label:
+		_fail("WebResourcePill must split label and value into child labels")
+		return
+	if label.text != "\u91d1\u5e01" or value.text != "12":
+		_fail("WebResourcePill child labels must preserve label and value text")
+		return
+	if int(label.custom_minimum_size.x) >= int(value.custom_minimum_size.x):
+		_fail("WebResourcePill value must have stronger horizontal emphasis than the label")
+		return
+	for child_label in [label, value]:
+		if child_label.autowrap_mode != TextServer.AUTOWRAP_OFF:
+			_fail("WebResourcePill text must not wrap")
+			return
+		if child_label.text_overrun_behavior != TextServer.OVERRUN_TRIM_ELLIPSIS or not child_label.clip_text:
+			_fail("WebResourcePill text must clip and trim overflow")
+			return
+	var long_pill = pill_factory.create("\u8d85\u957f\u8d44\u6e90\u6807\u7b7e\u4e0d\u5e94\u6491\u5f00", "999999999999999999", "danger")
+	if int(long_pill.custom_minimum_size.x) != int(pill.custom_minimum_size.x) or int(long_pill.custom_minimum_size.y) != int(pill.custom_minimum_size.y):
+		_fail("WebResourcePill long text must keep the same fixed minimum size")
+		return
+	var long_pill_minimum: Vector2 = long_pill.get_combined_minimum_size()
+	if int(long_pill_minimum.x) > int(pill.custom_minimum_size.x) or int(long_pill_minimum.y) > int(pill.custom_minimum_size.y):
+		_fail("WebResourcePill long text must not expand the combined minimum size")
 		return
 
 	print("Web shared controls smoke passed")
