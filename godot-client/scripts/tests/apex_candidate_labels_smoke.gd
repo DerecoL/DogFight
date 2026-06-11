@@ -15,6 +15,13 @@ func _run() -> void:
 	await process_frame
 
 	var text := _collect_text(screen)
+	var daily_tab := _find_by_name(screen, "ApexTab_daily") as Button
+	if daily_tab == null:
+		_fail("Apex daily tab missing")
+		return
+	daily_tab.emit_signal("pressed")
+	await process_frame
+	text += _collect_text(screen)
 	for part in ["巅峰竞技场", "巅峰赛季", "可投入的完成狗", "提交巅峰 柴犬", "12胜2负", "第16回合", "遗物 1", "装备 2", "查看配置", "巅峰柴", "柴犬", "我的记录", "雪原萨摩", "萨摩耶", "种子"]:
 		if not text.contains(str(part)):
 			_fail("Apex candidate label missing: %s" % str(part))
@@ -64,6 +71,15 @@ func _collect_text(node: Node) -> String:
 	for child in node.get_children():
 		text += _collect_text(child)
 	return text
+
+func _find_by_name(node: Node, node_name: String) -> Node:
+	if node.name == node_name:
+		return node
+	for child in node.get_children():
+		var found := _find_by_name(child, node_name)
+		if found != null:
+			return found
+	return null
 
 func _fail(message: String) -> void:
 	push_error(message)

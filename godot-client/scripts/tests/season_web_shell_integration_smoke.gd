@@ -12,7 +12,7 @@ func _init() -> void:
 	if screen.find_child("WebShell", true, false) == null:
 		_fail("SeasonScreen must include WebShell")
 		return
-	var content := screen.get_node_or_null("WebShell/Root/Content")
+	var content: Node = screen.get_node_or_null("WebShell/Root/Content")
 	if content == null:
 		_fail("SeasonScreen must expose WebShell content")
 		return

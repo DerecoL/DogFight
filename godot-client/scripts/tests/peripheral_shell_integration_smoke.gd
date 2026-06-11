@@ -46,11 +46,11 @@ func _init() -> void:
 		screen.call("set_payload", config.get("payload", {}))
 		await process_frame
 
-		var shell := screen.find_child("WebShell", true, false)
+		var shell: Node = screen.find_child("WebShell", true, false)
 		if shell == null:
 			_fail("Peripheral screen must include WebShell: %s" % path)
 			return
-		var content := shell.get_node_or_null("Root/Content")
+		var content: Node = shell.get_node_or_null("Root/Content")
 		if content == null:
 			_fail("Peripheral screen must expose WebShell content: %s" % path)
 			return
