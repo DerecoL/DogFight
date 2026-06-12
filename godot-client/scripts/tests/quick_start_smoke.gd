@@ -1,6 +1,56 @@
 extends SceneTree
 
+const ApiClientScript := preload("res://scripts/api/ApiClient.gd")
+
+class FakeApi:
+	extends ApiClientScript
+
+	var users: Dictionary = {}
+	var current_account := ""
+
+	func post_json(path: String, body: Dictionary = {}) -> Dictionary:
+		match path:
+			"/auth/register":
+				var account := str(body.get("account", ""))
+				var user := {"id": "user-%s" % account, "account": account, "nickname": null}
+				users[account] = user
+				current_account = account
+				return _finish_fake_request(path, _ok({"user": user.duplicate(true), "needsNickname": true}))
+			"/profile/nickname":
+				if current_account.is_empty() or not users.has(current_account):
+					return _finish_fake_request(path, _error("No active user"))
+				var user: Dictionary = users[current_account]
+				user["nickname"] = str(body.get("nickname", ""))
+				users[current_account] = user
+				return _finish_fake_request(path, _ok({"user": user.duplicate(true), "needsNickname": false}))
+			_:
+				return _finish_fake_request(path, _ok({}))
+
+	func get_json(path: String) -> Dictionary:
+		match path:
+			"/me":
+				if current_account.is_empty() or not users.has(current_account):
+					return _finish_fake_request(path, _error("Not logged in"))
+				var user: Dictionary = users[current_account]
+				return _finish_fake_request(path, _ok({"user": user.duplicate(true), "needsNickname": _needs_nickname(user), "activeRun": null}))
+			_:
+				return _finish_fake_request(path, _ok({}))
+
+	func _finish_fake_request(path: String, response: Dictionary) -> Dictionary:
+		request_finished.emit(path, bool(response.get("ok", false)), int(response.get("status", 0)), response)
+		return response
+
+	func _needs_nickname(user: Dictionary) -> bool:
+		return user.get("nickname", null) == null or str(user.get("nickname", "")).strip_edges().is_empty()
+
+	func _ok(data: Dictionary) -> Dictionary:
+		return {"ok": true, "status": 200, "error": "", "data": data}
+
+	func _error(message: String) -> Dictionary:
+		return {"ok": false, "status": 400, "error": message, "data": {}}
+
 var main_node: Node
+var fake_api_node: FakeApi
 var api_finished_count := 0
 var api_seen_paths: Dictionary = {}
 var api_failures: Array[String] = []
@@ -32,7 +82,11 @@ func _run() -> void:
 	root.add_child(main)
 	await process_frame
 	await process_frame
-	var api = main.get("api")
+	var fake_api := FakeApi.new()
+	fake_api_node = fake_api
+	main.set("api", fake_api)
+	main.add_child(fake_api)
+	var api = fake_api
 	if api != null and api.has_signal("request_finished"):
 		api.request_finished.connect(func(path: String, ok: bool, status: int, payload: Dictionary) -> void:
 			api_finished_count += 1

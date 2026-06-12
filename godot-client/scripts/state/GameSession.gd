@@ -15,6 +15,8 @@ const WebUiScreenIds := preload("res://scripts/ui/web/WebUiScreenIds.gd")
 const AppStore := preload("res://scripts/state/AppStore.gd")
 const RunStore := preload("res://scripts/state/RunStore.gd")
 const DEFAULT_API_BASE_URL := "http://127.0.0.1:4000/api"
+const LOCAL_API_TIMEOUT_SECONDS := 3.0
+const REMOTE_API_TIMEOUT_SECONDS := 20.0
 
 var api_base_url: String = DEFAULT_API_BASE_URL
 var api: ApiClient
@@ -41,6 +43,7 @@ func _ready() -> void:
 		api_base_url = override_url.rstrip("/")
 	api = ApiClient.new()
 	api.configure(api_base_url)
+	api.timeout_seconds = _api_timeout_for_base_url(api_base_url)
 	add_child(api)
 	feedback_sound_bus = FeedbackSoundBus.new()
 	add_child(feedback_sound_bus)
@@ -80,6 +83,12 @@ func _ready() -> void:
 		battle_started.connect(_show_battle_screen)
 	if not run_changed.is_connected(_on_run_changed_for_screen):
 		run_changed.connect(_on_run_changed_for_screen)
+
+func _api_timeout_for_base_url(base_url: String) -> float:
+	var normalized := base_url.to_lower()
+	if normalized.begins_with("http://127.") or normalized.begins_with("http://localhost") or normalized.begins_with("http://[::1]"):
+		return LOCAL_API_TIMEOUT_SECONDS
+	return REMOTE_API_TIMEOUT_SECONDS
 
 func login(account: String, password: String) -> bool:
 	var response := await api.post_json(ApiRoutes.login(), {"account": account, "password": password})

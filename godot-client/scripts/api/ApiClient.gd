@@ -18,6 +18,11 @@ func is_loading() -> bool:
 	return active_request_count > 0
 
 func request_json(method: int, path: String, body: Dictionary = {}) -> Dictionary:
+	if await _is_local_service_unavailable():
+		var unavailable := {"ok": false, "status": 0, "error": _local_service_unavailable_message(), "data": {}}
+		_begin_request(path)
+		_finish_request(path, false, 0, unavailable)
+		return unavailable
 	var http := HTTPRequest.new()
 	http.timeout = timeout_seconds
 	add_child(http)
@@ -85,6 +90,57 @@ func _finish_request(path: String, ok: bool, status: int, payload: Dictionary) -
 
 func _local_service_unavailable_message() -> String:
 	return "本地服务未启动。请先运行 scripts/start-godot-dev.ps1，再登录、注册或快速开始。"
+
+func _is_local_service_unavailable() -> bool:
+	var endpoint := _local_base_url_endpoint()
+	if endpoint.is_empty():
+		return false
+	var tree := get_tree()
+	if tree == null:
+		return false
+	var peer := StreamPeerTCP.new()
+	var error := peer.connect_to_host(str(endpoint.get("host", "")), int(endpoint.get("port", 0)))
+	if error != OK:
+		return true
+	for _attempt in range(6):
+		peer.poll()
+		var status := peer.get_status()
+		if status == StreamPeerTCP.STATUS_CONNECTED:
+			peer.disconnect_from_host()
+			return false
+		if status == StreamPeerTCP.STATUS_ERROR:
+			return true
+		await tree.create_timer(0.05).timeout
+	peer.disconnect_from_host()
+	return true
+
+func _local_base_url_endpoint() -> Dictionary:
+	var lower := base_url.to_lower()
+	var default_port := 80
+	var without_scheme := lower
+	if lower.begins_with("http://"):
+		without_scheme = lower.substr("http://".length())
+	elif lower.begins_with("https://"):
+		without_scheme = lower.substr("https://".length())
+		default_port = 443
+	else:
+		return {}
+	var slash_index := without_scheme.find("/")
+	var authority := without_scheme if slash_index == -1 else without_scheme.substr(0, slash_index)
+	var host := authority
+	var port := default_port
+	if authority.begins_with("[::1]"):
+		host = "::1"
+		var ipv6_port_index := authority.find("]:")
+		if ipv6_port_index != -1:
+			port = int(authority.substr(ipv6_port_index + 2))
+	elif authority.contains(":"):
+		var host_parts := authority.split(":", false, 1)
+		host = str(host_parts[0])
+		port = int(host_parts[1])
+	if host == "localhost" or host == "::1" or host.begins_with("127."):
+		return {"host": host, "port": port}
+	return {}
 
 func _capture_cookie(headers: PackedStringArray) -> void:
 	for header in headers:
