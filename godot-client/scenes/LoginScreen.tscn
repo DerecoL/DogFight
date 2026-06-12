@@ -150,9 +150,10 @@ placeholder_text = "密码"
 secret = true
 
 [node name="ErrorScroll" type="ScrollContainer" parent="AuthShell/AuthPanel/Margin/Form"]
-custom_minimum_size = Vector2(0, 42)
+custom_minimum_size = Vector2(0, 64)
 layout_mode = 2
 horizontal_scroll_mode = 0
+vertical_scroll_mode = 0
 
 [node name="ErrorLabel" type="Label" parent="AuthShell/AuthPanel/Margin/Form/ErrorScroll"]
 unique_name_in_owner = true

@@ -62,6 +62,22 @@ func _run() -> void:
 	if not (taptap_code as LineEdit).is_visible_in_tree() or not (taptap_button as Button).is_visible_in_tree():
 		_fail("TapTap auth controls must be visible after expanding")
 		return
+	login.call("_on_error_raised", "Local service is unavailable. Run scripts/start-godot-dev.ps1 before login, register, or quick start.")
+	await process_frame
+	var error_scroll = login.find_child("ErrorScroll", true, false)
+	if not error_scroll is ScrollContainer:
+		_fail("Login error hint must stay in a stable non-overflowing error area")
+		return
+	var scrollbar := (error_scroll as ScrollContainer).get_v_scroll_bar()
+	if scrollbar != null and scrollbar.visible:
+		_fail("Login error hint must not create an internal scrollbar in the auth panel")
+		return
+	var panel_bottom := (auth_panel as Control).get_global_rect().end.y
+	for control in [debug_toggle, debug_group, quick_start, taptap_code, taptap_button]:
+		var control_rect := (control as Control).get_global_rect()
+		if control_rect.end.y > panel_bottom + 0.5:
+			_fail("%s must remain inside the stable auth panel after long errors" % control.name)
+			return
 	login.queue_free()
 	for _frame in range(5):
 		await process_frame
